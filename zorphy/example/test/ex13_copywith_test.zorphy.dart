@@ -29,8 +29,8 @@ class A extends $A {
     return copyWith(a: a);
   }
 
-  A copyWithFn({String? Function(String?)? a}) {
-    return A(a: a != null ? a(this.a) : this.a);
+  A copyWithAFn({String? Function()? a}) {
+    return A(a: a != null ? a() : this.a);
   }
 
   A patchWithA({APatch? patchInput}) {
@@ -175,11 +175,8 @@ class B extends $B implements A {
     return copyWith(a: a, b: b);
   }
 
-  B copyWithFn({String? Function(String?)? a, int? Function(int?)? b}) {
-    return B(
-      a: a != null ? a(this.a) : this.a,
-      b: b != null ? b(this.b) : this.b,
-    );
+  B copyWithBFn({String? Function()? a, int? Function()? b}) {
+    return B(a: a != null ? a() : this.a, b: b != null ? b() : this.b);
   }
 
   B patchWithB({BPatch? patchInput}) {
@@ -201,6 +198,10 @@ class B extends $B implements A {
 
   B copyWithA({String? a}) {
     return copyWith(a: a);
+  }
+
+  B copyWithAFn({String? Function()? a}) {
+    return copyWith(a: a != null ? a() : this.a);
   }
 
   B patchWithA({APatch? patchInput}) {
@@ -361,15 +362,15 @@ class C extends $C implements B, A {
     return copyWith(b: b, a: a, c: c);
   }
 
-  C copyWithFn({
-    int? Function(int?)? b,
-    String? Function(String?)? a,
-    bool? Function(bool?)? c,
+  C copyWithCFn({
+    int? Function()? b,
+    String? Function()? a,
+    bool? Function()? c,
   }) {
     return C(
-      b: b != null ? b(this.b) : this.b,
-      a: a != null ? a(this.a) : this.a,
-      c: c != null ? c(this.c) : this.c,
+      b: b != null ? b() : this.b,
+      a: a != null ? a() : this.a,
+      c: c != null ? c() : this.c,
     );
   }
 
@@ -401,6 +402,14 @@ class C extends $C implements B, A {
 
   C copyWithA({String? a}) {
     return copyWith(a: a);
+  }
+
+  C copyWithBFn({int? Function()? b}) {
+    return copyWith(b: b != null ? b() : this.b);
+  }
+
+  C copyWithAFn({String? Function()? a}) {
+    return copyWith(a: a != null ? a() : this.a);
   }
 
   C patchWithB({BPatch? patchInput}) {

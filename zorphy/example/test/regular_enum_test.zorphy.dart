@@ -472,6 +472,17 @@ class ProjectPatch implements Patch<Project> {
     return this;
   }
 
+  ProjectPatch updateTasksAt(int index, TaskPatch Function(TaskPatch) patch) {
+    _patch[Project$.tasks] = (List<dynamic> list) {
+      var updatedList = List.from(list);
+      if (index >= 0 && index < updatedList.length) {
+        updatedList[index] = patch(updatedList[index] as TaskPatch);
+      }
+      return updatedList;
+    };
+    return this;
+  }
+
   ProjectPatch withDefaultPriorities(Map<String, Priority>? value) {
     _patch[Project$.defaultPriorities] = value;
     return this;

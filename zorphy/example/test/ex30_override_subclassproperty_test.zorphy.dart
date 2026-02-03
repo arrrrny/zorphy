@@ -123,6 +123,22 @@ class APatch implements Patch<A> {
     _patch[A$.a] = value;
     return this;
   }
+
+  APatch withAPatch(PersonPatch patch) {
+    _patch[A$.a] = patch;
+    return this;
+  }
+
+  APatch withAPatchFunc(PersonPatch Function(PersonPatch) patch) {
+    _patch[A$.a] = (dynamic current) {
+      var currentPatch = PersonPatch();
+      if (current != null) {
+        currentPatch = current as PersonPatch;
+      }
+      return patch(currentPatch);
+    };
+    return this;
+  }
 }
 
 extension ACompareE on A {

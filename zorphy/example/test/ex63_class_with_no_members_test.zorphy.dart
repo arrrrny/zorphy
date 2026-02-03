@@ -14,15 +14,7 @@ class EulaState extends $EulaState {
 
   EulaState copyWith({
   }) {
-    return EulaState(
-    );
-  }
-
-  EulaState copyWithEulaState({
-  }) {
-    return copyWith(
-      ,
-    );
+    return EulaState();
   }
 
 
@@ -31,7 +23,7 @@ class EulaState extends $EulaState {
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is EulaState &&
+    return other is EulaState;
   }
 
   @override
@@ -41,7 +33,7 @@ class EulaState extends $EulaState {
 
   @override
   String toString() {
-    return 'EulaState(' +
+    return 'EulaState()';
   }
 
 }

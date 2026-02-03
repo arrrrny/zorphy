@@ -37,10 +37,10 @@ class Pet extends $Pet {
     return copyWith(name: name, age: age);
   }
 
-  Pet copyWithFn({String? Function(String?)? name, int? Function(int?)? age}) {
+  Pet copyWithPetFn({String? Function()? name, int? Function()? age}) {
     return Pet(
-      name: name != null ? name(this.name) : this.name,
-      age: age != null ? age(this.age) : this.age,
+      name: name != null ? name() : this.name,
+      age: age != null ? age() : this.age,
     );
   }
 
@@ -330,23 +330,21 @@ class FrankensteinsDogCat extends $FrankensteinsDogCat
     );
   }
 
-  FrankensteinsDogCat copyWithFn({
-    String? Function(String?)? woofSound,
-    String? Function(String?)? name,
-    int? Function(int?)? age,
-    double? Function(double?)? whiskerLength,
-    int? Function(int?)? _ageInYears,
+  FrankensteinsDogCat copyWithFrankensteinsDogCatFn({
+    String? Function()? woofSound,
+    String? Function()? name,
+    int? Function()? age,
+    double? Function()? whiskerLength,
+    int? Function()? _ageInYears,
   }) {
     return FrankensteinsDogCat(
-      woofSound: woofSound != null ? woofSound(this.woofSound) : this.woofSound,
-      name: name != null ? name(this.name) : this.name,
-      age: age != null ? age(this.age) : this.age,
+      woofSound: woofSound != null ? woofSound() : this.woofSound,
+      name: name != null ? name() : this.name,
+      age: age != null ? age() : this.age,
       whiskerLength: whiskerLength != null
-          ? whiskerLength(this.whiskerLength)
+          ? whiskerLength()
           : this.whiskerLength,
-      _ageInYears: _ageInYears != null
-          ? _ageInYears(this._ageInYears)
-          : this._ageInYears,
+      _ageInYears: _ageInYears != null ? _ageInYears() : this._ageInYears,
     );
   }
 
@@ -396,6 +394,30 @@ class FrankensteinsDogCat extends $FrankensteinsDogCat
 
   FrankensteinsDogCat copyWithCat({double? whiskerLength}) {
     return copyWith(whiskerLength: whiskerLength);
+  }
+
+  FrankensteinsDogCat copyWithDogFn({String? Function()? woofSound}) {
+    return copyWith(
+      woofSound: woofSound != null ? woofSound() : this.woofSound,
+    );
+  }
+
+  FrankensteinsDogCat copyWithPetFn({
+    String? Function()? name,
+    int? Function()? age,
+  }) {
+    return copyWith(
+      name: name != null ? name() : this.name,
+      age: age != null ? age() : this.age,
+    );
+  }
+
+  FrankensteinsDogCat copyWithCatFn({double? Function()? whiskerLength}) {
+    return copyWith(
+      whiskerLength: whiskerLength != null
+          ? whiskerLength()
+          : this.whiskerLength,
+    );
   }
 
   FrankensteinsDogCat patchWithDog({DogPatch? patchInput}) {
@@ -689,16 +711,16 @@ class Cat extends $Cat implements Pet {
     return copyWith(name: name, age: age, whiskerLength: whiskerLength);
   }
 
-  Cat copyWithFn({
-    String? Function(String?)? name,
-    int? Function(int?)? age,
-    double? Function(double?)? whiskerLength,
+  Cat copyWithCatFn({
+    String? Function()? name,
+    int? Function()? age,
+    double? Function()? whiskerLength,
   }) {
     return Cat(
-      name: name != null ? name(this.name) : this.name,
-      age: age != null ? age(this.age) : this.age,
+      name: name != null ? name() : this.name,
+      age: age != null ? age() : this.age,
       whiskerLength: whiskerLength != null
-          ? whiskerLength(this.whiskerLength)
+          ? whiskerLength()
           : this.whiskerLength,
     );
   }
@@ -727,6 +749,13 @@ class Cat extends $Cat implements Pet {
 
   Cat copyWithPet({String? name, int? age}) {
     return copyWith(name: name, age: age);
+  }
+
+  Cat copyWithPetFn({String? Function()? name, int? Function()? age}) {
+    return copyWith(
+      name: name != null ? name() : this.name,
+      age: age != null ? age() : this.age,
+    );
   }
 
   Cat patchWithPet({PetPatch? patchInput}) {
@@ -953,15 +982,15 @@ class Dog extends $Dog implements Pet {
     return copyWith(name: name, age: age, woofSound: woofSound);
   }
 
-  Dog copyWithFn({
-    String? Function(String?)? name,
-    int? Function(int?)? age,
-    String? Function(String?)? woofSound,
+  Dog copyWithDogFn({
+    String? Function()? name,
+    int? Function()? age,
+    String? Function()? woofSound,
   }) {
     return Dog(
-      name: name != null ? name(this.name) : this.name,
-      age: age != null ? age(this.age) : this.age,
-      woofSound: woofSound != null ? woofSound(this.woofSound) : this.woofSound,
+      name: name != null ? name() : this.name,
+      age: age != null ? age() : this.age,
+      woofSound: woofSound != null ? woofSound() : this.woofSound,
     );
   }
 
@@ -989,6 +1018,13 @@ class Dog extends $Dog implements Pet {
 
   Dog copyWithPet({String? name, int? age}) {
     return copyWith(name: name, age: age);
+  }
+
+  Dog copyWithPetFn({String? Function()? name, int? Function()? age}) {
+    return copyWith(
+      name: name != null ? name() : this.name,
+      age: age != null ? age() : this.age,
+    );
   }
 
   Dog patchWithPet({PetPatch? patchInput}) {
@@ -1215,17 +1251,15 @@ class Fish extends $Fish implements Pet {
     return copyWith(name: name, age: age, fishColour: fishColour);
   }
 
-  Fish copyWithFn({
-    String? Function(String?)? name,
-    int? Function(int?)? age,
-    eFishColour? Function(eFishColour?)? fishColour,
+  Fish copyWithFishFn({
+    String? Function()? name,
+    int? Function()? age,
+    eFishColour? Function()? fishColour,
   }) {
     return Fish(
-      name: name != null ? name(this.name) : this.name,
-      age: age != null ? age(this.age) : this.age,
-      fishColour: fishColour != null
-          ? fishColour(this.fishColour)
-          : this.fishColour,
+      name: name != null ? name() : this.name,
+      age: age != null ? age() : this.age,
+      fishColour: fishColour != null ? fishColour() : this.fishColour,
     );
   }
 
@@ -1253,6 +1287,13 @@ class Fish extends $Fish implements Pet {
 
   Fish copyWithPet({String? name, int? age}) {
     return copyWith(name: name, age: age);
+  }
+
+  Fish copyWithPetFn({String? Function()? name, int? Function()? age}) {
+    return copyWith(
+      name: name != null ? name() : this.name,
+      age: age != null ? age() : this.age,
+    );
   }
 
   Fish patchWithPet({PetPatch? patchInput}) {
@@ -2362,15 +2403,15 @@ class Z extends $Z implements Y, X {
     return copyWith(valY: valY, val: val, valZ: valZ);
   }
 
-  Z copyWithFn({
-    int? Function(int?)? valY,
-    String? Function(String?)? val,
-    double? Function(double?)? valZ,
+  Z copyWithZFn({
+    int? Function()? valY,
+    String? Function()? val,
+    double? Function()? valZ,
   }) {
     return Z(
-      valY: valY != null ? valY(this.valY) : this.valY,
-      val: val != null ? val(this.val) : this.val,
-      valZ: valZ != null ? valZ(this.valZ) : this.valZ,
+      valY: valY != null ? valY() : this.valY,
+      val: val != null ? val() : this.val,
+      valZ: valZ != null ? valZ() : this.valZ,
     );
   }
 
@@ -2402,6 +2443,14 @@ class Z extends $Z implements Y, X {
 
   Z copyWithX({String? val}) {
     return copyWith(val: val);
+  }
+
+  Z copyWithYFn({int? Function()? valY}) {
+    return copyWith(valY: valY != null ? valY() : this.valY);
+  }
+
+  Z copyWithXFn({String? Function()? val}) {
+    return copyWith(val: val != null ? val() : this.val);
   }
 
   Z patchWithY({YPatch? patchInput}) {

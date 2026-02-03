@@ -46,6 +46,10 @@ class Circle implements $$Shape {
     );
   }
 
+  Circle copyWithShape({double? area}) {
+    return copyWith(area: area);
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -236,6 +240,10 @@ class Rectangle implements $$Shape {
                 : _patchMap[Rectangle$.height]
           : this.height,
     );
+  }
+
+  Rectangle copyWithShape({double? area}) {
+    return copyWith(area: area);
   }
 
   @override
@@ -582,8 +590,40 @@ class TreeNodePatch implements Patch<TreeNode> {
     return this;
   }
 
+  TreeNodePatch updateChildrenAt(
+    int index,
+    TreeNodePatch Function(TreeNodePatch) patch,
+  ) {
+    _patch[TreeNode$.children] = (List<dynamic> list) {
+      var updatedList = List.from(list);
+      if (index >= 0 && index < updatedList.length) {
+        updatedList[index] = patch(updatedList[index] as TreeNodePatch);
+      }
+      return updatedList;
+    };
+    return this;
+  }
+
   TreeNodePatch withParent(TreeNode? value) {
     _patch[TreeNode$.parent] = value;
+    return this;
+  }
+
+  TreeNodePatch withParentPatch(TreeNodePatch patch) {
+    _patch[TreeNode$.parent] = patch;
+    return this;
+  }
+
+  TreeNodePatch withParentPatchFunc(
+    TreeNodePatch Function(TreeNodePatch) patch,
+  ) {
+    _patch[TreeNode$.parent] = (dynamic current) {
+      var currentPatch = TreeNodePatch();
+      if (current != null) {
+        currentPatch = current as TreeNodePatch;
+      }
+      return patch(currentPatch);
+    };
     return this;
   }
 }

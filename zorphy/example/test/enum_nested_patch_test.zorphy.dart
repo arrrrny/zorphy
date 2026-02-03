@@ -678,8 +678,44 @@ class DevicePatch implements Patch<Device> {
     return this;
   }
 
+  DevicePatch withOsPatch(OperatingSystemPatch patch) {
+    _patch[Device$.os] = patch;
+    return this;
+  }
+
+  DevicePatch withOsPatchFunc(
+    OperatingSystemPatch Function(OperatingSystemPatch) patch,
+  ) {
+    _patch[Device$.os] = (dynamic current) {
+      var currentPatch = OperatingSystemPatch();
+      if (current != null) {
+        currentPatch = current as OperatingSystemPatch;
+      }
+      return patch(currentPatch);
+    };
+    return this;
+  }
+
   DevicePatch withDeviceType(DeviceType? value) {
     _patch[Device$.deviceType] = value;
+    return this;
+  }
+
+  DevicePatch withDeviceTypePatch(DeviceTypePatch patch) {
+    _patch[Device$.deviceType] = patch;
+    return this;
+  }
+
+  DevicePatch withDeviceTypePatchFunc(
+    DeviceTypePatch Function(DeviceTypePatch) patch,
+  ) {
+    _patch[Device$.deviceType] = (dynamic current) {
+      var currentPatch = DeviceTypePatch();
+      if (current != null) {
+        currentPatch = current as DeviceTypePatch;
+      }
+      return patch(currentPatch);
+    };
     return this;
   }
 
@@ -688,8 +724,36 @@ class DevicePatch implements Patch<Device> {
     return this;
   }
 
+  DevicePatch updateSupportedOSAt(
+    int index,
+    OperatingSystemPatch Function(OperatingSystemPatch) patch,
+  ) {
+    _patch[Device$.supportedOS] = (List<dynamic> list) {
+      var updatedList = List.from(list);
+      if (index >= 0 && index < updatedList.length) {
+        updatedList[index] = patch(updatedList[index] as OperatingSystemPatch);
+      }
+      return updatedList;
+    };
+    return this;
+  }
+
   DevicePatch withPeripherals(Map<String, DeviceType>? value) {
     _patch[Device$.peripherals] = value;
+    return this;
+  }
+
+  DevicePatch updatePeripheralsValue(
+    String key,
+    DeviceTypePatch Function(DeviceTypePatch) patch,
+  ) {
+    _patch[Device$.peripherals] = (Map<dynamic, dynamic> map) {
+      var updatedMap = Map.from(map);
+      if (updatedMap.containsKey(key)) {
+        updatedMap[key] = patch(updatedMap[key] as DeviceTypePatch);
+      }
+      return updatedMap;
+    };
     return this;
   }
 }
@@ -962,13 +1026,59 @@ class UserPatch implements Patch<User> {
     return this;
   }
 
+  UserPatch withPrimaryDevicePatch(DevicePatch patch) {
+    _patch[User$.primaryDevice] = patch;
+    return this;
+  }
+
+  UserPatch withPrimaryDevicePatchFunc(
+    DevicePatch Function(DevicePatch) patch,
+  ) {
+    _patch[User$.primaryDevice] = (dynamic current) {
+      var currentPatch = DevicePatch();
+      if (current != null) {
+        currentPatch = current as DevicePatch;
+      }
+      return patch(currentPatch);
+    };
+    return this;
+  }
+
   UserPatch withDevices(List<Device>? value) {
     _patch[User$.devices] = value;
     return this;
   }
 
+  UserPatch updateDevicesAt(
+    int index,
+    DevicePatch Function(DevicePatch) patch,
+  ) {
+    _patch[User$.devices] = (List<dynamic> list) {
+      var updatedList = List.from(list);
+      if (index >= 0 && index < updatedList.length) {
+        updatedList[index] = patch(updatedList[index] as DevicePatch);
+      }
+      return updatedList;
+    };
+    return this;
+  }
+
   UserPatch withPreferences(Map<String, OperatingSystem>? value) {
     _patch[User$.preferences] = value;
+    return this;
+  }
+
+  UserPatch updatePreferencesValue(
+    String key,
+    OperatingSystemPatch Function(OperatingSystemPatch) patch,
+  ) {
+    _patch[User$.preferences] = (Map<dynamic, dynamic> map) {
+      var updatedMap = Map.from(map);
+      if (updatedMap.containsKey(key)) {
+        updatedMap[key] = patch(updatedMap[key] as OperatingSystemPatch);
+      }
+      return updatedMap;
+    };
     return this;
   }
 }

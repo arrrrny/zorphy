@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex2_generic_interfaces_test.zorphy.dart';
 
 //GENERIC INTERFACES AND GENERICS ARE HANDLED AUTOMATICALLY

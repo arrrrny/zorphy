@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex24_generics_fields_test.zorphy.dart';
 
 ///A LIST THAT IS OF A GENERATED GENERIC TYPE

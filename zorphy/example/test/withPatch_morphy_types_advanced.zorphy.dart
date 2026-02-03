@@ -1841,6 +1841,24 @@ class AdvancedCustomerPatch implements Patch<AdvancedCustomer> {
     _patch[AdvancedCustomer$.profile] = value;
     return this;
   }
+
+  AdvancedCustomerPatch withProfilePatch(CustomerProfilePatch patch) {
+    _patch[AdvancedCustomer$.profile] = patch;
+    return this;
+  }
+
+  AdvancedCustomerPatch withProfilePatchFunc(
+    CustomerProfilePatch Function(CustomerProfilePatch) patch,
+  ) {
+    _patch[AdvancedCustomer$.profile] = (dynamic current) {
+      var currentPatch = CustomerProfilePatch();
+      if (current != null) {
+        currentPatch = current as CustomerProfilePatch;
+      }
+      return patch(currentPatch);
+    };
+    return this;
+  }
 }
 
 extension AdvancedCustomerSerialization on AdvancedCustomer {

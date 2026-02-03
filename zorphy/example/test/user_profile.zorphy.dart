@@ -245,13 +245,59 @@ class UserProfilePatch implements Patch<UserProfile> {
     return this;
   }
 
+  UserProfilePatch withDemographicsPatch(DemographicsPatch patch) {
+    _patch[UserProfile$.demographics] = patch;
+    return this;
+  }
+
+  UserProfilePatch withDemographicsPatchFunc(
+    DemographicsPatch Function(DemographicsPatch) patch,
+  ) {
+    _patch[UserProfile$.demographics] = (dynamic current) {
+      var currentPatch = DemographicsPatch();
+      if (current != null) {
+        currentPatch = current as DemographicsPatch;
+      }
+      return patch(currentPatch);
+    };
+    return this;
+  }
+
   UserProfilePatch withDemographicsHistory(Map<String, Demographics>? value) {
     _patch[UserProfile$.demographicsHistory] = value;
     return this;
   }
 
+  UserProfilePatch updateDemographicsHistoryValue(
+    String key,
+    DemographicsPatch Function(DemographicsPatch) patch,
+  ) {
+    _patch[UserProfile$.demographicsHistory] = (Map<dynamic, dynamic> map) {
+      var updatedMap = Map.from(map);
+      if (updatedMap.containsKey(key)) {
+        updatedMap[key] = patch(updatedMap[key] as DemographicsPatch);
+      }
+      return updatedMap;
+    };
+    return this;
+  }
+
   UserProfilePatch withSavedProfiles(List<Demographics>? value) {
     _patch[UserProfile$.savedProfiles] = value;
+    return this;
+  }
+
+  UserProfilePatch updateSavedProfilesAt(
+    int index,
+    DemographicsPatch Function(DemographicsPatch) patch,
+  ) {
+    _patch[UserProfile$.savedProfiles] = (List<dynamic> list) {
+      var updatedList = List.from(list);
+      if (index >= 0 && index < updatedList.length) {
+        updatedList[index] = patch(updatedList[index] as DemographicsPatch);
+      }
+      return updatedList;
+    };
     return this;
   }
 }

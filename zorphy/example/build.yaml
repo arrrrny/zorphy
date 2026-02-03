@@ -12,9 +12,9 @@ targets:
           - lib/**
           - test/**
         options:
-          # Reduces generated code size
           explicit_to_json: false
           include_if_null: false
+          generic_argument_factories: true
 
 # Global options for better performance
 global_options:

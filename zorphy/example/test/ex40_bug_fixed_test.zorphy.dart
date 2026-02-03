@@ -115,6 +115,22 @@ class Monitor_PurpleAir implements $$MonitorI {
     );
   }
 
+  Monitor_PurpleAir copyWithMonitorI({
+    String? monitorId,
+    int? locationId,
+    String? monitorName,
+    String? monitorPostcode,
+    bool? isExcluded,
+  }) {
+    return copyWith(
+      monitorId: monitorId,
+      locationId: locationId,
+      monitorName: monitorName,
+      monitorPostcode: monitorPostcode,
+      isExcluded: isExcluded,
+    );
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;

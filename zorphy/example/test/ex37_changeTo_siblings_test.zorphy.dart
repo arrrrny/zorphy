@@ -42,6 +42,10 @@ class SubA implements $$Super {
     );
   }
 
+  SubA copyWithSuper({String? x}) {
+    return copyWith(x: x);
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -189,6 +193,10 @@ class SubB implements $$Super {
                 : _patchMap[SubB$.z]
           : this.z,
     );
+  }
+
+  SubB copyWithSuper({String? x}) {
+    return copyWith(x: x);
   }
 
   @override

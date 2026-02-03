@@ -208,20 +208,55 @@ String typeToString(DartType type) {
             return "${param.name}${bound == null ? "" : " = ${typeToString(bound)}"}";
           }).join(', ')}>"
         : '';
+
+    // Reserved keywords that cannot be used as identifiers
+    const reservedKeywords = {
+      'abstract', 'as', 'base', 'break', 'case', 'catch', 'class', 'const',
+      'continue', 'covariant', 'default', 'deferred', 'do', 'dynamic', 'else',
+      'enum', 'export', 'extends', 'extension', 'external', 'factory', 'false',
+      'final', 'finally', 'for', 'Function', 'get', 'hide', 'if', 'implements',
+      'import', 'in', 'interface', 'is', 'late', 'library', 'mixin', 'new',
+      'null', 'on', 'operator', 'part', 'rethrow', 'return', 'set', 'show',
+      'static', 'super', 'switch', 'sync', 'this', 'throw', 'true', 'try',
+      'type', 'typedef', 'var', 'void', 'while', 'with', 'yield'
+    };
+
+    String sanitizeParameterName(String? name) {
+      if (name == null || reservedKeywords.contains(name)) {
+        // If it's null or a reserved keyword, return the type without a name
+        // This is valid for function type signatures
+        return '';
+      }
+      return name;
+    }
+
     final normal = type.formalParameters
         .where((param) => param.isRequiredPositional)
-        .map((param) => "${typeToString(param.type)} ${param.name}")
+        .map((param) {
+          final paramName = sanitizeParameterName(param.name);
+          return paramName.isEmpty
+              ? typeToString(param.type)
+              : "${typeToString(param.type)} $paramName";
+        })
         .join(', ');
     final named = type.formalParameters
         .where((param) => param.isNamed)
-        .map(
-          (param) =>
-              "${param.isRequiredNamed ? 'required ' : ''}${typeToString(param.type)} ${param.name}",
-        )
+        .map((param) {
+          final paramName = sanitizeParameterName(param.name);
+          final prefix = param.isRequiredNamed ? 'required ' : '';
+          return paramName.isEmpty
+              ? "${prefix}${typeToString(param.type)}"
+              : "${prefix}${typeToString(param.type)} $paramName";
+        })
         .join(', ');
     final optional = type.formalParameters
         .where((param) => param.isOptionalPositional)
-        .map((param) => "${typeToString(param.type)} ${param.name}")
+        .map((param) {
+          final paramName = sanitizeParameterName(param.name);
+          return paramName.isEmpty
+              ? typeToString(param.type)
+              : "${typeToString(param.type)} $paramName";
+        })
         .join(', ');
     final parts = [
       if (normal.isNotEmpty) normal,

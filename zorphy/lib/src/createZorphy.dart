@@ -122,8 +122,7 @@ String createZorphy(
         allFieldsDistinct, "\$$className", generateCopyWithFn));
   } else {
     // Don't add const modifier to concrete classes - only abstract classes can be const
-    sb.writeln(
-        "class $className$genericsStr$extendsStr$implementsStr {");
+    sb.writeln("class $className$genericsStr$extendsStr$implementsStr {");
     // Determine if class extends abstract parent (needs @override) or just implements (no @override)
     // hasExtends is true only when we actually extend, false when we only implement
     var hasExtendsParam = extendsStr.isNotEmpty && factoryMethods.isEmpty;
@@ -153,6 +152,10 @@ String createZorphy(
     sb.writeln(getPatchWithMethod(allFieldsDistinct, className));
     sb.writeln(
         getInterfaceCopyWithMethods(interfaces, allFieldsDistinct, className));
+    if (generateCopyWithFn) {
+      sb.writeln(getInterfaceCopyWithFnMethods(
+          interfaces, allFieldsDistinct, className));
+    }
     sb.writeln(
         getInterfacePatchWithMethods(interfaces, allFieldsDistinct, className));
   }

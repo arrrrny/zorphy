@@ -183,15 +183,21 @@ class B<T> extends $B implements A {
   final String id;
   @override
   final T blah;
+  @override
+  final Object? Function(T)? toJson_T;
 
-  B({required this.id, required this.blah});
+  B({required this.id, required this.blah, this.toJson_T});
 
-  B copyWith({String? id, T? blah}) {
-    return B(id: id ?? this.id, blah: blah ?? this.blah);
+  B copyWith({String? id, T? blah, Object? Function(T)? toJson_T}) {
+    return B(
+      id: id ?? this.id,
+      blah: blah ?? this.blah,
+      toJson_T: toJson_T ?? this.toJson_T,
+    );
   }
 
-  B copyWithB({String? id, T? blah}) {
-    return copyWith(id: id, blah: blah);
+  B copyWithB({String? id, T? blah, Object? Function(T)? toJson_T}) {
+    return copyWith(id: id, blah: blah, toJson_T: toJson_T);
   }
 
   B patchWithB({BPatch? patchInput}) {
@@ -208,6 +214,11 @@ class B<T> extends $B implements A {
                 ? _patchMap[B$.blah](this.blah)
                 : _patchMap[B$.blah]
           : this.blah,
+      toJson_T: _patchMap.containsKey(B$.toJson_T)
+          ? (_patchMap[B$.toJson_T] is Function)
+                ? _patchMap[B$.toJson_T](this.toJson_T)
+                : _patchMap[B$.toJson_T]
+          : this.toJson_T,
     );
   }
 
@@ -225,23 +236,32 @@ class B<T> extends $B implements A {
                 : _patchMap[A$.id]
           : this.id,
       blah: this.blah,
+      toJson_T: this.toJson_T,
     );
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is B && id == other.id && blah == other.blah;
+    return other is B &&
+        id == other.id &&
+        blah == other.blah &&
+        toJson_T == other.toJson_T;
   }
 
   @override
   int get hashCode {
-    return Object.hash(this.id, this.blah);
+    return Object.hash(this.id, this.blah, this.toJson_T);
   }
 
   @override
   String toString() {
-    return 'B(' + 'id: ${id}' + ', ' + 'blah: ${blah})';
+    return 'B(' +
+        'id: ${id}' +
+        ', ' +
+        'blah: ${blah}' +
+        ', ' +
+        'toJson_T: ${toJson_T})';
   }
 
   /// Creates a [B] instance from JSON
@@ -278,7 +298,7 @@ class B<T> extends $B implements A {
   }
 }
 
-enum B$ { id, blah }
+enum B$ { id, blah, toJson_T }
 
 class BPatch implements Patch<B> {
   final Map<B$, dynamic> _patch = {};
@@ -353,6 +373,11 @@ class BPatch implements Patch<B> {
 
   BPatch withBlah(dynamic value) {
     _patch[B$.blah] = value;
+    return this;
+  }
+
+  BPatch withToJson_T(Object? Function(T)? value) {
+    _patch[B$.toJson_T] = value;
     return this;
   }
 }

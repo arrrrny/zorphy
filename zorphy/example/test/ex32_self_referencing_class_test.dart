@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 //SELF REFERENCING CLASS
 part 'ex32_self_referencing_class_test.zorphy.dart';
 

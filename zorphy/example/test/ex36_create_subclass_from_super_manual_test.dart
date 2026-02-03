@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 // COPY WITH FROM SUPER CLASS TO SUB CLASS
 
 part 'ex36_create_subclass_from_super_manual_test.zorphy.dart';

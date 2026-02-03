@@ -29,8 +29,8 @@ class A extends $A {
     return copyWith(a: a);
   }
 
-  A copyWithFn({Person? Function(Person?)? a}) {
-    return A(a: a != null ? a(this.a) : this.a);
+  A copyWithAFn({Person? Function()? a}) {
+    return A(a: a != null ? a() : this.a);
   }
 
   A patchWithA({APatch? patchInput}) {
@@ -134,6 +134,22 @@ class APatch implements Patch<A> {
     _patch[A$.a] = value;
     return this;
   }
+
+  APatch withAPatch(PersonPatch patch) {
+    _patch[A$.a] = patch;
+    return this;
+  }
+
+  APatch withAPatchFunc(PersonPatch Function(PersonPatch) patch) {
+    _patch[A$.a] = (dynamic current) {
+      var currentPatch = PersonPatch();
+      if (current != null) {
+        currentPatch = current as PersonPatch;
+      }
+      return patch(currentPatch);
+    };
+    return this;
+  }
 }
 
 extension ACompareE on A {
@@ -168,8 +184,8 @@ class B extends $B implements A {
     return copyWith(a: a);
   }
 
-  B copyWithFn({Employee? Function(Employee?)? a}) {
-    return B(a: a != null ? a(this.a) : this.a);
+  B copyWithBFn({Employee? Function()? a}) {
+    return B(a: a != null ? a() : this.a);
   }
 
   B patchWithB({BPatch? patchInput}) {
@@ -186,6 +202,10 @@ class B extends $B implements A {
 
   B copyWithA({Person? a}) {
     return copyWith(a: a);
+  }
+
+  B copyWithAFn({Employee? Function()? a}) {
+    return copyWith(a: a != null ? a() : this.a);
   }
 
   B patchWithA({APatch? patchInput}) {
@@ -330,14 +350,8 @@ class C extends $C implements B, A {
     return copyWith(a: a, a: a);
   }
 
-  C copyWithFn({
-    Manager? Function(Manager?)? a,
-    Manager? Function(Manager?)? a,
-  }) {
-    return C(
-      a: a != null ? a(this.a) : this.a,
-      a: a != null ? a(this.a) : this.a,
-    );
+  C copyWithCFn({Manager? Function()? a, Manager? Function()? a}) {
+    return C(a: a != null ? a() : this.a, a: a != null ? a() : this.a);
   }
 
   C patchWithC({CPatch? patchInput}) {
@@ -363,6 +377,14 @@ class C extends $C implements B, A {
 
   C copyWithA({Person? a}) {
     return copyWith(a: a);
+  }
+
+  C copyWithBFn({Manager? Function()? a, Manager? Function()? a}) {
+    return copyWith(a: a != null ? a() : this.a, a: a != null ? a() : this.a);
+  }
+
+  C copyWithAFn({Manager? Function()? a, Manager? Function()? a}) {
+    return copyWith(a: a != null ? a() : this.a, a: a != null ? a() : this.a);
   }
 
   C patchWithB({BPatch? patchInput}) {

@@ -1,4 +1,4 @@
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 import 'package:test/test.dart';
 
 part 'ex11_generic_subclass_test.zorphy.dart';

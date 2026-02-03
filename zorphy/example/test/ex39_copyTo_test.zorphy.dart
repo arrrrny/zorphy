@@ -45,6 +45,10 @@ class A implements $$Super {
     );
   }
 
+  A copyWithSuper({String? x}) {
+    return copyWith(x: x);
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -184,6 +188,10 @@ class B implements $$Super {
                 : _patchMap[B$.y]
           : this.y,
     );
+  }
+
+  B copyWithSuper({String? x}) {
+    return copyWith(x: x);
   }
 
   @override

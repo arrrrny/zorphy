@@ -1,4 +1,4 @@
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex18_inheritance_generics.zorphy.dart';
 
 // Trigger regeneration to test casting fix

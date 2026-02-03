@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex34_list_equality_with_nulls_test.zorphy.dart';
 
 //EQUALITY WITH NULLABLE & NON NULLABLE LISTS

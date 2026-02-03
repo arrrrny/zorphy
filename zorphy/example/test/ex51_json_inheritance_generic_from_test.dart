@@ -83,6 +83,9 @@ abstract class $A {
 @Zorphy(generateJson: true)
 abstract class $B<T> implements $A {
   T get blah;
+
+  // Add a function to convert T to JSON
+  Object? Function(T)? get toJson_T;
 }
 
 @Zorphy(generateJson: true)

@@ -41,6 +41,10 @@ class SubA implements $$Super {
     );
   }
 
+  SubA copyWithSuper({String? x}) {
+    return copyWith(x: x);
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -193,15 +197,15 @@ class SubB implements $$Super {
     return copyWith(x: x, z: z, cs: cs);
   }
 
-  SubB copyWithFn({
-    String? Function(String?)? x,
-    String? Function(String?)? z,
-    List<C>? Function(List<C>?)? cs,
+  SubB copyWithSubBFn({
+    String? Function()? x,
+    String? Function()? z,
+    List<C>? Function()? cs,
   }) {
     return SubB(
-      x: x != null ? x(this.x) : this.x,
-      z: z != null ? z(this.z) : this.z,
-      cs: cs != null ? cs(this.cs) : this.cs,
+      x: x != null ? x() : this.x,
+      z: z != null ? z() : this.z,
+      cs: cs != null ? cs() : this.cs,
     );
   }
 
@@ -225,6 +229,14 @@ class SubB implements $$Super {
                 : _patchMap[SubB$.cs]
           : this.cs,
     );
+  }
+
+  SubB copyWithSuper({String? x}) {
+    return copyWith(x: x);
+  }
+
+  SubB copyWithSuperFn({String? Function()? x}) {
+    return copyWith(x: x != null ? x() : this.x);
   }
 
   @override
@@ -324,6 +336,17 @@ class SubBPatch implements Patch<SubB> {
 
   SubBPatch withCs(List<C>? value) {
     _patch[SubB$.cs] = value;
+    return this;
+  }
+
+  SubBPatch updateCsAt(int index, CPatch Function(CPatch) patch) {
+    _patch[SubB$.cs] = (List<dynamic> list) {
+      var updatedList = List.from(list);
+      if (index >= 0 && index < updatedList.length) {
+        updatedList[index] = patch(updatedList[index] as CPatch);
+      }
+      return updatedList;
+    };
     return this;
   }
 }

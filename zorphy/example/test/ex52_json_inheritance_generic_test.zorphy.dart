@@ -12,15 +12,17 @@ part of 'ex52_json_inheritance_generic_test.dart';
 class A<T1> extends $A {
   @override
   final T1 id;
+  @override
+  final Object? Function(T1)? toJson_T1;
 
-  A({required this.id});
+  A({required this.id, this.toJson_T1});
 
-  A copyWith({T1? id}) {
-    return A(id: id ?? this.id);
+  A copyWith({T1? id, Object? Function(T1)? toJson_T1}) {
+    return A(id: id ?? this.id, toJson_T1: toJson_T1 ?? this.toJson_T1);
   }
 
-  A copyWithA({T1? id}) {
-    return copyWith(id: id);
+  A copyWithA({T1? id, Object? Function(T1)? toJson_T1}) {
+    return copyWith(id: id, toJson_T1: toJson_T1);
   }
 
   A patchWithA({APatch? patchInput}) {
@@ -32,23 +34,28 @@ class A<T1> extends $A {
                 ? _patchMap[A$.id](this.id)
                 : _patchMap[A$.id]
           : this.id,
+      toJson_T1: _patchMap.containsKey(A$.toJson_T1)
+          ? (_patchMap[A$.toJson_T1] is Function)
+                ? _patchMap[A$.toJson_T1](this.toJson_T1)
+                : _patchMap[A$.toJson_T1]
+          : this.toJson_T1,
     );
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is A && id == other.id;
+    return other is A && id == other.id && toJson_T1 == other.toJson_T1;
   }
 
   @override
   int get hashCode {
-    return Object.hash(id, 0);
+    return Object.hash(this.id, this.toJson_T1);
   }
 
   @override
   String toString() {
-    return 'A(' + 'id: ${id})';
+    return 'A(' + 'id: ${id}' + ', ' + 'toJson_T1: ${toJson_T1})';
   }
 
   /// Creates a [A] instance from JSON
@@ -97,7 +104,7 @@ class A<T1> extends $A {
   }
 }
 
-enum A$ { id }
+enum A$ { id, toJson_T1 }
 
 class APatch implements Patch<A> {
   final Map<A$, dynamic> _patch = {};
@@ -169,6 +176,11 @@ class APatch implements Patch<A> {
     _patch[A$.id] = value;
     return this;
   }
+
+  APatch withToJson_T1(Object? Function(T1)? value) {
+    _patch[A$.toJson_T1] = value;
+    return this;
+  }
 }
 
 extension ASerialization on A<T1> {
@@ -207,35 +219,83 @@ extension AChangeToE on A {
     required String xyz,
     required T1 valT1,
     required T2 valT2,
+    Object? Function(T2)? toJson_T2,
     required T blah,
+    Object? Function(T)? toJson_T,
+    Object? Function(T1)? toJson_T1,
   }) {
     final _patcher = CPatch();
     _patcher.withXyz(xyz);
     _patcher.withValT1(valT1);
     _patcher.withValT2(valT2);
+    if (toJson_T2 != null) {
+      _patcher.withToJson_T2(toJson_T2);
+    }
     _patcher.withBlah(blah);
+    if (toJson_T != null) {
+      _patcher.withToJson_T(toJson_T);
+    }
+    if (toJson_T1 != null) {
+      _patcher.withToJson_T1(toJson_T1);
+    }
     final _patchMap = _patcher.toPatch();
     return C(
       xyz: _patchMap[C$.xyz],
       valT1: _patchMap[C$.valT1],
       valT2: _patchMap[C$.valT2],
+      toJson_T1: _patchMap.containsKey(C$.toJson_T1)
+          ? (_patchMap[C$.toJson_T1] is Function)
+                ? _patchMap[C$.toJson_T1](toJson_T1)
+                : _patchMap[C$.toJson_T1]
+          : toJson_T1,
+      toJson_T2: _patchMap.containsKey(C$.toJson_T2)
+          ? (_patchMap[C$.toJson_T2] is Function)
+                ? _patchMap[C$.toJson_T2](toJson_T2)
+                : _patchMap[C$.toJson_T2]
+          : toJson_T2,
       id: _patchMap.containsKey(C$.id)
           ? (_patchMap[C$.id] is Function)
                 ? _patchMap[C$.id](id)
                 : _patchMap[C$.id]
           : id,
       blah: _patchMap[C$.blah],
+      toJson_T: _patchMap.containsKey(C$.toJson_T)
+          ? (_patchMap[C$.toJson_T] is Function)
+                ? _patchMap[C$.toJson_T](toJson_T)
+                : _patchMap[C$.toJson_T]
+          : toJson_T,
     );
   }
 
-  B changeToB({required T1 valT1, required T2 valT2}) {
+  B changeToB({
+    required T1 valT1,
+    required T2 valT2,
+    Object? Function(T2)? toJson_T2,
+    Object? Function(T1)? toJson_T1,
+  }) {
     final _patcher = BPatch();
     _patcher.withValT1(valT1);
     _patcher.withValT2(valT2);
+    if (toJson_T2 != null) {
+      _patcher.withToJson_T2(toJson_T2);
+    }
+    if (toJson_T1 != null) {
+      _patcher.withToJson_T1(toJson_T1);
+    }
     final _patchMap = _patcher.toPatch();
     return B(
       valT1: _patchMap[B$.valT1],
       valT2: _patchMap[B$.valT2],
+      toJson_T1: _patchMap.containsKey(B$.toJson_T1)
+          ? (_patchMap[B$.toJson_T1] is Function)
+                ? _patchMap[B$.toJson_T1](toJson_T1)
+                : _patchMap[B$.toJson_T1]
+          : toJson_T1,
+      toJson_T2: _patchMap.containsKey(B$.toJson_T2)
+          ? (_patchMap[B$.toJson_T2] is Function)
+                ? _patchMap[B$.toJson_T2](toJson_T2)
+                : _patchMap[B$.toJson_T2]
+          : toJson_T2,
       id: _patchMap.containsKey(B$.id)
           ? (_patchMap[B$.id] is Function)
                 ? _patchMap[B$.id](id)
@@ -250,22 +310,52 @@ class B<T1, T2> extends $B implements A {
   @override
   final T1 id;
   @override
+  final Object? Function(T1)? toJson_T1;
+  @override
   final T1 valT1;
   @override
   final T2 valT2;
+  @override
+  final Object? Function(T2)? toJson_T2;
 
-  B({required this.id, required this.valT1, required this.valT2});
+  B({
+    required this.id,
+    this.toJson_T1,
+    required this.valT1,
+    required this.valT2,
+    this.toJson_T2,
+  });
 
-  B copyWith({T1? id, T1? valT1, T2? valT2}) {
+  B copyWith({
+    T1? id,
+    Object? Function(T1)? toJson_T1,
+    T1? valT1,
+    T2? valT2,
+    Object? Function(T2)? toJson_T2,
+  }) {
     return B(
       id: id ?? this.id,
+      toJson_T1: toJson_T1 ?? this.toJson_T1,
       valT1: valT1 ?? this.valT1,
       valT2: valT2 ?? this.valT2,
+      toJson_T2: toJson_T2 ?? this.toJson_T2,
     );
   }
 
-  B copyWithB({T1? id, T1? valT1, T2? valT2}) {
-    return copyWith(id: id, valT1: valT1, valT2: valT2);
+  B copyWithB({
+    T1? id,
+    Object? Function(T1)? toJson_T1,
+    T1? valT1,
+    T2? valT2,
+    Object? Function(T2)? toJson_T2,
+  }) {
+    return copyWith(
+      id: id,
+      toJson_T1: toJson_T1,
+      valT1: valT1,
+      valT2: valT2,
+      toJson_T2: toJson_T2,
+    );
   }
 
   B patchWithB({BPatch? patchInput}) {
@@ -277,6 +367,11 @@ class B<T1, T2> extends $B implements A {
                 ? _patchMap[B$.id](this.id)
                 : _patchMap[B$.id]
           : this.id,
+      toJson_T1: _patchMap.containsKey(B$.toJson_T1)
+          ? (_patchMap[B$.toJson_T1] is Function)
+                ? _patchMap[B$.toJson_T1](this.toJson_T1)
+                : _patchMap[B$.toJson_T1]
+          : this.toJson_T1,
       valT1: _patchMap.containsKey(B$.valT1)
           ? (_patchMap[B$.valT1] is Function)
                 ? _patchMap[B$.valT1](this.valT1)
@@ -287,11 +382,16 @@ class B<T1, T2> extends $B implements A {
                 ? _patchMap[B$.valT2](this.valT2)
                 : _patchMap[B$.valT2]
           : this.valT2,
+      toJson_T2: _patchMap.containsKey(B$.toJson_T2)
+          ? (_patchMap[B$.toJson_T2] is Function)
+                ? _patchMap[B$.toJson_T2](this.toJson_T2)
+                : _patchMap[B$.toJson_T2]
+          : this.toJson_T2,
     );
   }
 
-  B copyWithA({T1? id}) {
-    return copyWith(id: id);
+  B copyWithA({T1? id, Object? Function(T1)? toJson_T1}) {
+    return copyWith(id: id, toJson_T1: toJson_T1);
   }
 
   B patchWithA({APatch? patchInput}) {
@@ -303,8 +403,14 @@ class B<T1, T2> extends $B implements A {
                 ? _patchMap[A$.id](this.id)
                 : _patchMap[A$.id]
           : this.id,
+      toJson_T1: _patchMap.containsKey(A$.toJson_T1)
+          ? (_patchMap[A$.toJson_T1] is Function)
+                ? _patchMap[A$.toJson_T1](this.toJson_T1)
+                : _patchMap[A$.toJson_T1]
+          : this.toJson_T1,
       valT1: this.valT1,
       valT2: this.valT2,
+      toJson_T2: this.toJson_T2,
     );
   }
 
@@ -313,13 +419,21 @@ class B<T1, T2> extends $B implements A {
     if (identical(this, other)) return true;
     return other is B &&
         id == other.id &&
+        toJson_T1 == other.toJson_T1 &&
         valT1 == other.valT1 &&
-        valT2 == other.valT2;
+        valT2 == other.valT2 &&
+        toJson_T2 == other.toJson_T2;
   }
 
   @override
   int get hashCode {
-    return Object.hash(this.id, this.valT1, this.valT2);
+    return Object.hash(
+      this.id,
+      this.toJson_T1,
+      this.valT1,
+      this.valT2,
+      this.toJson_T2,
+    );
   }
 
   @override
@@ -327,9 +441,13 @@ class B<T1, T2> extends $B implements A {
     return 'B(' +
         'id: ${id}' +
         ', ' +
+        'toJson_T1: ${toJson_T1}' +
+        ', ' +
         'valT1: ${valT1}' +
         ', ' +
-        'valT2: ${valT2})';
+        'valT2: ${valT2}' +
+        ', ' +
+        'toJson_T2: ${toJson_T2})';
   }
 
   /// Creates a [B] instance from JSON
@@ -373,7 +491,7 @@ class B<T1, T2> extends $B implements A {
   }
 }
 
-enum B$ { id, valT1, valT2 }
+enum B$ { id, toJson_T1, valT1, valT2, toJson_T2 }
 
 class BPatch implements Patch<B> {
   final Map<B$, dynamic> _patch = {};
@@ -446,6 +564,11 @@ class BPatch implements Patch<B> {
     return this;
   }
 
+  BPatch withToJson_T1(Object? Function(T1)? value) {
+    _patch[B$.toJson_T1] = value;
+    return this;
+  }
+
   BPatch withValT1(dynamic value) {
     _patch[B$.valT1] = value;
     return this;
@@ -453,6 +576,11 @@ class BPatch implements Patch<B> {
 
   BPatch withValT2(dynamic value) {
     _patch[B$.valT2] = value;
+    return this;
+  }
+
+  BPatch withToJson_T2(Object? Function(T2)? value) {
+    _patch[B$.toJson_T2] = value;
     return this;
   }
 }
@@ -495,9 +623,19 @@ extension BCompareE on B {
 }
 
 extension BChangeToE on B {
-  C changeToC({required String xyz}) {
+  C changeToC({
+    required String xyz,
+    Object? Function(T1)? toJson_T1,
+    Object? Function(T2)? toJson_T2,
+  }) {
     final _patcher = CPatch();
     _patcher.withXyz(xyz);
+    if (toJson_T1 != null) {
+      _patcher.withToJson_T1(toJson_T1);
+    }
+    if (toJson_T2 != null) {
+      _patcher.withToJson_T2(toJson_T2);
+    }
     final _patchMap = _patcher.toPatch();
     return C(
       xyz: _patchMap[C$.xyz],
@@ -511,6 +649,16 @@ extension BChangeToE on B {
                 ? _patchMap[C$.valT2](valT2)
                 : _patchMap[C$.valT2]
           : valT2,
+      toJson_T1: _patchMap.containsKey(C$.toJson_T1)
+          ? (_patchMap[C$.toJson_T1] is Function)
+                ? _patchMap[C$.toJson_T1](toJson_T1)
+                : _patchMap[C$.toJson_T1]
+          : toJson_T1,
+      toJson_T2: _patchMap.containsKey(C$.toJson_T2)
+          ? (_patchMap[C$.toJson_T2] is Function)
+                ? _patchMap[C$.toJson_T2](toJson_T2)
+                : _patchMap[C$.toJson_T2]
+          : toJson_T2,
       id: _patchMap.containsKey(C$.id)
           ? (_patchMap[C$.id] is Function)
                 ? _patchMap[C$.id](id)
@@ -527,28 +675,64 @@ class C<T1, T2> extends $C implements B, A {
   @override
   final T2 valT2;
   @override
+  final Object? Function(T1)? toJson_T1;
+  @override
+  final Object? Function(T2)? toJson_T2;
+  @override
   final T1 id;
+  @override
+  final Object? Function(T1)? toJson_T1;
   @override
   final String xyz;
 
   C({
     required this.valT1,
     required this.valT2,
+    this.toJson_T1,
+    this.toJson_T2,
     required this.id,
+    this.toJson_T1,
     required this.xyz,
   });
 
-  C copyWith({T1? valT1, T2? valT2, T1? id, String? xyz}) {
+  C copyWith({
+    T1? valT1,
+    T2? valT2,
+    Object? Function(T1)? toJson_T1,
+    Object? Function(T2)? toJson_T2,
+    T1? id,
+    Object? Function(T1)? toJson_T1,
+    String? xyz,
+  }) {
     return C(
       valT1: valT1 ?? this.valT1,
       valT2: valT2 ?? this.valT2,
+      toJson_T1: toJson_T1 ?? this.toJson_T1,
+      toJson_T2: toJson_T2 ?? this.toJson_T2,
       id: id ?? this.id,
+      toJson_T1: toJson_T1 ?? this.toJson_T1,
       xyz: xyz ?? this.xyz,
     );
   }
 
-  C copyWithC({T1? valT1, T2? valT2, T1? id, String? xyz}) {
-    return copyWith(valT1: valT1, valT2: valT2, id: id, xyz: xyz);
+  C copyWithC({
+    T1? valT1,
+    T2? valT2,
+    Object? Function(T1)? toJson_T1,
+    Object? Function(T2)? toJson_T2,
+    T1? id,
+    Object? Function(T1)? toJson_T1,
+    String? xyz,
+  }) {
+    return copyWith(
+      valT1: valT1,
+      valT2: valT2,
+      toJson_T1: toJson_T1,
+      toJson_T2: toJson_T2,
+      id: id,
+      toJson_T1: toJson_T1,
+      xyz: xyz,
+    );
   }
 
   C patchWithC({CPatch? patchInput}) {
@@ -565,11 +749,26 @@ class C<T1, T2> extends $C implements B, A {
                 ? _patchMap[C$.valT2](this.valT2)
                 : _patchMap[C$.valT2]
           : this.valT2,
+      toJson_T1: _patchMap.containsKey(C$.toJson_T1)
+          ? (_patchMap[C$.toJson_T1] is Function)
+                ? _patchMap[C$.toJson_T1](this.toJson_T1)
+                : _patchMap[C$.toJson_T1]
+          : this.toJson_T1,
+      toJson_T2: _patchMap.containsKey(C$.toJson_T2)
+          ? (_patchMap[C$.toJson_T2] is Function)
+                ? _patchMap[C$.toJson_T2](this.toJson_T2)
+                : _patchMap[C$.toJson_T2]
+          : this.toJson_T2,
       id: _patchMap.containsKey(C$.id)
           ? (_patchMap[C$.id] is Function)
                 ? _patchMap[C$.id](this.id)
                 : _patchMap[C$.id]
           : this.id,
+      toJson_T1: _patchMap.containsKey(C$.toJson_T1)
+          ? (_patchMap[C$.toJson_T1] is Function)
+                ? _patchMap[C$.toJson_T1](this.toJson_T1)
+                : _patchMap[C$.toJson_T1]
+          : this.toJson_T1,
       xyz: _patchMap.containsKey(C$.xyz)
           ? (_patchMap[C$.xyz] is Function)
                 ? _patchMap[C$.xyz](this.xyz)
@@ -578,12 +777,22 @@ class C<T1, T2> extends $C implements B, A {
     );
   }
 
-  C copyWithB({T1? valT1, T2? valT2}) {
-    return copyWith(valT1: valT1, valT2: valT2);
+  C copyWithB({
+    T1? valT1,
+    T2? valT2,
+    Object? Function(T1)? toJson_T1,
+    Object? Function(T2)? toJson_T2,
+  }) {
+    return copyWith(
+      valT1: valT1,
+      valT2: valT2,
+      toJson_T1: toJson_T1,
+      toJson_T2: toJson_T2,
+    );
   }
 
-  C copyWithA({T1? id}) {
-    return copyWith(id: id);
+  C copyWithA({T1? id, Object? Function(T1)? toJson_T1}) {
+    return copyWith(id: id, toJson_T1: toJson_T1);
   }
 
   C patchWithB({BPatch? patchInput}) {
@@ -600,7 +809,22 @@ class C<T1, T2> extends $C implements B, A {
                 ? _patchMap[B$.valT2](this.valT2)
                 : _patchMap[B$.valT2]
           : this.valT2,
+      toJson_T1: _patchMap.containsKey(B$.toJson_T1)
+          ? (_patchMap[B$.toJson_T1] is Function)
+                ? _patchMap[B$.toJson_T1](this.toJson_T1)
+                : _patchMap[B$.toJson_T1]
+          : this.toJson_T1,
+      toJson_T2: _patchMap.containsKey(B$.toJson_T2)
+          ? (_patchMap[B$.toJson_T2] is Function)
+                ? _patchMap[B$.toJson_T2](this.toJson_T2)
+                : _patchMap[B$.toJson_T2]
+          : this.toJson_T2,
       id: this.id,
+      toJson_T1: _patchMap.containsKey(B$.toJson_T1)
+          ? (_patchMap[B$.toJson_T1] is Function)
+                ? _patchMap[B$.toJson_T1](this.toJson_T1)
+                : _patchMap[B$.toJson_T1]
+          : this.toJson_T1,
       xyz: this.xyz,
     );
   }
@@ -611,11 +835,22 @@ class C<T1, T2> extends $C implements B, A {
     return C(
       valT1: this.valT1,
       valT2: this.valT2,
+      toJson_T1: _patchMap.containsKey(A$.toJson_T1)
+          ? (_patchMap[A$.toJson_T1] is Function)
+                ? _patchMap[A$.toJson_T1](this.toJson_T1)
+                : _patchMap[A$.toJson_T1]
+          : this.toJson_T1,
+      toJson_T2: this.toJson_T2,
       id: _patchMap.containsKey(A$.id)
           ? (_patchMap[A$.id] is Function)
                 ? _patchMap[A$.id](this.id)
                 : _patchMap[A$.id]
           : this.id,
+      toJson_T1: _patchMap.containsKey(A$.toJson_T1)
+          ? (_patchMap[A$.toJson_T1] is Function)
+                ? _patchMap[A$.toJson_T1](this.toJson_T1)
+                : _patchMap[A$.toJson_T1]
+          : this.toJson_T1,
       xyz: this.xyz,
     );
   }
@@ -626,13 +861,24 @@ class C<T1, T2> extends $C implements B, A {
     return other is C &&
         valT1 == other.valT1 &&
         valT2 == other.valT2 &&
+        toJson_T1 == other.toJson_T1 &&
+        toJson_T2 == other.toJson_T2 &&
         id == other.id &&
+        toJson_T1 == other.toJson_T1 &&
         xyz == other.xyz;
   }
 
   @override
   int get hashCode {
-    return Object.hash(this.valT1, this.valT2, this.id, this.xyz);
+    return Object.hash(
+      this.valT1,
+      this.valT2,
+      this.toJson_T1,
+      this.toJson_T2,
+      this.id,
+      this.toJson_T1,
+      this.xyz,
+    );
   }
 
   @override
@@ -642,7 +888,13 @@ class C<T1, T2> extends $C implements B, A {
         ', ' +
         'valT2: ${valT2}' +
         ', ' +
+        'toJson_T1: ${toJson_T1}' +
+        ', ' +
+        'toJson_T2: ${toJson_T2}' +
+        ', ' +
         'id: ${id}' +
+        ', ' +
+        'toJson_T1: ${toJson_T1}' +
         ', ' +
         'xyz: ${xyz})';
   }
@@ -682,7 +934,7 @@ class C<T1, T2> extends $C implements B, A {
   }
 }
 
-enum C$ { valT1, valT2, id, xyz }
+enum C$ { valT1, valT2, toJson_T1, toJson_T2, id, toJson_T1, xyz }
 
 class CPatch implements Patch<C> {
   final Map<C$, dynamic> _patch = {};
@@ -760,8 +1012,23 @@ class CPatch implements Patch<C> {
     return this;
   }
 
+  CPatch withToJson_T1(Object? Function(T1)? value) {
+    _patch[C$.toJson_T1] = value;
+    return this;
+  }
+
+  CPatch withToJson_T2(Object? Function(T2)? value) {
+    _patch[C$.toJson_T2] = value;
+    return this;
+  }
+
   CPatch withId(dynamic value) {
     _patch[C$.id] = value;
+    return this;
+  }
+
+  CPatch withToJson_T1(Object? Function(T1)? value) {
+    _patch[C$.toJson_T1] = value;
     return this;
   }
 

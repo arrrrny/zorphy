@@ -241,6 +241,10 @@ class BasicResponse implements $$SimpleResponse {
     );
   }
 
+  BasicResponse copyWithSimpleResponse({String? message, String? status}) {
+    return copyWith(message: message, status: status);
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -453,6 +457,10 @@ class DetailedResponse implements $$SimpleResponse {
                 : _patchMap[DetailedResponse$.data]
           : this.data,
     );
+  }
+
+  DetailedResponse copyWithSimpleResponse({String? message, String? status}) {
+    return copyWith(message: message, status: status);
   }
 
   @override
@@ -695,6 +703,10 @@ class ConcreteResponse implements $$SimpleResponse {
                 : _patchMap[ConcreteResponse$.isSuccess]
           : this.isSuccess,
     );
+  }
+
+  ConcreteResponse copyWithSimpleResponse({String? message, String? status}) {
+    return copyWith(message: message, status: status);
   }
 
   @override

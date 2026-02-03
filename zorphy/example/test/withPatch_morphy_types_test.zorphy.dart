@@ -341,6 +341,22 @@ class UserPatch implements Patch<User> {
     _patch[User$.profile] = value;
     return this;
   }
+
+  UserPatch withProfilePatch(ProfilePatch patch) {
+    _patch[User$.profile] = patch;
+    return this;
+  }
+
+  UserPatch withProfilePatchFunc(ProfilePatch Function(ProfilePatch) patch) {
+    _patch[User$.profile] = (dynamic current) {
+      var currentPatch = ProfilePatch();
+      if (current != null) {
+        currentPatch = current as ProfilePatch;
+      }
+      return patch(currentPatch);
+    };
+    return this;
+  }
 }
 
 extension UserSerialization on User {

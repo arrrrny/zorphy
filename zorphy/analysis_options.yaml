@@ -1,0 +1,4 @@
+analyzer:
+  exclude:
+    - example/build_output/**
+    - example/test/**.zorphy.dart

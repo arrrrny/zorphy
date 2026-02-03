@@ -302,6 +302,14 @@ class DetailedApiResponse implements $$ApiResponse {
     );
   }
 
+  DetailedApiResponse copyWithApiResponse({
+    String? status,
+    String? message,
+    DateTime? timestamp,
+  }) {
+    return copyWith(status: status, message: message, timestamp: timestamp);
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -778,6 +786,14 @@ class User implements $$BaseEntity {
                 : _patchMap[User$.email]
           : this.email,
     );
+  }
+
+  User copyWithBaseEntity({
+    String? id,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return copyWith(id: id, createdAt: createdAt, updatedAt: updatedAt);
   }
 
   @override

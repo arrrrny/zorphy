@@ -1,4 +1,4 @@
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 import 'age_group.dart';
 import 'generation.dart';

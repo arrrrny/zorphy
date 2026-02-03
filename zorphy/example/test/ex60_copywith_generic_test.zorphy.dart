@@ -36,11 +36,8 @@ class A<T> extends $A {
     return copyWith(x: x, y: y);
   }
 
-  A copyWithFn({T? Function(T?)? x, T? Function(T?)? y}) {
-    return A(
-      x: x != null ? x(this.x) : this.x,
-      y: y != null ? y(this.y) : this.y,
-    );
+  A copyWithAFn({T? Function()? x, T? Function()? y}) {
+    return A(x: x != null ? x() : this.x, y: y != null ? y() : this.y);
   }
 
   A patchWithA({APatch? patchInput}) {

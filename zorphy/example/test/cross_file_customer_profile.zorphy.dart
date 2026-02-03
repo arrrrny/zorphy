@@ -486,13 +486,59 @@ class CustomerPatch implements Patch<Customer> {
     return this;
   }
 
+  CustomerPatch withProfilePatch(CustomerProfilePatch patch) {
+    _patch[Customer$.profile] = patch;
+    return this;
+  }
+
+  CustomerPatch withProfilePatchFunc(
+    CustomerProfilePatch Function(CustomerProfilePatch) patch,
+  ) {
+    _patch[Customer$.profile] = (dynamic current) {
+      var currentPatch = CustomerProfilePatch();
+      if (current != null) {
+        currentPatch = current as CustomerProfilePatch;
+      }
+      return patch(currentPatch);
+    };
+    return this;
+  }
+
   CustomerPatch withProfiles(List<CustomerProfile>? value) {
     _patch[Customer$.profiles] = value;
     return this;
   }
 
+  CustomerPatch updateProfilesAt(
+    int index,
+    CustomerProfilePatch Function(CustomerProfilePatch) patch,
+  ) {
+    _patch[Customer$.profiles] = (List<dynamic> list) {
+      var updatedList = List.from(list);
+      if (index >= 0 && index < updatedList.length) {
+        updatedList[index] = patch(updatedList[index] as CustomerProfilePatch);
+      }
+      return updatedList;
+    };
+    return this;
+  }
+
   CustomerPatch withProfileHistory(Map<String, CustomerProfile>? value) {
     _patch[Customer$.profileHistory] = value;
+    return this;
+  }
+
+  CustomerPatch updateProfileHistoryValue(
+    String key,
+    CustomerProfilePatch Function(CustomerProfilePatch) patch,
+  ) {
+    _patch[Customer$.profileHistory] = (Map<dynamic, dynamic> map) {
+      var updatedMap = Map.from(map);
+      if (updatedMap.containsKey(key)) {
+        updatedMap[key] = patch(updatedMap[key] as CustomerProfilePatch);
+      }
+      return updatedMap;
+    };
     return this;
   }
 }

@@ -1,5 +1,5 @@
 //import 'package:test/test.dart';
-//import 'package:zorphy_annotation/zorphy.dart';//import 'package:meta/meta.dart';
+//import 'package:zorphy_annotation/zorphy_annotation.dart';//import 'package:meta/meta.dart';
 //
 //part 'ex6_test.zorphy.dart';
 //

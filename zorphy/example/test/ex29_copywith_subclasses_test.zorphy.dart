@@ -33,11 +33,11 @@ sealed class $A {
     );
   }
 
-  A copyWithFn({
-    String? Function(String?)? a,
+  A copyWithAFn({
+    String? Function()? a,
   }) {
     return A(
-      a: a != null ? a(this.a) : this.a,
+      a: a != null ? a() : this.a,
     );
   }
 
@@ -80,13 +80,13 @@ class B<T1> implements $$A {
     );
   }
 
-  B copyWithFn({
-    String? Function(String?)? a,
-    T1? Function(T1?)? b,
+  B copyWithBFn({
+    String? Function()? a,
+    T1? Function()? b,
   }) {
     return B(
-      a: a != null ? a(this.a) : this.a,
-      b: b != null ? b(this.b) : this.b,
+      a: a != null ? a() : this.a,
+      b: b != null ? b() : this.b,
     );
   }
 
@@ -101,6 +101,23 @@ class B<T1> implements $$A {
     );
   }
 
+
+  B copyWithA({
+    String? a,
+  }) {
+    return copyWith(
+      a: a,
+    );
+  }
+
+
+  B copyWithAFn({
+    String? Function()? a,
+  }) {
+    return copyWith(
+      a: a != null ? a() : this.a,
+    );
+  }
 
 
   @override
@@ -275,17 +292,17 @@ class C<T1> implements $$A {
     );
   }
 
-  C copyWithFn({
-    String? Function(String?)? a,
-    T1? Function(T1?)? b,
-    String? Function(String?)? a,
-    bool? Function(bool?)? c,
+  C copyWithCFn({
+    String? Function()? a,
+    T1? Function()? b,
+    String? Function()? a,
+    bool? Function()? c,
   }) {
     return C(
-      a: a != null ? a(this.a) : this.a,
-      b: b != null ? b(this.b) : this.b,
-      a: a != null ? a(this.a) : this.a,
-      c: c != null ? c(this.c) : this.c,
+      a: a != null ? a() : this.a,
+      b: b != null ? b() : this.b,
+      a: a != null ? a() : this.a,
+      c: c != null ? c() : this.c,
     );
   }
 
@@ -309,6 +326,39 @@ class C<T1> implements $$A {
   }) {
     return copyWith(
       a: a, b: b,
+    );
+  }
+
+  C copyWithA({
+    String? a,
+  }) {
+    return copyWith(
+      a: a,
+    );
+  }
+
+
+  C copyWithBFn({
+    String? Function()? a,
+    T1? Function()? b,
+    String? Function()? a,
+  }) {
+    return copyWith(
+      a: a != null ? a() : this.a,
+      b: b != null ? b() : this.b,
+      a: a != null ? a() : this.a,
+    );
+  }
+
+  C copyWithAFn({
+    String? Function()? a,
+    T1? Function()? b,
+    String? Function()? a,
+  }) {
+    return copyWith(
+      a: a != null ? a() : this.a,
+      b: b != null ? b() : this.b,
+      a: a != null ? a() : this.a,
     );
   }
 
@@ -513,15 +563,15 @@ class D<T1> implements $$A {
     );
   }
 
-  D copyWithFn({
-    String? Function(String?)? a,
-    T1? Function(T1?)? b,
-    String? Function(String?)? a,
+  D copyWithDFn({
+    String? Function()? a,
+    T1? Function()? b,
+    String? Function()? a,
   }) {
     return D(
-      a: a != null ? a(this.a) : this.a,
-      b: b != null ? b(this.b) : this.b,
-      a: a != null ? a(this.a) : this.a,
+      a: a != null ? a() : this.a,
+      b: b != null ? b() : this.b,
+      a: a != null ? a() : this.a,
     );
   }
 
@@ -544,6 +594,39 @@ class D<T1> implements $$A {
   }) {
     return copyWith(
       a: a, b: b,
+    );
+  }
+
+  D copyWithA({
+    String? a,
+  }) {
+    return copyWith(
+      a: a,
+    );
+  }
+
+
+  D copyWithBFn({
+    String? Function()? a,
+    T1? Function()? b,
+    String? Function()? a,
+  }) {
+    return copyWith(
+      a: a != null ? a() : this.a,
+      b: b != null ? b() : this.b,
+      a: a != null ? a() : this.a,
+    );
+  }
+
+  D copyWithAFn({
+    String? Function()? a,
+    T1? Function()? b,
+    String? Function()? a,
+  }) {
+    return copyWith(
+      a: a != null ? a() : this.a,
+      b: b != null ? b() : this.b,
+      a: a != null ? a() : this.a,
     );
   }
 
@@ -703,21 +786,7 @@ sealed class $X {
 
   X copyWith({
   }) {
-    return X(
-    );
-  }
-
-  X copyWithX({
-  }) {
-    return copyWith(
-      ,
-    );
-  }
-
-  X copyWithFn({
-  }) {
-    return X(
-    );
+    return X();
   }
 
 }
@@ -752,11 +821,11 @@ class Y implements $$X {
     );
   }
 
-  Y copyWithFn({
-    String? Function(String?)? a,
+  Y copyWithYFn({
+    String? Function()? a,
   }) {
     return Y(
-      a: a != null ? a(this.a) : this.a,
+      a: a != null ? a() : this.a,
     );
   }
 
@@ -769,6 +838,7 @@ class Y implements $$X {
       a: _patchMap.containsKey(Y$.a) ? (_patchMap[Y$.a] is Function) ? _patchMap[Y$.a](this.a) : _patchMap[Y$.a] : this.a
     );
   }
+
 
 
 

@@ -1,4 +1,4 @@
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex17_multiple_inheritance.zorphy.dart';
 
 ///BatchLesson does xyz

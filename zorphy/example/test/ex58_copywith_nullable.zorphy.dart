@@ -36,13 +36,10 @@ class Pet extends $Pet {
     return copyWith(type: type, name: name);
   }
 
-  Pet copyWithFn({
-    String? Function(String?)? type,
-    String? Function(String?)? name,
-  }) {
+  Pet copyWithPetFn({String? Function()? type, String? Function()? name}) {
     return Pet(
-      type: type != null ? type(this.type) : this.type,
-      name: name != null ? name(this.name) : this.name,
+      type: type != null ? type() : this.type,
+      name: name != null ? name() : this.name,
     );
   }
 

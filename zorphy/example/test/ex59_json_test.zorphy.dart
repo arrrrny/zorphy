@@ -851,6 +851,20 @@ class BuildingPatch implements Patch<Building> {
     _patch[Building$.people] = value;
     return this;
   }
+
+  BuildingPatch updatePeopleAt(
+    int index,
+    PersonPatch Function(PersonPatch) patch,
+  ) {
+    _patch[Building$.people] = (List<dynamic> list) {
+      var updatedList = List.from(list);
+      if (index >= 0 && index < updatedList.length) {
+        updatedList[index] = patch(updatedList[index] as PersonPatch);
+      }
+      return updatedList;
+    };
+    return this;
+  }
 }
 
 extension BuildingSerialization on Building {

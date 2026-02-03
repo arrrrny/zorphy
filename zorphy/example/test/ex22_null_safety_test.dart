@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex22_null_safety_test.zorphy.dart';
 
 //NULL FIELD NAMES - NULL SAFETY USING ?

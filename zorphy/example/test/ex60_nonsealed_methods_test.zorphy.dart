@@ -639,6 +639,10 @@ class SparkMessage implements $$SystemMessage {
     );
   }
 
+  SparkMessage copyWithSystemMessage({String? systemType, String? metadata}) {
+    return copyWith(systemType: systemType, metadata: metadata);
+  }
+
   SparkMessage copyWithChatMessage({
     String? id,
     DateTime? createdAt,

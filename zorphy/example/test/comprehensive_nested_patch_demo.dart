@@ -1,4 +1,4 @@
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'comprehensive_nested_patch_demo.zorphy.dart';
 
 /// A person's profile information

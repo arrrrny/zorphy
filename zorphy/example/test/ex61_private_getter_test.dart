@@ -1,4 +1,4 @@
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 import 'package:test/test.dart';
 
 part 'ex61_private_getter_test.zorphy.dart';

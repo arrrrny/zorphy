@@ -63,6 +63,14 @@ class Todo2_incomplete implements $$Todo2 {
     );
   }
 
+  Todo2_incomplete copyWithTodo2({
+    String? title,
+    String? id,
+    String? description,
+  }) {
+    return copyWith(title: title, id: id, description: description);
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -301,6 +309,14 @@ class Todo2_complete implements $$Todo2 {
                 : _patchMap[Todo2_complete$.completedDate]
           : this.completedDate,
     );
+  }
+
+  Todo2_complete copyWithTodo2({
+    String? title,
+    String? id,
+    String? description,
+  }) {
+    return copyWith(title: title, id: id, description: description);
   }
 
   @override

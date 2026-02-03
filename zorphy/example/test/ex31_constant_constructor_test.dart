@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex31_constant_constructor_test.zorphy.dart';
 
 ///To create a constant constructor, create the definition in our class definition.

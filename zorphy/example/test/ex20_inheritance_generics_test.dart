@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex20_inheritance_generics_test.zorphy.dart';
 part 'ex20_inheritance_generics_test.morphy2.dart';
 

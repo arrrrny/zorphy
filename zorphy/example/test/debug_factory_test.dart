@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'debug_factory_test.zorphy.dart';
 part 'debug_factory_test.g.dart';

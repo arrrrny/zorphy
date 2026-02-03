@@ -44,15 +44,15 @@ class Person implements $Person {
     return copyWith(firstName: firstName, lastName: lastName, age: age);
   }
 
-  Person copyWithFn({
-    String? Function(String?)? firstName,
-    String? Function(String?)? lastName,
-    int? Function(int?)? age,
+  Person copyWithPersonFn({
+    String? Function()? firstName,
+    String? Function()? lastName,
+    int? Function()? age,
   }) {
     return Person(
-      firstName: firstName != null ? firstName(this.firstName) : this.firstName,
-      lastName: lastName != null ? lastName(this.lastName) : this.lastName,
-      age: age != null ? age(this.age) : this.age,
+      firstName: firstName != null ? firstName() : this.firstName,
+      lastName: lastName != null ? lastName() : this.lastName,
+      age: age != null ? age() : this.age,
     );
   }
 
@@ -245,15 +245,13 @@ class Actor extends $Actor {
     return copyWith(stageName: stageName, yearsActive: yearsActive);
   }
 
-  Actor copyWithFn({
-    String? Function(String?)? stageName,
-    int? Function(int?)? yearsActive,
+  Actor copyWithActorFn({
+    String? Function()? stageName,
+    int? Function()? yearsActive,
   }) {
     return Actor(
-      stageName: stageName != null ? stageName(this.stageName) : this.stageName,
-      yearsActive: yearsActive != null
-          ? yearsActive(this.yearsActive)
-          : this.yearsActive,
+      stageName: stageName != null ? stageName() : this.stageName,
+      yearsActive: yearsActive != null ? yearsActive() : this.yearsActive,
     );
   }
 
@@ -468,21 +466,19 @@ class Employee implements $Employee, Person {
     );
   }
 
-  Employee copyWithFn({
-    String? Function(String?)? firstName,
-    String? Function(String?)? lastName,
-    int? Function(int?)? age,
-    String? Function(String?)? department,
-    double? Function(double?)? salary,
+  Employee copyWithEmployeeFn({
+    String? Function()? firstName,
+    String? Function()? lastName,
+    int? Function()? age,
+    String? Function()? department,
+    double? Function()? salary,
   }) {
     return Employee(
-      firstName: firstName != null ? firstName(this.firstName) : this.firstName,
-      lastName: lastName != null ? lastName(this.lastName) : this.lastName,
-      age: age != null ? age(this.age) : this.age,
-      department: department != null
-          ? department(this.department)
-          : this.department,
-      salary: salary != null ? salary(this.salary) : this.salary,
+      firstName: firstName != null ? firstName() : this.firstName,
+      lastName: lastName != null ? lastName() : this.lastName,
+      age: age != null ? age() : this.age,
+      department: department != null ? department() : this.department,
+      salary: salary != null ? salary() : this.salary,
     );
   }
 
@@ -530,6 +526,18 @@ class Employee implements $Employee, Person {
 
   Employee copyWithPerson({String? firstName, String? lastName, int? age}) {
     return copyWith(firstName: firstName, lastName: lastName, age: age);
+  }
+
+  Employee copyWithPersonFn({
+    String? Function()? firstName,
+    String? Function()? lastName,
+    int? Function()? age,
+  }) {
+    return copyWith(
+      firstName: firstName != null ? firstName() : this.firstName,
+      lastName: lastName != null ? lastName() : this.lastName,
+      age: age != null ? age() : this.age,
+    );
   }
 
   Employee patchWithPerson({PersonPatch? patchInput}) {

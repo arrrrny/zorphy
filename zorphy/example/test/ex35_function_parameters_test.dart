@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex35_function_parameters_test.zorphy.dart';
 
 //PARAMETERS OF A TYPE FUNCTION, THAT INCLUDE A VALUET2 OBJECT, MUST RETAIN THE DOLLAR

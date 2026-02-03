@@ -202,6 +202,9 @@ main() {
 @Zorphy(generateJson: true, explicitSubTypes: [$C, $B])
 abstract class $A<T1> {
   T1 get id;
+
+  // Add a function to convert T1 to JSON
+  Object? Function(T1)? get toJson_T1;
 }
 
 @Zorphy(generateJson: true, explicitSubTypes: [$C])
@@ -209,6 +212,10 @@ abstract class $B<T1, T2> implements $A<T1> {
   T1 get valT1;
 
   T2 get valT2;
+
+  // Add functions to convert T1 and T2 to JSON
+  Object? Function(T1)? get toJson_T1;
+  Object? Function(T2)? get toJson_T2;
 }
 
 @Zorphy(generateJson: true)

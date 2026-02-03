@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'ex61_nonsealed_json_test.zorphy.dart';
 part 'ex61_nonsealed_json_test.g.dart';

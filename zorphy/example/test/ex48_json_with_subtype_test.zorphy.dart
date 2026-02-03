@@ -165,8 +165,35 @@ class APatch implements Patch<A> {
     return this;
   }
 
+  APatch withXPatch(XPatch patch) {
+    _patch[A$.x] = patch;
+    return this;
+  }
+
+  APatch withXPatchFunc(XPatch Function(XPatch) patch) {
+    _patch[A$.x] = (dynamic current) {
+      var currentPatch = XPatch();
+      if (current != null) {
+        currentPatch = current as XPatch;
+      }
+      return patch(currentPatch);
+    };
+    return this;
+  }
+
   APatch withXs(List<X>? value) {
     _patch[A$.xs] = value;
+    return this;
+  }
+
+  APatch updateXsAt(int index, XPatch Function(XPatch) patch) {
+    _patch[A$.xs] = (List<dynamic> list) {
+      var updatedList = List.from(list);
+      if (index >= 0 && index < updatedList.length) {
+        updatedList[index] = patch(updatedList[index] as XPatch);
+      }
+      return updatedList;
+    };
     return this;
   }
 }

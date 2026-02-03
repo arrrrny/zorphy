@@ -35,8 +35,8 @@ class Super extends $Super {
     return copyWith(id: id);
   }
 
-  Super copyWithFn({String? Function(String?)? id}) {
-    return Super(id: id != null ? id(this.id) : this.id);
+  Super copyWithSuperFn({String? Function()? id}) {
+    return Super(id: id != null ? id() : this.id);
   }
 
   Super patchWithSuper({SuperPatch? patchInput}) {

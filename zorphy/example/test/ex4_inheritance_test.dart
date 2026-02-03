@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'ex4_inheritance_test.zorphy.dart';
 
 //ONLY USE IMPLEMENTS, EXTENDS IS NOT ALLOWED
