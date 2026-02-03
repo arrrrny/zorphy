@@ -1,0 +1,66 @@
+// ignore_for_file: unnecessary_cast
+// ignore_for_file: unused_element
+
+import 'package:test/test.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'ex50_json_inheritance_generic_test.g.dart';
+part 'ex50_json_inheritance_generic_test.zorphy.dart';
+
+/// When using generics that require JSON then we need to define
+/// how that generic is converted into JSON.  Unfortunately we
+/// must do that for every single creation of an object (see jsongenerics.png)
+/// To make this a bit easier we can curry the constructors
+
+// B<String> B_String({required String id, required String blah}) {
+//   return B<String>(id: id, blah: blah, toJson_T: (x) => x as String);
+// }
+//
+// B<X> B_X({required String id, required X blah}) {
+//   return B<X>(id: id, blah: blah, toJson_T: (x) => x.toJson());
+// }
+
+main() {
+  test("1 toJson", () {
+    var aList = [
+      A(id: "1"),
+      B<String>(id: "2", blah: "sdf"),
+      B<X>(
+        id: "3",
+        blah: X(xyz: "my custom"),
+      ),
+    ];
+
+    var result = aList
+        .map((e) => e.toJsonCustom({X: (X x) => x.toJson()}))
+        .toList();
+
+    var expected = [
+      {'id': '1', '_className_': 'A'},
+      {'id': '2', 'blah': 'sdf', '_className_': 'B', '_T_': 'String'},
+      {
+        'id': '3',
+        'blah': {'xyz': 'my custom', '_className_': 'X'},
+        '_className_': 'B',
+        '_T_': 'X',
+      },
+    ];
+
+    expect(result, expected);
+  });
+}
+
+@Zorphy(generateJson: true)
+abstract class $A {
+  String get id;
+}
+
+@Zorphy(generateJson: true)
+abstract class $B<T> implements $A {
+  T get blah;
+}
+
+@Zorphy(generateJson: true)
+abstract class $X {
+  String get xyz;
+}

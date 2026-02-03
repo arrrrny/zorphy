@@ -1,0 +1,952 @@
+import 'package:dartx/dartx.dart';
+import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/common/classes.dart';
+import 'package:zorphy/src/factory_method.dart';
+
+List<NameTypeClassComment> getDistinctFields(
+  List<NameTypeClassComment> allFields,
+  List<Interface> interfaces,
+) {
+  var allFieldsDistinct = <NameTypeClassComment>[];
+
+  // Add interface fields first
+  for (var i in interfaces) {
+    for (var f in i.fields) {
+      var field = allFields.firstOrNullWhere((x) => x.name == f.name);
+      if (field != null) {
+        allFieldsDistinct.add(field);
+      } else {
+        allFieldsDistinct.add(
+          NameTypeClassComment(
+            f.name,
+            f.type,
+            i.interfaceName,
+          ),
+        );
+      }
+    }
+  }
+
+  // Add class fields that aren't in interfaces
+  for (var f in allFields) {
+    if (!allFieldsDistinct.any((x) => x.name == f.name)) {
+      allFieldsDistinct.add(f);
+    }
+  }
+
+  return allFieldsDistinct;
+}
+
+String getProperties(
+  List<NameTypeClassComment> fields,
+  String className,
+  bool isAbstract,
+  bool hidePublicConstructor,
+  bool generateCopyWithFn,
+  bool generateJson,
+  bool hasExtends,
+) {
+  var sb = StringBuffer();
+  var classNameTrimmed = className.replaceAll("\$", "");
+
+  for (var f in fields) {
+    // Add JsonKey annotation if present from source
+    if (f.jsonKeyInfo != null) {
+      sb.writeln("  ${f.jsonKeyInfo!.toAnnotationString()}");
+    }
+
+    // Determine the field type
+    // For concrete classes, replace $-prefixed types with concrete class names
+    var fieldType = f.type;
+    if (!isAbstract && fieldType != null) {
+      fieldType = _replaceDollarTypesWithConcrete(fieldType);
+    }
+
+    if (isAbstract) {
+      sb.writeln("  ${fieldType} get ${f.name};");
+    } else {
+      // Only add @override if the class extends an abstract parent
+      // If it only implements interfaces, don't add @override for fields
+      if (hasExtends) {
+        sb.writeln("  @override");
+      }
+      sb.writeln("  final ${fieldType} ${f.name};");
+    }
+  }
+
+  if (!isAbstract && !hidePublicConstructor) {
+    // Constructor
+    sb.writeln("");
+    sb.writeln("  ${classNameTrimmed}({");
+    for (var f in fields) {
+      // Determine the field type (same logic as above for field declarations)
+      var fieldType = f.type;
+      if (fieldType != null) {
+        fieldType = _replaceDollarTypesWithConcrete(fieldType);
+      }
+
+      // Check if field is nullable - if it ends with ?, don't add required
+      // Use the transformed fieldType to check for nullability
+      var isNullable = fieldType != null && fieldType!.endsWith('?');
+      var requiredKeyword = isNullable ? "" : "required ";
+      sb.writeln("    ${requiredKeyword}this.${f.name},");
+    }
+    sb.writeln("  });");
+
+    // Named constructor for copyWith
+    if (generateCopyWithFn) {
+      sb.writeln("");
+      sb.writeln("  ${classNameTrimmed}._copyWith({");
+      for (var f in fields) {
+        var fieldType =
+            f.type != null ? _replaceDollarTypesWithConcrete(f.type!) : f.type;
+        sb.writeln("    ${fieldType}? ${f.name},");
+      }
+      sb.writeln("  }) : ");
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        var comma = i == fields.length - 1 ? ";" : ",";
+        sb.writeln(
+            "    ${f.name} = ${f.name} ?? throw ArgumentError(\"${f.name} is required\")$comma");
+      }
+    }
+  }
+
+  return sb.toString();
+}
+
+String generateFactoryMethod(
+  FactoryMethodInfo factory,
+  String classNameTrimmed,
+  List<NameTypeClassComment> allFields,
+) {
+  var sb = StringBuffer();
+
+  sb.write("  factory ${classNameTrimmed}.${factory.name}(");
+
+  if (factory.parameters.isNotEmpty) {
+    if (factory.parameters.any((p) => p.isNamed)) {
+      sb.write("{");
+      sb.write(
+        factory.parameters
+            .map((p) {
+              var prefix = p.isRequired ? "required " : "";
+              var suffix = p.hasDefaultValue && p.defaultValue != null
+                  ? " = ${p.defaultValue}"
+                  : "";
+              var cleanType = _replaceDollarTypesWithConcrete(
+                  p.type.replaceAll('\$', ''));
+              return "${prefix}${cleanType} ${p.name}${suffix}";
+            })
+            .join(", "),
+      );
+      sb.write("}");
+    } else {
+      sb.write(
+        factory.parameters
+            .map((p) {
+              var suffix = p.hasDefaultValue && p.defaultValue != null
+                  ? " = ${p.defaultValue}"
+                  : "";
+              var cleanType =
+                  _replaceDollarTypesWithConcrete(p.type.replaceAll('\$', ''));
+              return "${cleanType} ${p.name}${suffix}";
+            })
+            .join(", "),
+      );
+    }
+  }
+
+  sb.write(") => ");
+
+  var bodyCode = factory.bodyCode;
+  var useAbstractFactoryCall = bodyCode.trim().isEmpty;
+  if (useAbstractFactoryCall) {
+    var callArgs = factory.parameters
+        .map((p) => p.isNamed ? "${p.name}: ${p.name}" : p.name)
+        .join(", ");
+    var abstractClassName = factory.className.replaceAll('\$', '');
+    bodyCode = "${abstractClassName}.${factory.name}($callArgs)";
+  }
+
+  if (bodyCode.contains('return ') && bodyCode.endsWith(';')) {
+    bodyCode = bodyCode.substring(7, bodyCode.length - 1);
+  }
+
+  if (!useAbstractFactoryCall) {
+    bodyCode = bodyCode
+        .replaceAll(
+          '${factory.className.replaceAll('\$', '')}._',
+          '${classNameTrimmed}._',
+        )
+        .replaceAll('\$', '');
+  }
+
+  sb.writeln("${bodyCode};");
+  sb.writeln();
+
+  return sb.toString();
+}
+
+/// Generates changeTo extension methods for explicitSubTypes
+/// This allows converting from one concrete class to another explicit subtype
+String getChangeToExtension({
+  required List<NameTypeClassComment> sourceFields,
+  required String sourceClassName,
+  required List<Interface> explicitSubTypes,
+  required List<String> knownClasses,
+}) {
+  var sb = StringBuffer();
+
+  if (explicitSubTypes.isEmpty) {
+    return '';
+  }
+
+  var sourceClassNameTrimmed = sourceClassName.replaceAll('\$', '');
+  sb.writeln();
+  sb.writeln(
+      "extension ${sourceClassNameTrimmed}ChangeToE on $sourceClassNameTrimmed {");
+
+  for (var targetInterface in explicitSubTypes) {
+    var targetClassName = targetInterface.interfaceName.replaceAll('\$', '');
+    var targetFields = targetInterface.fields;
+    var targetFieldsDistinct = <NameType>[];
+    var targetFieldNames = <String>{};
+    for (var field in targetFields) {
+      if (targetFieldNames.add(field.name)) {
+        targetFieldsDistinct.add(field);
+      }
+    }
+
+    // Generate parameters for the target type - only include fields that aren't in source
+    var sourceFieldNames = sourceFields.map((f) => f.name).toSet();
+    var targetOnlyFields = targetFieldsDistinct
+        .where((f) => !sourceFieldNames.contains(f.name))
+        .toList();
+
+    // Build parameter list
+    var params = <String>[];
+    for (var field in targetOnlyFields) {
+      var fieldTypeRaw = field.type ?? '';
+      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
+      var fieldName = field.name;
+      var isNullable = fieldType.endsWith('?');
+
+      if (isNullable) {
+        params.add('$fieldType $fieldName');
+      } else {
+        params.add('required $fieldType $fieldName');
+      }
+    }
+
+    // Also include fields that exist in both but might want to override (nullable)
+    for (var field in targetFieldsDistinct) {
+      var fieldTypeRaw = field.type ?? '';
+      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
+      var fieldName = field.name;
+      var isNullable = fieldType.endsWith('?');
+
+      if (sourceFieldNames.contains(fieldName) && isNullable) {
+        // Add optional parameter for fields that exist in both
+        params.add('$fieldType $fieldName');
+      }
+    }
+
+    // Generate method signature
+    var paramsStr = params.join(", ");
+    var paramClause = paramsStr.isNotEmpty ? '{$paramsStr}' : '';
+    sb.writeln('  $targetClassName changeTo$targetClassName($paramClause) {');
+    sb.writeln('    final _patcher = ${targetClassName}Patch();');
+
+    // Set required fields
+    for (var field in targetOnlyFields) {
+      var fieldName = field.name;
+      var fieldTypeRaw = field.type ?? '';
+      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
+      var isNullable = fieldType.endsWith('?');
+      var fieldNameCap = fieldName[0].toUpperCase() + fieldName.substring(1);
+
+      if (!isNullable) {
+        sb.writeln('    _patcher.with$fieldNameCap($fieldName);');
+      } else if (params.contains('$fieldType $fieldName')) {
+        sb.writeln('    if ($fieldName != null) {');
+        sb.writeln('      _patcher.with$fieldNameCap($fieldName);');
+        sb.writeln('    }');
+      }
+    }
+
+    // Set optional override fields
+    for (var field in targetFieldsDistinct) {
+      var fieldTypeRaw = field.type ?? '';
+      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
+      var fieldName = field.name;
+      var isNullable = fieldType.endsWith('?');
+      var fieldNameCap = fieldName[0].toUpperCase() + fieldName.substring(1);
+
+      if (sourceFieldNames.contains(fieldName) &&
+          isNullable &&
+          params.contains('$fieldType $fieldName')) {
+        sb.writeln('    if ($fieldName != null) {');
+        sb.writeln('      _patcher.with$fieldNameCap($fieldName);');
+        sb.writeln('    }');
+      }
+    }
+
+    sb.writeln('    final _patchMap = _patcher.toPatch();');
+
+    // Generate constructor call
+    sb.write('    return $targetClassName(');
+
+    var constructorParams = <String>[];
+    for (var field in targetFieldsDistinct) {
+      var fieldName = field.name;
+      var fieldTypeRaw = field.type ?? '';
+      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
+      var fieldEnum = "${targetClassName}\$.$fieldName";
+      var isNullable = fieldType.endsWith('?');
+
+      // Check if field has special handling (needs patch handling)
+      var baseType = fieldType.replaceAll('?', '');
+      var needsPatchHandling = _needsPatchHandling(baseType, knownClasses);
+
+      if (needsPatchHandling) {
+        constructorParams
+            .add('      $fieldName: _patchMap.containsKey($fieldEnum)\n'
+                '          ? (_patchMap[$fieldEnum] is Function)\n'
+                '                ? _patchMap[$fieldEnum]($fieldName)\n'
+                '                : _patchMap[$fieldEnum]\n'
+                '          : $fieldName');
+      } else if (isNullable && params.contains('$fieldType $fieldName')) {
+        // Optional parameter that might be in patch
+        constructorParams
+            .add('      $fieldName: _patchMap.containsKey($fieldEnum)\n'
+                '          ? (_patchMap[$fieldEnum] is Function)\n'
+                '                ? _patchMap[$fieldEnum]($fieldName)\n'
+                '                : _patchMap[$fieldEnum]\n'
+                '          : $fieldName');
+      } else if (!sourceFieldNames.contains(fieldName)) {
+        // Field only in target (required)
+        constructorParams.add('      $fieldName: _patchMap[$fieldEnum]');
+      } else {
+        // Field in both - use patch or current value
+        constructorParams
+            .add('      $fieldName: _patchMap.containsKey($fieldEnum)\n'
+                '          ? (_patchMap[$fieldEnum] is Function)\n'
+                '                ? _patchMap[$fieldEnum]($fieldName)\n'
+                '                : _patchMap[$fieldEnum]\n'
+                '          : $fieldName');
+      }
+    }
+
+    if (constructorParams.isNotEmpty) {
+      sb.writeln();
+      for (var i = 0; i < constructorParams.length; i++) {
+        var isLast = i == constructorParams.length - 1;
+        sb.write(constructorParams[i]);
+        if (!isLast) {
+          sb.writeln(',');
+        } else {
+          sb.writeln();
+        }
+      }
+    }
+
+    sb.writeln('    );');
+    sb.writeln('  }');
+    sb.writeln();
+  }
+
+  sb.writeln('}');
+
+  return sb.toString();
+}
+
+/// Check if a type needs patch handling (is a known Morphy/Zorphy class)
+bool _needsPatchHandling(String baseType, List<String> knownClasses) {
+  return knownClasses.contains(baseType);
+}
+
+/// Replace $-prefixed types with concrete class names for JSON serialization
+/// For example: $TreeNode -> TreeNode, List<$TreeNode> -> List<TreeNode>
+String _replaceDollarTypesWithConcrete(String type) {
+  // Handle List<$Type> or List<$Type?>
+  if (type.startsWith('List<') && type.contains('>')) {
+    var innerType = type.substring(5, type.lastIndexOf('>'));
+    var isNullable = innerType.endsWith('?');
+    var baseInnerType =
+        isNullable ? innerType.substring(0, innerType.length - 1) : innerType;
+
+    // If the inner type starts with $, remove it
+    if (baseInnerType.startsWith('\$')) {
+      var trimmedType = baseInnerType.replaceAll('\$', '');
+      return 'List<$trimmedType${isNullable ? '?' : ''}>';
+    }
+    return type;
+  }
+
+  // Handle Map<K, $Type> or Map<K, $Type?>
+  if (type.startsWith('Map<') && type.contains('>')) {
+    var parts = type.substring(4, type.lastIndexOf('>')).split(',');
+    if (parts.length >= 2) {
+      var keyType = parts[0].trim();
+      var valueType = parts[1].trim();
+      var isValueNullable = valueType.endsWith('?');
+      var baseValueType = isValueNullable
+          ? valueType.substring(0, valueType.length - 1)
+          : valueType;
+
+      // If the value type starts with $, remove it
+      if (baseValueType.startsWith('\$')) {
+        var trimmedType = baseValueType.replaceAll('\$', '');
+        return 'Map<$keyType, $trimmedType${isValueNullable ? '?' : ''}>';
+      }
+    }
+    return type;
+  }
+
+  // Handle direct $Type or $Type?
+  var isNullable = type.endsWith('?');
+  var baseType = isNullable ? type.substring(0, type.length - 1) : type;
+
+  if (baseType.startsWith('\$')) {
+    var trimmedType = baseType.replaceAll('\$', '');
+    return '$trimmedType${isNullable ? '?' : ''}';
+  }
+
+  return type;
+}
+
+String getPropertiesAbstract(
+  List<NameTypeClassComment> fields,
+  String className,
+  bool generateCopyWithFn,
+) {
+  var sb = StringBuffer();
+
+  for (var f in fields) {
+    // Add JsonKey annotation if present
+    if (f.jsonKeyInfo != null) {
+      sb.writeln("  ${f.jsonKeyInfo!.toAnnotationString()}");
+    }
+    sb.writeln("  ${f.type} get ${f.name};");
+  }
+
+  // Private constructor for abstract classes
+  sb.writeln("");
+  sb.writeln("  const ${className}._internal();");
+
+  // Named constructor for copyWith
+  if (generateCopyWithFn) {
+    sb.writeln("");
+    sb.writeln("  const factory ${className}._copyWith({");
+    for (var f in fields) {
+      sb.writeln("    ${f.type}? ${f.name},");
+    }
+    sb.writeln("  }) = _\$${className}CopyWith;");
+  }
+
+  return sb.toString();
+}
+
+String getCopyWith(
+  List<NameTypeClassComment> fields,
+  String className,
+  bool generateCopyWithFn,
+) {
+  var sb = StringBuffer();
+  var classNameTrimmed = className.replaceAll("\$", "");
+
+  // Regular copyWith method (standard convention)
+  sb.writeln("  $classNameTrimmed copyWith({");
+  for (var f in fields) {
+    var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+    var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
+    sb.writeln("    $nullableType ${f.name},");
+  }
+  sb.writeln("  }) {");
+  sb.writeln("    return $classNameTrimmed(");
+  for (var f in fields) {
+    sb.writeln("      ${f.name}: ${f.name} ?? this.${f.name},");
+  }
+  sb.writeln("    );");
+  sb.writeln("  }");
+
+  // Alias: copyWith{Entity} for polymorphic/disambiguation cases
+  // This delegates to the standard copyWith method
+  sb.writeln("");
+  sb.writeln("  $classNameTrimmed copyWith$classNameTrimmed({");
+  for (var f in fields) {
+    var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+    var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
+    sb.writeln("    $nullableType ${f.name},");
+  }
+  sb.writeln("  }) {");
+  sb.writeln("    return copyWith(");
+  var params = fields.map((f) => "${f.name}: ${f.name}").join(", ");
+  sb.writeln("      $params,");
+  sb.writeln("    );");
+  sb.writeln("  }");
+
+  // Function-based copyWith if enabled
+  if (generateCopyWithFn) {
+    sb.writeln("");
+    sb.writeln("  $classNameTrimmed copyWithFn({");
+    for (var f in fields) {
+      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+      var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
+      sb.writeln("    $nullableType Function($nullableType)? ${f.name},");
+    }
+    sb.writeln("  }) {");
+    sb.writeln("    return $classNameTrimmed(");
+    for (var f in fields) {
+      sb.writeln(
+          "      ${f.name}: ${f.name} != null ? ${f.name}(this.${f.name}) : this.${f.name},");
+    }
+    sb.writeln("    );");
+    sb.writeln("  }");
+  }
+
+  return sb.toString();
+}
+
+String getInterfaceCopyWithMethods(
+  List<Interface> interfaces,
+  List<NameTypeClassComment> classFields,
+  String className,
+) {
+  var sb = StringBuffer();
+  var classNameTrimmed = className.replaceAll("\$", "");
+  var classFieldNames = classFields.map((f) => f.name).toSet();
+
+  for (var i in interfaces) {
+    var interfaceName = i.interfaceName;
+    if (!interfaceName.startsWith("\$") || interfaceName.startsWith("\$\$")) {
+      continue;
+    }
+    var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
+    if (interfaceNameTrimmed == classNameTrimmed) continue;
+
+    var interfaceFields =
+        i.fields.where((f) => classFieldNames.contains(f.name)).toList();
+    if (interfaceFields.isEmpty) continue;
+
+    sb.writeln("");
+    sb.writeln("  $classNameTrimmed copyWith$interfaceNameTrimmed({");
+    for (var f in interfaceFields) {
+      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+      var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
+      sb.writeln("    $nullableType ${f.name},");
+    }
+    sb.writeln("  }) {");
+    sb.writeln("    return copyWith(");
+    var params = interfaceFields.map((f) => "${f.name}: ${f.name}").join(", ");
+    sb.writeln("      $params,");
+    sb.writeln("    );");
+    sb.writeln("  }");
+  }
+
+  return sb.toString();
+}
+
+String getEqualsAndHashCode(
+  List<NameTypeClassComment> fields,
+  String className,
+) {
+  var sb = StringBuffer();
+
+  // equals operator
+  sb.writeln("  @override");
+  sb.writeln("  bool operator ==(Object other) {");
+  sb.writeln("    if (identical(this, other)) return true;");
+  sb.writeln("    return other is ${className} &&");
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    var comma = i == fields.length - 1 ? ";" : " &&";
+    sb.writeln("        ${f.name} == other.${f.name}$comma");
+  }
+  sb.writeln("  }");
+
+  // hashCode
+  sb.writeln("");
+  sb.writeln("  @override");
+  sb.writeln("  int get hashCode {");
+  if (fields.isEmpty) {
+    sb.writeln("    return 0;");
+  } else if (fields.length == 1) {
+    // For single field, use Object.hash() with the field and 0
+    sb.writeln("    return Object.hash(${fields[0].name}, 0);");
+  } else if (fields.length <= 20) {
+    // For 2-20 fields, use Object.hash() directly
+    sb.writeln("    return Object.hash(");
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      var comma = i == fields.length - 1 ? ");" : ",";
+      sb.writeln("      this.${f.name}$comma");
+    }
+  } else {
+    // For >20 fields, split into multiple Object.hash() calls and combine
+    var chunkSize = 20;
+    var chunks = (fields.length / chunkSize).ceil();
+
+    for (var c = 0; c < chunks; c++) {
+      var start = c * chunkSize;
+      var end = (start + chunkSize).clamp(0, fields.length);
+      var chunkFields = fields.sublist(start, end);
+
+      if (c == 0) {
+        sb.write("    return Object.hash(");
+        for (var i = 0; i < chunkFields.length; i++) {
+          var f = chunkFields[i];
+          var comma = i == chunkFields.length - 1 ? ")" : ",";
+          sb.write("this.${f.name}$comma");
+        }
+      } else {
+        sb.write(" ^ Object.hash(");
+        for (var i = 0; i < chunkFields.length; i++) {
+          var f = chunkFields[i];
+          var comma = i == chunkFields.length - 1 ? ")" : ",";
+          sb.write("this.${f.name}$comma");
+        }
+      }
+    }
+    sb.writeln(";");
+  }
+  sb.writeln("  }");
+
+  return sb.toString();
+}
+
+String getToString(
+  List<NameTypeClassComment> fields,
+  String className,
+) {
+  var sb = StringBuffer();
+
+  sb.writeln("  @override");
+  sb.writeln("  String toString() {");
+  sb.writeln("    return '$className(' +");
+
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    var isLast = i == fields.length - 1;
+    sb.write("        '${f.name}: \${${f.name}}");
+    if (isLast) {
+      sb.writeln(")';");
+    } else {
+      sb.writeln("' + ', ' +");
+    }
+  }
+  sb.writeln("  }");
+
+  return sb.toString();
+}
+
+String getEnumPropertyList(
+  List<NameTypeClassComment> fields,
+  String className,
+) {
+  if (fields.isEmpty) return '';
+
+  String classNameTrimmed = '${className.replaceAll("\$", "")}';
+  String enumName = '${classNameTrimmed}\$';
+
+  var sb = StringBuffer();
+
+  // Generate enum
+  sb.writeln("enum $enumName {");
+  sb.writeln(
+    fields
+        .map((e) => e.name.startsWith("_") ? e.name.substring(1) : e.name)
+        .join(","),
+  );
+  sb.writeln("}\n");
+  return sb.toString();
+}
+
+String getPatchClass(
+  List<NameTypeClassComment> fields,
+  String className,
+  List<String> knownClasses, [
+  List<String> genericTypeNames = const [],
+]) {
+  if (fields.isEmpty) {
+    // Don't generate patch classes for classes with no fields
+    return '';
+  }
+
+  String classNameTrimmed = '${className.replaceAll("\$", "")}';
+  String enumName = '${classNameTrimmed}\$';
+
+  var sb = StringBuffer();
+
+  // Add Patch<T> implementation
+  sb.writeln(
+    "class ${classNameTrimmed}Patch implements Patch<$classNameTrimmed> {",
+  );
+  sb.writeln("  final Map<$enumName, dynamic> _patch = {};");
+  sb.writeln();
+
+  // Static factory methods
+  sb.writeln(
+    "  static ${classNameTrimmed}Patch create([Map<String, dynamic>? diff]) {",
+  );
+  sb.writeln("    final patch = ${classNameTrimmed}Patch();");
+  sb.writeln("    if (diff != null) {");
+  sb.writeln("      diff.forEach((key, value) {");
+  sb.writeln("        try {");
+  sb.writeln(
+    "          final enumValue = $enumName.values.firstWhere((e) => e.name == key);",
+  );
+  sb.writeln("          if (value is Function) {");
+  sb.writeln("            patch._patch[enumValue] = value();");
+  sb.writeln("          } else {");
+  sb.writeln("            patch._patch[enumValue] = value;");
+  sb.writeln("          }");
+  sb.writeln("        } catch (_) {}");
+  sb.writeln("      });");
+  sb.writeln("    }");
+  sb.writeln("    return patch;");
+  sb.writeln("  }");
+  sb.writeln();
+
+  // Generate fromPatch
+  sb.writeln(
+    "  static ${classNameTrimmed}Patch fromPatch(Map<${classNameTrimmed}\$, dynamic> patch) {",
+  );
+  sb.writeln("    final _patch = ${classNameTrimmed}Patch();");
+  sb.writeln("    _patch._patch.addAll(patch);");
+  sb.writeln("    return _patch;");
+  sb.writeln("  }");
+  sb.writeln();
+
+  // Convert to map method
+  sb.writeln("  Map<$enumName, dynamic> toPatch() => Map.from(_patch);");
+  sb.writeln();
+
+  sb.writeln("  $classNameTrimmed applyTo($classNameTrimmed entity) {");
+  sb.writeln("    return entity.patchWith$classNameTrimmed(patchInput: this);");
+  sb.writeln("  }");
+  sb.writeln();
+
+  // Add toJson method with _className_
+  sb.writeln("  Map<String, dynamic> toJson() {");
+  sb.writeln("    final json = <String, dynamic>{};");
+  sb.writeln("    _patch.forEach((key, value) {");
+  sb.writeln("      if (value != null) {");
+  sb.writeln("        if (value is Function) {");
+  sb.writeln("          final result = value();");
+  sb.writeln("          json[key.name] = _convertToJson(result);");
+  sb.writeln("        } else {");
+  sb.writeln("          json[key.name] = _convertToJson(value);");
+  sb.writeln("        }");
+  sb.writeln("      }");
+  sb.writeln("    });");
+  sb.writeln("    return json;");
+  sb.writeln("  }");
+  sb.writeln();
+
+  // Add convertToJson method
+  sb.writeln("  dynamic _convertToJson(dynamic value) {");
+  sb.writeln("    if (value == null) return null;");
+  sb.writeln("    if (value is DateTime) return value.toIso8601String();");
+  sb.writeln("    if (value is Enum) return value.toString().split('.').last;");
+  sb.writeln(
+    "    if (value is List) return value.map((e) => _convertToJson(e)).toList();",
+  );
+  sb.writeln(
+    "    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));",
+  );
+  sb.writeln(
+    "    if (value is num || value is bool || value is String) return value;",
+  );
+  sb.writeln("    try {");
+  sb.writeln(
+      "        if (value?.toJsonLean != null) return value.toJsonLean();");
+  sb.writeln("      } catch (_) {}");
+  sb.writeln("    if (value?.toJson != null) return value.toJson();");
+  sb.writeln("    return value.toString();");
+  sb.writeln("  }");
+  sb.writeln();
+
+  // Add fromJson factory
+  sb.writeln(
+    "  static ${classNameTrimmed}Patch fromJson(Map<String, dynamic> json) {",
+  );
+  sb.writeln("    return create(json);");
+  sb.writeln("  }");
+  sb.writeln();
+
+  // Generate with methods
+  for (var field in fields) {
+    var name =
+        field.name.startsWith("_") ? field.name.substring(1) : field.name;
+    var baseType = getDataTypeWithoutDollars(field.type ?? "dynamic");
+    var capitalizedName =
+        name.substring(0, 1).toUpperCase() + name.substring(1);
+
+    var cleanBaseType = baseType.replaceAll("?", "");
+    var isGenericType = genericTypeNames.contains(cleanBaseType) ||
+        baseType.contains('<') &&
+            genericTypeNames.any((g) => baseType.contains(g));
+
+    var parameterType = isGenericType
+        ? 'dynamic'
+        : (baseType.endsWith('?') ? baseType : "$baseType?");
+
+    sb.writeln(
+      "  ${classNameTrimmed}Patch with$capitalizedName($parameterType value) {",
+    );
+    sb.writeln("    _patch[$enumName.$name] = value;");
+    sb.writeln("    return this;");
+    sb.writeln("  }");
+    sb.writeln();
+  }
+
+  sb.writeln("}");
+
+  return sb.toString();
+}
+
+String getDataTypeWithoutDollars(String type) {
+  return type.replaceAll('\$', '');
+}
+
+const PRIMITIVE_TYPES = [
+  'String',
+  'int',
+  'double',
+  'num',
+  'bool',
+  'DateTime',
+  'List',
+  'Set',
+  'Map',
+  'BigInt',
+  'Duration',
+  'Uri',
+  'dynamic'
+];
+
+String getPatchWithMethod(
+  List<NameTypeClassComment> fields,
+  String className,
+) {
+  if (fields.isEmpty) return '';
+
+  var classNameTrimmed = className.replaceAll("\$", "");
+  var enumName = '${classNameTrimmed}\$';
+
+  var sb = StringBuffer();
+
+  sb.writeln("  $classNameTrimmed patchWith$classNameTrimmed({");
+  sb.writeln("    $classNameTrimmed" + "Patch? patchInput,");
+  sb.writeln("  }) {");
+  sb.writeln(
+      "    final _patcher = patchInput ?? $classNameTrimmed" + "Patch();");
+  sb.writeln("    final _patchMap = _patcher.toPatch();");
+  sb.writeln("    return $classNameTrimmed(");
+
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    var comma = i == fields.length - 1 ? "" : ",";
+    sb.writeln(
+      "      ${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name}$comma",
+    );
+  }
+
+  sb.writeln("    );");
+  sb.writeln("  }");
+
+  return sb.toString();
+}
+
+String getInterfacePatchWithMethods(
+  List<Interface> interfaces,
+  List<NameTypeClassComment> classFields,
+  String className,
+) {
+  var sb = StringBuffer();
+  var classNameTrimmed = className.replaceAll("\$", "");
+  var classFieldNames = classFields.map((f) => f.name).toSet();
+
+  for (var i in interfaces) {
+    var interfaceName = i.interfaceName;
+    if (!interfaceName.startsWith("\$") || interfaceName.startsWith("\$\$")) {
+      continue;
+    }
+    var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
+    if (interfaceNameTrimmed == classNameTrimmed) continue;
+
+    var interfaceFields =
+        i.fields.where((f) => classFieldNames.contains(f.name)).toList();
+    if (interfaceFields.isEmpty) continue;
+
+    var enumName = '${interfaceNameTrimmed}\$';
+    var interfaceFieldNames = interfaceFields.map((f) => f.name).toSet();
+
+    sb.writeln("");
+    sb.writeln(
+        "  $classNameTrimmed patchWith$interfaceNameTrimmed({");
+    sb.writeln("    $interfaceNameTrimmed" + "Patch? patchInput,");
+    sb.writeln("  }) {");
+    sb.writeln(
+        "    final _patcher = patchInput ?? $interfaceNameTrimmed" + "Patch();");
+    sb.writeln("    final _patchMap = _patcher.toPatch();");
+    sb.writeln("    return $classNameTrimmed(");
+
+    for (var f in classFields) {
+      if (interfaceFieldNames.contains(f.name)) {
+        sb.writeln(
+          "      ${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name},",
+        );
+      } else {
+        sb.writeln("      ${f.name}: this.${f.name},");
+      }
+    }
+
+    sb.writeln("    );");
+    sb.writeln("  }");
+  }
+
+  return sb.toString();
+}
+
+String getCompareToExtension(
+  String classNameTrimmed,
+  List<NameTypeClassComment> allFields,
+  List<Interface> knownInterfaces,
+) {
+  var sb = StringBuffer();
+  sb.writeln();
+  sb.writeln("extension ${classNameTrimmed}CompareE on $classNameTrimmed {");
+  sb.writeln(
+      "  Map<String, dynamic> compareTo$classNameTrimmed($classNameTrimmed other) {");
+  sb.writeln("    final Map<String, dynamic> diff = {};");
+  sb.writeln();
+
+  for (var field in allFields) {
+    var fieldType = field.type ?? '';
+    var fieldName = field.name;
+    var isNullable = fieldType.endsWith('?');
+
+    if (fieldType.contains('Function')) {
+      continue; // Skip functions
+    }
+
+    if (isNullable) {
+      sb.writeln("    if ($fieldName != other.$fieldName) {");
+      sb.writeln("      diff['$fieldName'] = () => other.$fieldName;");
+      sb.writeln("    }");
+    } else {
+      sb.writeln("    if ($fieldName != other.$fieldName) {");
+      sb.writeln("      diff['$fieldName'] = () => other.$fieldName;");
+      sb.writeln("    }");
+    }
+  }
+
+  sb.writeln("    return diff;");
+  sb.writeln("  }");
+  sb.writeln("}");
+
+  return sb.toString();
+}

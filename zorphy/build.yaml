@@ -1,0 +1,24 @@
+targets:
+  $default:
+    builders:
+      zorphy:zorphy:
+        enabled: true
+
+builders:
+  zorphy:
+    target: "zorphy"
+    import: "package:zorphy/builder.dart"
+    builder_factories: ["zorphyBuilder"]
+    build_extensions: { ".dart": [".zorphy.dart"] }
+    auto_apply: dependents
+    build_to: source
+    applies_builders: ["source_gen|combining_builder"]
+    runs_before: ["json_serializable:json_serializable"]
+  zorphy2:
+    target: ":zorphy2_generator"
+    import: "package:zorphy/builder2.dart"
+    builder_factories: ["zorphy2Builder"]
+    build_extensions: { ".dart": [".zorphy2.dart"] }
+    auto_apply: dependents
+    build_to: source
+    runs_before: ["json_serializable|json_serializable", "zorphy:zorphy"]
