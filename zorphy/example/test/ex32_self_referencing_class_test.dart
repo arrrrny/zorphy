@@ -1,7 +1,7 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
 //SELF REFERENCING CLASS
-part 'ex32_self_referencing_class_test.morphy.dart';
+part 'ex32_self_referencing_class_test.zorphy.dart';
 
 ///where a property of one class is the same type
 

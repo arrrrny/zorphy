@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy.dart';
 import 'package:test/test.dart';
 
-part 'ex11_generic_subclass_test.morphy.dart';
+part 'ex11_generic_subclass_test.zorphy.dart';
 
 //GENERIC SPECIFIED OF IMPLEMENTED CLASS
 

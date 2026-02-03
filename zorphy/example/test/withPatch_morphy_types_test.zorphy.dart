@@ -61,6 +61,23 @@ class Profile extends $Profile {
   /// Creates a [Profile] instance from JSON
   factory Profile.fromJson(Map<String, dynamic> json) =>
       _$ProfileFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ProfileToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Profile$ { name, age }
@@ -228,6 +245,23 @@ class User extends $User {
 
   /// Creates a [User] instance from JSON
   factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$UserToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum User$ { email, profile }

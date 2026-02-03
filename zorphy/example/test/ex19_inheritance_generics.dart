@@ -1,5 +1,5 @@
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex19_inheritance_generics.morphy.dart';
+part 'ex19_inheritance_generics.zorphy.dart';
 
 @zorphy
 abstract class $$A {}

@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy.dart';
 import 'package:test/test.dart';
 
-part 'ex62_private_getter_test.morphy.dart';
+part 'ex62_private_getter_test.zorphy.dart';
 
 //nullable private getters and private morphy class
 

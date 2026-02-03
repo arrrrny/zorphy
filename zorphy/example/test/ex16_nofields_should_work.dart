@@ -1,5 +1,5 @@
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex16_nofields_should_work.morphy.dart';
+part 'ex16_nofields_should_work.zorphy.dart';
 
 //ERROR ON NON ABSTRACT CLASSES WITH NO FIELDS
 

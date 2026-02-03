@@ -88,6 +88,23 @@ class OperatingSystem extends $OperatingSystem {
   /// Creates a [OperatingSystem] instance from JSON
   factory OperatingSystem.fromJson(Map<String, dynamic> json) =>
       _$OperatingSystemFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$OperatingSystemToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum OperatingSystem$ { name, version, isActive }
@@ -301,6 +318,23 @@ class DeviceType extends $DeviceType {
   /// Creates a [DeviceType] instance from JSON
   factory DeviceType.fromJson(Map<String, dynamic> json) =>
       _$DeviceTypeFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$DeviceTypeToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum DeviceType$ { category, manufacturer, screenSize }
@@ -547,6 +581,23 @@ class Device extends $Device {
 
   /// Creates a [Device] instance from JSON
   factory Device.fromJson(Map<String, dynamic> json) => _$DeviceFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$DeviceToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Device$ { deviceId, os, deviceType, supportedOS, peripherals }
@@ -809,6 +860,23 @@ class User extends $User {
 
   /// Creates a [User] instance from JSON
   factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$UserToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum User$ { name, email, primaryDevice, devices, preferences }

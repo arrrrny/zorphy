@@ -403,6 +403,23 @@ class LargeClass extends $LargeClass {
   /// Creates a [LargeClass] instance from JSON
   factory LargeClass.fromJson(Map<String, dynamic> json) =>
       _$LargeClassFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$LargeClassToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum LargeClass$ {

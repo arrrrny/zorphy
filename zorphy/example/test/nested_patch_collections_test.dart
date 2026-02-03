@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy.dart';
 import 'package:test/test.dart';
 
-part 'nested_patch_collections_test.morphy.dart';
+part 'nested_patch_collections_test.zorphy.dart';
 
 @zorphy
 abstract class $Address {

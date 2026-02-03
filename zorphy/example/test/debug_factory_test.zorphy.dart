@@ -72,6 +72,23 @@ class SimpleResponse implements $$SimpleResponse {
   /// Creates a [SimpleResponse] instance from JSON
   factory SimpleResponse.fromJson(Map<String, dynamic> json) =>
       _$SimpleResponseFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$SimpleResponseToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum SimpleResponse$ { message, status }
@@ -248,6 +265,23 @@ class BasicResponse implements $$SimpleResponse {
   /// Creates a [BasicResponse] instance from JSON
   factory BasicResponse.fromJson(Map<String, dynamic> json) =>
       _$BasicResponseFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$BasicResponseToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum BasicResponse$ { message, status }
@@ -448,6 +482,23 @@ class DetailedResponse implements $$SimpleResponse {
   /// Creates a [DetailedResponse] instance from JSON
   factory DetailedResponse.fromJson(Map<String, dynamic> json) =>
       _$DetailedResponseFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$DetailedResponseToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum DetailedResponse$ { message, status, data }
@@ -681,6 +732,23 @@ class ConcreteResponse implements $$SimpleResponse {
   /// Creates a [ConcreteResponse] instance from JSON
   factory ConcreteResponse.fromJson(Map<String, dynamic> json) =>
       _$ConcreteResponseFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ConcreteResponseToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum ConcreteResponse$ { message, status, timestamp, isSuccess }

@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex25_class_build_order_test.morphy.dart';
+part 'ex25_class_build_order_test.zorphy.dart';
 part 'ex25_class_build_order_test.morphy2.dart';
 
 ///EXPLICITLY BUILDING ONE BEFORE ANOTHER

@@ -56,6 +56,23 @@ class TestWithFactory implements $TestWithFactory {
   /// Creates a [TestWithFactory] instance from JSON
   factory TestWithFactory.fromJson(Map<String, dynamic> json) =>
       _$TestWithFactoryFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$TestWithFactoryToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum TestWithFactory$ { id }

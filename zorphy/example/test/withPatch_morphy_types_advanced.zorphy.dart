@@ -61,6 +61,23 @@ class CustomerProfile extends $CustomerProfile {
   /// Creates a [CustomerProfile] instance from JSON
   factory CustomerProfile.fromJson(Map<String, dynamic> json) =>
       _$CustomerProfileFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$CustomerProfileToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum CustomerProfile$ { name, age }
@@ -249,6 +266,23 @@ class Entity extends $Entity {
 
   /// Creates a [Entity] instance from JSON
   factory Entity.fromJson(Map<String, dynamic> json) => _$EntityFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$EntityToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Entity$ { code, name, id }
@@ -470,6 +504,23 @@ class Participant extends $$Participant implements Entity {
   /// Creates a [Participant] instance from JSON
   factory Participant.fromJson(Map<String, dynamic> json) =>
       _$ParticipantFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ParticipantToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Participant$ { code, name, id }
@@ -689,6 +740,23 @@ class Actor implements $$Participant {
 
   /// Creates a [Actor] instance from JSON
   factory Actor.fromJson(Map<String, dynamic> json) => _$ActorFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ActorToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Actor$ { code, name, id }
@@ -940,6 +1008,23 @@ class AdvancedUser implements $$Participant {
     throw UnsupportedError(
       "The _className_ '${json['_className_']}' is not supported by the AdvancedUser.fromJson constructor.",
     );
+  }
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$AdvancedUserToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
   }
 }
 
@@ -1322,6 +1407,23 @@ class Gamer implements $$Participant {
 
   /// Creates a [Gamer] instance from JSON
   factory Gamer.fromJson(Map<String, dynamic> json) => _$GamerFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$GamerToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Gamer$ { email, code, name, id, games }
@@ -1624,6 +1726,23 @@ class AdvancedCustomer implements $$Participant {
   /// Creates a [AdvancedCustomer] instance from JSON
   factory AdvancedCustomer.fromJson(Map<String, dynamic> json) =>
       _$AdvancedCustomerFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$AdvancedCustomerToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum AdvancedCustomer$ { email, code, name, id, profile }

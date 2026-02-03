@@ -1,5 +1,5 @@
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex18_inheritance_generics.morphy.dart';
+part 'ex18_inheritance_generics.zorphy.dart';
 
 // Trigger regeneration to test casting fix
 

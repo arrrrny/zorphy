@@ -1,3 +1,4 @@
+// dart format width=80
 // ignore_for_file: UNNECESSARY_CAST
 // ignore_for_file: type=lint
 
@@ -12,26 +13,26 @@ class Person implements $Person {
   final String? lastName;
   final int? age;
 
-  Person({
-    this.firstName,
-    this.lastName,
-    this.age,
-  });
+  Person({this.firstName, this.lastName, this.age});
 
-  Person._copyWith({
-    String?? firstName,
-    String?? lastName,
-    int?? age,
-  }) : 
-    firstName = firstName ?? (() { throw ArgumentError("firstName is required"); })(),
-    lastName = lastName ?? (() { throw ArgumentError("lastName is required"); })(),
-    age = age ?? (() { throw ArgumentError("age is required"); })();
+  Person._copyWith({String? firstName, String? lastName, int? age})
+    : firstName =
+          firstName ??
+          (() {
+            throw ArgumentError("firstName is required");
+          })(),
+      lastName =
+          lastName ??
+          (() {
+            throw ArgumentError("lastName is required");
+          })(),
+      age =
+          age ??
+          (() {
+            throw ArgumentError("age is required");
+          })();
 
-  Person copyWith({
-    String? firstName,
-    String? lastName,
-    int? age,
-  }) {
+  Person copyWith({String? firstName, String? lastName, int? age}) {
     return Person(
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
@@ -39,14 +40,8 @@ class Person implements $Person {
     );
   }
 
-  Person copyWithPerson({
-    String? firstName,
-    String? lastName,
-    int? age,
-  }) {
-    return copyWith(
-      firstName: firstName, lastName: lastName, age: age,
-    );
+  Person copyWithPerson({String? firstName, String? lastName, int? age}) {
+    return copyWith(firstName: firstName, lastName: lastName, age: age);
   }
 
   Person copyWithFn({
@@ -61,28 +56,37 @@ class Person implements $Person {
     );
   }
 
-  factory Person.fromNames({required String firstName, required String lastName}) => Person.fromNames(firstName: firstName, lastName: lastName);
+  factory Person.fromNames({
+    required String firstName,
+    required String lastName,
+  }) => Person.fromNames(firstName: firstName, lastName: lastName);
 
-
-  factory Person.withAge(String firstName, String lastName, int age) => Person.withAge(firstName, lastName, age);
-
+  factory Person.withAge(String firstName, String lastName, int age) =>
+      Person.withAge(firstName, lastName, age);
 
   factory Person.empty() => Person.empty();
 
-
-  Person patchWithPerson({
-    PersonPatch? patchInput,
-  }) {
+  Person patchWithPerson({PersonPatch? patchInput}) {
     final _patcher = patchInput ?? PersonPatch();
     final _patchMap = _patcher.toPatch();
     return Person(
-      firstName: _patchMap.containsKey(Person$.firstName) ? (_patchMap[Person$.firstName] is Function) ? _patchMap[Person$.firstName](this.firstName) : _patchMap[Person$.firstName] : this.firstName,
-      lastName: _patchMap.containsKey(Person$.lastName) ? (_patchMap[Person$.lastName] is Function) ? _patchMap[Person$.lastName](this.lastName) : _patchMap[Person$.lastName] : this.lastName,
-      age: _patchMap.containsKey(Person$.age) ? (_patchMap[Person$.age] is Function) ? _patchMap[Person$.age](this.age) : _patchMap[Person$.age] : this.age
+      firstName: _patchMap.containsKey(Person$.firstName)
+          ? (_patchMap[Person$.firstName] is Function)
+                ? _patchMap[Person$.firstName](this.firstName)
+                : _patchMap[Person$.firstName]
+          : this.firstName,
+      lastName: _patchMap.containsKey(Person$.lastName)
+          ? (_patchMap[Person$.lastName] is Function)
+                ? _patchMap[Person$.lastName](this.lastName)
+                : _patchMap[Person$.lastName]
+          : this.lastName,
+      age: _patchMap.containsKey(Person$.age)
+          ? (_patchMap[Person$.age] is Function)
+                ? _patchMap[Person$.age](this.age)
+                : _patchMap[Person$.age]
+          : this.age,
     );
   }
-
-
 
   @override
   bool operator ==(Object other) {
@@ -95,25 +99,21 @@ class Person implements $Person {
 
   @override
   int get hashCode {
-    return Object.hash(
-      this.firstName,
-      this.lastName,
-      this.age);
+    return Object.hash(this.firstName, this.lastName, this.age);
   }
 
   @override
   String toString() {
     return 'Person(' +
-        'firstName: ${firstName}' + ', ' +
-        'lastName: ${lastName}' + ', ' +
+        'firstName: ${firstName}' +
+        ', ' +
+        'lastName: ${lastName}' +
+        ', ' +
         'age: ${age})';
   }
-
-}
-enum Person$ {
-firstName,lastName,age
 }
 
+enum Person$ { firstName, lastName, age }
 
 class PersonPatch implements Patch<Person> {
   final Map<Person$, dynamic> _patch = {};
@@ -167,11 +167,12 @@ class PersonPatch implements Patch<Person> {
     if (value is DateTime) return value.toIso8601String();
     if (value is Enum) return value.toString().split('.').last;
     if (value is List) return value.map((e) => _convertToJson(e)).toList();
-    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
+    if (value is Map)
+      return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
     if (value is num || value is bool || value is String) return value;
     try {
-        if (value?.toJsonLean != null) return value.toJsonLean();
-      } catch (_) {}
+      if (value?.toJsonLean != null) return value.toJsonLean();
+    } catch (_) {}
     if (value?.toJson != null) return value.toJson();
     return value.toString();
   }
@@ -194,9 +195,7 @@ class PersonPatch implements Patch<Person> {
     _patch[Person$.age] = value;
     return this;
   }
-
 }
-
 
 extension PersonCompareE on Person {
   Map<String, dynamic> compareToPerson(Person other) {
@@ -215,44 +214,35 @@ extension PersonCompareE on Person {
   }
 }
 
-
-
-
 class Actor extends $Actor {
   @override
   final String? stageName;
   @override
   final int? yearsActive;
 
-  Actor({
-    this.stageName,
-    this.yearsActive,
-  });
+  Actor({this.stageName, this.yearsActive});
 
-  Actor._copyWith({
-    String?? stageName,
-    int?? yearsActive,
-  }) : 
-    stageName = stageName ?? (() { throw ArgumentError("stageName is required"); })(),
-    yearsActive = yearsActive ?? (() { throw ArgumentError("yearsActive is required"); })();
+  Actor._copyWith({String? stageName, int? yearsActive})
+    : stageName =
+          stageName ??
+          (() {
+            throw ArgumentError("stageName is required");
+          })(),
+      yearsActive =
+          yearsActive ??
+          (() {
+            throw ArgumentError("yearsActive is required");
+          })();
 
-  Actor copyWith({
-    String? stageName,
-    int? yearsActive,
-  }) {
+  Actor copyWith({String? stageName, int? yearsActive}) {
     return Actor(
       stageName: stageName ?? this.stageName,
       yearsActive: yearsActive ?? this.yearsActive,
     );
   }
 
-  Actor copyWithActor({
-    String? stageName,
-    int? yearsActive,
-  }) {
-    return copyWith(
-      stageName: stageName, yearsActive: yearsActive,
-    );
+  Actor copyWithActor({String? stageName, int? yearsActive}) {
+    return copyWith(stageName: stageName, yearsActive: yearsActive);
   }
 
   Actor copyWithFn({
@@ -261,22 +251,28 @@ class Actor extends $Actor {
   }) {
     return Actor(
       stageName: stageName != null ? stageName(this.stageName) : this.stageName,
-      yearsActive: yearsActive != null ? yearsActive(this.yearsActive) : this.yearsActive,
+      yearsActive: yearsActive != null
+          ? yearsActive(this.yearsActive)
+          : this.yearsActive,
     );
   }
 
-  Actor patchWithActor({
-    ActorPatch? patchInput,
-  }) {
+  Actor patchWithActor({ActorPatch? patchInput}) {
     final _patcher = patchInput ?? ActorPatch();
     final _patchMap = _patcher.toPatch();
     return Actor(
-      stageName: _patchMap.containsKey(Actor$.stageName) ? (_patchMap[Actor$.stageName] is Function) ? _patchMap[Actor$.stageName](this.stageName) : _patchMap[Actor$.stageName] : this.stageName,
-      yearsActive: _patchMap.containsKey(Actor$.yearsActive) ? (_patchMap[Actor$.yearsActive] is Function) ? _patchMap[Actor$.yearsActive](this.yearsActive) : _patchMap[Actor$.yearsActive] : this.yearsActive
+      stageName: _patchMap.containsKey(Actor$.stageName)
+          ? (_patchMap[Actor$.stageName] is Function)
+                ? _patchMap[Actor$.stageName](this.stageName)
+                : _patchMap[Actor$.stageName]
+          : this.stageName,
+      yearsActive: _patchMap.containsKey(Actor$.yearsActive)
+          ? (_patchMap[Actor$.yearsActive] is Function)
+                ? _patchMap[Actor$.yearsActive](this.yearsActive)
+                : _patchMap[Actor$.yearsActive]
+          : this.yearsActive,
     );
   }
-
-
 
   @override
   bool operator ==(Object other) {
@@ -288,23 +284,19 @@ class Actor extends $Actor {
 
   @override
   int get hashCode {
-    return Object.hash(
-      this.stageName,
-      this.yearsActive);
+    return Object.hash(this.stageName, this.yearsActive);
   }
 
   @override
   String toString() {
     return 'Actor(' +
-        'stageName: ${stageName}' + ', ' +
+        'stageName: ${stageName}' +
+        ', ' +
         'yearsActive: ${yearsActive})';
   }
-
-}
-enum Actor$ {
-stageName,yearsActive
 }
 
+enum Actor$ { stageName, yearsActive }
 
 class ActorPatch implements Patch<Actor> {
   final Map<Actor$, dynamic> _patch = {};
@@ -358,11 +350,12 @@ class ActorPatch implements Patch<Actor> {
     if (value is DateTime) return value.toIso8601String();
     if (value is Enum) return value.toString().split('.').last;
     if (value is List) return value.map((e) => _convertToJson(e)).toList();
-    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
+    if (value is Map)
+      return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
     if (value is num || value is bool || value is String) return value;
     try {
-        if (value?.toJsonLean != null) return value.toJsonLean();
-      } catch (_) {}
+      if (value?.toJsonLean != null) return value.toJsonLean();
+    } catch (_) {}
     if (value?.toJson != null) return value.toJson();
     return value.toString();
   }
@@ -380,9 +373,7 @@ class ActorPatch implements Patch<Actor> {
     _patch[Actor$.yearsActive] = value;
     return this;
   }
-
 }
-
 
 extension ActorCompareE on Actor {
   Map<String, dynamic> compareToActor(Actor other) {
@@ -397,9 +388,6 @@ extension ActorCompareE on Actor {
     return diff;
   }
 }
-
-
-
 
 class Employee implements $Employee, Person {
   final String? firstName;
@@ -417,17 +405,36 @@ class Employee implements $Employee, Person {
   });
 
   Employee._copyWith({
-    String?? firstName,
-    String?? lastName,
-    int?? age,
-    String?? department,
-    double?? salary,
-  }) : 
-    firstName = firstName ?? (() { throw ArgumentError("firstName is required"); })(),
-    lastName = lastName ?? (() { throw ArgumentError("lastName is required"); })(),
-    age = age ?? (() { throw ArgumentError("age is required"); })(),
-    department = department ?? (() { throw ArgumentError("department is required"); })(),
-    salary = salary ?? (() { throw ArgumentError("salary is required"); })();
+    String? firstName,
+    String? lastName,
+    int? age,
+    String? department,
+    double? salary,
+  }) : firstName =
+           firstName ??
+           (() {
+             throw ArgumentError("firstName is required");
+           })(),
+       lastName =
+           lastName ??
+           (() {
+             throw ArgumentError("lastName is required");
+           })(),
+       age =
+           age ??
+           (() {
+             throw ArgumentError("age is required");
+           })(),
+       department =
+           department ??
+           (() {
+             throw ArgumentError("department is required");
+           })(),
+       salary =
+           salary ??
+           (() {
+             throw ArgumentError("salary is required");
+           })();
 
   Employee copyWith({
     String? firstName,
@@ -453,7 +460,11 @@ class Employee implements $Employee, Person {
     double? salary,
   }) {
     return copyWith(
-      firstName: firstName, lastName: lastName, age: age, department: department, salary: salary,
+      firstName: firstName,
+      lastName: lastName,
+      age: age,
+      department: department,
+      salary: salary,
     );
   }
 
@@ -468,49 +479,78 @@ class Employee implements $Employee, Person {
       firstName: firstName != null ? firstName(this.firstName) : this.firstName,
       lastName: lastName != null ? lastName(this.lastName) : this.lastName,
       age: age != null ? age(this.age) : this.age,
-      department: department != null ? department(this.department) : this.department,
+      department: department != null
+          ? department(this.department)
+          : this.department,
       salary: salary != null ? salary(this.salary) : this.salary,
     );
   }
 
-  factory Employee.newHire({required String firstName, required String lastName, required String department}) => Employee.newHire(firstName: firstName, lastName: lastName, department: department);
+  factory Employee.newHire({
+    required String firstName,
+    required String lastName,
+    required String department,
+  }) => Employee.newHire(
+    firstName: firstName,
+    lastName: lastName,
+    department: department,
+  );
 
-
-  Employee patchWithEmployee({
-    EmployeePatch? patchInput,
-  }) {
+  Employee patchWithEmployee({EmployeePatch? patchInput}) {
     final _patcher = patchInput ?? EmployeePatch();
     final _patchMap = _patcher.toPatch();
     return Employee(
-      firstName: _patchMap.containsKey(Employee$.firstName) ? (_patchMap[Employee$.firstName] is Function) ? _patchMap[Employee$.firstName](this.firstName) : _patchMap[Employee$.firstName] : this.firstName,
-      lastName: _patchMap.containsKey(Employee$.lastName) ? (_patchMap[Employee$.lastName] is Function) ? _patchMap[Employee$.lastName](this.lastName) : _patchMap[Employee$.lastName] : this.lastName,
-      age: _patchMap.containsKey(Employee$.age) ? (_patchMap[Employee$.age] is Function) ? _patchMap[Employee$.age](this.age) : _patchMap[Employee$.age] : this.age,
-      department: _patchMap.containsKey(Employee$.department) ? (_patchMap[Employee$.department] is Function) ? _patchMap[Employee$.department](this.department) : _patchMap[Employee$.department] : this.department,
-      salary: _patchMap.containsKey(Employee$.salary) ? (_patchMap[Employee$.salary] is Function) ? _patchMap[Employee$.salary](this.salary) : _patchMap[Employee$.salary] : this.salary
+      firstName: _patchMap.containsKey(Employee$.firstName)
+          ? (_patchMap[Employee$.firstName] is Function)
+                ? _patchMap[Employee$.firstName](this.firstName)
+                : _patchMap[Employee$.firstName]
+          : this.firstName,
+      lastName: _patchMap.containsKey(Employee$.lastName)
+          ? (_patchMap[Employee$.lastName] is Function)
+                ? _patchMap[Employee$.lastName](this.lastName)
+                : _patchMap[Employee$.lastName]
+          : this.lastName,
+      age: _patchMap.containsKey(Employee$.age)
+          ? (_patchMap[Employee$.age] is Function)
+                ? _patchMap[Employee$.age](this.age)
+                : _patchMap[Employee$.age]
+          : this.age,
+      department: _patchMap.containsKey(Employee$.department)
+          ? (_patchMap[Employee$.department] is Function)
+                ? _patchMap[Employee$.department](this.department)
+                : _patchMap[Employee$.department]
+          : this.department,
+      salary: _patchMap.containsKey(Employee$.salary)
+          ? (_patchMap[Employee$.salary] is Function)
+                ? _patchMap[Employee$.salary](this.salary)
+                : _patchMap[Employee$.salary]
+          : this.salary,
     );
   }
 
-
-  Employee copyWithPerson({
-    String? firstName,
-    String? lastName,
-    int? age,
-  }) {
-    return copyWith(
-      firstName: firstName, lastName: lastName, age: age,
-    );
+  Employee copyWithPerson({String? firstName, String? lastName, int? age}) {
+    return copyWith(firstName: firstName, lastName: lastName, age: age);
   }
 
-
-  Employee patchWithPerson({
-    PersonPatch? patchInput,
-  }) {
+  Employee patchWithPerson({PersonPatch? patchInput}) {
     final _patcher = patchInput ?? PersonPatch();
     final _patchMap = _patcher.toPatch();
     return Employee(
-      firstName: _patchMap.containsKey(Person$.firstName) ? (_patchMap[Person$.firstName] is Function) ? _patchMap[Person$.firstName](this.firstName) : _patchMap[Person$.firstName] : this.firstName,
-      lastName: _patchMap.containsKey(Person$.lastName) ? (_patchMap[Person$.lastName] is Function) ? _patchMap[Person$.lastName](this.lastName) : _patchMap[Person$.lastName] : this.lastName,
-      age: _patchMap.containsKey(Person$.age) ? (_patchMap[Person$.age] is Function) ? _patchMap[Person$.age](this.age) : _patchMap[Person$.age] : this.age,
+      firstName: _patchMap.containsKey(Person$.firstName)
+          ? (_patchMap[Person$.firstName] is Function)
+                ? _patchMap[Person$.firstName](this.firstName)
+                : _patchMap[Person$.firstName]
+          : this.firstName,
+      lastName: _patchMap.containsKey(Person$.lastName)
+          ? (_patchMap[Person$.lastName] is Function)
+                ? _patchMap[Person$.lastName](this.lastName)
+                : _patchMap[Person$.lastName]
+          : this.lastName,
+      age: _patchMap.containsKey(Person$.age)
+          ? (_patchMap[Person$.age] is Function)
+                ? _patchMap[Person$.age](this.age)
+                : _patchMap[Person$.age]
+          : this.age,
       department: this.department,
       salary: this.salary,
     );
@@ -534,24 +574,26 @@ class Employee implements $Employee, Person {
       this.lastName,
       this.age,
       this.department,
-      this.salary);
+      this.salary,
+    );
   }
 
   @override
   String toString() {
     return 'Employee(' +
-        'firstName: ${firstName}' + ', ' +
-        'lastName: ${lastName}' + ', ' +
-        'age: ${age}' + ', ' +
-        'department: ${department}' + ', ' +
+        'firstName: ${firstName}' +
+        ', ' +
+        'lastName: ${lastName}' +
+        ', ' +
+        'age: ${age}' +
+        ', ' +
+        'department: ${department}' +
+        ', ' +
         'salary: ${salary})';
   }
-
-}
-enum Employee$ {
-firstName,lastName,age,department,salary
 }
 
+enum Employee$ { firstName, lastName, age, department, salary }
 
 class EmployeePatch implements Patch<Employee> {
   final Map<Employee$, dynamic> _patch = {};
@@ -605,11 +647,12 @@ class EmployeePatch implements Patch<Employee> {
     if (value is DateTime) return value.toIso8601String();
     if (value is Enum) return value.toString().split('.').last;
     if (value is List) return value.map((e) => _convertToJson(e)).toList();
-    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
+    if (value is Map)
+      return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
     if (value is num || value is bool || value is String) return value;
     try {
-        if (value?.toJsonLean != null) return value.toJsonLean();
-      } catch (_) {}
+      if (value?.toJsonLean != null) return value.toJsonLean();
+    } catch (_) {}
     if (value?.toJson != null) return value.toJson();
     return value.toString();
   }
@@ -642,9 +685,7 @@ class EmployeePatch implements Patch<Employee> {
     _patch[Employee$.salary] = value;
     return this;
   }
-
 }
-
 
 extension EmployeeCompareE on Employee {
   Map<String, dynamic> compareToEmployee(Employee other) {

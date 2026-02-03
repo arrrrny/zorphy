@@ -20,7 +20,7 @@
 # so this line is commented out by default.
 #.vscode/
 
-*.morphy.dart
+*.zorphy.dart
 *.morphy2.dart
 *.g.dart
 

@@ -100,7 +100,9 @@ String getProperties(
       for (var f in fields) {
         var fieldType =
             f.type != null ? _replaceDollarTypesWithConcrete(f.type!) : f.type;
-        sb.writeln("    ${fieldType}? ${f.name},");
+        // For copyWith, we want all parameters to be nullable, so add ? if not already present
+        var nullableFieldType = fieldType!.endsWith('?') ? fieldType : '${fieldType}?';
+        sb.writeln("    $nullableFieldType ${f.name},");
       }
       sb.writeln("  }) : ");
       for (var i = 0; i < fields.length; i++) {
@@ -133,8 +135,7 @@ String generateFactoryMethod(
           var suffix = p.hasDefaultValue && p.defaultValue != null
               ? " = ${p.defaultValue}"
               : "";
-          var cleanType =
-              _replaceDollarTypesWithConcrete(p.type.replaceAll('\$', ''));
+          var cleanType = _replaceDollarTypesWithConcrete(p.type);
           return "${prefix}${cleanType} ${p.name}${suffix}";
         }).join(", "),
       );
@@ -145,8 +146,7 @@ String generateFactoryMethod(
           var suffix = p.hasDefaultValue && p.defaultValue != null
               ? " = ${p.defaultValue}"
               : "";
-          var cleanType =
-              _replaceDollarTypesWithConcrete(p.type.replaceAll('\$', ''));
+          var cleanType = _replaceDollarTypesWithConcrete(p.type);
           return "${cleanType} ${p.name}${suffix}";
         }).join(", "),
       );
@@ -434,7 +434,7 @@ String getPropertiesAbstract(
   // Named constructor for copyWith
   if (generateCopyWithFn) {
     sb.writeln("");
-    sb.writeln("  const factory ${className}._copyWith({");
+    sb.writeln("  factory ${className}._copyWith({");
     for (var f in fields) {
       sb.writeln("    ${f.type}? ${f.name},");
     }

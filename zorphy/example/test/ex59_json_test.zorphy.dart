@@ -67,6 +67,23 @@ class Person extends $Person {
       "The _className_ '${json['_className_']}' is not supported by the Person.fromJson constructor.",
     );
   }
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$PersonToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Person$ { age }
@@ -289,6 +306,23 @@ class Athlete extends $Athlete implements Person {
     throw UnsupportedError(
       "The _className_ '${json['_className_']}' is not supported by the Athlete.fromJson constructor.",
     );
+  }
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$AthleteToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
   }
 }
 
@@ -538,6 +572,23 @@ class BaseballPlayer extends $BaseballPlayer implements Athlete, Person {
   /// Creates a [BaseballPlayer] instance from JSON
   factory BaseballPlayer.fromJson(Map<String, dynamic> json) =>
       _$BaseballPlayerFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$BaseballPlayerToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum BaseballPlayer$ { speed, age, height }
@@ -709,6 +760,23 @@ class Building extends $Building {
   /// Creates a [Building] instance from JSON
   factory Building.fromJson(Map<String, dynamic> json) =>
       _$BuildingFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$BuildingToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Building$ { people }

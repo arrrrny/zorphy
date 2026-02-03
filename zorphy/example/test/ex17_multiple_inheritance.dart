@@ -1,5 +1,5 @@
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex17_multiple_inheritance.morphy.dart';
+part 'ex17_multiple_inheritance.zorphy.dart';
 
 ///BatchLesson does xyz
 @zorphy

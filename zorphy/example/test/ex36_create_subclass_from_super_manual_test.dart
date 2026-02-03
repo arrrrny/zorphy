@@ -2,7 +2,7 @@ import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
 // COPY WITH FROM SUPER CLASS TO SUB CLASS
 
-part 'ex36_create_subclass_from_super_manual_test.morphy.dart';
+part 'ex36_create_subclass_from_super_manual_test.zorphy.dart';
 
 @zorphy
 abstract class $A {

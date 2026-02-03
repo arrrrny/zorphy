@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex20_inheritance_generics_test.morphy.dart';
+part 'ex20_inheritance_generics_test.zorphy.dart';
 part 'ex20_inheritance_generics_test.morphy2.dart';
 
 ///A GENERATED FILE SPECIFYING A GENERATED TYPE

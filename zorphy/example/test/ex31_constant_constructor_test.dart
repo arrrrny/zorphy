@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex31_constant_constructor_test.morphy.dart';
+part 'ex31_constant_constructor_test.zorphy.dart';
 
 ///To create a constant constructor, create the definition in our class definition.
 ///That then creates an alternative constructor that is a constant named .constant

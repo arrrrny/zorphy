@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex23_comments_test.morphy.dart';
+part 'ex23_comments_test.zorphy.dart';
 
 //TAKE COMMENTS FROM CLASS
 

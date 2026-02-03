@@ -94,6 +94,23 @@ class CustomerProfile extends $CustomerProfile {
   /// Creates a [CustomerProfile] instance from JSON
   factory CustomerProfile.fromJson(Map<String, dynamic> json) =>
       _$CustomerProfileFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$CustomerProfileToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum CustomerProfile$ { yearOfBirth, occupation, operatingSystem }
@@ -367,6 +384,23 @@ class Customer extends $Customer implements User {
   /// Creates a [Customer] instance from JSON
   factory Customer.fromJson(Map<String, dynamic> json) =>
       _$CustomerFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$CustomerToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Customer$ { name, email, profile, profiles, profileHistory }

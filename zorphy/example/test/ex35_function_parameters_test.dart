@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex35_function_parameters_test.morphy.dart';
+part 'ex35_function_parameters_test.zorphy.dart';
 
 //PARAMETERS OF A TYPE FUNCTION, THAT INCLUDE A VALUET2 OBJECT, MUST RETAIN THE DOLLAR
 //RETURN VALUES SHOULD REMOVE THE DOLLAR

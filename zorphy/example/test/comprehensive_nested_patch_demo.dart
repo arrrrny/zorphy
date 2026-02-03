@@ -1,5 +1,5 @@
 import 'package:zorphy_annotation/zorphy.dart';
-part 'comprehensive_nested_patch_demo.morphy.dart';
+part 'comprehensive_nested_patch_demo.zorphy.dart';
 
 /// A person's profile information
 @zorphy

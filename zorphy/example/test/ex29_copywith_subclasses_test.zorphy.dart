@@ -13,7 +13,7 @@ sealed class $A {
 
   const $A._internal();
 
-  const factory $A._copyWith({
+  factory $A._copyWith({
     String? a,
   }) = _$$ACopyWith;
 
@@ -698,7 +698,7 @@ sealed class $X {
 
   const $X._internal();
 
-  const factory $X._copyWith({
+  factory $X._copyWith({
   }) = _$$XCopyWith;
 
   X copyWith({

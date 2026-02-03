@@ -53,6 +53,23 @@ class A extends $A {
 
   /// Creates a [A] instance from JSON
   factory A.fromJson(Map<String, dynamic> json) => _$AFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$AToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum A$ { id }
@@ -242,6 +259,23 @@ class B<T> extends $B implements A {
       "The _className_ '${json['_className_']}' is not supported by the B.fromJson constructor.",
     );
   }
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$BToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum B$ { id, blah }
@@ -402,6 +436,23 @@ class X extends $X {
 
   /// Creates a [X] instance from JSON
   factory X.fromJson(Map<String, dynamic> json) => _$XFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$XToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum X$ { xyz }

@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex14_inheritance_test.morphy.dart';
+part 'ex14_inheritance_test.zorphy.dart';
 
 //TOSTRING
 

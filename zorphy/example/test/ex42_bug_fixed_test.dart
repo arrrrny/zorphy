@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex42_bug_fixed_test.morphy.dart';
+part 'ex42_bug_fixed_test.zorphy.dart';
 
 //nullable generic bug
 

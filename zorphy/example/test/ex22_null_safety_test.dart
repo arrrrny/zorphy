@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex22_null_safety_test.morphy.dart';
+part 'ex22_null_safety_test.zorphy.dart';
 
 //NULL FIELD NAMES - NULL SAFETY USING ?
 

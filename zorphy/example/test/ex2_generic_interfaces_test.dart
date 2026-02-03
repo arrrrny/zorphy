@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex2_generic_interfaces_test.morphy.dart';
+part 'ex2_generic_interfaces_test.zorphy.dart';
 
 //GENERIC INTERFACES AND GENERICS ARE HANDLED AUTOMATICALLY
 

@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy.dart';
 import 'package:test/test.dart';
 
-part 'ex55_sealed_class_test.morphy.dart';
+part 'ex55_sealed_class_test.zorphy.dart';
 
 ///the default for abstract classes is they are sealed
 ///this means we can use exhaustiveness checking

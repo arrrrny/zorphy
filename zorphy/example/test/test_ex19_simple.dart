@@ -4,7 +4,7 @@ import 'ex19_inheritance_generics.dart';
 void main() {
   group('Ex19 Inheritance Generics - Simple Compilation Test', () {
     test('ex19 file compiles without errors', () {
-      // This test verifies that the generated code in ex19_inheritance_generics.morphy.dart
+      // This test verifies that the generated code in ex19_inheritance_generics.zorphy.dart
       // compiles successfully with all the casting fixes applied
 
       // If this test runs, it means:

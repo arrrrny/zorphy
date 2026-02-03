@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex26_bug_test.morphy.dart';
+part 'ex26_bug_test.zorphy.dart';
 
 ///WEIRD HASHCODE BUG
 ///To recreate

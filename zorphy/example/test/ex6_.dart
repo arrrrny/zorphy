@@ -1,7 +1,7 @@
 //import 'package:test/test.dart';
 //import 'package:zorphy_annotation/zorphy.dart';//import 'package:meta/meta.dart';
 //
-//part 'ex6_test.morphy.dart';
+//part 'ex6_test.zorphy.dart';
 //
 ////CURRENTLY NOT ALLOWING CUSTOM GETTERS (CAN JUST USE A FUNCTION)
 ////  this is where mixins would have been a better approach

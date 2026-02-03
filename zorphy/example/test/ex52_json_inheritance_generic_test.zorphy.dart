@@ -78,6 +78,23 @@ class A<T1> extends $A {
       "The _className_ '${json['_className_']}' is not supported by the A.fromJson constructor.",
     );
   }
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$AToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum A$ { id }
@@ -336,6 +353,23 @@ class B<T1, T2> extends $B implements A {
     throw UnsupportedError(
       "The _className_ '${json['_className_']}' is not supported by the B.fromJson constructor.",
     );
+  }
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$BToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
   }
 }
 
@@ -628,6 +662,23 @@ class C<T1, T2> extends $C implements B, A {
     throw UnsupportedError(
       "The _className_ '${json['_className_']}' is not supported by the C.fromJson constructor.",
     );
+  }
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$CToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
   }
 }
 

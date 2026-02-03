@@ -90,6 +90,23 @@ class Todo2_incomplete implements $$Todo2 {
   /// Creates a [Todo2_incomplete] instance from JSON
   factory Todo2_incomplete.fromJson(Map<String, dynamic> json) =>
       _$Todo2_incompleteFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$Todo2_incompleteToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Todo2_incomplete$ { title, id, description }
@@ -321,6 +338,23 @@ class Todo2_complete implements $$Todo2 {
   /// Creates a [Todo2_complete] instance from JSON
   factory Todo2_complete.fromJson(Map<String, dynamic> json) =>
       _$Todo2_completeFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$Todo2_completeToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Todo2_complete$ { title, id, description, completedDate }

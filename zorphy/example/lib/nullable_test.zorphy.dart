@@ -260,6 +260,23 @@ class ErrorLog extends $ErrorLog {
   /// Creates a [ErrorLog] instance from JSON
   factory ErrorLog.fromJson(Map<String, dynamic> json) =>
       _$ErrorLogFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ErrorLogToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum ErrorLog$ {

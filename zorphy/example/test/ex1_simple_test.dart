@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy.dart';
 import 'package:test/test.dart';
 
-part 'ex1_simple_test.morphy.dart';
+part 'ex1_simple_test.zorphy.dart';
 
 //THE SIMPLEST OF EXAMPLES
 

@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
-part 'ex15_equality_test.morphy.dart';
+part 'ex15_equality_test.zorphy.dart';
 
 //EQUALITY
 
