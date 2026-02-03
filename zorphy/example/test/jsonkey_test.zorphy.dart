@@ -17,17 +17,9 @@ class User extends $User {
   @override
   final String emailAddress;
 
-  User({
-    required this.id,
-    required this.userName,
-    required this.emailAddress,
-  });
+  User({required this.id, required this.userName, required this.emailAddress});
 
-  User copyWith({
-    String? id,
-    String? userName,
-    String? emailAddress,
-  }) {
+  User copyWith({String? id, String? userName, String? emailAddress}) {
     return User(
       id: id ?? this.id,
       userName: userName ?? this.userName,
@@ -35,39 +27,30 @@ class User extends $User {
     );
   }
 
-  User copyWithUser({
-    String? id,
-    String? userName,
-    String? emailAddress,
-  }) {
-    return copyWith(
-      id: id,
-      userName: userName,
-      emailAddress: emailAddress,
-    );
+  User copyWithUser({String? id, String? userName, String? emailAddress}) {
+    return copyWith(id: id, userName: userName, emailAddress: emailAddress);
   }
 
-  User patchWithUser({
-    UserPatch? patchInput,
-  }) {
+  User patchWithUser({UserPatch? patchInput}) {
     final _patcher = patchInput ?? UserPatch();
     final _patchMap = _patcher.toPatch();
     return User(
-        id: _patchMap.containsKey(User$.id)
-            ? (_patchMap[User$.id] is Function)
+      id: _patchMap.containsKey(User$.id)
+          ? (_patchMap[User$.id] is Function)
                 ? _patchMap[User$.id](this.id)
                 : _patchMap[User$.id]
-            : this.id,
-        userName: _patchMap.containsKey(User$.userName)
-            ? (_patchMap[User$.userName] is Function)
+          : this.id,
+      userName: _patchMap.containsKey(User$.userName)
+          ? (_patchMap[User$.userName] is Function)
                 ? _patchMap[User$.userName](this.userName)
                 : _patchMap[User$.userName]
-            : this.userName,
-        emailAddress: _patchMap.containsKey(User$.emailAddress)
-            ? (_patchMap[User$.emailAddress] is Function)
+          : this.userName,
+      emailAddress: _patchMap.containsKey(User$.emailAddress)
+          ? (_patchMap[User$.emailAddress] is Function)
                 ? _patchMap[User$.emailAddress](this.emailAddress)
                 : _patchMap[User$.emailAddress]
-            : this.emailAddress);
+          : this.emailAddress,
+    );
   }
 
   @override
@@ -184,6 +167,22 @@ class UserPatch implements Patch<User> {
 
 extension UserSerialization on User {
   Map<String, dynamic> toJson() => _$UserToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$UserToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension UserCompareE on User {
@@ -242,27 +241,26 @@ class Profile extends $Profile {
     );
   }
 
-  Profile patchWithProfile({
-    ProfilePatch? patchInput,
-  }) {
+  Profile patchWithProfile({ProfilePatch? patchInput}) {
     final _patcher = patchInput ?? ProfilePatch();
     final _patchMap = _patcher.toPatch();
     return Profile(
-        userId: _patchMap.containsKey(Profile$.userId)
-            ? (_patchMap[Profile$.userId] is Function)
+      userId: _patchMap.containsKey(Profile$.userId)
+          ? (_patchMap[Profile$.userId] is Function)
                 ? _patchMap[Profile$.userId](this.userId)
                 : _patchMap[Profile$.userId]
-            : this.userId,
-        displayName: _patchMap.containsKey(Profile$.displayName)
-            ? (_patchMap[Profile$.displayName] is Function)
+          : this.userId,
+      displayName: _patchMap.containsKey(Profile$.displayName)
+          ? (_patchMap[Profile$.displayName] is Function)
                 ? _patchMap[Profile$.displayName](this.displayName)
                 : _patchMap[Profile$.displayName]
-            : this.displayName,
-        internalToken: _patchMap.containsKey(Profile$.internalToken)
-            ? (_patchMap[Profile$.internalToken] is Function)
+          : this.displayName,
+      internalToken: _patchMap.containsKey(Profile$.internalToken)
+          ? (_patchMap[Profile$.internalToken] is Function)
                 ? _patchMap[Profile$.internalToken](this.internalToken)
                 : _patchMap[Profile$.internalToken]
-            : this.internalToken);
+          : this.internalToken,
+    );
   }
 
   @override
@@ -380,6 +378,22 @@ class ProfilePatch implements Patch<Profile> {
 
 extension ProfileSerialization on Profile {
   Map<String, dynamic> toJson() => _$ProfileToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ProfileToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension ProfileCompareE on Profile {
@@ -408,17 +422,9 @@ class Settings extends $Settings {
   @override
   final bool? debugMode;
 
-  Settings({
-    required this.theme,
-    required this.language,
-    this.debugMode,
-  });
+  Settings({required this.theme, required this.language, this.debugMode});
 
-  Settings copyWith({
-    String? theme,
-    String? language,
-    bool? debugMode,
-  }) {
+  Settings copyWith({String? theme, String? language, bool? debugMode}) {
     return Settings(
       theme: theme ?? this.theme,
       language: language ?? this.language,
@@ -431,34 +437,29 @@ class Settings extends $Settings {
     String? language,
     bool? debugMode,
   }) {
-    return copyWith(
-      theme: theme,
-      language: language,
-      debugMode: debugMode,
-    );
+    return copyWith(theme: theme, language: language, debugMode: debugMode);
   }
 
-  Settings patchWithSettings({
-    SettingsPatch? patchInput,
-  }) {
+  Settings patchWithSettings({SettingsPatch? patchInput}) {
     final _patcher = patchInput ?? SettingsPatch();
     final _patchMap = _patcher.toPatch();
     return Settings(
-        theme: _patchMap.containsKey(Settings$.theme)
-            ? (_patchMap[Settings$.theme] is Function)
+      theme: _patchMap.containsKey(Settings$.theme)
+          ? (_patchMap[Settings$.theme] is Function)
                 ? _patchMap[Settings$.theme](this.theme)
                 : _patchMap[Settings$.theme]
-            : this.theme,
-        language: _patchMap.containsKey(Settings$.language)
-            ? (_patchMap[Settings$.language] is Function)
+          : this.theme,
+      language: _patchMap.containsKey(Settings$.language)
+          ? (_patchMap[Settings$.language] is Function)
                 ? _patchMap[Settings$.language](this.language)
                 : _patchMap[Settings$.language]
-            : this.language,
-        debugMode: _patchMap.containsKey(Settings$.debugMode)
-            ? (_patchMap[Settings$.debugMode] is Function)
+          : this.language,
+      debugMode: _patchMap.containsKey(Settings$.debugMode)
+          ? (_patchMap[Settings$.debugMode] is Function)
                 ? _patchMap[Settings$.debugMode](this.debugMode)
                 : _patchMap[Settings$.debugMode]
-            : this.debugMode);
+          : this.debugMode,
+    );
   }
 
   @override
@@ -576,6 +577,22 @@ class SettingsPatch implements Patch<Settings> {
 
 extension SettingsSerialization on Settings {
   Map<String, dynamic> toJson() => _$SettingsToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$SettingsToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension SettingsCompareE on Settings {

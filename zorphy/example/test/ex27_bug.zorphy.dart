@@ -15,15 +15,9 @@ class UserLectureInfoPopupVM extends $UserLectureInfoPopupVM {
   @override
   final bool isExcluded;
 
-  UserLectureInfoPopupVM({
-    required this.lectureId,
-    required this.isExcluded,
-  });
+  UserLectureInfoPopupVM({required this.lectureId, required this.isExcluded});
 
-  UserLectureInfoPopupVM copyWith({
-    String? lectureId,
-    bool? isExcluded,
-  }) {
+  UserLectureInfoPopupVM copyWith({String? lectureId, bool? isExcluded}) {
     return UserLectureInfoPopupVM(
       lectureId: lectureId ?? this.lectureId,
       isExcluded: isExcluded ?? this.isExcluded,
@@ -34,10 +28,7 @@ class UserLectureInfoPopupVM extends $UserLectureInfoPopupVM {
     String? lectureId,
     bool? isExcluded,
   }) {
-    return copyWith(
-      lectureId: lectureId,
-      isExcluded: isExcluded,
-    );
+    return copyWith(lectureId: lectureId, isExcluded: isExcluded);
   }
 
   UserLectureInfoPopupVM patchWithUserLectureInfoPopupVM({
@@ -46,16 +37,17 @@ class UserLectureInfoPopupVM extends $UserLectureInfoPopupVM {
     final _patcher = patchInput ?? UserLectureInfoPopupVMPatch();
     final _patchMap = _patcher.toPatch();
     return UserLectureInfoPopupVM(
-        lectureId: _patchMap.containsKey(UserLectureInfoPopupVM$.lectureId)
-            ? (_patchMap[UserLectureInfoPopupVM$.lectureId] is Function)
+      lectureId: _patchMap.containsKey(UserLectureInfoPopupVM$.lectureId)
+          ? (_patchMap[UserLectureInfoPopupVM$.lectureId] is Function)
                 ? _patchMap[UserLectureInfoPopupVM$.lectureId](this.lectureId)
                 : _patchMap[UserLectureInfoPopupVM$.lectureId]
-            : this.lectureId,
-        isExcluded: _patchMap.containsKey(UserLectureInfoPopupVM$.isExcluded)
-            ? (_patchMap[UserLectureInfoPopupVM$.isExcluded] is Function)
+          : this.lectureId,
+      isExcluded: _patchMap.containsKey(UserLectureInfoPopupVM$.isExcluded)
+          ? (_patchMap[UserLectureInfoPopupVM$.isExcluded] is Function)
                 ? _patchMap[UserLectureInfoPopupVM$.isExcluded](this.isExcluded)
                 : _patchMap[UserLectureInfoPopupVM$.isExcluded]
-            : this.isExcluded);
+          : this.isExcluded,
+    );
   }
 
   @override
@@ -90,8 +82,9 @@ class UserLectureInfoPopupVMPatch implements Patch<UserLectureInfoPopupVM> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              UserLectureInfoPopupVM$.values.firstWhere((e) => e.name == key);
+          final enumValue = UserLectureInfoPopupVM$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -104,7 +97,8 @@ class UserLectureInfoPopupVMPatch implements Patch<UserLectureInfoPopupVM> {
   }
 
   static UserLectureInfoPopupVMPatch fromPatch(
-      Map<UserLectureInfoPopupVM$, dynamic> patch) {
+    Map<UserLectureInfoPopupVM$, dynamic> patch,
+  ) {
     final _patch = UserLectureInfoPopupVMPatch();
     _patch._patch.addAll(patch);
     return _patch;
@@ -163,7 +157,8 @@ class UserLectureInfoPopupVMPatch implements Patch<UserLectureInfoPopupVM> {
 
 extension UserLectureInfoPopupVMCompareE on UserLectureInfoPopupVM {
   Map<String, dynamic> compareToUserLectureInfoPopupVM(
-      UserLectureInfoPopupVM other) {
+    UserLectureInfoPopupVM other,
+  ) {
     final Map<String, dynamic> diff = {};
 
     if (lectureId != other.lectureId) {
@@ -178,7 +173,7 @@ extension UserLectureInfoPopupVMCompareE on UserLectureInfoPopupVM {
 
 class UserLectureInfoPopupVM_worstWords
     extends $UserLectureInfoPopupVM_worstWords
-    implements $UserLectureInfoPopupVM {
+    implements UserLectureInfoPopupVM {
   @override
   final String lectureId;
   @override
@@ -229,38 +224,73 @@ class UserLectureInfoPopupVM_worstWords
     final _patcher = patchInput ?? UserLectureInfoPopupVM_worstWordsPatch();
     final _patchMap = _patcher.toPatch();
     return UserLectureInfoPopupVM_worstWords(
-        lectureId:
-            _patchMap.containsKey(UserLectureInfoPopupVM_worstWords$.lectureId)
-                ? (_patchMap[UserLectureInfoPopupVM_worstWords$.lectureId]
-                        is Function)
-                    ? _patchMap[UserLectureInfoPopupVM_worstWords$.lectureId](
-                        this.lectureId)
-                    : _patchMap[UserLectureInfoPopupVM_worstWords$.lectureId]
-                : this.lectureId,
-        isExcluded:
-            _patchMap.containsKey(UserLectureInfoPopupVM_worstWords$.isExcluded)
-                ? (_patchMap[UserLectureInfoPopupVM_worstWords$.isExcluded]
-                        is Function)
-                    ? _patchMap[UserLectureInfoPopupVM_worstWords$.isExcluded](
-                        this.isExcluded)
-                    : _patchMap[UserLectureInfoPopupVM_worstWords$.isExcluded]
-                : this.isExcluded,
-        worstWordDue: _patchMap
-                .containsKey(UserLectureInfoPopupVM_worstWords$.worstWordDue)
-            ? (_patchMap[UserLectureInfoPopupVM_worstWords$.worstWordDue]
+      lectureId:
+          _patchMap.containsKey(UserLectureInfoPopupVM_worstWords$.lectureId)
+          ? (_patchMap[UserLectureInfoPopupVM_worstWords$.lectureId]
+                    is Function)
+                ? _patchMap[UserLectureInfoPopupVM_worstWords$.lectureId](
+                    this.lectureId,
+                  )
+                : _patchMap[UserLectureInfoPopupVM_worstWords$.lectureId]
+          : this.lectureId,
+      isExcluded:
+          _patchMap.containsKey(UserLectureInfoPopupVM_worstWords$.isExcluded)
+          ? (_patchMap[UserLectureInfoPopupVM_worstWords$.isExcluded]
+                    is Function)
+                ? _patchMap[UserLectureInfoPopupVM_worstWords$.isExcluded](
+                    this.isExcluded,
+                  )
+                : _patchMap[UserLectureInfoPopupVM_worstWords$.isExcluded]
+          : this.isExcluded,
+      worstWordDue:
+          _patchMap.containsKey(UserLectureInfoPopupVM_worstWords$.worstWordDue)
+          ? (_patchMap[UserLectureInfoPopupVM_worstWords$.worstWordDue]
                     is Function)
                 ? _patchMap[UserLectureInfoPopupVM_worstWords$.worstWordDue](
-                    this.worstWordDue)
+                    this.worstWordDue,
+                  )
                 : _patchMap[UserLectureInfoPopupVM_worstWords$.worstWordDue]
-            : this.worstWordDue,
-        stageOfStages: _patchMap
-                .containsKey(UserLectureInfoPopupVM_worstWords$.stageOfStages)
-            ? (_patchMap[UserLectureInfoPopupVM_worstWords$.stageOfStages]
+          : this.worstWordDue,
+      stageOfStages:
+          _patchMap.containsKey(
+            UserLectureInfoPopupVM_worstWords$.stageOfStages,
+          )
+          ? (_patchMap[UserLectureInfoPopupVM_worstWords$.stageOfStages]
                     is Function)
                 ? _patchMap[UserLectureInfoPopupVM_worstWords$.stageOfStages](
-                    this.stageOfStages)
+                    this.stageOfStages,
+                  )
                 : _patchMap[UserLectureInfoPopupVM_worstWords$.stageOfStages]
-            : this.stageOfStages);
+          : this.stageOfStages,
+    );
+  }
+
+  UserLectureInfoPopupVM_worstWords copyWithUserLectureInfoPopupVM({
+    String? lectureId,
+    bool? isExcluded,
+  }) {
+    return copyWith(lectureId: lectureId, isExcluded: isExcluded);
+  }
+
+  UserLectureInfoPopupVM_worstWords patchWithUserLectureInfoPopupVM({
+    UserLectureInfoPopupVMPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? UserLectureInfoPopupVMPatch();
+    final _patchMap = _patcher.toPatch();
+    return UserLectureInfoPopupVM_worstWords(
+      lectureId: _patchMap.containsKey(UserLectureInfoPopupVM$.lectureId)
+          ? (_patchMap[UserLectureInfoPopupVM$.lectureId] is Function)
+                ? _patchMap[UserLectureInfoPopupVM$.lectureId](this.lectureId)
+                : _patchMap[UserLectureInfoPopupVM$.lectureId]
+          : this.lectureId,
+      isExcluded: _patchMap.containsKey(UserLectureInfoPopupVM$.isExcluded)
+          ? (_patchMap[UserLectureInfoPopupVM$.isExcluded] is Function)
+                ? _patchMap[UserLectureInfoPopupVM$.isExcluded](this.isExcluded)
+                : _patchMap[UserLectureInfoPopupVM$.isExcluded]
+          : this.isExcluded,
+      worstWordDue: this.worstWordDue,
+      stageOfStages: this.stageOfStages,
+    );
   }
 
   @override
@@ -276,7 +306,11 @@ class UserLectureInfoPopupVM_worstWords
   @override
   int get hashCode {
     return Object.hash(
-        this.lectureId, this.isExcluded, this.worstWordDue, this.stageOfStages);
+      this.lectureId,
+      this.isExcluded,
+      this.worstWordDue,
+      this.stageOfStages,
+    );
   }
 
   @override
@@ -296,15 +330,16 @@ enum UserLectureInfoPopupVM_worstWords$ {
   lectureId,
   isExcluded,
   worstWordDue,
-  stageOfStages
+  stageOfStages,
 }
 
 class UserLectureInfoPopupVM_worstWordsPatch
     implements Patch<UserLectureInfoPopupVM_worstWords> {
   final Map<UserLectureInfoPopupVM_worstWords$, dynamic> _patch = {};
 
-  static UserLectureInfoPopupVM_worstWordsPatch create(
-      [Map<String, dynamic>? diff]) {
+  static UserLectureInfoPopupVM_worstWordsPatch create([
+    Map<String, dynamic>? diff,
+  ]) {
     final patch = UserLectureInfoPopupVM_worstWordsPatch();
     if (diff != null) {
       diff.forEach((key, value) {
@@ -323,7 +358,8 @@ class UserLectureInfoPopupVM_worstWordsPatch
   }
 
   static UserLectureInfoPopupVM_worstWordsPatch fromPatch(
-      Map<UserLectureInfoPopupVM_worstWords$, dynamic> patch) {
+    Map<UserLectureInfoPopupVM_worstWords$, dynamic> patch,
+  ) {
     final _patch = UserLectureInfoPopupVM_worstWordsPatch();
     _patch._patch.addAll(patch);
     return _patch;
@@ -333,7 +369,8 @@ class UserLectureInfoPopupVM_worstWordsPatch
       Map.from(_patch);
 
   UserLectureInfoPopupVM_worstWords applyTo(
-      UserLectureInfoPopupVM_worstWords entity) {
+    UserLectureInfoPopupVM_worstWords entity,
+  ) {
     return entity.patchWithUserLectureInfoPopupVM_worstWords(patchInput: this);
   }
 
@@ -368,7 +405,8 @@ class UserLectureInfoPopupVM_worstWordsPatch
   }
 
   static UserLectureInfoPopupVM_worstWordsPatch fromJson(
-      Map<String, dynamic> json) {
+    Map<String, dynamic> json,
+  ) {
     return create(json);
   }
 
@@ -396,7 +434,8 @@ class UserLectureInfoPopupVM_worstWordsPatch
 extension UserLectureInfoPopupVM_worstWordsCompareE
     on UserLectureInfoPopupVM_worstWords {
   Map<String, dynamic> compareToUserLectureInfoPopupVM_worstWords(
-      UserLectureInfoPopupVM_worstWords other) {
+    UserLectureInfoPopupVM_worstWords other,
+  ) {
     final Map<String, dynamic> diff = {};
 
     if (lectureId != other.lectureId) {

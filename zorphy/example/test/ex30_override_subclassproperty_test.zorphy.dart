@@ -12,37 +12,26 @@ class A extends $A {
   @override
   final Person a;
 
-  A({
-    required this.a,
-  });
+  A({required this.a});
 
-  A copyWith({
-    Person? a,
-  }) {
-    return A(
-      a: a ?? this.a,
-    );
+  A copyWith({Person? a}) {
+    return A(a: a ?? this.a);
   }
 
-  A copyWithA({
-    Person? a,
-  }) {
-    return copyWith(
-      a: a,
-    );
+  A copyWithA({Person? a}) {
+    return copyWith(a: a);
   }
 
-  A patchWithA({
-    APatch? patchInput,
-  }) {
+  A patchWithA({APatch? patchInput}) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return A(
-        a: _patchMap.containsKey(A$.a)
-            ? (_patchMap[A$.a] is Function)
+      a: _patchMap.containsKey(A$.a)
+          ? (_patchMap[A$.a] is Function)
                 ? _patchMap[A$.a](this.a)
                 : _patchMap[A$.a]
-            : this.a);
+          : this.a,
+    );
   }
 
   @override
@@ -147,41 +136,46 @@ extension ACompareE on A {
   }
 }
 
-class B extends $B implements $A {
+class B extends $B implements A {
   @override
   final Employee a;
 
-  B({
-    required this.a,
-  });
+  B({required this.a});
 
-  B copyWith({
-    Employee? a,
-  }) {
-    return B(
-      a: a ?? this.a,
-    );
+  B copyWith({Employee? a}) {
+    return B(a: a ?? this.a);
   }
 
-  B copyWithB({
-    Employee? a,
-  }) {
-    return copyWith(
-      a: a,
-    );
+  B copyWithB({Employee? a}) {
+    return copyWith(a: a);
   }
 
-  B patchWithB({
-    BPatch? patchInput,
-  }) {
+  B patchWithB({BPatch? patchInput}) {
     final _patcher = patchInput ?? BPatch();
     final _patchMap = _patcher.toPatch();
     return B(
-        a: _patchMap.containsKey(B$.a)
-            ? (_patchMap[B$.a] is Function)
+      a: _patchMap.containsKey(B$.a)
+          ? (_patchMap[B$.a] is Function)
                 ? _patchMap[B$.a](this.a)
                 : _patchMap[B$.a]
-            : this.a);
+          : this.a,
+    );
+  }
+
+  B copyWithA({Person? a}) {
+    return copyWith(a: a);
+  }
+
+  B patchWithA({APatch? patchInput}) {
+    final _patcher = patchInput ?? APatch();
+    final _patchMap = _patcher.toPatch();
+    return B(
+      a: _patchMap.containsKey(A$.a)
+          ? (_patchMap[A$.a] is Function)
+                ? _patchMap[A$.a](this.a)
+                : _patchMap[A$.a]
+          : this.a,
+    );
   }
 
   @override

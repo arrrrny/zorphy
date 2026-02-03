@@ -77,40 +77,42 @@ class Monitor_PurpleAir implements $$MonitorI {
     final _patcher = patchInput ?? Monitor_PurpleAirPatch();
     final _patchMap = _patcher.toPatch();
     return Monitor_PurpleAir(
-        monitorId: _patchMap.containsKey(Monitor_PurpleAir$.monitorId)
-            ? (_patchMap[Monitor_PurpleAir$.monitorId] is Function)
+      monitorId: _patchMap.containsKey(Monitor_PurpleAir$.monitorId)
+          ? (_patchMap[Monitor_PurpleAir$.monitorId] is Function)
                 ? _patchMap[Monitor_PurpleAir$.monitorId](this.monitorId)
                 : _patchMap[Monitor_PurpleAir$.monitorId]
-            : this.monitorId,
-        locationId: _patchMap.containsKey(Monitor_PurpleAir$.locationId)
-            ? (_patchMap[Monitor_PurpleAir$.locationId] is Function)
+          : this.monitorId,
+      locationId: _patchMap.containsKey(Monitor_PurpleAir$.locationId)
+          ? (_patchMap[Monitor_PurpleAir$.locationId] is Function)
                 ? _patchMap[Monitor_PurpleAir$.locationId](this.locationId)
                 : _patchMap[Monitor_PurpleAir$.locationId]
-            : this.locationId,
-        monitorName: _patchMap.containsKey(Monitor_PurpleAir$.monitorName)
-            ? (_patchMap[Monitor_PurpleAir$.monitorName] is Function)
+          : this.locationId,
+      monitorName: _patchMap.containsKey(Monitor_PurpleAir$.monitorName)
+          ? (_patchMap[Monitor_PurpleAir$.monitorName] is Function)
                 ? _patchMap[Monitor_PurpleAir$.monitorName](this.monitorName)
                 : _patchMap[Monitor_PurpleAir$.monitorName]
-            : this.monitorName,
-        monitorPostcode:
-            _patchMap.containsKey(Monitor_PurpleAir$.monitorPostcode)
-                ? (_patchMap[Monitor_PurpleAir$.monitorPostcode] is Function)
-                    ? _patchMap[Monitor_PurpleAir$.monitorPostcode](
-                        this.monitorPostcode)
-                    : _patchMap[Monitor_PurpleAir$.monitorPostcode]
-                : this.monitorPostcode,
-        isExcluded: _patchMap.containsKey(Monitor_PurpleAir$.isExcluded)
-            ? (_patchMap[Monitor_PurpleAir$.isExcluded] is Function)
+          : this.monitorName,
+      monitorPostcode: _patchMap.containsKey(Monitor_PurpleAir$.monitorPostcode)
+          ? (_patchMap[Monitor_PurpleAir$.monitorPostcode] is Function)
+                ? _patchMap[Monitor_PurpleAir$.monitorPostcode](
+                    this.monitorPostcode,
+                  )
+                : _patchMap[Monitor_PurpleAir$.monitorPostcode]
+          : this.monitorPostcode,
+      isExcluded: _patchMap.containsKey(Monitor_PurpleAir$.isExcluded)
+          ? (_patchMap[Monitor_PurpleAir$.isExcluded] is Function)
                 ? _patchMap[Monitor_PurpleAir$.isExcluded](this.isExcluded)
                 : _patchMap[Monitor_PurpleAir$.isExcluded]
-            : this.isExcluded,
-        purpleAirSensorApiId: _patchMap
-                .containsKey(Monitor_PurpleAir$.purpleAirSensorApiId)
-            ? (_patchMap[Monitor_PurpleAir$.purpleAirSensorApiId] is Function)
+          : this.isExcluded,
+      purpleAirSensorApiId:
+          _patchMap.containsKey(Monitor_PurpleAir$.purpleAirSensorApiId)
+          ? (_patchMap[Monitor_PurpleAir$.purpleAirSensorApiId] is Function)
                 ? _patchMap[Monitor_PurpleAir$.purpleAirSensorApiId](
-                    this.purpleAirSensorApiId)
+                    this.purpleAirSensorApiId,
+                  )
                 : _patchMap[Monitor_PurpleAir$.purpleAirSensorApiId]
-            : this.purpleAirSensorApiId);
+          : this.purpleAirSensorApiId,
+    );
   }
 
   @override
@@ -127,8 +129,14 @@ class Monitor_PurpleAir implements $$MonitorI {
 
   @override
   int get hashCode {
-    return Object.hash(this.monitorId, this.locationId, this.monitorName,
-        this.monitorPostcode, this.isExcluded, this.purpleAirSensorApiId);
+    return Object.hash(
+      this.monitorId,
+      this.locationId,
+      this.monitorName,
+      this.monitorPostcode,
+      this.isExcluded,
+      this.purpleAirSensorApiId,
+    );
   }
 
   @override
@@ -154,7 +162,7 @@ enum Monitor_PurpleAir$ {
   monitorName,
   monitorPostcode,
   isExcluded,
-  purpleAirSensorApiId
+  purpleAirSensorApiId,
 }
 
 class Monitor_PurpleAirPatch implements Patch<Monitor_PurpleAir> {
@@ -165,8 +173,9 @@ class Monitor_PurpleAirPatch implements Patch<Monitor_PurpleAir> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              Monitor_PurpleAir$.values.firstWhere((e) => e.name == key);
+          final enumValue = Monitor_PurpleAir$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -179,7 +188,8 @@ class Monitor_PurpleAirPatch implements Patch<Monitor_PurpleAir> {
   }
 
   static Monitor_PurpleAirPatch fromPatch(
-      Map<Monitor_PurpleAir$, dynamic> patch) {
+    Map<Monitor_PurpleAir$, dynamic> patch,
+  ) {
     final _patch = Monitor_PurpleAirPatch();
     _patch._patch.addAll(patch);
     return _patch;

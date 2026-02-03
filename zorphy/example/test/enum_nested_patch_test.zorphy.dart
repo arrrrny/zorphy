@@ -23,11 +23,7 @@ class OperatingSystem extends $OperatingSystem {
     required this.isActive,
   });
 
-  OperatingSystem copyWith({
-    String? name,
-    String? version,
-    bool? isActive,
-  }) {
+  OperatingSystem copyWith({String? name, String? version, bool? isActive}) {
     return OperatingSystem(
       name: name ?? this.name,
       version: version ?? this.version,
@@ -40,34 +36,29 @@ class OperatingSystem extends $OperatingSystem {
     String? version,
     bool? isActive,
   }) {
-    return copyWith(
-      name: name,
-      version: version,
-      isActive: isActive,
-    );
+    return copyWith(name: name, version: version, isActive: isActive);
   }
 
-  OperatingSystem patchWithOperatingSystem({
-    OperatingSystemPatch? patchInput,
-  }) {
+  OperatingSystem patchWithOperatingSystem({OperatingSystemPatch? patchInput}) {
     final _patcher = patchInput ?? OperatingSystemPatch();
     final _patchMap = _patcher.toPatch();
     return OperatingSystem(
-        name: _patchMap.containsKey(OperatingSystem$.name)
-            ? (_patchMap[OperatingSystem$.name] is Function)
+      name: _patchMap.containsKey(OperatingSystem$.name)
+          ? (_patchMap[OperatingSystem$.name] is Function)
                 ? _patchMap[OperatingSystem$.name](this.name)
                 : _patchMap[OperatingSystem$.name]
-            : this.name,
-        version: _patchMap.containsKey(OperatingSystem$.version)
-            ? (_patchMap[OperatingSystem$.version] is Function)
+          : this.name,
+      version: _patchMap.containsKey(OperatingSystem$.version)
+          ? (_patchMap[OperatingSystem$.version] is Function)
                 ? _patchMap[OperatingSystem$.version](this.version)
                 : _patchMap[OperatingSystem$.version]
-            : this.version,
-        isActive: _patchMap.containsKey(OperatingSystem$.isActive)
-            ? (_patchMap[OperatingSystem$.isActive] is Function)
+          : this.version,
+      isActive: _patchMap.containsKey(OperatingSystem$.isActive)
+          ? (_patchMap[OperatingSystem$.isActive] is Function)
                 ? _patchMap[OperatingSystem$.isActive](this.isActive)
                 : _patchMap[OperatingSystem$.isActive]
-            : this.isActive);
+          : this.isActive,
+    );
   }
 
   @override
@@ -109,8 +100,9 @@ class OperatingSystemPatch implements Patch<OperatingSystem> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              OperatingSystem$.values.firstWhere((e) => e.name == key);
+          final enumValue = OperatingSystem$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -186,6 +178,22 @@ class OperatingSystemPatch implements Patch<OperatingSystem> {
 
 extension OperatingSystemSerialization on OperatingSystem {
   Map<String, dynamic> toJson() => _$OperatingSystemToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$OperatingSystemToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension OperatingSystemCompareE on OperatingSystem {
@@ -244,27 +252,26 @@ class DeviceType extends $DeviceType {
     );
   }
 
-  DeviceType patchWithDeviceType({
-    DeviceTypePatch? patchInput,
-  }) {
+  DeviceType patchWithDeviceType({DeviceTypePatch? patchInput}) {
     final _patcher = patchInput ?? DeviceTypePatch();
     final _patchMap = _patcher.toPatch();
     return DeviceType(
-        category: _patchMap.containsKey(DeviceType$.category)
-            ? (_patchMap[DeviceType$.category] is Function)
+      category: _patchMap.containsKey(DeviceType$.category)
+          ? (_patchMap[DeviceType$.category] is Function)
                 ? _patchMap[DeviceType$.category](this.category)
                 : _patchMap[DeviceType$.category]
-            : this.category,
-        manufacturer: _patchMap.containsKey(DeviceType$.manufacturer)
-            ? (_patchMap[DeviceType$.manufacturer] is Function)
+          : this.category,
+      manufacturer: _patchMap.containsKey(DeviceType$.manufacturer)
+          ? (_patchMap[DeviceType$.manufacturer] is Function)
                 ? _patchMap[DeviceType$.manufacturer](this.manufacturer)
                 : _patchMap[DeviceType$.manufacturer]
-            : this.manufacturer,
-        screenSize: _patchMap.containsKey(DeviceType$.screenSize)
-            ? (_patchMap[DeviceType$.screenSize] is Function)
+          : this.manufacturer,
+      screenSize: _patchMap.containsKey(DeviceType$.screenSize)
+          ? (_patchMap[DeviceType$.screenSize] is Function)
                 ? _patchMap[DeviceType$.screenSize](this.screenSize)
                 : _patchMap[DeviceType$.screenSize]
-            : this.screenSize);
+          : this.screenSize,
+    );
   }
 
   @override
@@ -382,6 +389,22 @@ class DeviceTypePatch implements Patch<DeviceType> {
 
 extension DeviceTypeSerialization on DeviceType {
   Map<String, dynamic> toJson() => _$DeviceTypeToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$DeviceTypeToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension DeviceTypeCompareE on DeviceType {
@@ -454,37 +477,36 @@ class Device extends $Device {
     );
   }
 
-  Device patchWithDevice({
-    DevicePatch? patchInput,
-  }) {
+  Device patchWithDevice({DevicePatch? patchInput}) {
     final _patcher = patchInput ?? DevicePatch();
     final _patchMap = _patcher.toPatch();
     return Device(
-        deviceId: _patchMap.containsKey(Device$.deviceId)
-            ? (_patchMap[Device$.deviceId] is Function)
+      deviceId: _patchMap.containsKey(Device$.deviceId)
+          ? (_patchMap[Device$.deviceId] is Function)
                 ? _patchMap[Device$.deviceId](this.deviceId)
                 : _patchMap[Device$.deviceId]
-            : this.deviceId,
-        os: _patchMap.containsKey(Device$.os)
-            ? (_patchMap[Device$.os] is Function)
+          : this.deviceId,
+      os: _patchMap.containsKey(Device$.os)
+          ? (_patchMap[Device$.os] is Function)
                 ? _patchMap[Device$.os](this.os)
                 : _patchMap[Device$.os]
-            : this.os,
-        deviceType: _patchMap.containsKey(Device$.deviceType)
-            ? (_patchMap[Device$.deviceType] is Function)
+          : this.os,
+      deviceType: _patchMap.containsKey(Device$.deviceType)
+          ? (_patchMap[Device$.deviceType] is Function)
                 ? _patchMap[Device$.deviceType](this.deviceType)
                 : _patchMap[Device$.deviceType]
-            : this.deviceType,
-        supportedOS: _patchMap.containsKey(Device$.supportedOS)
-            ? (_patchMap[Device$.supportedOS] is Function)
+          : this.deviceType,
+      supportedOS: _patchMap.containsKey(Device$.supportedOS)
+          ? (_patchMap[Device$.supportedOS] is Function)
                 ? _patchMap[Device$.supportedOS](this.supportedOS)
                 : _patchMap[Device$.supportedOS]
-            : this.supportedOS,
-        peripherals: _patchMap.containsKey(Device$.peripherals)
-            ? (_patchMap[Device$.peripherals] is Function)
+          : this.supportedOS,
+      peripherals: _patchMap.containsKey(Device$.peripherals)
+          ? (_patchMap[Device$.peripherals] is Function)
                 ? _patchMap[Device$.peripherals](this.peripherals)
                 : _patchMap[Device$.peripherals]
-            : this.peripherals);
+          : this.peripherals,
+    );
   }
 
   @override
@@ -500,8 +522,13 @@ class Device extends $Device {
 
   @override
   int get hashCode {
-    return Object.hash(this.deviceId, this.os, this.deviceType,
-        this.supportedOS, this.peripherals);
+    return Object.hash(
+      this.deviceId,
+      this.os,
+      this.deviceType,
+      this.supportedOS,
+      this.peripherals,
+    );
   }
 
   @override
@@ -618,6 +645,22 @@ class DevicePatch implements Patch<Device> {
 
 extension DeviceSerialization on Device {
   Map<String, dynamic> toJson() => _$DeviceToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$DeviceToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension DeviceCompareE on Device {
@@ -696,37 +739,36 @@ class User extends $User {
     );
   }
 
-  User patchWithUser({
-    UserPatch? patchInput,
-  }) {
+  User patchWithUser({UserPatch? patchInput}) {
     final _patcher = patchInput ?? UserPatch();
     final _patchMap = _patcher.toPatch();
     return User(
-        name: _patchMap.containsKey(User$.name)
-            ? (_patchMap[User$.name] is Function)
+      name: _patchMap.containsKey(User$.name)
+          ? (_patchMap[User$.name] is Function)
                 ? _patchMap[User$.name](this.name)
                 : _patchMap[User$.name]
-            : this.name,
-        email: _patchMap.containsKey(User$.email)
-            ? (_patchMap[User$.email] is Function)
+          : this.name,
+      email: _patchMap.containsKey(User$.email)
+          ? (_patchMap[User$.email] is Function)
                 ? _patchMap[User$.email](this.email)
                 : _patchMap[User$.email]
-            : this.email,
-        primaryDevice: _patchMap.containsKey(User$.primaryDevice)
-            ? (_patchMap[User$.primaryDevice] is Function)
+          : this.email,
+      primaryDevice: _patchMap.containsKey(User$.primaryDevice)
+          ? (_patchMap[User$.primaryDevice] is Function)
                 ? _patchMap[User$.primaryDevice](this.primaryDevice)
                 : _patchMap[User$.primaryDevice]
-            : this.primaryDevice,
-        devices: _patchMap.containsKey(User$.devices)
-            ? (_patchMap[User$.devices] is Function)
+          : this.primaryDevice,
+      devices: _patchMap.containsKey(User$.devices)
+          ? (_patchMap[User$.devices] is Function)
                 ? _patchMap[User$.devices](this.devices)
                 : _patchMap[User$.devices]
-            : this.devices,
-        preferences: _patchMap.containsKey(User$.preferences)
-            ? (_patchMap[User$.preferences] is Function)
+          : this.devices,
+      preferences: _patchMap.containsKey(User$.preferences)
+          ? (_patchMap[User$.preferences] is Function)
                 ? _patchMap[User$.preferences](this.preferences)
                 : _patchMap[User$.preferences]
-            : this.preferences);
+          : this.preferences,
+    );
   }
 
   @override
@@ -742,8 +784,13 @@ class User extends $User {
 
   @override
   int get hashCode {
-    return Object.hash(this.name, this.email, this.primaryDevice, this.devices,
-        this.preferences);
+    return Object.hash(
+      this.name,
+      this.email,
+      this.primaryDevice,
+      this.devices,
+      this.preferences,
+    );
   }
 
   @override
@@ -860,6 +907,22 @@ class UserPatch implements Patch<User> {
 
 extension UserSerialization on User {
   Map<String, dynamic> toJson() => _$UserToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$UserToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension UserCompareE on User {

@@ -1,3 +1,4 @@
+// dart format width=80
 // ignore_for_file: UNNECESSARY_CAST
 // ignore_for_file: type=lint
 
@@ -13,49 +14,37 @@ sealed class $Super {
   String get x;
 
   const $Super._internal();
-
 }
-
-
 
 class SubA implements $$Super {
   final String x;
 
-  SubA({
-    required this.x,
-  });
+  SubA({required this.x});
 
-  SubA copyWith({
-    String? x,
-  }) {
-    return SubA(
-      x: x ?? this.x,
-    );
+  SubA copyWith({String? x}) {
+    return SubA(x: x ?? this.x);
   }
 
-  SubA copyWithSubA({
-    String? x,
-  }) {
-    return copyWith(
-      x: x,
-    );
+  SubA copyWithSubA({String? x}) {
+    return copyWith(x: x);
   }
 
-  SubA patchWithSubA({
-    SubAPatch? patchInput,
-  }) {
+  SubA patchWithSubA({SubAPatch? patchInput}) {
     final _patcher = patchInput ?? SubAPatch();
     final _patchMap = _patcher.toPatch();
     return SubA(
-      x: _patchMap.containsKey(SubA$.x) ? (_patchMap[SubA$.x] is Function) ? _patchMap[SubA$.x](this.x) : _patchMap[SubA$.x] : this.x
+      x: _patchMap.containsKey(SubA$.x)
+          ? (_patchMap[SubA$.x] is Function)
+                ? _patchMap[SubA$.x](this.x)
+                : _patchMap[SubA$.x]
+          : this.x,
     );
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is SubA &&
-        x == other.x;
+    return other is SubA && x == other.x;
   }
 
   @override
@@ -65,15 +54,11 @@ class SubA implements $$Super {
 
   @override
   String toString() {
-    return 'SubA(' +
-        'x: ${x})';
+    return 'SubA(' + 'x: ${x})';
   }
-
-}
-enum SubA$ {
-x
 }
 
+enum SubA$ { x }
 
 class SubAPatch implements Patch<SubA> {
   final Map<SubA$, dynamic> _patch = {};
@@ -127,11 +112,12 @@ class SubAPatch implements Patch<SubA> {
     if (value is DateTime) return value.toIso8601String();
     if (value is Enum) return value.toString().split('.').last;
     if (value is List) return value.map((e) => _convertToJson(e)).toList();
-    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
+    if (value is Map)
+      return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
     if (value is num || value is bool || value is String) return value;
     try {
-        if (value?.toJsonLean != null) return value.toJsonLean();
-      } catch (_) {}
+      if (value?.toJsonLean != null) return value.toJsonLean();
+    } catch (_) {}
     if (value?.toJson != null) return value.toJson();
     return value.toString();
   }
@@ -144,9 +130,7 @@ class SubAPatch implements Patch<SubA> {
     _patch[SubA$.x] = value;
     return this;
   }
-
 }
-
 
 extension SubACompareE on SubA {
   Map<String, dynamic> compareToSubA(SubA other) {
@@ -159,9 +143,8 @@ extension SubACompareE on SubA {
   }
 }
 
-
 extension SubAChangeToE on SubA {
-  SubB changeToSubB({required String z, required List<$C> cs}) {
+  SubB changeToSubB({required String z, required List<C> cs}) {
     final _patcher = SubBPatch();
     _patcher.withZ(z);
     _patcher.withCs(cs);
@@ -171,57 +154,43 @@ extension SubAChangeToE on SubA {
       cs: _patchMap[SubB$.cs],
       x: _patchMap.containsKey(SubB$.x)
           ? (_patchMap[SubB$.x] is Function)
-                ? _patchMap[SubB$.x](this.x)
+                ? _patchMap[SubB$.x](x)
                 : _patchMap[SubB$.x]
-          : this.x
+          : x,
     );
   }
-
 }
-
-
-
 
 class SubB implements $$Super {
   final String x;
   final String z;
   final List<C> cs;
 
-  SubB({
-    required this.x,
-    required this.z,
-    required this.cs,
-  });
+  SubB({required this.x, required this.z, required this.cs});
 
-  SubB._copyWith({
-    String? x,
-    String? z,
-    List<C>? cs,
-  }) : 
-    x = x ?? throw ArgumentError("x is required"),
-    z = z ?? throw ArgumentError("z is required"),
-    cs = cs ?? throw ArgumentError("cs is required");
+  SubB._copyWith({String? x, String? z, List<C>? cs})
+    : x =
+          x ??
+          (() {
+            throw ArgumentError("x is required");
+          })(),
+      z =
+          z ??
+          (() {
+            throw ArgumentError("z is required");
+          })(),
+      cs =
+          cs ??
+          (() {
+            throw ArgumentError("cs is required");
+          })();
 
-  SubB copyWith({
-    String? x,
-    String? z,
-    List<C>? cs,
-  }) {
-    return SubB(
-      x: x ?? this.x,
-      z: z ?? this.z,
-      cs: cs ?? this.cs,
-    );
+  SubB copyWith({String? x, String? z, List<C>? cs}) {
+    return SubB(x: x ?? this.x, z: z ?? this.z, cs: cs ?? this.cs);
   }
 
-  SubB copyWithSubB({
-    String? x,
-    String? z,
-    List<C>? cs,
-  }) {
-    return copyWith(
-      x: x, z: z, cs: cs,
-    );
+  SubB copyWithSubB({String? x, String? z, List<C>? cs}) {
+    return copyWith(x: x, z: z, cs: cs);
   }
 
   SubB copyWithFn({
@@ -236,48 +205,46 @@ class SubB implements $$Super {
     );
   }
 
-  SubB patchWithSubB({
-    SubBPatch? patchInput,
-  }) {
+  SubB patchWithSubB({SubBPatch? patchInput}) {
     final _patcher = patchInput ?? SubBPatch();
     final _patchMap = _patcher.toPatch();
     return SubB(
-      x: _patchMap.containsKey(SubB$.x) ? (_patchMap[SubB$.x] is Function) ? _patchMap[SubB$.x](this.x) : _patchMap[SubB$.x] : this.x,
-      z: _patchMap.containsKey(SubB$.z) ? (_patchMap[SubB$.z] is Function) ? _patchMap[SubB$.z](this.z) : _patchMap[SubB$.z] : this.z,
-      cs: _patchMap.containsKey(SubB$.cs) ? (_patchMap[SubB$.cs] is Function) ? _patchMap[SubB$.cs](this.cs) : _patchMap[SubB$.cs] : this.cs
+      x: _patchMap.containsKey(SubB$.x)
+          ? (_patchMap[SubB$.x] is Function)
+                ? _patchMap[SubB$.x](this.x)
+                : _patchMap[SubB$.x]
+          : this.x,
+      z: _patchMap.containsKey(SubB$.z)
+          ? (_patchMap[SubB$.z] is Function)
+                ? _patchMap[SubB$.z](this.z)
+                : _patchMap[SubB$.z]
+          : this.z,
+      cs: _patchMap.containsKey(SubB$.cs)
+          ? (_patchMap[SubB$.cs] is Function)
+                ? _patchMap[SubB$.cs](this.cs)
+                : _patchMap[SubB$.cs]
+          : this.cs,
     );
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is SubB &&
-        x == other.x &&
-        z == other.z &&
-        cs == other.cs;
+    return other is SubB && x == other.x && z == other.z && cs == other.cs;
   }
 
   @override
   int get hashCode {
-    return Object.hash(
-      this.x,
-      this.z,
-      this.cs);
+    return Object.hash(this.x, this.z, this.cs);
   }
 
   @override
   String toString() {
-    return 'SubB(' +
-        'x: ${x}' + ', ' +
-        'z: ${z}' + ', ' +
-        'cs: ${cs})';
+    return 'SubB(' + 'x: ${x}' + ', ' + 'z: ${z}' + ', ' + 'cs: ${cs})';
   }
-
-}
-enum SubB$ {
-x,z,cs
 }
 
+enum SubB$ { x, z, cs }
 
 class SubBPatch implements Patch<SubB> {
   final Map<SubB$, dynamic> _patch = {};
@@ -331,11 +298,12 @@ class SubBPatch implements Patch<SubB> {
     if (value is DateTime) return value.toIso8601String();
     if (value is Enum) return value.toString().split('.').last;
     if (value is List) return value.map((e) => _convertToJson(e)).toList();
-    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
+    if (value is Map)
+      return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
     if (value is num || value is bool || value is String) return value;
     try {
-        if (value?.toJsonLean != null) return value.toJsonLean();
-      } catch (_) {}
+      if (value?.toJsonLean != null) return value.toJsonLean();
+    } catch (_) {}
     if (value?.toJson != null) return value.toJson();
     return value.toString();
   }
@@ -358,9 +326,7 @@ class SubBPatch implements Patch<SubB> {
     _patch[SubB$.cs] = value;
     return this;
   }
-
 }
-
 
 extension SubBCompareE on SubB {
   Map<String, dynamic> compareToSubB(SubB other) {
@@ -379,48 +345,36 @@ extension SubBCompareE on SubB {
   }
 }
 
-
-
-
 class C extends $C {
   @override
   final String m;
 
-  C({
-    required this.m,
-  });
+  C({required this.m});
 
-  C copyWith({
-    String? m,
-  }) {
-    return C(
-      m: m ?? this.m,
-    );
+  C copyWith({String? m}) {
+    return C(m: m ?? this.m);
   }
 
-  C copyWithC({
-    String? m,
-  }) {
-    return copyWith(
-      m: m,
-    );
+  C copyWithC({String? m}) {
+    return copyWith(m: m);
   }
 
-  C patchWithC({
-    CPatch? patchInput,
-  }) {
+  C patchWithC({CPatch? patchInput}) {
     final _patcher = patchInput ?? CPatch();
     final _patchMap = _patcher.toPatch();
     return C(
-      m: _patchMap.containsKey(C$.m) ? (_patchMap[C$.m] is Function) ? _patchMap[C$.m](this.m) : _patchMap[C$.m] : this.m
+      m: _patchMap.containsKey(C$.m)
+          ? (_patchMap[C$.m] is Function)
+                ? _patchMap[C$.m](this.m)
+                : _patchMap[C$.m]
+          : this.m,
     );
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is C &&
-        m == other.m;
+    return other is C && m == other.m;
   }
 
   @override
@@ -430,15 +384,11 @@ class C extends $C {
 
   @override
   String toString() {
-    return 'C(' +
-        'm: ${m})';
+    return 'C(' + 'm: ${m})';
   }
-
-}
-enum C$ {
-m
 }
 
+enum C$ { m }
 
 class CPatch implements Patch<C> {
   final Map<C$, dynamic> _patch = {};
@@ -492,11 +442,12 @@ class CPatch implements Patch<C> {
     if (value is DateTime) return value.toIso8601String();
     if (value is Enum) return value.toString().split('.').last;
     if (value is List) return value.map((e) => _convertToJson(e)).toList();
-    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
+    if (value is Map)
+      return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
     if (value is num || value is bool || value is String) return value;
     try {
-        if (value?.toJsonLean != null) return value.toJsonLean();
-      } catch (_) {}
+      if (value?.toJsonLean != null) return value.toJsonLean();
+    } catch (_) {}
     if (value?.toJson != null) return value.toJson();
     return value.toString();
   }
@@ -509,9 +460,7 @@ class CPatch implements Patch<C> {
     _patch[C$.m] = value;
     return this;
   }
-
 }
-
 
 extension CCompareE on C {
   Map<String, dynamic> compareToC(C other) {

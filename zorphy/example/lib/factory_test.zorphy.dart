@@ -12,37 +12,29 @@ part of 'factory_test.dart';
 class TestWithFactory implements $TestWithFactory {
   final String id;
 
-  TestWithFactory({
-    required this.id,
-  });
+  TestWithFactory({required this.id});
 
-  TestWithFactory copyWith({
-    String? id,
-  }) {
-    return TestWithFactory(
-      id: id ?? this.id,
-    );
+  TestWithFactory copyWith({String? id}) {
+    return TestWithFactory(id: id ?? this.id);
   }
 
-  TestWithFactory copyWithTestWithFactory({
-    String? id,
-  }) {
-    return copyWith(
-      id: id,
-    );
+  TestWithFactory copyWithTestWithFactory({String? id}) {
+    return copyWith(id: id);
   }
 
-  TestWithFactory patchWithTestWithFactory({
-    TestWithFactoryPatch? patchInput,
-  }) {
+  factory TestWithFactory.create({required String id}) =>
+      TestWithFactory.create(id: id);
+
+  TestWithFactory patchWithTestWithFactory({TestWithFactoryPatch? patchInput}) {
     final _patcher = patchInput ?? TestWithFactoryPatch();
     final _patchMap = _patcher.toPatch();
     return TestWithFactory(
-        id: _patchMap.containsKey(TestWithFactory$.id)
-            ? (_patchMap[TestWithFactory$.id] is Function)
+      id: _patchMap.containsKey(TestWithFactory$.id)
+          ? (_patchMap[TestWithFactory$.id] is Function)
                 ? _patchMap[TestWithFactory$.id](this.id)
                 : _patchMap[TestWithFactory$.id]
-            : this.id);
+          : this.id,
+    );
   }
 
   @override
@@ -76,8 +68,9 @@ class TestWithFactoryPatch implements Patch<TestWithFactory> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              TestWithFactory$.values.firstWhere((e) => e.name == key);
+          final enumValue = TestWithFactory$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -143,6 +136,22 @@ class TestWithFactoryPatch implements Patch<TestWithFactory> {
 
 extension TestWithFactorySerialization on TestWithFactory {
   Map<String, dynamic> toJson() => _$TestWithFactoryToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$TestWithFactoryToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension TestWithFactoryCompareE on TestWithFactory {

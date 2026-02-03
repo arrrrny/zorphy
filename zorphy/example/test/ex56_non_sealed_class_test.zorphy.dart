@@ -18,17 +18,9 @@ class Todo2 extends $$Todo2 {
   @override
   final String description;
 
-  Todo2({
-    required this.title,
-    required this.id,
-    required this.description,
-  });
+  Todo2({required this.title, required this.id, required this.description});
 
-  Todo2 copyWith({
-    String? title,
-    String? id,
-    String? description,
-  }) {
+  Todo2 copyWith({String? title, String? id, String? description}) {
     return Todo2(
       title: title ?? this.title,
       id: id ?? this.id,
@@ -36,39 +28,30 @@ class Todo2 extends $$Todo2 {
     );
   }
 
-  Todo2 copyWithTodo2({
-    String? title,
-    String? id,
-    String? description,
-  }) {
-    return copyWith(
-      title: title,
-      id: id,
-      description: description,
-    );
+  Todo2 copyWithTodo2({String? title, String? id, String? description}) {
+    return copyWith(title: title, id: id, description: description);
   }
 
-  Todo2 patchWithTodo2({
-    Todo2Patch? patchInput,
-  }) {
+  Todo2 patchWithTodo2({Todo2Patch? patchInput}) {
     final _patcher = patchInput ?? Todo2Patch();
     final _patchMap = _patcher.toPatch();
     return Todo2(
-        title: _patchMap.containsKey(Todo2$.title)
-            ? (_patchMap[Todo2$.title] is Function)
+      title: _patchMap.containsKey(Todo2$.title)
+          ? (_patchMap[Todo2$.title] is Function)
                 ? _patchMap[Todo2$.title](this.title)
                 : _patchMap[Todo2$.title]
-            : this.title,
-        id: _patchMap.containsKey(Todo2$.id)
-            ? (_patchMap[Todo2$.id] is Function)
+          : this.title,
+      id: _patchMap.containsKey(Todo2$.id)
+          ? (_patchMap[Todo2$.id] is Function)
                 ? _patchMap[Todo2$.id](this.id)
                 : _patchMap[Todo2$.id]
-            : this.id,
-        description: _patchMap.containsKey(Todo2$.description)
-            ? (_patchMap[Todo2$.description] is Function)
+          : this.id,
+      description: _patchMap.containsKey(Todo2$.description)
+          ? (_patchMap[Todo2$.description] is Function)
                 ? _patchMap[Todo2$.description](this.description)
                 : _patchMap[Todo2$.description]
-            : this.description);
+          : this.description,
+    );
   }
 
   @override
@@ -208,11 +191,7 @@ class Todo2_incomplete implements $$Todo2 {
     required this.description,
   });
 
-  Todo2_incomplete copyWith({
-    String? title,
-    String? id,
-    String? description,
-  }) {
+  Todo2_incomplete copyWith({String? title, String? id, String? description}) {
     return Todo2_incomplete(
       title: title ?? this.title,
       id: id ?? this.id,
@@ -225,11 +204,7 @@ class Todo2_incomplete implements $$Todo2 {
     String? id,
     String? description,
   }) {
-    return copyWith(
-      title: title,
-      id: id,
-      description: description,
-    );
+    return copyWith(title: title, id: id, description: description);
   }
 
   Todo2_incomplete patchWithTodo2_incomplete({
@@ -238,21 +213,22 @@ class Todo2_incomplete implements $$Todo2 {
     final _patcher = patchInput ?? Todo2_incompletePatch();
     final _patchMap = _patcher.toPatch();
     return Todo2_incomplete(
-        title: _patchMap.containsKey(Todo2_incomplete$.title)
-            ? (_patchMap[Todo2_incomplete$.title] is Function)
+      title: _patchMap.containsKey(Todo2_incomplete$.title)
+          ? (_patchMap[Todo2_incomplete$.title] is Function)
                 ? _patchMap[Todo2_incomplete$.title](this.title)
                 : _patchMap[Todo2_incomplete$.title]
-            : this.title,
-        id: _patchMap.containsKey(Todo2_incomplete$.id)
-            ? (_patchMap[Todo2_incomplete$.id] is Function)
+          : this.title,
+      id: _patchMap.containsKey(Todo2_incomplete$.id)
+          ? (_patchMap[Todo2_incomplete$.id] is Function)
                 ? _patchMap[Todo2_incomplete$.id](this.id)
                 : _patchMap[Todo2_incomplete$.id]
-            : this.id,
-        description: _patchMap.containsKey(Todo2_incomplete$.description)
-            ? (_patchMap[Todo2_incomplete$.description] is Function)
+          : this.id,
+      description: _patchMap.containsKey(Todo2_incomplete$.description)
+          ? (_patchMap[Todo2_incomplete$.description] is Function)
                 ? _patchMap[Todo2_incomplete$.description](this.description)
                 : _patchMap[Todo2_incomplete$.description]
-            : this.description);
+          : this.description,
+    );
   }
 
   @override
@@ -290,8 +266,9 @@ class Todo2_incompletePatch implements Patch<Todo2_incomplete> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              Todo2_incomplete$.values.firstWhere((e) => e.name == key);
+          final enumValue = Todo2_incomplete$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -304,7 +281,8 @@ class Todo2_incompletePatch implements Patch<Todo2_incomplete> {
   }
 
   static Todo2_incompletePatch fromPatch(
-      Map<Todo2_incomplete$, dynamic> patch) {
+    Map<Todo2_incomplete$, dynamic> patch,
+  ) {
     final _patch = Todo2_incompletePatch();
     _patch._patch.addAll(patch);
     return _patch;
@@ -424,32 +402,31 @@ class Todo2_complete implements $$Todo2 {
     );
   }
 
-  Todo2_complete patchWithTodo2_complete({
-    Todo2_completePatch? patchInput,
-  }) {
+  Todo2_complete patchWithTodo2_complete({Todo2_completePatch? patchInput}) {
     final _patcher = patchInput ?? Todo2_completePatch();
     final _patchMap = _patcher.toPatch();
     return Todo2_complete(
-        title: _patchMap.containsKey(Todo2_complete$.title)
-            ? (_patchMap[Todo2_complete$.title] is Function)
+      title: _patchMap.containsKey(Todo2_complete$.title)
+          ? (_patchMap[Todo2_complete$.title] is Function)
                 ? _patchMap[Todo2_complete$.title](this.title)
                 : _patchMap[Todo2_complete$.title]
-            : this.title,
-        id: _patchMap.containsKey(Todo2_complete$.id)
-            ? (_patchMap[Todo2_complete$.id] is Function)
+          : this.title,
+      id: _patchMap.containsKey(Todo2_complete$.id)
+          ? (_patchMap[Todo2_complete$.id] is Function)
                 ? _patchMap[Todo2_complete$.id](this.id)
                 : _patchMap[Todo2_complete$.id]
-            : this.id,
-        description: _patchMap.containsKey(Todo2_complete$.description)
-            ? (_patchMap[Todo2_complete$.description] is Function)
+          : this.id,
+      description: _patchMap.containsKey(Todo2_complete$.description)
+          ? (_patchMap[Todo2_complete$.description] is Function)
                 ? _patchMap[Todo2_complete$.description](this.description)
                 : _patchMap[Todo2_complete$.description]
-            : this.description,
-        completedDate: _patchMap.containsKey(Todo2_complete$.completedDate)
-            ? (_patchMap[Todo2_complete$.completedDate] is Function)
+          : this.description,
+      completedDate: _patchMap.containsKey(Todo2_complete$.completedDate)
+          ? (_patchMap[Todo2_complete$.completedDate] is Function)
                 ? _patchMap[Todo2_complete$.completedDate](this.completedDate)
                 : _patchMap[Todo2_complete$.completedDate]
-            : this.completedDate);
+          : this.completedDate,
+    );
   }
 
   @override
@@ -465,7 +442,11 @@ class Todo2_complete implements $$Todo2 {
   @override
   int get hashCode {
     return Object.hash(
-        this.title, this.id, this.description, this.completedDate);
+      this.title,
+      this.id,
+      this.description,
+      this.completedDate,
+    );
   }
 
   @override
@@ -491,8 +472,9 @@ class Todo2_completePatch implements Patch<Todo2_complete> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              Todo2_complete$.values.firstWhere((e) => e.name == key);
+          final enumValue = Todo2_complete$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -644,34 +626,59 @@ class Todo2_complete_assigned implements $$Todo2 {
     final _patcher = patchInput ?? Todo2_complete_assignedPatch();
     final _patchMap = _patcher.toPatch();
     return Todo2_complete_assigned(
-        completedDate: _patchMap
-                .containsKey(Todo2_complete_assigned$.completedDate)
-            ? (_patchMap[Todo2_complete_assigned$.completedDate] is Function)
+      completedDate:
+          _patchMap.containsKey(Todo2_complete_assigned$.completedDate)
+          ? (_patchMap[Todo2_complete_assigned$.completedDate] is Function)
                 ? _patchMap[Todo2_complete_assigned$.completedDate](
-                    this.completedDate)
+                    this.completedDate,
+                  )
                 : _patchMap[Todo2_complete_assigned$.completedDate]
-            : this.completedDate,
-        title: _patchMap.containsKey(Todo2_complete_assigned$.title)
-            ? (_patchMap[Todo2_complete_assigned$.title] is Function)
+          : this.completedDate,
+      title: _patchMap.containsKey(Todo2_complete_assigned$.title)
+          ? (_patchMap[Todo2_complete_assigned$.title] is Function)
                 ? _patchMap[Todo2_complete_assigned$.title](this.title)
                 : _patchMap[Todo2_complete_assigned$.title]
-            : this.title,
-        id: _patchMap.containsKey(Todo2_complete_assigned$.id)
-            ? (_patchMap[Todo2_complete_assigned$.id] is Function)
+          : this.title,
+      id: _patchMap.containsKey(Todo2_complete_assigned$.id)
+          ? (_patchMap[Todo2_complete_assigned$.id] is Function)
                 ? _patchMap[Todo2_complete_assigned$.id](this.id)
                 : _patchMap[Todo2_complete_assigned$.id]
-            : this.id,
-        description: _patchMap.containsKey(Todo2_complete_assigned$.description)
-            ? (_patchMap[Todo2_complete_assigned$.description] is Function)
+          : this.id,
+      description: _patchMap.containsKey(Todo2_complete_assigned$.description)
+          ? (_patchMap[Todo2_complete_assigned$.description] is Function)
                 ? _patchMap[Todo2_complete_assigned$.description](
-                    this.description)
+                    this.description,
+                  )
                 : _patchMap[Todo2_complete_assigned$.description]
-            : this.description,
-        managerId: _patchMap.containsKey(Todo2_complete_assigned$.managerId)
-            ? (_patchMap[Todo2_complete_assigned$.managerId] is Function)
+          : this.description,
+      managerId: _patchMap.containsKey(Todo2_complete_assigned$.managerId)
+          ? (_patchMap[Todo2_complete_assigned$.managerId] is Function)
                 ? _patchMap[Todo2_complete_assigned$.managerId](this.managerId)
                 : _patchMap[Todo2_complete_assigned$.managerId]
-            : this.managerId);
+          : this.managerId,
+    );
+  }
+
+  Todo2_complete_assigned copyWithTodo2_complete({DateTime? completedDate}) {
+    return copyWith(completedDate: completedDate);
+  }
+
+  Todo2_complete_assigned patchWithTodo2_complete({
+    Todo2_completePatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? Todo2_completePatch();
+    final _patchMap = _patcher.toPatch();
+    return Todo2_complete_assigned(
+      completedDate: _patchMap.containsKey(Todo2_complete$.completedDate)
+          ? (_patchMap[Todo2_complete$.completedDate] is Function)
+                ? _patchMap[Todo2_complete$.completedDate](this.completedDate)
+                : _patchMap[Todo2_complete$.completedDate]
+          : this.completedDate,
+      title: this.title,
+      id: this.id,
+      description: this.description,
+      managerId: this.managerId,
+    );
   }
 
   @override
@@ -687,8 +694,13 @@ class Todo2_complete_assigned implements $$Todo2 {
 
   @override
   int get hashCode {
-    return Object.hash(this.completedDate, this.title, this.id,
-        this.description, this.managerId);
+    return Object.hash(
+      this.completedDate,
+      this.title,
+      this.id,
+      this.description,
+      this.managerId,
+    );
   }
 
   @override
@@ -711,7 +723,7 @@ enum Todo2_complete_assigned$ {
   title,
   id,
   description,
-  managerId
+  managerId,
 }
 
 class Todo2_complete_assignedPatch implements Patch<Todo2_complete_assigned> {
@@ -722,8 +734,9 @@ class Todo2_complete_assignedPatch implements Patch<Todo2_complete_assigned> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              Todo2_complete_assigned$.values.firstWhere((e) => e.name == key);
+          final enumValue = Todo2_complete_assigned$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -736,7 +749,8 @@ class Todo2_complete_assignedPatch implements Patch<Todo2_complete_assigned> {
   }
 
   static Todo2_complete_assignedPatch fromPatch(
-      Map<Todo2_complete_assigned$, dynamic> patch) {
+    Map<Todo2_complete_assigned$, dynamic> patch,
+  ) {
     final _patch = Todo2_complete_assignedPatch();
     _patch._patch.addAll(patch);
     return _patch;
@@ -810,7 +824,8 @@ class Todo2_complete_assignedPatch implements Patch<Todo2_complete_assigned> {
 
 extension Todo2_complete_assignedCompareE on Todo2_complete_assigned {
   Map<String, dynamic> compareToTodo2_complete_assigned(
-      Todo2_complete_assigned other) {
+    Todo2_complete_assigned other,
+  ) {
     final Map<String, dynamic> diff = {};
 
     if (completedDate != other.completedDate) {

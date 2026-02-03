@@ -183,9 +183,7 @@ String createZorphy(
         ...typesExplicit,
         Interface.fromGenerics(
           className,
-          classGenerics
-              .map((g) => NameType(g.name, g.type))
-              .toList(),
+          classGenerics.map((g) => NameType(g.name, g.type)).toList(),
           [],
           false,
         ),
@@ -193,8 +191,7 @@ String createZorphy(
       for (var i = 0; i < classesForJson.length; i++) {
         var c = classesForJson[i];
         var interfaceName = c.interfaceName.replaceAll("\$", "");
-        var genericTypes =
-            c.typeParams.map((e) => "'_${e.name}_'").join(",");
+        var genericTypes = c.typeParams.map((e) => "'_${e.name}_'").join(",");
         var isCurrentClass = interfaceName == classNameTrimmed;
         var prefix = i == 0 ? "if" : "} else if";
         if (c.typeParams.isNotEmpty) {
@@ -214,12 +211,30 @@ String createZorphy(
         }
       }
       sb.writeln("    }");
-      sb.writeln(
-          "    throw UnsupportedError(\"The _className_ '" +
-              r"${json['_className_']}" +
-              "' is not supported by the ${classNameTrimmed}.fromJson constructor.\");");
+      sb.writeln("    throw UnsupportedError(\"The _className_ '" +
+          r"${json['_className_']}" +
+          "' is not supported by the ${classNameTrimmed}.fromJson constructor.\");");
       sb.writeln("  }");
     }
+
+    sb.writeln("");
+    sb.writeln("  Map<String, dynamic> toJsonLean() {");
+    sb.writeln(
+        "    final Map<String, dynamic> data = _\$${className}ToJson(this);");
+    sb.writeln("    return _sanitizeJson(data);");
+    sb.writeln("  }");
+    sb.writeln("");
+    sb.writeln("  dynamic _sanitizeJson(dynamic json) {");
+    sb.writeln("    if (json is Map<String, dynamic>) {");
+    sb.writeln("      json.remove('_className_');");
+    sb.writeln("      return json..forEach((key, value) {");
+    sb.writeln("        json[key] = _sanitizeJson(value);");
+    sb.writeln("      });");
+    sb.writeln("    } else if (json is List) {");
+    sb.writeln("      return json.map((e) => _sanitizeJson(e)).toList();");
+    sb.writeln("    }");
+    sb.writeln("    return json;");
+    sb.writeln("  }");
   }
 
   sb.writeln("}");
@@ -248,7 +263,8 @@ String createZorphy(
     sb.writeln(
         "  Map<String, dynamic> toJson() => _\$${className}ToJson(this);");
     sb.writeln("  Map<String, dynamic> toJsonLean() {");
-    sb.writeln("    final Map<String, dynamic> data = _\$${className}ToJson(this);");
+    sb.writeln(
+        "    final Map<String, dynamic> data = _\$${className}ToJson(this);");
     sb.writeln("    return _sanitizeJson(data);");
     sb.writeln("  }");
     sb.writeln("");

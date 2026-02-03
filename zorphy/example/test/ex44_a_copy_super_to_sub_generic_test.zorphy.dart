@@ -12,37 +12,26 @@ class Super extends $Super {
   @override
   final String id;
 
-  Super({
-    required this.id,
-  });
+  Super({required this.id});
 
-  Super copyWith({
-    String? id,
-  }) {
-    return Super(
-      id: id ?? this.id,
-    );
+  Super copyWith({String? id}) {
+    return Super(id: id ?? this.id);
   }
 
-  Super copyWithSuper({
-    String? id,
-  }) {
-    return copyWith(
-      id: id,
-    );
+  Super copyWithSuper({String? id}) {
+    return copyWith(id: id);
   }
 
-  Super patchWithSuper({
-    SuperPatch? patchInput,
-  }) {
+  Super patchWithSuper({SuperPatch? patchInput}) {
     final _patcher = patchInput ?? SuperPatch();
     final _patchMap = _patcher.toPatch();
     return Super(
-        id: _patchMap.containsKey(Super$.id)
-            ? (_patchMap[Super$.id] is Function)
+      id: _patchMap.containsKey(Super$.id)
+          ? (_patchMap[Super$.id] is Function)
                 ? _patchMap[Super$.id](this.id)
                 : _patchMap[Super$.id]
-            : this.id);
+          : this.id,
+    );
   }
 
   @override
@@ -154,17 +143,18 @@ extension SuperChangeToE on Super {
     _patcher.withCode(code);
     final _patchMap = _patcher.toPatch();
     return Sub(
-        description: _patchMap[Sub$.description],
-        code: _patchMap[Sub$.code],
-        id: _patchMap.containsKey(Sub$.id)
-            ? (_patchMap[Sub$.id] is Function)
-                ? _patchMap[Sub$.id](this.id)
+      description: _patchMap[Sub$.description],
+      code: _patchMap[Sub$.code],
+      id: _patchMap.containsKey(Sub$.id)
+          ? (_patchMap[Sub$.id] is Function)
+                ? _patchMap[Sub$.id](id)
                 : _patchMap[Sub$.id]
-            : this.id);
+          : id,
+    );
   }
 }
 
-class Sub<T> extends $Sub implements $Super {
+class Sub<T> extends $Sub implements Super {
   @override
   final String id;
   @override
@@ -172,17 +162,9 @@ class Sub<T> extends $Sub implements $Super {
   @override
   final T code;
 
-  Sub({
-    required this.id,
-    required this.description,
-    required this.code,
-  });
+  Sub({required this.id, required this.description, required this.code});
 
-  Sub copyWith({
-    String? id,
-    String? description,
-    T? code,
-  }) {
+  Sub copyWith({String? id, String? description, T? code}) {
     return Sub(
       id: id ?? this.id,
       description: description ?? this.description,
@@ -190,39 +172,48 @@ class Sub<T> extends $Sub implements $Super {
     );
   }
 
-  Sub copyWithSub({
-    String? id,
-    String? description,
-    T? code,
-  }) {
-    return copyWith(
-      id: id,
-      description: description,
-      code: code,
-    );
+  Sub copyWithSub({String? id, String? description, T? code}) {
+    return copyWith(id: id, description: description, code: code);
   }
 
-  Sub patchWithSub({
-    SubPatch? patchInput,
-  }) {
+  Sub patchWithSub({SubPatch? patchInput}) {
     final _patcher = patchInput ?? SubPatch();
     final _patchMap = _patcher.toPatch();
     return Sub(
-        id: _patchMap.containsKey(Sub$.id)
-            ? (_patchMap[Sub$.id] is Function)
+      id: _patchMap.containsKey(Sub$.id)
+          ? (_patchMap[Sub$.id] is Function)
                 ? _patchMap[Sub$.id](this.id)
                 : _patchMap[Sub$.id]
-            : this.id,
-        description: _patchMap.containsKey(Sub$.description)
-            ? (_patchMap[Sub$.description] is Function)
+          : this.id,
+      description: _patchMap.containsKey(Sub$.description)
+          ? (_patchMap[Sub$.description] is Function)
                 ? _patchMap[Sub$.description](this.description)
                 : _patchMap[Sub$.description]
-            : this.description,
-        code: _patchMap.containsKey(Sub$.code)
-            ? (_patchMap[Sub$.code] is Function)
+          : this.description,
+      code: _patchMap.containsKey(Sub$.code)
+          ? (_patchMap[Sub$.code] is Function)
                 ? _patchMap[Sub$.code](this.code)
                 : _patchMap[Sub$.code]
-            : this.code);
+          : this.code,
+    );
+  }
+
+  Sub copyWithSuper({String? id}) {
+    return copyWith(id: id);
+  }
+
+  Sub patchWithSuper({SuperPatch? patchInput}) {
+    final _patcher = patchInput ?? SuperPatch();
+    final _patchMap = _patcher.toPatch();
+    return Sub(
+      id: _patchMap.containsKey(Super$.id)
+          ? (_patchMap[Super$.id] is Function)
+                ? _patchMap[Super$.id](this.id)
+                : _patchMap[Super$.id]
+          : this.id,
+      description: this.description,
+      code: this.code,
+    );
   }
 
   @override

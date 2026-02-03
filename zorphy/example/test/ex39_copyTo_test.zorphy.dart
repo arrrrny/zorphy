@@ -18,47 +18,31 @@ class A implements $$Super {
   final String x;
   final String z;
 
-  A({
-    required this.x,
-    required this.z,
-  });
+  A({required this.x, required this.z});
 
-  A copyWith({
-    String? x,
-    String? z,
-  }) {
-    return A(
-      x: x ?? this.x,
-      z: z ?? this.z,
-    );
+  A copyWith({String? x, String? z}) {
+    return A(x: x ?? this.x, z: z ?? this.z);
   }
 
-  A copyWithA({
-    String? x,
-    String? z,
-  }) {
-    return copyWith(
-      x: x,
-      z: z,
-    );
+  A copyWithA({String? x, String? z}) {
+    return copyWith(x: x, z: z);
   }
 
-  A patchWithA({
-    APatch? patchInput,
-  }) {
+  A patchWithA({APatch? patchInput}) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return A(
-        x: _patchMap.containsKey(A$.x)
-            ? (_patchMap[A$.x] is Function)
+      x: _patchMap.containsKey(A$.x)
+          ? (_patchMap[A$.x] is Function)
                 ? _patchMap[A$.x](this.x)
                 : _patchMap[A$.x]
-            : this.x,
-        z: _patchMap.containsKey(A$.z)
-            ? (_patchMap[A$.z] is Function)
+          : this.x,
+      z: _patchMap.containsKey(A$.z)
+          ? (_patchMap[A$.z] is Function)
                 ? _patchMap[A$.z](this.z)
                 : _patchMap[A$.z]
-            : this.z);
+          : this.z,
+    );
   }
 
   @override
@@ -175,47 +159,31 @@ class B implements $$Super {
   final String x;
   final String y;
 
-  B({
-    required this.x,
-    required this.y,
-  });
+  B({required this.x, required this.y});
 
-  B copyWith({
-    String? x,
-    String? y,
-  }) {
-    return B(
-      x: x ?? this.x,
-      y: y ?? this.y,
-    );
+  B copyWith({String? x, String? y}) {
+    return B(x: x ?? this.x, y: y ?? this.y);
   }
 
-  B copyWithB({
-    String? x,
-    String? y,
-  }) {
-    return copyWith(
-      x: x,
-      y: y,
-    );
+  B copyWithB({String? x, String? y}) {
+    return copyWith(x: x, y: y);
   }
 
-  B patchWithB({
-    BPatch? patchInput,
-  }) {
+  B patchWithB({BPatch? patchInput}) {
     final _patcher = patchInput ?? BPatch();
     final _patchMap = _patcher.toPatch();
     return B(
-        x: _patchMap.containsKey(B$.x)
-            ? (_patchMap[B$.x] is Function)
+      x: _patchMap.containsKey(B$.x)
+          ? (_patchMap[B$.x] is Function)
                 ? _patchMap[B$.x](this.x)
                 : _patchMap[B$.x]
-            : this.x,
-        y: _patchMap.containsKey(B$.y)
-            ? (_patchMap[B$.y] is Function)
+          : this.x,
+      y: _patchMap.containsKey(B$.y)
+          ? (_patchMap[B$.y] is Function)
                 ? _patchMap[B$.y](this.y)
                 : _patchMap[B$.y]
-            : this.y);
+          : this.y,
+    );
   }
 
   @override

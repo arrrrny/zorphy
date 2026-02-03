@@ -58,8 +58,8 @@ class B<T1> implements $$A {
     String? a,
     T1? b,
   }) : 
-    a = a ?? throw ArgumentError("a is required"),
-    b = b ?? throw ArgumentError("b is required");
+    a = a ?? (() { throw ArgumentError("a is required"); })(),
+    b = b ?? (() { throw ArgumentError("b is required"); })();
 
   B copyWith({
     String? a,
@@ -100,6 +100,8 @@ class B<T1> implements $$A {
       b: _patchMap.containsKey(B$.b) ? (_patchMap[B$.b] is Function) ? _patchMap[B$.b](this.b) : _patchMap[B$.b] : this.b
     );
   }
+
+
 
   @override
   bool operator ==(Object other) {
@@ -243,10 +245,10 @@ class C<T1> implements $$A {
     String? a,
     bool? c,
   }) : 
-    a = a ?? throw ArgumentError("a is required"),
-    b = b ?? throw ArgumentError("b is required"),
-    a = a ?? throw ArgumentError("a is required"),
-    c = c ?? throw ArgumentError("c is required");
+    a = a ?? (() { throw ArgumentError("a is required"); })(),
+    b = b ?? (() { throw ArgumentError("b is required"); })(),
+    a = a ?? (() { throw ArgumentError("a is required"); })(),
+    c = c ?? (() { throw ArgumentError("c is required"); })();
 
   C copyWith({
     String? a,
@@ -297,6 +299,30 @@ class C<T1> implements $$A {
       b: _patchMap.containsKey(C$.b) ? (_patchMap[C$.b] is Function) ? _patchMap[C$.b](this.b) : _patchMap[C$.b] : this.b,
       a: _patchMap.containsKey(C$.a) ? (_patchMap[C$.a] is Function) ? _patchMap[C$.a](this.a) : _patchMap[C$.a] : this.a,
       c: _patchMap.containsKey(C$.c) ? (_patchMap[C$.c] is Function) ? _patchMap[C$.c](this.c) : _patchMap[C$.c] : this.c
+    );
+  }
+
+
+  C copyWithB({
+    String? a,
+    T1? b,
+  }) {
+    return copyWith(
+      a: a, b: b,
+    );
+  }
+
+
+  C patchWithB({
+    BPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? BPatch();
+    final _patchMap = _patcher.toPatch();
+    return C(
+      a: _patchMap.containsKey(B$.a) ? (_patchMap[B$.a] is Function) ? _patchMap[B$.a](this.a) : _patchMap[B$.a] : this.a,
+      b: _patchMap.containsKey(B$.b) ? (_patchMap[B$.b] is Function) ? _patchMap[B$.b](this.b) : _patchMap[B$.b] : this.b,
+      a: _patchMap.containsKey(B$.a) ? (_patchMap[B$.a] is Function) ? _patchMap[B$.a](this.a) : _patchMap[B$.a] : this.a,
+      c: this.c,
     );
   }
 
@@ -461,9 +487,9 @@ class D<T1> implements $$A {
     T1? b,
     String? a,
   }) : 
-    a = a ?? throw ArgumentError("a is required"),
-    b = b ?? throw ArgumentError("b is required"),
-    a = a ?? throw ArgumentError("a is required");
+    a = a ?? (() { throw ArgumentError("a is required"); })(),
+    b = b ?? (() { throw ArgumentError("b is required"); })(),
+    a = a ?? (() { throw ArgumentError("a is required"); })();
 
   D copyWith({
     String? a,
@@ -508,6 +534,29 @@ class D<T1> implements $$A {
       a: _patchMap.containsKey(D$.a) ? (_patchMap[D$.a] is Function) ? _patchMap[D$.a](this.a) : _patchMap[D$.a] : this.a,
       b: _patchMap.containsKey(D$.b) ? (_patchMap[D$.b] is Function) ? _patchMap[D$.b](this.b) : _patchMap[D$.b] : this.b,
       a: _patchMap.containsKey(D$.a) ? (_patchMap[D$.a] is Function) ? _patchMap[D$.a](this.a) : _patchMap[D$.a] : this.a
+    );
+  }
+
+
+  D copyWithB({
+    String? a,
+    T1? b,
+  }) {
+    return copyWith(
+      a: a, b: b,
+    );
+  }
+
+
+  D patchWithB({
+    BPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? BPatch();
+    final _patchMap = _patcher.toPatch();
+    return D(
+      a: _patchMap.containsKey(B$.a) ? (_patchMap[B$.a] is Function) ? _patchMap[B$.a](this.a) : _patchMap[B$.a] : this.a,
+      b: _patchMap.containsKey(B$.b) ? (_patchMap[B$.b] is Function) ? _patchMap[B$.b](this.b) : _patchMap[B$.b] : this.b,
+      a: _patchMap.containsKey(B$.a) ? (_patchMap[B$.a] is Function) ? _patchMap[B$.a](this.a) : _patchMap[B$.a] : this.a,
     );
   }
 
@@ -685,7 +734,7 @@ class Y implements $$X {
   Y._copyWith({
     String? a,
   }) : 
-    a = a ?? throw ArgumentError("a is required");
+    a = a ?? (() { throw ArgumentError("a is required"); })();
 
   Y copyWith({
     String? a,
@@ -720,6 +769,8 @@ class Y implements $$X {
       a: _patchMap.containsKey(Y$.a) ? (_patchMap[Y$.a] is Function) ? _patchMap[Y$.a](this.a) : _patchMap[Y$.a] : this.a
     );
   }
+
+
 
   @override
   bool operator ==(Object other) {

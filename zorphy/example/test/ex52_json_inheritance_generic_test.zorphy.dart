@@ -13,37 +13,26 @@ class A<T1> extends $A {
   @override
   final T1 id;
 
-  A({
-    required this.id,
-  });
+  A({required this.id});
 
-  A copyWith({
-    T1? id,
-  }) {
-    return A(
-      id: id ?? this.id,
-    );
+  A copyWith({T1? id}) {
+    return A(id: id ?? this.id);
   }
 
-  A copyWithA({
-    T1? id,
-  }) {
-    return copyWith(
-      id: id,
-    );
+  A copyWithA({T1? id}) {
+    return copyWith(id: id);
   }
 
-  A patchWithA({
-    APatch? patchInput,
-  }) {
+  A patchWithA({APatch? patchInput}) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return A(
-        id: _patchMap.containsKey(A$.id)
-            ? (_patchMap[A$.id] is Function)
+      id: _patchMap.containsKey(A$.id)
+          ? (_patchMap[A$.id] is Function)
                 ? _patchMap[A$.id](this.id)
                 : _patchMap[A$.id]
-            : this.id);
+          : this.id,
+    );
   }
 
   @override
@@ -63,7 +52,32 @@ class A<T1> extends $A {
   }
 
   /// Creates a [A] instance from JSON
-  factory A.fromJson(Map<String, dynamic> json) => _$AFromJson(json);
+  factory A.fromJson(Map<String, dynamic> json) {
+    if (json['_className_'] == null) {
+      return _$AFromJson(json);
+    }
+    if (json['_className_'] == "C") {
+      var fn_fromJson = getFromJsonToGenericFn(C_Generics_Sing().fns, json, [
+        '_T1_',
+        '_T2_',
+      ]);
+      return fn_fromJson(json);
+    } else if (json['_className_'] == "B") {
+      var fn_fromJson = getFromJsonToGenericFn(B_Generics_Sing().fns, json, [
+        '_T1_',
+        '_T2_',
+      ]);
+      return fn_fromJson(json);
+    } else if (json['_className_'] == "A") {
+      var fn_fromJson = getFromJsonToGenericFn(A_Generics_Sing().fns, json, [
+        '_T1_',
+      ]);
+      return fn_fromJson(json);
+    }
+    throw UnsupportedError(
+      "The _className_ '${json['_className_']}' is not supported by the A.fromJson constructor.",
+    );
+  }
 }
 
 enum A$ { id }
@@ -142,6 +156,22 @@ class APatch implements Patch<A> {
 
 extension ASerialization on A<T1> {
   Map<String, dynamic> toJson() => _$AToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$AToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension ACompareE on A {
@@ -156,11 +186,12 @@ extension ACompareE on A {
 }
 
 extension AChangeToE on A {
-  C changeToC(
-      {required String xyz,
-      required T1 valT1,
-      required T2 valT2,
-      required T blah}) {
+  C changeToC({
+    required String xyz,
+    required T1 valT1,
+    required T2 valT2,
+    required T blah,
+  }) {
     final _patcher = CPatch();
     _patcher.withXyz(xyz);
     _patcher.withValT1(valT1);
@@ -168,20 +199,16 @@ extension AChangeToE on A {
     _patcher.withBlah(blah);
     final _patchMap = _patcher.toPatch();
     return C(
-        xyz: _patchMap[C$.xyz],
-        valT1: _patchMap[C$.valT1],
-        valT2: _patchMap[C$.valT2],
-        id: _patchMap.containsKey(C$.id)
-            ? (_patchMap[C$.id] is Function)
-                ? _patchMap[C$.id](this.id)
+      xyz: _patchMap[C$.xyz],
+      valT1: _patchMap[C$.valT1],
+      valT2: _patchMap[C$.valT2],
+      id: _patchMap.containsKey(C$.id)
+          ? (_patchMap[C$.id] is Function)
+                ? _patchMap[C$.id](id)
                 : _patchMap[C$.id]
-            : this.id,
-        blah: _patchMap[C$.blah],
-        id: _patchMap.containsKey(C$.id)
-            ? (_patchMap[C$.id] is Function)
-                ? _patchMap[C$.id](this.id)
-                : _patchMap[C$.id]
-            : this.id);
+          : id,
+      blah: _patchMap[C$.blah],
+    );
   }
 
   B changeToB({required T1 valT1, required T2 valT2}) {
@@ -190,18 +217,19 @@ extension AChangeToE on A {
     _patcher.withValT2(valT2);
     final _patchMap = _patcher.toPatch();
     return B(
-        valT1: _patchMap[B$.valT1],
-        valT2: _patchMap[B$.valT2],
-        id: _patchMap.containsKey(B$.id)
-            ? (_patchMap[B$.id] is Function)
-                ? _patchMap[B$.id](this.id)
+      valT1: _patchMap[B$.valT1],
+      valT2: _patchMap[B$.valT2],
+      id: _patchMap.containsKey(B$.id)
+          ? (_patchMap[B$.id] is Function)
+                ? _patchMap[B$.id](id)
                 : _patchMap[B$.id]
-            : this.id);
+          : id,
+    );
   }
 }
 
 @JsonSerializable(explicitToJson: true)
-class B<T1, T2> extends $B implements $A {
+class B<T1, T2> extends $B implements A {
   @override
   final T1 id;
   @override
@@ -209,17 +237,9 @@ class B<T1, T2> extends $B implements $A {
   @override
   final T2 valT2;
 
-  B({
-    required this.id,
-    required this.valT1,
-    required this.valT2,
-  });
+  B({required this.id, required this.valT1, required this.valT2});
 
-  B copyWith({
-    T1? id,
-    T1? valT1,
-    T2? valT2,
-  }) {
+  B copyWith({T1? id, T1? valT1, T2? valT2}) {
     return B(
       id: id ?? this.id,
       valT1: valT1 ?? this.valT1,
@@ -227,39 +247,48 @@ class B<T1, T2> extends $B implements $A {
     );
   }
 
-  B copyWithB({
-    T1? id,
-    T1? valT1,
-    T2? valT2,
-  }) {
-    return copyWith(
-      id: id,
-      valT1: valT1,
-      valT2: valT2,
-    );
+  B copyWithB({T1? id, T1? valT1, T2? valT2}) {
+    return copyWith(id: id, valT1: valT1, valT2: valT2);
   }
 
-  B patchWithB({
-    BPatch? patchInput,
-  }) {
+  B patchWithB({BPatch? patchInput}) {
     final _patcher = patchInput ?? BPatch();
     final _patchMap = _patcher.toPatch();
     return B(
-        id: _patchMap.containsKey(B$.id)
-            ? (_patchMap[B$.id] is Function)
+      id: _patchMap.containsKey(B$.id)
+          ? (_patchMap[B$.id] is Function)
                 ? _patchMap[B$.id](this.id)
                 : _patchMap[B$.id]
-            : this.id,
-        valT1: _patchMap.containsKey(B$.valT1)
-            ? (_patchMap[B$.valT1] is Function)
+          : this.id,
+      valT1: _patchMap.containsKey(B$.valT1)
+          ? (_patchMap[B$.valT1] is Function)
                 ? _patchMap[B$.valT1](this.valT1)
                 : _patchMap[B$.valT1]
-            : this.valT1,
-        valT2: _patchMap.containsKey(B$.valT2)
-            ? (_patchMap[B$.valT2] is Function)
+          : this.valT1,
+      valT2: _patchMap.containsKey(B$.valT2)
+          ? (_patchMap[B$.valT2] is Function)
                 ? _patchMap[B$.valT2](this.valT2)
                 : _patchMap[B$.valT2]
-            : this.valT2);
+          : this.valT2,
+    );
+  }
+
+  B copyWithA({T1? id}) {
+    return copyWith(id: id);
+  }
+
+  B patchWithA({APatch? patchInput}) {
+    final _patcher = patchInput ?? APatch();
+    final _patchMap = _patcher.toPatch();
+    return B(
+      id: _patchMap.containsKey(A$.id)
+          ? (_patchMap[A$.id] is Function)
+                ? _patchMap[A$.id](this.id)
+                : _patchMap[A$.id]
+          : this.id,
+      valT1: this.valT1,
+      valT2: this.valT2,
+    );
   }
 
   @override
@@ -287,7 +316,27 @@ class B<T1, T2> extends $B implements $A {
   }
 
   /// Creates a [B] instance from JSON
-  factory B.fromJson(Map<String, dynamic> json) => _$BFromJson(json);
+  factory B.fromJson(Map<String, dynamic> json) {
+    if (json['_className_'] == null) {
+      return _$BFromJson(json);
+    }
+    if (json['_className_'] == "C") {
+      var fn_fromJson = getFromJsonToGenericFn(C_Generics_Sing().fns, json, [
+        '_T1_',
+        '_T2_',
+      ]);
+      return fn_fromJson(json);
+    } else if (json['_className_'] == "B") {
+      var fn_fromJson = getFromJsonToGenericFn(B_Generics_Sing().fns, json, [
+        '_T1_',
+        '_T2_',
+      ]);
+      return fn_fromJson(json);
+    }
+    throw UnsupportedError(
+      "The _className_ '${json['_className_']}' is not supported by the B.fromJson constructor.",
+    );
+  }
 }
 
 enum B$ { id, valT1, valT2 }
@@ -376,6 +425,22 @@ class BPatch implements Patch<B> {
 
 extension BSerialization on B<T1, T2> {
   Map<String, dynamic> toJson() => _$BToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$BToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension BCompareE on B {
@@ -401,27 +466,28 @@ extension BChangeToE on B {
     _patcher.withXyz(xyz);
     final _patchMap = _patcher.toPatch();
     return C(
-        xyz: _patchMap[C$.xyz],
-        valT1: _patchMap.containsKey(C$.valT1)
-            ? (_patchMap[C$.valT1] is Function)
-                ? _patchMap[C$.valT1](this.valT1)
+      xyz: _patchMap[C$.xyz],
+      valT1: _patchMap.containsKey(C$.valT1)
+          ? (_patchMap[C$.valT1] is Function)
+                ? _patchMap[C$.valT1](valT1)
                 : _patchMap[C$.valT1]
-            : this.valT1,
-        valT2: _patchMap.containsKey(C$.valT2)
-            ? (_patchMap[C$.valT2] is Function)
-                ? _patchMap[C$.valT2](this.valT2)
+          : valT1,
+      valT2: _patchMap.containsKey(C$.valT2)
+          ? (_patchMap[C$.valT2] is Function)
+                ? _patchMap[C$.valT2](valT2)
                 : _patchMap[C$.valT2]
-            : this.valT2,
-        id: _patchMap.containsKey(C$.id)
-            ? (_patchMap[C$.id] is Function)
-                ? _patchMap[C$.id](this.id)
+          : valT2,
+      id: _patchMap.containsKey(C$.id)
+          ? (_patchMap[C$.id] is Function)
+                ? _patchMap[C$.id](id)
                 : _patchMap[C$.id]
-            : this.id);
+          : id,
+    );
   }
 }
 
 @JsonSerializable(explicitToJson: true)
-class C<T1, T2> extends $C implements $B, $A {
+class C<T1, T2> extends $C implements B, A {
   @override
   final T1 valT1;
   @override
@@ -438,12 +504,7 @@ class C<T1, T2> extends $C implements $B, $A {
     required this.xyz,
   });
 
-  C copyWith({
-    T1? valT1,
-    T2? valT2,
-    T1? id,
-    String? xyz,
-  }) {
+  C copyWith({T1? valT1, T2? valT2, T1? id, String? xyz}) {
     return C(
       valT1: valT1 ?? this.valT1,
       valT2: valT2 ?? this.valT2,
@@ -452,46 +513,77 @@ class C<T1, T2> extends $C implements $B, $A {
     );
   }
 
-  C copyWithC({
-    T1? valT1,
-    T2? valT2,
-    T1? id,
-    String? xyz,
-  }) {
-    return copyWith(
-      valT1: valT1,
-      valT2: valT2,
-      id: id,
-      xyz: xyz,
-    );
+  C copyWithC({T1? valT1, T2? valT2, T1? id, String? xyz}) {
+    return copyWith(valT1: valT1, valT2: valT2, id: id, xyz: xyz);
   }
 
-  C patchWithC({
-    CPatch? patchInput,
-  }) {
+  C patchWithC({CPatch? patchInput}) {
     final _patcher = patchInput ?? CPatch();
     final _patchMap = _patcher.toPatch();
     return C(
-        valT1: _patchMap.containsKey(C$.valT1)
-            ? (_patchMap[C$.valT1] is Function)
+      valT1: _patchMap.containsKey(C$.valT1)
+          ? (_patchMap[C$.valT1] is Function)
                 ? _patchMap[C$.valT1](this.valT1)
                 : _patchMap[C$.valT1]
-            : this.valT1,
-        valT2: _patchMap.containsKey(C$.valT2)
-            ? (_patchMap[C$.valT2] is Function)
+          : this.valT1,
+      valT2: _patchMap.containsKey(C$.valT2)
+          ? (_patchMap[C$.valT2] is Function)
                 ? _patchMap[C$.valT2](this.valT2)
                 : _patchMap[C$.valT2]
-            : this.valT2,
-        id: _patchMap.containsKey(C$.id)
-            ? (_patchMap[C$.id] is Function)
+          : this.valT2,
+      id: _patchMap.containsKey(C$.id)
+          ? (_patchMap[C$.id] is Function)
                 ? _patchMap[C$.id](this.id)
                 : _patchMap[C$.id]
-            : this.id,
-        xyz: _patchMap.containsKey(C$.xyz)
-            ? (_patchMap[C$.xyz] is Function)
+          : this.id,
+      xyz: _patchMap.containsKey(C$.xyz)
+          ? (_patchMap[C$.xyz] is Function)
                 ? _patchMap[C$.xyz](this.xyz)
                 : _patchMap[C$.xyz]
-            : this.xyz);
+          : this.xyz,
+    );
+  }
+
+  C copyWithB({T1? valT1, T2? valT2}) {
+    return copyWith(valT1: valT1, valT2: valT2);
+  }
+
+  C copyWithA({T1? id}) {
+    return copyWith(id: id);
+  }
+
+  C patchWithB({BPatch? patchInput}) {
+    final _patcher = patchInput ?? BPatch();
+    final _patchMap = _patcher.toPatch();
+    return C(
+      valT1: _patchMap.containsKey(B$.valT1)
+          ? (_patchMap[B$.valT1] is Function)
+                ? _patchMap[B$.valT1](this.valT1)
+                : _patchMap[B$.valT1]
+          : this.valT1,
+      valT2: _patchMap.containsKey(B$.valT2)
+          ? (_patchMap[B$.valT2] is Function)
+                ? _patchMap[B$.valT2](this.valT2)
+                : _patchMap[B$.valT2]
+          : this.valT2,
+      id: this.id,
+      xyz: this.xyz,
+    );
+  }
+
+  C patchWithA({APatch? patchInput}) {
+    final _patcher = patchInput ?? APatch();
+    final _patchMap = _patcher.toPatch();
+    return C(
+      valT1: this.valT1,
+      valT2: this.valT2,
+      id: _patchMap.containsKey(A$.id)
+          ? (_patchMap[A$.id] is Function)
+                ? _patchMap[A$.id](this.id)
+                : _patchMap[A$.id]
+          : this.id,
+      xyz: this.xyz,
+    );
   }
 
   @override
@@ -522,7 +614,21 @@ class C<T1, T2> extends $C implements $B, $A {
   }
 
   /// Creates a [C] instance from JSON
-  factory C.fromJson(Map<String, dynamic> json) => _$CFromJson(json);
+  factory C.fromJson(Map<String, dynamic> json) {
+    if (json['_className_'] == null) {
+      return _$CFromJson(json);
+    }
+    if (json['_className_'] == "C") {
+      var fn_fromJson = getFromJsonToGenericFn(C_Generics_Sing().fns, json, [
+        '_T1_',
+        '_T2_',
+      ]);
+      return fn_fromJson(json);
+    }
+    throw UnsupportedError(
+      "The _className_ '${json['_className_']}' is not supported by the C.fromJson constructor.",
+    );
+  }
 }
 
 enum C$ { valT1, valT2, id, xyz }
@@ -616,6 +722,22 @@ class CPatch implements Patch<C> {
 
 extension CSerialization on C<T1, T2> {
   Map<String, dynamic> toJson() => _$CToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$CToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension CCompareE on C {

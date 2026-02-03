@@ -23,8 +23,8 @@ class Pet extends $Pet {
     String? name,
     int? age,
   }) : 
-    name = name ?? throw ArgumentError("name is required"),
-    age = age ?? throw ArgumentError("age is required");
+    name = name ?? (() { throw ArgumentError("name is required"); })(),
+    age = age ?? (() { throw ArgumentError("age is required"); })();
 
   Pet copyWith({
     String? name,
@@ -66,6 +66,8 @@ class Pet extends $Pet {
     );
   }
 
+
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -90,7 +92,17 @@ class Pet extends $Pet {
 
 
   /// Creates a [Pet] instance from JSON
-  factory Pet.fromJson(Map<String, dynamic> json) => _$PetFromJson(json);
+  factory Pet.fromJson(Map<String, dynamic> json) {
+    if (json['_className_'] == null) {
+      return _$PetFromJson(json);
+    }
+    if (json['_className_'] == "Cat") {
+      return Cat.fromJson(json);
+    } else if (json['_className_'] == "Pet") {
+      return _$PetFromJson(json);
+    }
+    throw UnsupportedError("The _className_ '${json['_className_']}' is not supported by the Pet.fromJson constructor.");
+  }
 }
 enum Pet$ {
 name,age
@@ -177,6 +189,22 @@ class PetPatch implements Patch<Pet> {
 
 extension PetSerialization on Pet {
   Map<String, dynamic> toJson() => _$PetToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$PetToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension PetCompareE on Pet {
@@ -203,14 +231,14 @@ extension PetChangeToE on Pet {
       whiskerLength: _patchMap[Cat$.whiskerLength],
       name: _patchMap.containsKey(Cat$.name)
           ? (_patchMap[Cat$.name] is Function)
-                ? _patchMap[Cat$.name](this.name)
+                ? _patchMap[Cat$.name](name)
                 : _patchMap[Cat$.name]
-          : this.name,
+          : name,
       age: _patchMap.containsKey(Cat$.age)
           ? (_patchMap[Cat$.age] is Function)
-                ? _patchMap[Cat$.age](this.age)
+                ? _patchMap[Cat$.age](age)
                 : _patchMap[Cat$.age]
-          : this.age
+          : age
     );
   }
 
@@ -220,7 +248,7 @@ extension PetChangeToE on Pet {
 
 
 @JsonSerializable(explicitToJson: true)
-class FrankensteinsDogCat extends $FrankensteinsDogCat implements $Dog, $Pet, $Cat {
+class FrankensteinsDogCat extends $FrankensteinsDogCat implements Dog, Pet, Cat {
   @override
   final String woofSound;
   @override
@@ -247,11 +275,11 @@ class FrankensteinsDogCat extends $FrankensteinsDogCat implements $Dog, $Pet, $C
     double? whiskerLength,
     int?? _ageInYears,
   }) : 
-    woofSound = woofSound ?? throw ArgumentError("woofSound is required"),
-    name = name ?? throw ArgumentError("name is required"),
-    age = age ?? throw ArgumentError("age is required"),
-    whiskerLength = whiskerLength ?? throw ArgumentError("whiskerLength is required"),
-    _ageInYears = _ageInYears ?? throw ArgumentError("_ageInYears is required");
+    woofSound = woofSound ?? (() { throw ArgumentError("woofSound is required"); })(),
+    name = name ?? (() { throw ArgumentError("name is required"); })(),
+    age = age ?? (() { throw ArgumentError("age is required"); })(),
+    whiskerLength = whiskerLength ?? (() { throw ArgumentError("whiskerLength is required"); })(),
+    _ageInYears = _ageInYears ?? (() { throw ArgumentError("_ageInYears is required"); })();
 
   FrankensteinsDogCat copyWith({
     String? woofSound,
@@ -308,6 +336,75 @@ class FrankensteinsDogCat extends $FrankensteinsDogCat implements $Dog, $Pet, $C
       age: _patchMap.containsKey(FrankensteinsDogCat$.age) ? (_patchMap[FrankensteinsDogCat$.age] is Function) ? _patchMap[FrankensteinsDogCat$.age](this.age) : _patchMap[FrankensteinsDogCat$.age] : this.age,
       whiskerLength: _patchMap.containsKey(FrankensteinsDogCat$.whiskerLength) ? (_patchMap[FrankensteinsDogCat$.whiskerLength] is Function) ? _patchMap[FrankensteinsDogCat$.whiskerLength](this.whiskerLength) : _patchMap[FrankensteinsDogCat$.whiskerLength] : this.whiskerLength,
       _ageInYears: _patchMap.containsKey(FrankensteinsDogCat$._ageInYears) ? (_patchMap[FrankensteinsDogCat$._ageInYears] is Function) ? _patchMap[FrankensteinsDogCat$._ageInYears](this._ageInYears) : _patchMap[FrankensteinsDogCat$._ageInYears] : this._ageInYears
+    );
+  }
+
+
+  FrankensteinsDogCat copyWithDog({
+    String? woofSound,
+  }) {
+    return copyWith(
+      woofSound: woofSound,
+    );
+  }
+
+  FrankensteinsDogCat copyWithPet({
+    String? name,
+    int? age,
+  }) {
+    return copyWith(
+      name: name, age: age,
+    );
+  }
+
+  FrankensteinsDogCat copyWithCat({
+    double? whiskerLength,
+  }) {
+    return copyWith(
+      whiskerLength: whiskerLength,
+    );
+  }
+
+
+  FrankensteinsDogCat patchWithDog({
+    DogPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? DogPatch();
+    final _patchMap = _patcher.toPatch();
+    return FrankensteinsDogCat(
+      woofSound: _patchMap.containsKey(Dog$.woofSound) ? (_patchMap[Dog$.woofSound] is Function) ? _patchMap[Dog$.woofSound](this.woofSound) : _patchMap[Dog$.woofSound] : this.woofSound,
+      name: this.name,
+      age: this.age,
+      whiskerLength: this.whiskerLength,
+      _ageInYears: this._ageInYears,
+    );
+  }
+
+  FrankensteinsDogCat patchWithPet({
+    PetPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? PetPatch();
+    final _patchMap = _patcher.toPatch();
+    return FrankensteinsDogCat(
+      woofSound: this.woofSound,
+      name: _patchMap.containsKey(Pet$.name) ? (_patchMap[Pet$.name] is Function) ? _patchMap[Pet$.name](this.name) : _patchMap[Pet$.name] : this.name,
+      age: _patchMap.containsKey(Pet$.age) ? (_patchMap[Pet$.age] is Function) ? _patchMap[Pet$.age](this.age) : _patchMap[Pet$.age] : this.age,
+      whiskerLength: this.whiskerLength,
+      _ageInYears: this._ageInYears,
+    );
+  }
+
+  FrankensteinsDogCat patchWithCat({
+    CatPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? CatPatch();
+    final _patchMap = _patcher.toPatch();
+    return FrankensteinsDogCat(
+      woofSound: this.woofSound,
+      name: this.name,
+      age: this.age,
+      whiskerLength: _patchMap.containsKey(Cat$.whiskerLength) ? (_patchMap[Cat$.whiskerLength] is Function) ? _patchMap[Cat$.whiskerLength](this.whiskerLength) : _patchMap[Cat$.whiskerLength] : this.whiskerLength,
+      _ageInYears: this._ageInYears,
     );
   }
 
@@ -446,6 +543,22 @@ class FrankensteinsDogCatPatch implements Patch<FrankensteinsDogCat> {
 
 extension FrankensteinsDogCatSerialization on FrankensteinsDogCat {
   Map<String, dynamic> toJson() => _$FrankensteinsDogCatToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$FrankensteinsDogCatToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension FrankensteinsDogCatCompareE on FrankensteinsDogCat {
@@ -475,7 +588,7 @@ extension FrankensteinsDogCatCompareE on FrankensteinsDogCat {
 
 
 @JsonSerializable(explicitToJson: true)
-class Cat extends $Cat implements $Pet {
+class Cat extends $Cat implements Pet {
   @override
   final String name;
   @override
@@ -494,9 +607,9 @@ class Cat extends $Cat implements $Pet {
     int? age,
     double? whiskerLength,
   }) : 
-    name = name ?? throw ArgumentError("name is required"),
-    age = age ?? throw ArgumentError("age is required"),
-    whiskerLength = whiskerLength ?? throw ArgumentError("whiskerLength is required");
+    name = name ?? (() { throw ArgumentError("name is required"); })(),
+    age = age ?? (() { throw ArgumentError("age is required"); })(),
+    whiskerLength = whiskerLength ?? (() { throw ArgumentError("whiskerLength is required"); })();
 
   Cat copyWith({
     String? name,
@@ -541,6 +654,29 @@ class Cat extends $Cat implements $Pet {
       name: _patchMap.containsKey(Cat$.name) ? (_patchMap[Cat$.name] is Function) ? _patchMap[Cat$.name](this.name) : _patchMap[Cat$.name] : this.name,
       age: _patchMap.containsKey(Cat$.age) ? (_patchMap[Cat$.age] is Function) ? _patchMap[Cat$.age](this.age) : _patchMap[Cat$.age] : this.age,
       whiskerLength: _patchMap.containsKey(Cat$.whiskerLength) ? (_patchMap[Cat$.whiskerLength] is Function) ? _patchMap[Cat$.whiskerLength](this.whiskerLength) : _patchMap[Cat$.whiskerLength] : this.whiskerLength
+    );
+  }
+
+
+  Cat copyWithPet({
+    String? name,
+    int? age,
+  }) {
+    return copyWith(
+      name: name, age: age,
+    );
+  }
+
+
+  Cat patchWithPet({
+    PetPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? PetPatch();
+    final _patchMap = _patcher.toPatch();
+    return Cat(
+      name: _patchMap.containsKey(Pet$.name) ? (_patchMap[Pet$.name] is Function) ? _patchMap[Pet$.name](this.name) : _patchMap[Pet$.name] : this.name,
+      age: _patchMap.containsKey(Pet$.age) ? (_patchMap[Pet$.age] is Function) ? _patchMap[Pet$.age](this.age) : _patchMap[Pet$.age] : this.age,
+      whiskerLength: this.whiskerLength,
     );
   }
 
@@ -663,6 +799,22 @@ class CatPatch implements Patch<Cat> {
 
 extension CatSerialization on Cat {
   Map<String, dynamic> toJson() => _$CatToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$CatToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension CatCompareE on Cat {
@@ -686,7 +838,7 @@ extension CatCompareE on Cat {
 
 
 @JsonSerializable(explicitToJson: true)
-class Dog extends $Dog implements $Pet {
+class Dog extends $Dog implements Pet {
   @override
   final String name;
   @override
@@ -705,9 +857,9 @@ class Dog extends $Dog implements $Pet {
     int? age,
     String? woofSound,
   }) : 
-    name = name ?? throw ArgumentError("name is required"),
-    age = age ?? throw ArgumentError("age is required"),
-    woofSound = woofSound ?? throw ArgumentError("woofSound is required");
+    name = name ?? (() { throw ArgumentError("name is required"); })(),
+    age = age ?? (() { throw ArgumentError("age is required"); })(),
+    woofSound = woofSound ?? (() { throw ArgumentError("woofSound is required"); })();
 
   Dog copyWith({
     String? name,
@@ -752,6 +904,29 @@ class Dog extends $Dog implements $Pet {
       name: _patchMap.containsKey(Dog$.name) ? (_patchMap[Dog$.name] is Function) ? _patchMap[Dog$.name](this.name) : _patchMap[Dog$.name] : this.name,
       age: _patchMap.containsKey(Dog$.age) ? (_patchMap[Dog$.age] is Function) ? _patchMap[Dog$.age](this.age) : _patchMap[Dog$.age] : this.age,
       woofSound: _patchMap.containsKey(Dog$.woofSound) ? (_patchMap[Dog$.woofSound] is Function) ? _patchMap[Dog$.woofSound](this.woofSound) : _patchMap[Dog$.woofSound] : this.woofSound
+    );
+  }
+
+
+  Dog copyWithPet({
+    String? name,
+    int? age,
+  }) {
+    return copyWith(
+      name: name, age: age,
+    );
+  }
+
+
+  Dog patchWithPet({
+    PetPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? PetPatch();
+    final _patchMap = _patcher.toPatch();
+    return Dog(
+      name: _patchMap.containsKey(Pet$.name) ? (_patchMap[Pet$.name] is Function) ? _patchMap[Pet$.name](this.name) : _patchMap[Pet$.name] : this.name,
+      age: _patchMap.containsKey(Pet$.age) ? (_patchMap[Pet$.age] is Function) ? _patchMap[Pet$.age](this.age) : _patchMap[Pet$.age] : this.age,
+      woofSound: this.woofSound,
     );
   }
 
@@ -874,6 +1049,22 @@ class DogPatch implements Patch<Dog> {
 
 extension DogSerialization on Dog {
   Map<String, dynamic> toJson() => _$DogToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$DogToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension DogCompareE on Dog {
@@ -897,7 +1088,7 @@ extension DogCompareE on Dog {
 
 
 @JsonSerializable(explicitToJson: true)
-class Fish extends $Fish implements $Pet {
+class Fish extends $Fish implements Pet {
   @override
   final String name;
   @override
@@ -916,9 +1107,9 @@ class Fish extends $Fish implements $Pet {
     int? age,
     eFishColour? fishColour,
   }) : 
-    name = name ?? throw ArgumentError("name is required"),
-    age = age ?? throw ArgumentError("age is required"),
-    fishColour = fishColour ?? throw ArgumentError("fishColour is required");
+    name = name ?? (() { throw ArgumentError("name is required"); })(),
+    age = age ?? (() { throw ArgumentError("age is required"); })(),
+    fishColour = fishColour ?? (() { throw ArgumentError("fishColour is required"); })();
 
   Fish copyWith({
     String? name,
@@ -963,6 +1154,29 @@ class Fish extends $Fish implements $Pet {
       name: _patchMap.containsKey(Fish$.name) ? (_patchMap[Fish$.name] is Function) ? _patchMap[Fish$.name](this.name) : _patchMap[Fish$.name] : this.name,
       age: _patchMap.containsKey(Fish$.age) ? (_patchMap[Fish$.age] is Function) ? _patchMap[Fish$.age](this.age) : _patchMap[Fish$.age] : this.age,
       fishColour: _patchMap.containsKey(Fish$.fishColour) ? (_patchMap[Fish$.fishColour] is Function) ? _patchMap[Fish$.fishColour](this.fishColour) : _patchMap[Fish$.fishColour] : this.fishColour
+    );
+  }
+
+
+  Fish copyWithPet({
+    String? name,
+    int? age,
+  }) {
+    return copyWith(
+      name: name, age: age,
+    );
+  }
+
+
+  Fish patchWithPet({
+    PetPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? PetPatch();
+    final _patchMap = _patcher.toPatch();
+    return Fish(
+      name: _patchMap.containsKey(Pet$.name) ? (_patchMap[Pet$.name] is Function) ? _patchMap[Pet$.name](this.name) : _patchMap[Pet$.name] : this.name,
+      age: _patchMap.containsKey(Pet$.age) ? (_patchMap[Pet$.age] is Function) ? _patchMap[Pet$.age](this.age) : _patchMap[Pet$.age] : this.age,
+      fishColour: this.fishColour,
     );
   }
 
@@ -1085,6 +1299,22 @@ class FishPatch implements Patch<Fish> {
 
 extension FishSerialization on Fish {
   Map<String, dynamic> toJson() => _$FishToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$FishToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension FishCompareE on Fish {
@@ -1147,6 +1377,8 @@ class PetOwner<TPet extends $Pet> extends $PetOwner {
       pet: _patchMap.containsKey(PetOwner$.pet) ? (_patchMap[PetOwner$.pet] is Function) ? _patchMap[PetOwner$.pet](this.pet) : _patchMap[PetOwner$.pet] : this.pet
     );
   }
+
+
 
   @override
   bool operator ==(Object other) {
@@ -1306,6 +1538,8 @@ class A extends $A {
       timestamp: _patchMap.containsKey(A$.timestamp) ? (_patchMap[A$.timestamp] is Function) ? _patchMap[A$.timestamp](this.timestamp) : _patchMap[A$.timestamp] : this.timestamp
     );
   }
+
+
 
   @override
   bool operator ==(Object other) {
@@ -1471,6 +1705,8 @@ const class B extends $B {
     );
   }
 
+
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -1629,6 +1865,8 @@ class X extends $X {
     );
   }
 
+
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -1649,7 +1887,19 @@ class X extends $X {
 
 
   /// Creates a [X] instance from JSON
-  factory X.fromJson(Map<String, dynamic> json) => _$XFromJson(json);
+  factory X.fromJson(Map<String, dynamic> json) {
+    if (json['_className_'] == null) {
+      return _$XFromJson(json);
+    }
+    if (json['_className_'] == "Z") {
+      return Z.fromJson(json);
+    } else if (json['_className_'] == "Y") {
+      return Y.fromJson(json);
+    } else if (json['_className_'] == "X") {
+      return _$XFromJson(json);
+    }
+    throw UnsupportedError("The _className_ '${json['_className_']}' is not supported by the X.fromJson constructor.");
+  }
 }
 enum X$ {
 val
@@ -1731,6 +1981,22 @@ class XPatch implements Patch<X> {
 
 extension XSerialization on X {
   Map<String, dynamic> toJson() => _$XToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$XToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension XCompareE on X {
@@ -1757,9 +2023,9 @@ extension XChangeToE on X {
       valY: _patchMap[Z$.valY],
       val: _patchMap.containsKey(Z$.val)
           ? (_patchMap[Z$.val] is Function)
-                ? _patchMap[Z$.val](this.val)
+                ? _patchMap[Z$.val](val)
                 : _patchMap[Z$.val]
-          : this.val,
+          : val,
       a: _patchMap[Z$.a]
     );
   }
@@ -1772,9 +2038,9 @@ extension XChangeToE on X {
       valY: _patchMap[Y$.valY],
       val: _patchMap.containsKey(Y$.val)
           ? (_patchMap[Y$.val] is Function)
-                ? _patchMap[Y$.val](this.val)
+                ? _patchMap[Y$.val](val)
                 : _patchMap[Y$.val]
-          : this.val
+          : val
     );
   }
 
@@ -1784,7 +2050,7 @@ extension XChangeToE on X {
 
 
 @JsonSerializable(explicitToJson: true)
-class Y extends $Y implements $X {
+class Y extends $Y implements X {
   @override
   final String val;
   @override
@@ -1825,6 +2091,27 @@ class Y extends $Y implements $X {
     );
   }
 
+
+  Y copyWithX({
+    String? val,
+  }) {
+    return copyWith(
+      val: val,
+    );
+  }
+
+
+  Y patchWithX({
+    XPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? XPatch();
+    final _patchMap = _patcher.toPatch();
+    return Y(
+      val: _patchMap.containsKey(X$.val) ? (_patchMap[X$.val] is Function) ? _patchMap[X$.val](this.val) : _patchMap[X$.val] : this.val,
+      valY: this.valY,
+    );
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -1849,7 +2136,17 @@ class Y extends $Y implements $X {
 
 
   /// Creates a [Y] instance from JSON
-  factory Y.fromJson(Map<String, dynamic> json) => _$YFromJson(json);
+  factory Y.fromJson(Map<String, dynamic> json) {
+    if (json['_className_'] == null) {
+      return _$YFromJson(json);
+    }
+    if (json['_className_'] == "Z") {
+      return Z.fromJson(json);
+    } else if (json['_className_'] == "Y") {
+      return _$YFromJson(json);
+    }
+    throw UnsupportedError("The _className_ '${json['_className_']}' is not supported by the Y.fromJson constructor.");
+  }
 }
 enum Y$ {
 val,valY
@@ -1936,6 +2233,22 @@ class YPatch implements Patch<Y> {
 
 extension YSerialization on Y {
   Map<String, dynamic> toJson() => _$YToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$YToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension YCompareE on Y {
@@ -1962,14 +2275,14 @@ extension YChangeToE on Y {
       valZ: _patchMap[Z$.valZ],
       valY: _patchMap.containsKey(Z$.valY)
           ? (_patchMap[Z$.valY] is Function)
-                ? _patchMap[Z$.valY](this.valY)
+                ? _patchMap[Z$.valY](valY)
                 : _patchMap[Z$.valY]
-          : this.valY,
+          : valY,
       val: _patchMap.containsKey(Z$.val)
           ? (_patchMap[Z$.val] is Function)
-                ? _patchMap[Z$.val](this.val)
+                ? _patchMap[Z$.val](val)
                 : _patchMap[Z$.val]
-          : this.val
+          : val
     );
   }
 
@@ -1979,7 +2292,7 @@ extension YChangeToE on Y {
 
 
 @JsonSerializable(explicitToJson: true)
-class Z extends $Z implements $Y, $X {
+class Z extends $Z implements Y, X {
   @override
   final int valY;
   @override
@@ -1998,9 +2311,9 @@ class Z extends $Z implements $Y, $X {
     String? val,
     double? valZ,
   }) : 
-    valY = valY ?? throw ArgumentError("valY is required"),
-    val = val ?? throw ArgumentError("val is required"),
-    valZ = valZ ?? throw ArgumentError("valZ is required");
+    valY = valY ?? (() { throw ArgumentError("valY is required"); })(),
+    val = val ?? (() { throw ArgumentError("val is required"); })(),
+    valZ = valZ ?? (() { throw ArgumentError("valZ is required"); })();
 
   Z copyWith({
     int? valY,
@@ -2045,6 +2358,48 @@ class Z extends $Z implements $Y, $X {
       valY: _patchMap.containsKey(Z$.valY) ? (_patchMap[Z$.valY] is Function) ? _patchMap[Z$.valY](this.valY) : _patchMap[Z$.valY] : this.valY,
       val: _patchMap.containsKey(Z$.val) ? (_patchMap[Z$.val] is Function) ? _patchMap[Z$.val](this.val) : _patchMap[Z$.val] : this.val,
       valZ: _patchMap.containsKey(Z$.valZ) ? (_patchMap[Z$.valZ] is Function) ? _patchMap[Z$.valZ](this.valZ) : _patchMap[Z$.valZ] : this.valZ
+    );
+  }
+
+
+  Z copyWithY({
+    int? valY,
+  }) {
+    return copyWith(
+      valY: valY,
+    );
+  }
+
+  Z copyWithX({
+    String? val,
+  }) {
+    return copyWith(
+      val: val,
+    );
+  }
+
+
+  Z patchWithY({
+    YPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? YPatch();
+    final _patchMap = _patcher.toPatch();
+    return Z(
+      valY: _patchMap.containsKey(Y$.valY) ? (_patchMap[Y$.valY] is Function) ? _patchMap[Y$.valY](this.valY) : _patchMap[Y$.valY] : this.valY,
+      val: this.val,
+      valZ: this.valZ,
+    );
+  }
+
+  Z patchWithX({
+    XPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? XPatch();
+    final _patchMap = _patcher.toPatch();
+    return Z(
+      valY: this.valY,
+      val: _patchMap.containsKey(X$.val) ? (_patchMap[X$.val] is Function) ? _patchMap[X$.val](this.val) : _patchMap[X$.val] : this.val,
+      valZ: this.valZ,
     );
   }
 
@@ -2167,6 +2522,22 @@ class ZPatch implements Patch<Z> {
 
 extension ZSerialization on Z {
   Map<String, dynamic> toJson() => _$ZToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ZToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension ZCompareE on Z {

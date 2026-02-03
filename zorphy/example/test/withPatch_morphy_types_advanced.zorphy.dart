@@ -15,47 +15,31 @@ class CustomerProfile extends $CustomerProfile {
   @override
   final int age;
 
-  CustomerProfile({
-    required this.name,
-    required this.age,
-  });
+  CustomerProfile({required this.name, required this.age});
 
-  CustomerProfile copyWith({
-    String? name,
-    int? age,
-  }) {
-    return CustomerProfile(
-      name: name ?? this.name,
-      age: age ?? this.age,
-    );
+  CustomerProfile copyWith({String? name, int? age}) {
+    return CustomerProfile(name: name ?? this.name, age: age ?? this.age);
   }
 
-  CustomerProfile copyWithCustomerProfile({
-    String? name,
-    int? age,
-  }) {
-    return copyWith(
-      name: name,
-      age: age,
-    );
+  CustomerProfile copyWithCustomerProfile({String? name, int? age}) {
+    return copyWith(name: name, age: age);
   }
 
-  CustomerProfile patchWithCustomerProfile({
-    CustomerProfilePatch? patchInput,
-  }) {
+  CustomerProfile patchWithCustomerProfile({CustomerProfilePatch? patchInput}) {
     final _patcher = patchInput ?? CustomerProfilePatch();
     final _patchMap = _patcher.toPatch();
     return CustomerProfile(
-        name: _patchMap.containsKey(CustomerProfile$.name)
-            ? (_patchMap[CustomerProfile$.name] is Function)
+      name: _patchMap.containsKey(CustomerProfile$.name)
+          ? (_patchMap[CustomerProfile$.name] is Function)
                 ? _patchMap[CustomerProfile$.name](this.name)
                 : _patchMap[CustomerProfile$.name]
-            : this.name,
-        age: _patchMap.containsKey(CustomerProfile$.age)
-            ? (_patchMap[CustomerProfile$.age] is Function)
+          : this.name,
+      age: _patchMap.containsKey(CustomerProfile$.age)
+          ? (_patchMap[CustomerProfile$.age] is Function)
                 ? _patchMap[CustomerProfile$.age](this.age)
                 : _patchMap[CustomerProfile$.age]
-            : this.age);
+          : this.age,
+    );
   }
 
   @override
@@ -89,8 +73,9 @@ class CustomerProfilePatch implements Patch<CustomerProfile> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              CustomerProfile$.values.firstWhere((e) => e.name == key);
+          final enumValue = CustomerProfile$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -161,6 +146,22 @@ class CustomerProfilePatch implements Patch<CustomerProfile> {
 
 extension CustomerProfileSerialization on CustomerProfile {
   Map<String, dynamic> toJson() => _$CustomerProfileToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$CustomerProfileToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension CustomerProfileCompareE on CustomerProfile {
@@ -186,17 +187,9 @@ class Entity extends $Entity {
   @override
   final String? id;
 
-  Entity({
-    this.code,
-    this.name,
-    this.id,
-  });
+  Entity({this.code, this.name, this.id});
 
-  Entity copyWith({
-    String? code,
-    String? name,
-    String? id,
-  }) {
+  Entity copyWith({String? code, String? name, String? id}) {
     return Entity(
       code: code ?? this.code,
       name: name ?? this.name,
@@ -204,39 +197,30 @@ class Entity extends $Entity {
     );
   }
 
-  Entity copyWithEntity({
-    String? code,
-    String? name,
-    String? id,
-  }) {
-    return copyWith(
-      code: code,
-      name: name,
-      id: id,
-    );
+  Entity copyWithEntity({String? code, String? name, String? id}) {
+    return copyWith(code: code, name: name, id: id);
   }
 
-  Entity patchWithEntity({
-    EntityPatch? patchInput,
-  }) {
+  Entity patchWithEntity({EntityPatch? patchInput}) {
     final _patcher = patchInput ?? EntityPatch();
     final _patchMap = _patcher.toPatch();
     return Entity(
-        code: _patchMap.containsKey(Entity$.code)
-            ? (_patchMap[Entity$.code] is Function)
+      code: _patchMap.containsKey(Entity$.code)
+          ? (_patchMap[Entity$.code] is Function)
                 ? _patchMap[Entity$.code](this.code)
                 : _patchMap[Entity$.code]
-            : this.code,
-        name: _patchMap.containsKey(Entity$.name)
-            ? (_patchMap[Entity$.name] is Function)
+          : this.code,
+      name: _patchMap.containsKey(Entity$.name)
+          ? (_patchMap[Entity$.name] is Function)
                 ? _patchMap[Entity$.name](this.name)
                 : _patchMap[Entity$.name]
-            : this.name,
-        id: _patchMap.containsKey(Entity$.id)
-            ? (_patchMap[Entity$.id] is Function)
+          : this.name,
+      id: _patchMap.containsKey(Entity$.id)
+          ? (_patchMap[Entity$.id] is Function)
                 ? _patchMap[Entity$.id](this.id)
                 : _patchMap[Entity$.id]
-            : this.id);
+          : this.id,
+    );
   }
 
   @override
@@ -353,6 +337,22 @@ class EntityPatch implements Patch<Entity> {
 
 extension EntitySerialization on Entity {
   Map<String, dynamic> toJson() => _$EntityToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$EntityToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension EntityCompareE on Entity {
@@ -373,7 +373,7 @@ extension EntityCompareE on Entity {
 }
 
 @JsonSerializable(explicitToJson: true)
-class Participant extends $$Participant implements $Entity {
+class Participant extends $$Participant implements Entity {
   @override
   final String? code;
   @override
@@ -381,17 +381,9 @@ class Participant extends $$Participant implements $Entity {
   @override
   final String? id;
 
-  Participant({
-    this.code,
-    this.name,
-    this.id,
-  });
+  Participant({this.code, this.name, this.id});
 
-  Participant copyWith({
-    String? code,
-    String? name,
-    String? id,
-  }) {
+  Participant copyWith({String? code, String? name, String? id}) {
     return Participant(
       code: code ?? this.code,
       name: name ?? this.name,
@@ -399,39 +391,56 @@ class Participant extends $$Participant implements $Entity {
     );
   }
 
-  Participant copyWithParticipant({
-    String? code,
-    String? name,
-    String? id,
-  }) {
-    return copyWith(
-      code: code,
-      name: name,
-      id: id,
-    );
+  Participant copyWithParticipant({String? code, String? name, String? id}) {
+    return copyWith(code: code, name: name, id: id);
   }
 
-  Participant patchWithParticipant({
-    ParticipantPatch? patchInput,
-  }) {
+  Participant patchWithParticipant({ParticipantPatch? patchInput}) {
     final _patcher = patchInput ?? ParticipantPatch();
     final _patchMap = _patcher.toPatch();
     return Participant(
-        code: _patchMap.containsKey(Participant$.code)
-            ? (_patchMap[Participant$.code] is Function)
+      code: _patchMap.containsKey(Participant$.code)
+          ? (_patchMap[Participant$.code] is Function)
                 ? _patchMap[Participant$.code](this.code)
                 : _patchMap[Participant$.code]
-            : this.code,
-        name: _patchMap.containsKey(Participant$.name)
-            ? (_patchMap[Participant$.name] is Function)
+          : this.code,
+      name: _patchMap.containsKey(Participant$.name)
+          ? (_patchMap[Participant$.name] is Function)
                 ? _patchMap[Participant$.name](this.name)
                 : _patchMap[Participant$.name]
-            : this.name,
-        id: _patchMap.containsKey(Participant$.id)
-            ? (_patchMap[Participant$.id] is Function)
+          : this.name,
+      id: _patchMap.containsKey(Participant$.id)
+          ? (_patchMap[Participant$.id] is Function)
                 ? _patchMap[Participant$.id](this.id)
                 : _patchMap[Participant$.id]
-            : this.id);
+          : this.id,
+    );
+  }
+
+  Participant copyWithEntity({String? code, String? name, String? id}) {
+    return copyWith(code: code, name: name, id: id);
+  }
+
+  Participant patchWithEntity({EntityPatch? patchInput}) {
+    final _patcher = patchInput ?? EntityPatch();
+    final _patchMap = _patcher.toPatch();
+    return Participant(
+      code: _patchMap.containsKey(Entity$.code)
+          ? (_patchMap[Entity$.code] is Function)
+                ? _patchMap[Entity$.code](this.code)
+                : _patchMap[Entity$.code]
+          : this.code,
+      name: _patchMap.containsKey(Entity$.name)
+          ? (_patchMap[Entity$.name] is Function)
+                ? _patchMap[Entity$.name](this.name)
+                : _patchMap[Entity$.name]
+          : this.name,
+      id: _patchMap.containsKey(Entity$.id)
+          ? (_patchMap[Entity$.id] is Function)
+                ? _patchMap[Entity$.id](this.id)
+                : _patchMap[Entity$.id]
+          : this.id,
+    );
   }
 
   @override
@@ -473,8 +482,9 @@ class ParticipantPatch implements Patch<Participant> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              Participant$.values.firstWhere((e) => e.name == key);
+          final enumValue = Participant$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -550,6 +560,22 @@ class ParticipantPatch implements Patch<Participant> {
 
 extension ParticipantSerialization on Participant {
   Map<String, dynamic> toJson() => _$ParticipantToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ParticipantToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension ParticipantCompareE on Participant {
@@ -575,17 +601,9 @@ class Actor implements $$Participant {
   final String? name;
   final String? id;
 
-  Actor({
-    this.code,
-    this.name,
-    this.id,
-  });
+  Actor({this.code, this.name, this.id});
 
-  Actor copyWith({
-    String? code,
-    String? name,
-    String? id,
-  }) {
+  Actor copyWith({String? code, String? name, String? id}) {
     return Actor(
       code: code ?? this.code,
       name: name ?? this.name,
@@ -593,39 +611,56 @@ class Actor implements $$Participant {
     );
   }
 
-  Actor copyWithActor({
-    String? code,
-    String? name,
-    String? id,
-  }) {
-    return copyWith(
-      code: code,
-      name: name,
-      id: id,
-    );
+  Actor copyWithActor({String? code, String? name, String? id}) {
+    return copyWith(code: code, name: name, id: id);
   }
 
-  Actor patchWithActor({
-    ActorPatch? patchInput,
-  }) {
+  Actor patchWithActor({ActorPatch? patchInput}) {
     final _patcher = patchInput ?? ActorPatch();
     final _patchMap = _patcher.toPatch();
     return Actor(
-        code: _patchMap.containsKey(Actor$.code)
-            ? (_patchMap[Actor$.code] is Function)
+      code: _patchMap.containsKey(Actor$.code)
+          ? (_patchMap[Actor$.code] is Function)
                 ? _patchMap[Actor$.code](this.code)
                 : _patchMap[Actor$.code]
-            : this.code,
-        name: _patchMap.containsKey(Actor$.name)
-            ? (_patchMap[Actor$.name] is Function)
+          : this.code,
+      name: _patchMap.containsKey(Actor$.name)
+          ? (_patchMap[Actor$.name] is Function)
                 ? _patchMap[Actor$.name](this.name)
                 : _patchMap[Actor$.name]
-            : this.name,
-        id: _patchMap.containsKey(Actor$.id)
-            ? (_patchMap[Actor$.id] is Function)
+          : this.name,
+      id: _patchMap.containsKey(Actor$.id)
+          ? (_patchMap[Actor$.id] is Function)
                 ? _patchMap[Actor$.id](this.id)
                 : _patchMap[Actor$.id]
-            : this.id);
+          : this.id,
+    );
+  }
+
+  Actor copyWithEntity({String? code, String? name, String? id}) {
+    return copyWith(code: code, name: name, id: id);
+  }
+
+  Actor patchWithEntity({EntityPatch? patchInput}) {
+    final _patcher = patchInput ?? EntityPatch();
+    final _patchMap = _patcher.toPatch();
+    return Actor(
+      code: _patchMap.containsKey(Entity$.code)
+          ? (_patchMap[Entity$.code] is Function)
+                ? _patchMap[Entity$.code](this.code)
+                : _patchMap[Entity$.code]
+          : this.code,
+      name: _patchMap.containsKey(Entity$.name)
+          ? (_patchMap[Entity$.name] is Function)
+                ? _patchMap[Entity$.name](this.name)
+                : _patchMap[Entity$.name]
+          : this.name,
+      id: _patchMap.containsKey(Entity$.id)
+          ? (_patchMap[Entity$.id] is Function)
+                ? _patchMap[Entity$.id](this.id)
+                : _patchMap[Entity$.id]
+          : this.id,
+    );
   }
 
   @override
@@ -742,6 +777,22 @@ class ActorPatch implements Patch<Actor> {
 
 extension ActorSerialization on Actor {
   Map<String, dynamic> toJson() => _$ActorToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ActorToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension ActorCompareE on Actor {
@@ -768,12 +819,7 @@ class AdvancedUser implements $$Participant {
   final String? id;
   final String email;
 
-  AdvancedUser({
-    this.code,
-    this.name,
-    this.id,
-    required this.email,
-  });
+  AdvancedUser({this.code, this.name, this.id, required this.email});
 
   AdvancedUser copyWith({
     String? code,
@@ -795,40 +841,61 @@ class AdvancedUser implements $$Participant {
     String? id,
     String? email,
   }) {
-    return copyWith(
-      code: code,
-      name: name,
-      id: id,
-      email: email,
-    );
+    return copyWith(code: code, name: name, id: id, email: email);
   }
 
-  AdvancedUser patchWithAdvancedUser({
-    AdvancedUserPatch? patchInput,
-  }) {
+  AdvancedUser patchWithAdvancedUser({AdvancedUserPatch? patchInput}) {
     final _patcher = patchInput ?? AdvancedUserPatch();
     final _patchMap = _patcher.toPatch();
     return AdvancedUser(
-        code: _patchMap.containsKey(AdvancedUser$.code)
-            ? (_patchMap[AdvancedUser$.code] is Function)
+      code: _patchMap.containsKey(AdvancedUser$.code)
+          ? (_patchMap[AdvancedUser$.code] is Function)
                 ? _patchMap[AdvancedUser$.code](this.code)
                 : _patchMap[AdvancedUser$.code]
-            : this.code,
-        name: _patchMap.containsKey(AdvancedUser$.name)
-            ? (_patchMap[AdvancedUser$.name] is Function)
+          : this.code,
+      name: _patchMap.containsKey(AdvancedUser$.name)
+          ? (_patchMap[AdvancedUser$.name] is Function)
                 ? _patchMap[AdvancedUser$.name](this.name)
                 : _patchMap[AdvancedUser$.name]
-            : this.name,
-        id: _patchMap.containsKey(AdvancedUser$.id)
-            ? (_patchMap[AdvancedUser$.id] is Function)
+          : this.name,
+      id: _patchMap.containsKey(AdvancedUser$.id)
+          ? (_patchMap[AdvancedUser$.id] is Function)
                 ? _patchMap[AdvancedUser$.id](this.id)
                 : _patchMap[AdvancedUser$.id]
-            : this.id,
-        email: _patchMap.containsKey(AdvancedUser$.email)
-            ? (_patchMap[AdvancedUser$.email] is Function)
+          : this.id,
+      email: _patchMap.containsKey(AdvancedUser$.email)
+          ? (_patchMap[AdvancedUser$.email] is Function)
                 ? _patchMap[AdvancedUser$.email](this.email)
                 : _patchMap[AdvancedUser$.email]
-            : this.email);
+          : this.email,
+    );
+  }
+
+  AdvancedUser copyWithEntity({String? code, String? name, String? id}) {
+    return copyWith(code: code, name: name, id: id);
+  }
+
+  AdvancedUser patchWithEntity({EntityPatch? patchInput}) {
+    final _patcher = patchInput ?? EntityPatch();
+    final _patchMap = _patcher.toPatch();
+    return AdvancedUser(
+      code: _patchMap.containsKey(Entity$.code)
+          ? (_patchMap[Entity$.code] is Function)
+                ? _patchMap[Entity$.code](this.code)
+                : _patchMap[Entity$.code]
+          : this.code,
+      name: _patchMap.containsKey(Entity$.name)
+          ? (_patchMap[Entity$.name] is Function)
+                ? _patchMap[Entity$.name](this.name)
+                : _patchMap[Entity$.name]
+          : this.name,
+      id: _patchMap.containsKey(Entity$.id)
+          ? (_patchMap[Entity$.id] is Function)
+                ? _patchMap[Entity$.id](this.id)
+                : _patchMap[Entity$.id]
+          : this.id,
+      email: this.email,
+    );
   }
 
   @override
@@ -859,8 +926,21 @@ class AdvancedUser implements $$Participant {
   }
 
   /// Creates a [AdvancedUser] instance from JSON
-  factory AdvancedUser.fromJson(Map<String, dynamic> json) =>
-      _$AdvancedUserFromJson(json);
+  factory AdvancedUser.fromJson(Map<String, dynamic> json) {
+    if (json['_className_'] == null) {
+      return _$AdvancedUserFromJson(json);
+    }
+    if (json['_className_'] == "AdvancedCustomer") {
+      return AdvancedCustomer.fromJson(json);
+    } else if (json['_className_'] == "Gamer") {
+      return Gamer.fromJson(json);
+    } else if (json['_className_'] == "AdvancedUser") {
+      return _$AdvancedUserFromJson(json);
+    }
+    throw UnsupportedError(
+      "The _className_ '${json['_className_']}' is not supported by the AdvancedUser.fromJson constructor.",
+    );
+  }
 }
 
 enum AdvancedUser$ { code, name, id, email }
@@ -873,8 +953,9 @@ class AdvancedUserPatch implements Patch<AdvancedUser> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              AdvancedUser$.values.firstWhere((e) => e.name == key);
+          final enumValue = AdvancedUser$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -955,6 +1036,22 @@ class AdvancedUserPatch implements Patch<AdvancedUser> {
 
 extension AdvancedUserSerialization on AdvancedUser {
   Map<String, dynamic> toJson() => _$AdvancedUserToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$AdvancedUserToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension AdvancedUserCompareE on AdvancedUser {
@@ -978,8 +1075,12 @@ extension AdvancedUserCompareE on AdvancedUser {
 }
 
 extension AdvancedUserChangeToE on AdvancedUser {
-  AdvancedCustomer changeToAdvancedCustomer(
-      {$CustomerProfile? profile, String? code, String? name, String? id}) {
+  AdvancedCustomer changeToAdvancedCustomer({
+    CustomerProfile? profile,
+    String? code,
+    String? name,
+    String? id,
+  }) {
     final _patcher = AdvancedCustomerPatch();
     if (profile != null) {
       _patcher.withProfile(profile);
@@ -995,35 +1096,40 @@ extension AdvancedUserChangeToE on AdvancedUser {
     }
     final _patchMap = _patcher.toPatch();
     return AdvancedCustomer(
-        profile: _patchMap.containsKey(AdvancedCustomer$.profile)
-            ? (_patchMap[AdvancedCustomer$.profile] is Function)
-                ? _patchMap[AdvancedCustomer$.profile](this.profile)
+      profile: _patchMap.containsKey(AdvancedCustomer$.profile)
+          ? (_patchMap[AdvancedCustomer$.profile] is Function)
+                ? _patchMap[AdvancedCustomer$.profile](profile)
                 : _patchMap[AdvancedCustomer$.profile]
-            : this.profile,
-        email: _patchMap.containsKey(AdvancedCustomer$.email)
-            ? (_patchMap[AdvancedCustomer$.email] is Function)
-                ? _patchMap[AdvancedCustomer$.email](this.email)
+          : profile,
+      email: _patchMap.containsKey(AdvancedCustomer$.email)
+          ? (_patchMap[AdvancedCustomer$.email] is Function)
+                ? _patchMap[AdvancedCustomer$.email](email)
                 : _patchMap[AdvancedCustomer$.email]
-            : this.email,
-        code: _patchMap.containsKey(AdvancedCustomer$.code)
-            ? (_patchMap[AdvancedCustomer$.code] is Function)
-                ? _patchMap[AdvancedCustomer$.code](this.code)
+          : email,
+      code: _patchMap.containsKey(AdvancedCustomer$.code)
+          ? (_patchMap[AdvancedCustomer$.code] is Function)
+                ? _patchMap[AdvancedCustomer$.code](code)
                 : _patchMap[AdvancedCustomer$.code]
-            : this.code,
-        name: _patchMap.containsKey(AdvancedCustomer$.name)
-            ? (_patchMap[AdvancedCustomer$.name] is Function)
-                ? _patchMap[AdvancedCustomer$.name](this.name)
+          : code,
+      name: _patchMap.containsKey(AdvancedCustomer$.name)
+          ? (_patchMap[AdvancedCustomer$.name] is Function)
+                ? _patchMap[AdvancedCustomer$.name](name)
                 : _patchMap[AdvancedCustomer$.name]
-            : this.name,
-        id: _patchMap.containsKey(AdvancedCustomer$.id)
-            ? (_patchMap[AdvancedCustomer$.id] is Function)
-                ? _patchMap[AdvancedCustomer$.id](this.id)
+          : name,
+      id: _patchMap.containsKey(AdvancedCustomer$.id)
+          ? (_patchMap[AdvancedCustomer$.id] is Function)
+                ? _patchMap[AdvancedCustomer$.id](id)
                 : _patchMap[AdvancedCustomer$.id]
-            : this.id);
+          : id,
+    );
   }
 
-  Gamer changeToGamer(
-      {List<String>? games, String? code, String? name, String? id}) {
+  Gamer changeToGamer({
+    List<String>? games,
+    String? code,
+    String? name,
+    String? id,
+  }) {
     final _patcher = GamerPatch();
     if (games != null) {
       _patcher.withGames(games);
@@ -1039,31 +1145,32 @@ extension AdvancedUserChangeToE on AdvancedUser {
     }
     final _patchMap = _patcher.toPatch();
     return Gamer(
-        games: _patchMap.containsKey(Gamer$.games)
-            ? (_patchMap[Gamer$.games] is Function)
-                ? _patchMap[Gamer$.games](this.games)
+      games: _patchMap.containsKey(Gamer$.games)
+          ? (_patchMap[Gamer$.games] is Function)
+                ? _patchMap[Gamer$.games](games)
                 : _patchMap[Gamer$.games]
-            : this.games,
-        email: _patchMap.containsKey(Gamer$.email)
-            ? (_patchMap[Gamer$.email] is Function)
-                ? _patchMap[Gamer$.email](this.email)
+          : games,
+      email: _patchMap.containsKey(Gamer$.email)
+          ? (_patchMap[Gamer$.email] is Function)
+                ? _patchMap[Gamer$.email](email)
                 : _patchMap[Gamer$.email]
-            : this.email,
-        code: _patchMap.containsKey(Gamer$.code)
-            ? (_patchMap[Gamer$.code] is Function)
-                ? _patchMap[Gamer$.code](this.code)
+          : email,
+      code: _patchMap.containsKey(Gamer$.code)
+          ? (_patchMap[Gamer$.code] is Function)
+                ? _patchMap[Gamer$.code](code)
                 : _patchMap[Gamer$.code]
-            : this.code,
-        name: _patchMap.containsKey(Gamer$.name)
-            ? (_patchMap[Gamer$.name] is Function)
-                ? _patchMap[Gamer$.name](this.name)
+          : code,
+      name: _patchMap.containsKey(Gamer$.name)
+          ? (_patchMap[Gamer$.name] is Function)
+                ? _patchMap[Gamer$.name](name)
                 : _patchMap[Gamer$.name]
-            : this.name,
-        id: _patchMap.containsKey(Gamer$.id)
-            ? (_patchMap[Gamer$.id] is Function)
-                ? _patchMap[Gamer$.id](this.id)
+          : name,
+      id: _patchMap.containsKey(Gamer$.id)
+          ? (_patchMap[Gamer$.id] is Function)
+                ? _patchMap[Gamer$.id](id)
                 : _patchMap[Gamer$.id]
-            : this.id);
+          : id,
+    );
   }
 }
 
@@ -1075,13 +1182,7 @@ class Gamer implements $$Participant {
   final String? id;
   final List<String>? games;
 
-  Gamer({
-    required this.email,
-    this.code,
-    this.name,
-    this.id,
-    this.games,
-  });
+  Gamer({required this.email, this.code, this.name, this.id, this.games});
 
   Gamer copyWith({
     String? email,
@@ -1106,46 +1207,87 @@ class Gamer implements $$Participant {
     String? id,
     List<String>? games,
   }) {
-    return copyWith(
-      email: email,
-      code: code,
-      name: name,
-      id: id,
-      games: games,
-    );
+    return copyWith(email: email, code: code, name: name, id: id, games: games);
   }
 
-  Gamer patchWithGamer({
-    GamerPatch? patchInput,
-  }) {
+  Gamer patchWithGamer({GamerPatch? patchInput}) {
     final _patcher = patchInput ?? GamerPatch();
     final _patchMap = _patcher.toPatch();
     return Gamer(
-        email: _patchMap.containsKey(Gamer$.email)
-            ? (_patchMap[Gamer$.email] is Function)
+      email: _patchMap.containsKey(Gamer$.email)
+          ? (_patchMap[Gamer$.email] is Function)
                 ? _patchMap[Gamer$.email](this.email)
                 : _patchMap[Gamer$.email]
-            : this.email,
-        code: _patchMap.containsKey(Gamer$.code)
-            ? (_patchMap[Gamer$.code] is Function)
+          : this.email,
+      code: _patchMap.containsKey(Gamer$.code)
+          ? (_patchMap[Gamer$.code] is Function)
                 ? _patchMap[Gamer$.code](this.code)
                 : _patchMap[Gamer$.code]
-            : this.code,
-        name: _patchMap.containsKey(Gamer$.name)
-            ? (_patchMap[Gamer$.name] is Function)
+          : this.code,
+      name: _patchMap.containsKey(Gamer$.name)
+          ? (_patchMap[Gamer$.name] is Function)
                 ? _patchMap[Gamer$.name](this.name)
                 : _patchMap[Gamer$.name]
-            : this.name,
-        id: _patchMap.containsKey(Gamer$.id)
-            ? (_patchMap[Gamer$.id] is Function)
+          : this.name,
+      id: _patchMap.containsKey(Gamer$.id)
+          ? (_patchMap[Gamer$.id] is Function)
                 ? _patchMap[Gamer$.id](this.id)
                 : _patchMap[Gamer$.id]
-            : this.id,
-        games: _patchMap.containsKey(Gamer$.games)
-            ? (_patchMap[Gamer$.games] is Function)
+          : this.id,
+      games: _patchMap.containsKey(Gamer$.games)
+          ? (_patchMap[Gamer$.games] is Function)
                 ? _patchMap[Gamer$.games](this.games)
                 : _patchMap[Gamer$.games]
-            : this.games);
+          : this.games,
+    );
+  }
+
+  Gamer copyWithAdvancedUser({String? email}) {
+    return copyWith(email: email);
+  }
+
+  Gamer copyWithEntity({String? code, String? name, String? id}) {
+    return copyWith(code: code, name: name, id: id);
+  }
+
+  Gamer patchWithAdvancedUser({AdvancedUserPatch? patchInput}) {
+    final _patcher = patchInput ?? AdvancedUserPatch();
+    final _patchMap = _patcher.toPatch();
+    return Gamer(
+      email: _patchMap.containsKey(AdvancedUser$.email)
+          ? (_patchMap[AdvancedUser$.email] is Function)
+                ? _patchMap[AdvancedUser$.email](this.email)
+                : _patchMap[AdvancedUser$.email]
+          : this.email,
+      code: this.code,
+      name: this.name,
+      id: this.id,
+      games: this.games,
+    );
+  }
+
+  Gamer patchWithEntity({EntityPatch? patchInput}) {
+    final _patcher = patchInput ?? EntityPatch();
+    final _patchMap = _patcher.toPatch();
+    return Gamer(
+      email: this.email,
+      code: _patchMap.containsKey(Entity$.code)
+          ? (_patchMap[Entity$.code] is Function)
+                ? _patchMap[Entity$.code](this.code)
+                : _patchMap[Entity$.code]
+          : this.code,
+      name: _patchMap.containsKey(Entity$.name)
+          ? (_patchMap[Entity$.name] is Function)
+                ? _patchMap[Entity$.name](this.name)
+                : _patchMap[Entity$.name]
+          : this.name,
+      id: _patchMap.containsKey(Entity$.id)
+          ? (_patchMap[Entity$.id] is Function)
+                ? _patchMap[Entity$.id](this.id)
+                : _patchMap[Entity$.id]
+          : this.id,
+      games: this.games,
+    );
   }
 
   @override
@@ -1278,6 +1420,22 @@ class GamerPatch implements Patch<Gamer> {
 
 extension GamerSerialization on Gamer {
   Map<String, dynamic> toJson() => _$GamerToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$GamerToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension GamerCompareE on Gamer {
@@ -1357,31 +1515,80 @@ class AdvancedCustomer implements $$Participant {
     final _patcher = patchInput ?? AdvancedCustomerPatch();
     final _patchMap = _patcher.toPatch();
     return AdvancedCustomer(
-        email: _patchMap.containsKey(AdvancedCustomer$.email)
-            ? (_patchMap[AdvancedCustomer$.email] is Function)
+      email: _patchMap.containsKey(AdvancedCustomer$.email)
+          ? (_patchMap[AdvancedCustomer$.email] is Function)
                 ? _patchMap[AdvancedCustomer$.email](this.email)
                 : _patchMap[AdvancedCustomer$.email]
-            : this.email,
-        code: _patchMap.containsKey(AdvancedCustomer$.code)
-            ? (_patchMap[AdvancedCustomer$.code] is Function)
+          : this.email,
+      code: _patchMap.containsKey(AdvancedCustomer$.code)
+          ? (_patchMap[AdvancedCustomer$.code] is Function)
                 ? _patchMap[AdvancedCustomer$.code](this.code)
                 : _patchMap[AdvancedCustomer$.code]
-            : this.code,
-        name: _patchMap.containsKey(AdvancedCustomer$.name)
-            ? (_patchMap[AdvancedCustomer$.name] is Function)
+          : this.code,
+      name: _patchMap.containsKey(AdvancedCustomer$.name)
+          ? (_patchMap[AdvancedCustomer$.name] is Function)
                 ? _patchMap[AdvancedCustomer$.name](this.name)
                 : _patchMap[AdvancedCustomer$.name]
-            : this.name,
-        id: _patchMap.containsKey(AdvancedCustomer$.id)
-            ? (_patchMap[AdvancedCustomer$.id] is Function)
+          : this.name,
+      id: _patchMap.containsKey(AdvancedCustomer$.id)
+          ? (_patchMap[AdvancedCustomer$.id] is Function)
                 ? _patchMap[AdvancedCustomer$.id](this.id)
                 : _patchMap[AdvancedCustomer$.id]
-            : this.id,
-        profile: _patchMap.containsKey(AdvancedCustomer$.profile)
-            ? (_patchMap[AdvancedCustomer$.profile] is Function)
+          : this.id,
+      profile: _patchMap.containsKey(AdvancedCustomer$.profile)
+          ? (_patchMap[AdvancedCustomer$.profile] is Function)
                 ? _patchMap[AdvancedCustomer$.profile](this.profile)
                 : _patchMap[AdvancedCustomer$.profile]
-            : this.profile);
+          : this.profile,
+    );
+  }
+
+  AdvancedCustomer copyWithAdvancedUser({String? email}) {
+    return copyWith(email: email);
+  }
+
+  AdvancedCustomer copyWithEntity({String? code, String? name, String? id}) {
+    return copyWith(code: code, name: name, id: id);
+  }
+
+  AdvancedCustomer patchWithAdvancedUser({AdvancedUserPatch? patchInput}) {
+    final _patcher = patchInput ?? AdvancedUserPatch();
+    final _patchMap = _patcher.toPatch();
+    return AdvancedCustomer(
+      email: _patchMap.containsKey(AdvancedUser$.email)
+          ? (_patchMap[AdvancedUser$.email] is Function)
+                ? _patchMap[AdvancedUser$.email](this.email)
+                : _patchMap[AdvancedUser$.email]
+          : this.email,
+      code: this.code,
+      name: this.name,
+      id: this.id,
+      profile: this.profile,
+    );
+  }
+
+  AdvancedCustomer patchWithEntity({EntityPatch? patchInput}) {
+    final _patcher = patchInput ?? EntityPatch();
+    final _patchMap = _patcher.toPatch();
+    return AdvancedCustomer(
+      email: this.email,
+      code: _patchMap.containsKey(Entity$.code)
+          ? (_patchMap[Entity$.code] is Function)
+                ? _patchMap[Entity$.code](this.code)
+                : _patchMap[Entity$.code]
+          : this.code,
+      name: _patchMap.containsKey(Entity$.name)
+          ? (_patchMap[Entity$.name] is Function)
+                ? _patchMap[Entity$.name](this.name)
+                : _patchMap[Entity$.name]
+          : this.name,
+      id: _patchMap.containsKey(Entity$.id)
+          ? (_patchMap[Entity$.id] is Function)
+                ? _patchMap[Entity$.id](this.id)
+                : _patchMap[Entity$.id]
+          : this.id,
+      profile: this.profile,
+    );
   }
 
   @override
@@ -1429,8 +1636,9 @@ class AdvancedCustomerPatch implements Patch<AdvancedCustomer> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              AdvancedCustomer$.values.firstWhere((e) => e.name == key);
+          final enumValue = AdvancedCustomer$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -1443,7 +1651,8 @@ class AdvancedCustomerPatch implements Patch<AdvancedCustomer> {
   }
 
   static AdvancedCustomerPatch fromPatch(
-      Map<AdvancedCustomer$, dynamic> patch) {
+    Map<AdvancedCustomer$, dynamic> patch,
+  ) {
     final _patch = AdvancedCustomerPatch();
     _patch._patch.addAll(patch);
     return _patch;
@@ -1517,6 +1726,22 @@ class AdvancedCustomerPatch implements Patch<AdvancedCustomer> {
 
 extension AdvancedCustomerSerialization on AdvancedCustomer {
   Map<String, dynamic> toJson() => _$AdvancedCustomerToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$AdvancedCustomerToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension AdvancedCustomerCompareE on AdvancedCustomer {

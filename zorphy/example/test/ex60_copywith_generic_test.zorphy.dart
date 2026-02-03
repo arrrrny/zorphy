@@ -1,3 +1,4 @@
+// dart format width=80
 // ignore_for_file: UNNECESSARY_CAST
 // ignore_for_file: type=lint
 
@@ -13,85 +14,70 @@ class A<T> extends $A {
   @override
   final T y;
 
-  A({
-    required this.x,
-    required this.y,
-  });
+  A({required this.x, required this.y});
 
-  A._copyWith({
-    T? x,
-    T? y,
-  }) : 
-    x = x ?? throw ArgumentError("x is required"),
-    y = y ?? throw ArgumentError("y is required");
+  A._copyWith({T? x, T? y})
+    : x =
+          x ??
+          (() {
+            throw ArgumentError("x is required");
+          })(),
+      y =
+          y ??
+          (() {
+            throw ArgumentError("y is required");
+          })();
 
-  A copyWith({
-    T? x,
-    T? y,
-  }) {
-    return A(
-      x: x ?? this.x,
-      y: y ?? this.y,
-    );
+  A copyWith({T? x, T? y}) {
+    return A(x: x ?? this.x, y: y ?? this.y);
   }
 
-  A copyWithA({
-    T? x,
-    T? y,
-  }) {
-    return copyWith(
-      x: x, y: y,
-    );
+  A copyWithA({T? x, T? y}) {
+    return copyWith(x: x, y: y);
   }
 
-  A copyWithFn({
-    T? Function(T?)? x,
-    T? Function(T?)? y,
-  }) {
+  A copyWithFn({T? Function(T?)? x, T? Function(T?)? y}) {
     return A(
       x: x != null ? x(this.x) : this.x,
       y: y != null ? y(this.y) : this.y,
     );
   }
 
-  A patchWithA({
-    APatch? patchInput,
-  }) {
+  A patchWithA({APatch? patchInput}) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return A(
-      x: _patchMap.containsKey(A$.x) ? (_patchMap[A$.x] is Function) ? _patchMap[A$.x](this.x) : _patchMap[A$.x] : this.x,
-      y: _patchMap.containsKey(A$.y) ? (_patchMap[A$.y] is Function) ? _patchMap[A$.y](this.y) : _patchMap[A$.y] : this.y
+      x: _patchMap.containsKey(A$.x)
+          ? (_patchMap[A$.x] is Function)
+                ? _patchMap[A$.x](this.x)
+                : _patchMap[A$.x]
+          : this.x,
+      y: _patchMap.containsKey(A$.y)
+          ? (_patchMap[A$.y] is Function)
+                ? _patchMap[A$.y](this.y)
+                : _patchMap[A$.y]
+          : this.y,
     );
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is A &&
-        x == other.x &&
-        y == other.y;
+    return other is A && x == other.x && y == other.y;
   }
 
   @override
   int get hashCode {
-    return Object.hash(
-      this.x,
-      this.y);
+    return Object.hash(this.x, this.y);
   }
 
   @override
   String toString() {
-    return 'A(' +
-        'x: ${x}' + ', ' +
-        'y: ${y})';
+    return 'A(' + 'x: ${x}' + ', ' + 'y: ${y})';
   }
-
-}
-enum A$ {
-x,y
 }
 
+enum A$ { x, y }
 
 class APatch implements Patch<A> {
   final Map<A$, dynamic> _patch = {};
@@ -145,11 +131,12 @@ class APatch implements Patch<A> {
     if (value is DateTime) return value.toIso8601String();
     if (value is Enum) return value.toString().split('.').last;
     if (value is List) return value.map((e) => _convertToJson(e)).toList();
-    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
+    if (value is Map)
+      return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
     if (value is num || value is bool || value is String) return value;
     try {
-        if (value?.toJsonLean != null) return value.toJsonLean();
-      } catch (_) {}
+      if (value?.toJsonLean != null) return value.toJsonLean();
+    } catch (_) {}
     if (value?.toJson != null) return value.toJson();
     return value.toString();
   }
@@ -167,9 +154,7 @@ class APatch implements Patch<A> {
     _patch[A$.y] = value;
     return this;
   }
-
 }
-
 
 extension ACompareE on A {
   Map<String, dynamic> compareToA(A other) {

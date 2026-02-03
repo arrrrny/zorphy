@@ -15,37 +15,26 @@ sealed class $A<T> {
 class B<T> implements $$A {
   final T data;
 
-  B({
-    required this.data,
-  });
+  B({required this.data});
 
-  B copyWith({
-    T? data,
-  }) {
-    return B(
-      data: data ?? this.data,
-    );
+  B copyWith({T? data}) {
+    return B(data: data ?? this.data);
   }
 
-  B copyWithB({
-    T? data,
-  }) {
-    return copyWith(
-      data: data,
-    );
+  B copyWithB({T? data}) {
+    return copyWith(data: data);
   }
 
-  B patchWithB({
-    BPatch? patchInput,
-  }) {
+  B patchWithB({BPatch? patchInput}) {
     final _patcher = patchInput ?? BPatch();
     final _patchMap = _patcher.toPatch();
     return B(
-        data: _patchMap.containsKey(B$.data)
-            ? (_patchMap[B$.data] is Function)
+      data: _patchMap.containsKey(B$.data)
+          ? (_patchMap[B$.data] is Function)
                 ? _patchMap[B$.data](this.data)
                 : _patchMap[B$.data]
-            : this.data);
+          : this.data,
+    );
   }
 
   @override
@@ -154,47 +143,34 @@ class C<T> implements $$A {
   final eEnumExample failureCode;
   final String description;
 
-  C({
-    required this.failureCode,
-    required this.description,
-  });
+  C({required this.failureCode, required this.description});
 
-  C copyWith({
-    eEnumExample? failureCode,
-    String? description,
-  }) {
+  C copyWith({eEnumExample? failureCode, String? description}) {
     return C(
       failureCode: failureCode ?? this.failureCode,
       description: description ?? this.description,
     );
   }
 
-  C copyWithC({
-    eEnumExample? failureCode,
-    String? description,
-  }) {
-    return copyWith(
-      failureCode: failureCode,
-      description: description,
-    );
+  C copyWithC({eEnumExample? failureCode, String? description}) {
+    return copyWith(failureCode: failureCode, description: description);
   }
 
-  C patchWithC({
-    CPatch? patchInput,
-  }) {
+  C patchWithC({CPatch? patchInput}) {
     final _patcher = patchInput ?? CPatch();
     final _patchMap = _patcher.toPatch();
     return C(
-        failureCode: _patchMap.containsKey(C$.failureCode)
-            ? (_patchMap[C$.failureCode] is Function)
+      failureCode: _patchMap.containsKey(C$.failureCode)
+          ? (_patchMap[C$.failureCode] is Function)
                 ? _patchMap[C$.failureCode](this.failureCode)
                 : _patchMap[C$.failureCode]
-            : this.failureCode,
-        description: _patchMap.containsKey(C$.description)
-            ? (_patchMap[C$.description] is Function)
+          : this.failureCode,
+      description: _patchMap.containsKey(C$.description)
+          ? (_patchMap[C$.description] is Function)
                 ? _patchMap[C$.description](this.description)
                 : _patchMap[C$.description]
-            : this.description);
+          : this.description,
+    );
   }
 
   @override

@@ -13,37 +13,26 @@ class Person extends $Person {
   @override
   final int age;
 
-  Person({
-    required this.age,
-  });
+  Person({required this.age});
 
-  Person copyWith({
-    int? age,
-  }) {
-    return Person(
-      age: age ?? this.age,
-    );
+  Person copyWith({int? age}) {
+    return Person(age: age ?? this.age);
   }
 
-  Person copyWithPerson({
-    int? age,
-  }) {
-    return copyWith(
-      age: age,
-    );
+  Person copyWithPerson({int? age}) {
+    return copyWith(age: age);
   }
 
-  Person patchWithPerson({
-    PersonPatch? patchInput,
-  }) {
+  Person patchWithPerson({PersonPatch? patchInput}) {
     final _patcher = patchInput ?? PersonPatch();
     final _patchMap = _patcher.toPatch();
     return Person(
-        age: _patchMap.containsKey(Person$.age)
-            ? (_patchMap[Person$.age] is Function)
+      age: _patchMap.containsKey(Person$.age)
+          ? (_patchMap[Person$.age] is Function)
                 ? _patchMap[Person$.age](this.age)
                 : _patchMap[Person$.age]
-            : this.age);
+          : this.age,
+    );
   }
 
   @override
@@ -63,7 +52,21 @@ class Person extends $Person {
   }
 
   /// Creates a [Person] instance from JSON
-  factory Person.fromJson(Map<String, dynamic> json) => _$PersonFromJson(json);
+  factory Person.fromJson(Map<String, dynamic> json) {
+    if (json['_className_'] == null) {
+      return _$PersonFromJson(json);
+    }
+    if (json['_className_'] == "Athlete") {
+      return Athlete.fromJson(json);
+    } else if (json['_className_'] == "BaseballPlayer") {
+      return BaseballPlayer.fromJson(json);
+    } else if (json['_className_'] == "Person") {
+      return _$PersonFromJson(json);
+    }
+    throw UnsupportedError(
+      "The _className_ '${json['_className_']}' is not supported by the Person.fromJson constructor.",
+    );
+  }
 }
 
 enum Person$ { age }
@@ -142,6 +145,22 @@ class PersonPatch implements Patch<Person> {
 
 extension PersonSerialization on Person {
   Map<String, dynamic> toJson() => _$PersonToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$PersonToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension PersonCompareE on Person {
@@ -161,79 +180,84 @@ extension PersonChangeToE on Person {
     _patcher.withSpeed(speed);
     final _patchMap = _patcher.toPatch();
     return Athlete(
-        speed: _patchMap[Athlete$.speed],
-        age: _patchMap.containsKey(Athlete$.age)
-            ? (_patchMap[Athlete$.age] is Function)
-                ? _patchMap[Athlete$.age](this.age)
+      speed: _patchMap[Athlete$.speed],
+      age: _patchMap.containsKey(Athlete$.age)
+          ? (_patchMap[Athlete$.age] is Function)
+                ? _patchMap[Athlete$.age](age)
                 : _patchMap[Athlete$.age]
-            : this.age);
+          : age,
+    );
   }
 
-  BaseballPlayer changeToBaseballPlayer(
-      {required int height, required int speed}) {
+  BaseballPlayer changeToBaseballPlayer({
+    required int height,
+    required int speed,
+  }) {
     final _patcher = BaseballPlayerPatch();
     _patcher.withHeight(height);
     _patcher.withSpeed(speed);
     final _patchMap = _patcher.toPatch();
     return BaseballPlayer(
-        height: _patchMap[BaseballPlayer$.height],
-        speed: _patchMap[BaseballPlayer$.speed],
-        age: _patchMap.containsKey(BaseballPlayer$.age)
-            ? (_patchMap[BaseballPlayer$.age] is Function)
-                ? _patchMap[BaseballPlayer$.age](this.age)
+      height: _patchMap[BaseballPlayer$.height],
+      speed: _patchMap[BaseballPlayer$.speed],
+      age: _patchMap.containsKey(BaseballPlayer$.age)
+          ? (_patchMap[BaseballPlayer$.age] is Function)
+                ? _patchMap[BaseballPlayer$.age](age)
                 : _patchMap[BaseballPlayer$.age]
-            : this.age);
+          : age,
+    );
   }
 }
 
 @JsonSerializable(explicitToJson: true)
-class Athlete extends $Athlete implements $Person {
+class Athlete extends $Athlete implements Person {
   @override
   final int age;
   @override
   final int speed;
 
-  Athlete({
-    required this.age,
-    required this.speed,
-  });
+  Athlete({required this.age, required this.speed});
 
-  Athlete copyWith({
-    int? age,
-    int? speed,
-  }) {
-    return Athlete(
-      age: age ?? this.age,
-      speed: speed ?? this.speed,
-    );
+  Athlete copyWith({int? age, int? speed}) {
+    return Athlete(age: age ?? this.age, speed: speed ?? this.speed);
   }
 
-  Athlete copyWithAthlete({
-    int? age,
-    int? speed,
-  }) {
-    return copyWith(
-      age: age,
-      speed: speed,
-    );
+  Athlete copyWithAthlete({int? age, int? speed}) {
+    return copyWith(age: age, speed: speed);
   }
 
-  Athlete patchWithAthlete({
-    AthletePatch? patchInput,
-  }) {
+  Athlete patchWithAthlete({AthletePatch? patchInput}) {
     final _patcher = patchInput ?? AthletePatch();
     final _patchMap = _patcher.toPatch();
     return Athlete(
-        age: _patchMap.containsKey(Athlete$.age)
-            ? (_patchMap[Athlete$.age] is Function)
+      age: _patchMap.containsKey(Athlete$.age)
+          ? (_patchMap[Athlete$.age] is Function)
                 ? _patchMap[Athlete$.age](this.age)
                 : _patchMap[Athlete$.age]
-            : this.age,
-        speed: _patchMap.containsKey(Athlete$.speed)
-            ? (_patchMap[Athlete$.speed] is Function)
+          : this.age,
+      speed: _patchMap.containsKey(Athlete$.speed)
+          ? (_patchMap[Athlete$.speed] is Function)
                 ? _patchMap[Athlete$.speed](this.speed)
                 : _patchMap[Athlete$.speed]
-            : this.speed);
+          : this.speed,
+    );
+  }
+
+  Athlete copyWithPerson({int? age}) {
+    return copyWith(age: age);
+  }
+
+  Athlete patchWithPerson({PersonPatch? patchInput}) {
+    final _patcher = patchInput ?? PersonPatch();
+    final _patchMap = _patcher.toPatch();
+    return Athlete(
+      age: _patchMap.containsKey(Person$.age)
+          ? (_patchMap[Person$.age] is Function)
+                ? _patchMap[Person$.age](this.age)
+                : _patchMap[Person$.age]
+          : this.age,
+      speed: this.speed,
+    );
   }
 
   @override
@@ -253,8 +277,19 @@ class Athlete extends $Athlete implements $Person {
   }
 
   /// Creates a [Athlete] instance from JSON
-  factory Athlete.fromJson(Map<String, dynamic> json) =>
-      _$AthleteFromJson(json);
+  factory Athlete.fromJson(Map<String, dynamic> json) {
+    if (json['_className_'] == null) {
+      return _$AthleteFromJson(json);
+    }
+    if (json['_className_'] == "BaseballPlayer") {
+      return BaseballPlayer.fromJson(json);
+    } else if (json['_className_'] == "Athlete") {
+      return _$AthleteFromJson(json);
+    }
+    throw UnsupportedError(
+      "The _className_ '${json['_className_']}' is not supported by the Athlete.fromJson constructor.",
+    );
+  }
 }
 
 enum Athlete$ { age, speed }
@@ -338,6 +373,22 @@ class AthletePatch implements Patch<Athlete> {
 
 extension AthleteSerialization on Athlete {
   Map<String, dynamic> toJson() => _$AthleteToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$AthleteToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension AthleteCompareE on Athlete {
@@ -360,22 +411,23 @@ extension AthleteChangeToE on Athlete {
     _patcher.withHeight(height);
     final _patchMap = _patcher.toPatch();
     return BaseballPlayer(
-        height: _patchMap[BaseballPlayer$.height],
-        speed: _patchMap.containsKey(BaseballPlayer$.speed)
-            ? (_patchMap[BaseballPlayer$.speed] is Function)
-                ? _patchMap[BaseballPlayer$.speed](this.speed)
+      height: _patchMap[BaseballPlayer$.height],
+      speed: _patchMap.containsKey(BaseballPlayer$.speed)
+          ? (_patchMap[BaseballPlayer$.speed] is Function)
+                ? _patchMap[BaseballPlayer$.speed](speed)
                 : _patchMap[BaseballPlayer$.speed]
-            : this.speed,
-        age: _patchMap.containsKey(BaseballPlayer$.age)
-            ? (_patchMap[BaseballPlayer$.age] is Function)
-                ? _patchMap[BaseballPlayer$.age](this.age)
+          : speed,
+      age: _patchMap.containsKey(BaseballPlayer$.age)
+          ? (_patchMap[BaseballPlayer$.age] is Function)
+                ? _patchMap[BaseballPlayer$.age](age)
                 : _patchMap[BaseballPlayer$.age]
-            : this.age);
+          : age,
+    );
   }
 }
 
 @JsonSerializable(explicitToJson: true)
-class BaseballPlayer extends $BaseballPlayer implements $Athlete, $Person {
+class BaseballPlayer extends $BaseballPlayer implements Athlete, Person {
   @override
   final int speed;
   @override
@@ -389,11 +441,7 @@ class BaseballPlayer extends $BaseballPlayer implements $Athlete, $Person {
     required this.height,
   });
 
-  BaseballPlayer copyWith({
-    int? speed,
-    int? age,
-    int? height,
-  }) {
+  BaseballPlayer copyWith({int? speed, int? age, int? height}) {
     return BaseballPlayer(
       speed: speed ?? this.speed,
       age: age ?? this.age,
@@ -401,39 +449,66 @@ class BaseballPlayer extends $BaseballPlayer implements $Athlete, $Person {
     );
   }
 
-  BaseballPlayer copyWithBaseballPlayer({
-    int? speed,
-    int? age,
-    int? height,
-  }) {
-    return copyWith(
-      speed: speed,
-      age: age,
-      height: height,
-    );
+  BaseballPlayer copyWithBaseballPlayer({int? speed, int? age, int? height}) {
+    return copyWith(speed: speed, age: age, height: height);
   }
 
-  BaseballPlayer patchWithBaseballPlayer({
-    BaseballPlayerPatch? patchInput,
-  }) {
+  BaseballPlayer patchWithBaseballPlayer({BaseballPlayerPatch? patchInput}) {
     final _patcher = patchInput ?? BaseballPlayerPatch();
     final _patchMap = _patcher.toPatch();
     return BaseballPlayer(
-        speed: _patchMap.containsKey(BaseballPlayer$.speed)
-            ? (_patchMap[BaseballPlayer$.speed] is Function)
+      speed: _patchMap.containsKey(BaseballPlayer$.speed)
+          ? (_patchMap[BaseballPlayer$.speed] is Function)
                 ? _patchMap[BaseballPlayer$.speed](this.speed)
                 : _patchMap[BaseballPlayer$.speed]
-            : this.speed,
-        age: _patchMap.containsKey(BaseballPlayer$.age)
-            ? (_patchMap[BaseballPlayer$.age] is Function)
+          : this.speed,
+      age: _patchMap.containsKey(BaseballPlayer$.age)
+          ? (_patchMap[BaseballPlayer$.age] is Function)
                 ? _patchMap[BaseballPlayer$.age](this.age)
                 : _patchMap[BaseballPlayer$.age]
-            : this.age,
-        height: _patchMap.containsKey(BaseballPlayer$.height)
-            ? (_patchMap[BaseballPlayer$.height] is Function)
+          : this.age,
+      height: _patchMap.containsKey(BaseballPlayer$.height)
+          ? (_patchMap[BaseballPlayer$.height] is Function)
                 ? _patchMap[BaseballPlayer$.height](this.height)
                 : _patchMap[BaseballPlayer$.height]
-            : this.height);
+          : this.height,
+    );
+  }
+
+  BaseballPlayer copyWithAthlete({int? speed}) {
+    return copyWith(speed: speed);
+  }
+
+  BaseballPlayer copyWithPerson({int? age}) {
+    return copyWith(age: age);
+  }
+
+  BaseballPlayer patchWithAthlete({AthletePatch? patchInput}) {
+    final _patcher = patchInput ?? AthletePatch();
+    final _patchMap = _patcher.toPatch();
+    return BaseballPlayer(
+      speed: _patchMap.containsKey(Athlete$.speed)
+          ? (_patchMap[Athlete$.speed] is Function)
+                ? _patchMap[Athlete$.speed](this.speed)
+                : _patchMap[Athlete$.speed]
+          : this.speed,
+      age: this.age,
+      height: this.height,
+    );
+  }
+
+  BaseballPlayer patchWithPerson({PersonPatch? patchInput}) {
+    final _patcher = patchInput ?? PersonPatch();
+    final _patchMap = _patcher.toPatch();
+    return BaseballPlayer(
+      speed: this.speed,
+      age: _patchMap.containsKey(Person$.age)
+          ? (_patchMap[Person$.age] is Function)
+                ? _patchMap[Person$.age](this.age)
+                : _patchMap[Person$.age]
+          : this.age,
+      height: this.height,
+    );
   }
 
   @override
@@ -475,8 +550,9 @@ class BaseballPlayerPatch implements Patch<BaseballPlayer> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              BaseballPlayer$.values.firstWhere((e) => e.name == key);
+          final enumValue = BaseballPlayer$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -552,6 +628,22 @@ class BaseballPlayerPatch implements Patch<BaseballPlayer> {
 
 extension BaseballPlayerSerialization on BaseballPlayer {
   Map<String, dynamic> toJson() => _$BaseballPlayerToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$BaseballPlayerToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension BaseballPlayerCompareE on BaseballPlayer {
@@ -576,37 +668,26 @@ class Building extends $Building {
   @override
   final List<Person> people;
 
-  Building({
-    required this.people,
-  });
+  Building({required this.people});
 
-  Building copyWith({
-    List<Person>? people,
-  }) {
-    return Building(
-      people: people ?? this.people,
-    );
+  Building copyWith({List<Person>? people}) {
+    return Building(people: people ?? this.people);
   }
 
-  Building copyWithBuilding({
-    List<Person>? people,
-  }) {
-    return copyWith(
-      people: people,
-    );
+  Building copyWithBuilding({List<Person>? people}) {
+    return copyWith(people: people);
   }
 
-  Building patchWithBuilding({
-    BuildingPatch? patchInput,
-  }) {
+  Building patchWithBuilding({BuildingPatch? patchInput}) {
     final _patcher = patchInput ?? BuildingPatch();
     final _patchMap = _patcher.toPatch();
     return Building(
-        people: _patchMap.containsKey(Building$.people)
-            ? (_patchMap[Building$.people] is Function)
+      people: _patchMap.containsKey(Building$.people)
+          ? (_patchMap[Building$.people] is Function)
                 ? _patchMap[Building$.people](this.people)
                 : _patchMap[Building$.people]
-            : this.people);
+          : this.people,
+    );
   }
 
   @override
@@ -706,6 +787,22 @@ class BuildingPatch implements Patch<Building> {
 
 extension BuildingSerialization on Building {
   Map<String, dynamic> toJson() => _$BuildingToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$BuildingToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension BuildingCompareE on Building {

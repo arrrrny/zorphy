@@ -107,7 +107,7 @@ String getProperties(
         var f = fields[i];
         var comma = i == fields.length - 1 ? ";" : ",";
         sb.writeln(
-            "    ${f.name} = ${f.name} ?? throw ArgumentError(\"${f.name} is required\")$comma");
+            "    ${f.name} = ${f.name} ?? (() { throw ArgumentError(\"${f.name} is required\"); })()$comma");
       }
     }
   }
@@ -128,31 +128,27 @@ String generateFactoryMethod(
     if (factory.parameters.any((p) => p.isNamed)) {
       sb.write("{");
       sb.write(
-        factory.parameters
-            .map((p) {
-              var prefix = p.isRequired ? "required " : "";
-              var suffix = p.hasDefaultValue && p.defaultValue != null
-                  ? " = ${p.defaultValue}"
-                  : "";
-              var cleanType = _replaceDollarTypesWithConcrete(
-                  p.type.replaceAll('\$', ''));
-              return "${prefix}${cleanType} ${p.name}${suffix}";
-            })
-            .join(", "),
+        factory.parameters.map((p) {
+          var prefix = p.isRequired ? "required " : "";
+          var suffix = p.hasDefaultValue && p.defaultValue != null
+              ? " = ${p.defaultValue}"
+              : "";
+          var cleanType =
+              _replaceDollarTypesWithConcrete(p.type.replaceAll('\$', ''));
+          return "${prefix}${cleanType} ${p.name}${suffix}";
+        }).join(", "),
       );
       sb.write("}");
     } else {
       sb.write(
-        factory.parameters
-            .map((p) {
-              var suffix = p.hasDefaultValue && p.defaultValue != null
-                  ? " = ${p.defaultValue}"
-                  : "";
-              var cleanType =
-                  _replaceDollarTypesWithConcrete(p.type.replaceAll('\$', ''));
-              return "${cleanType} ${p.name}${suffix}";
-            })
-            .join(", "),
+        factory.parameters.map((p) {
+          var suffix = p.hasDefaultValue && p.defaultValue != null
+              ? " = ${p.defaultValue}"
+              : "";
+          var cleanType =
+              _replaceDollarTypesWithConcrete(p.type.replaceAll('\$', ''));
+          return "${cleanType} ${p.name}${suffix}";
+        }).join(", "),
       );
     }
   }
@@ -885,12 +881,11 @@ String getInterfacePatchWithMethods(
     var interfaceFieldNames = interfaceFields.map((f) => f.name).toSet();
 
     sb.writeln("");
-    sb.writeln(
-        "  $classNameTrimmed patchWith$interfaceNameTrimmed({");
+    sb.writeln("  $classNameTrimmed patchWith$interfaceNameTrimmed({");
     sb.writeln("    $interfaceNameTrimmed" + "Patch? patchInput,");
     sb.writeln("  }) {");
-    sb.writeln(
-        "    final _patcher = patchInput ?? $interfaceNameTrimmed" + "Patch();");
+    sb.writeln("    final _patcher = patchInput ?? $interfaceNameTrimmed" +
+        "Patch();");
     sb.writeln("    final _patchMap = _patcher.toPatch();");
     sb.writeln("    return $classNameTrimmed(");
 

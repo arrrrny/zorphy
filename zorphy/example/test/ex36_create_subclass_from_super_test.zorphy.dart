@@ -14,37 +14,26 @@ class A extends $A {
   @override
   final String x;
 
-  A({
-    required this.x,
-  });
+  A({required this.x});
 
-  A copyWith({
-    String? x,
-  }) {
-    return A(
-      x: x ?? this.x,
-    );
+  A copyWith({String? x}) {
+    return A(x: x ?? this.x);
   }
 
-  A copyWithA({
-    String? x,
-  }) {
-    return copyWith(
-      x: x,
-    );
+  A copyWithA({String? x}) {
+    return copyWith(x: x);
   }
 
-  A patchWithA({
-    APatch? patchInput,
-  }) {
+  A patchWithA({APatch? patchInput}) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return A(
-        x: _patchMap.containsKey(A$.x)
-            ? (_patchMap[A$.x] is Function)
+      x: _patchMap.containsKey(A$.x)
+          ? (_patchMap[A$.x] is Function)
                 ? _patchMap[A$.x](this.x)
                 : _patchMap[A$.x]
-            : this.x);
+          : this.x,
+    );
   }
 
   @override
@@ -155,67 +144,64 @@ extension AChangeToE on A {
     _patcher.withY(y);
     final _patchMap = _patcher.toPatch();
     return B(
-        x: _patchMap.containsKey(B$.x)
-            ? (_patchMap[B$.x] is Function)
-                ? _patchMap[B$.x](this.x)
+      x: _patchMap.containsKey(B$.x)
+          ? (_patchMap[B$.x] is Function)
+                ? _patchMap[B$.x](x)
                 : _patchMap[B$.x]
-            : this.x,
-        y: _patchMap[B$.y],
-        x: _patchMap.containsKey(B$.x)
-            ? (_patchMap[B$.x] is Function)
-                ? _patchMap[B$.x](this.x)
-                : _patchMap[B$.x]
-            : this.x);
+          : x,
+      y: _patchMap[B$.y],
+    );
   }
 }
 
-class B extends $B implements $A {
+class B extends $B implements A {
   @override
   final String x;
   @override
   final String y;
 
-  B({
-    required this.x,
-    required this.y,
-  });
+  B({required this.x, required this.y});
 
-  B copyWith({
-    String? x,
-    String? y,
-  }) {
-    return B(
-      x: x ?? this.x,
-      y: y ?? this.y,
-    );
+  B copyWith({String? x, String? y}) {
+    return B(x: x ?? this.x, y: y ?? this.y);
   }
 
-  B copyWithB({
-    String? x,
-    String? y,
-  }) {
-    return copyWith(
-      x: x,
-      y: y,
-    );
+  B copyWithB({String? x, String? y}) {
+    return copyWith(x: x, y: y);
   }
 
-  B patchWithB({
-    BPatch? patchInput,
-  }) {
+  B patchWithB({BPatch? patchInput}) {
     final _patcher = patchInput ?? BPatch();
     final _patchMap = _patcher.toPatch();
     return B(
-        x: _patchMap.containsKey(B$.x)
-            ? (_patchMap[B$.x] is Function)
+      x: _patchMap.containsKey(B$.x)
+          ? (_patchMap[B$.x] is Function)
                 ? _patchMap[B$.x](this.x)
                 : _patchMap[B$.x]
-            : this.x,
-        y: _patchMap.containsKey(B$.y)
-            ? (_patchMap[B$.y] is Function)
+          : this.x,
+      y: _patchMap.containsKey(B$.y)
+          ? (_patchMap[B$.y] is Function)
                 ? _patchMap[B$.y](this.y)
                 : _patchMap[B$.y]
-            : this.y);
+          : this.y,
+    );
+  }
+
+  B copyWithA({String? x}) {
+    return copyWith(x: x);
+  }
+
+  B patchWithA({APatch? patchInput}) {
+    final _patcher = patchInput ?? APatch();
+    final _patchMap = _patcher.toPatch();
+    return B(
+      x: _patchMap.containsKey(A$.x)
+          ? (_patchMap[A$.x] is Function)
+                ? _patchMap[A$.x](this.x)
+                : _patchMap[A$.x]
+          : this.x,
+      y: this.y,
+    );
   }
 
   @override

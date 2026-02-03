@@ -13,47 +13,39 @@ class SimpleResponse implements $$SimpleResponse {
   final String message;
   final String status;
 
-  SimpleResponse({
-    required this.message,
-    required this.status,
-  });
+  SimpleResponse({required this.message, required this.status});
 
-  SimpleResponse copyWith({
-    String? message,
-    String? status,
-  }) {
+  SimpleResponse copyWith({String? message, String? status}) {
     return SimpleResponse(
       message: message ?? this.message,
       status: status ?? this.status,
     );
   }
 
-  SimpleResponse copyWithSimpleResponse({
-    String? message,
-    String? status,
-  }) {
-    return copyWith(
-      message: message,
-      status: status,
-    );
+  SimpleResponse copyWithSimpleResponse({String? message, String? status}) {
+    return copyWith(message: message, status: status);
   }
 
-  SimpleResponse patchWithSimpleResponse({
-    SimpleResponsePatch? patchInput,
-  }) {
+  factory SimpleResponse.success(String message) =>
+      SimpleResponse.success(message);
+
+  factory SimpleResponse.error(String error) => SimpleResponse.error(error);
+
+  SimpleResponse patchWithSimpleResponse({SimpleResponsePatch? patchInput}) {
     final _patcher = patchInput ?? SimpleResponsePatch();
     final _patchMap = _patcher.toPatch();
     return SimpleResponse(
-        message: _patchMap.containsKey(SimpleResponse$.message)
-            ? (_patchMap[SimpleResponse$.message] is Function)
+      message: _patchMap.containsKey(SimpleResponse$.message)
+          ? (_patchMap[SimpleResponse$.message] is Function)
                 ? _patchMap[SimpleResponse$.message](this.message)
                 : _patchMap[SimpleResponse$.message]
-            : this.message,
-        status: _patchMap.containsKey(SimpleResponse$.status)
-            ? (_patchMap[SimpleResponse$.status] is Function)
+          : this.message,
+      status: _patchMap.containsKey(SimpleResponse$.status)
+          ? (_patchMap[SimpleResponse$.status] is Function)
                 ? _patchMap[SimpleResponse$.status](this.status)
                 : _patchMap[SimpleResponse$.status]
-            : this.status);
+          : this.status,
+    );
   }
 
   @override
@@ -92,8 +84,9 @@ class SimpleResponsePatch implements Patch<SimpleResponse> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              SimpleResponse$.values.firstWhere((e) => e.name == key);
+          final enumValue = SimpleResponse$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -164,6 +157,22 @@ class SimpleResponsePatch implements Patch<SimpleResponse> {
 
 extension SimpleResponseSerialization on SimpleResponse {
   Map<String, dynamic> toJson() => _$SimpleResponseToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$SimpleResponseToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension SimpleResponseCompareE on SimpleResponse {
@@ -185,47 +194,34 @@ class BasicResponse implements $$SimpleResponse {
   final String message;
   final String status;
 
-  BasicResponse({
-    required this.message,
-    required this.status,
-  });
+  BasicResponse({required this.message, required this.status});
 
-  BasicResponse copyWith({
-    String? message,
-    String? status,
-  }) {
+  BasicResponse copyWith({String? message, String? status}) {
     return BasicResponse(
       message: message ?? this.message,
       status: status ?? this.status,
     );
   }
 
-  BasicResponse copyWithBasicResponse({
-    String? message,
-    String? status,
-  }) {
-    return copyWith(
-      message: message,
-      status: status,
-    );
+  BasicResponse copyWithBasicResponse({String? message, String? status}) {
+    return copyWith(message: message, status: status);
   }
 
-  BasicResponse patchWithBasicResponse({
-    BasicResponsePatch? patchInput,
-  }) {
+  BasicResponse patchWithBasicResponse({BasicResponsePatch? patchInput}) {
     final _patcher = patchInput ?? BasicResponsePatch();
     final _patchMap = _patcher.toPatch();
     return BasicResponse(
-        message: _patchMap.containsKey(BasicResponse$.message)
-            ? (_patchMap[BasicResponse$.message] is Function)
+      message: _patchMap.containsKey(BasicResponse$.message)
+          ? (_patchMap[BasicResponse$.message] is Function)
                 ? _patchMap[BasicResponse$.message](this.message)
                 : _patchMap[BasicResponse$.message]
-            : this.message,
-        status: _patchMap.containsKey(BasicResponse$.status)
-            ? (_patchMap[BasicResponse$.status] is Function)
+          : this.message,
+      status: _patchMap.containsKey(BasicResponse$.status)
+          ? (_patchMap[BasicResponse$.status] is Function)
                 ? _patchMap[BasicResponse$.status](this.status)
                 : _patchMap[BasicResponse$.status]
-            : this.status);
+          : this.status,
+    );
   }
 
   @override
@@ -264,8 +260,9 @@ class BasicResponsePatch implements Patch<BasicResponse> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              BasicResponse$.values.firstWhere((e) => e.name == key);
+          final enumValue = BasicResponse$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -336,6 +333,22 @@ class BasicResponsePatch implements Patch<BasicResponse> {
 
 extension BasicResponseSerialization on BasicResponse {
   Map<String, dynamic> toJson() => _$BasicResponseToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$BasicResponseToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension BasicResponseCompareE on BasicResponse {
@@ -381,11 +394,7 @@ class DetailedResponse implements $$SimpleResponse {
     String? status,
     Map<String, dynamic>? data,
   }) {
-    return copyWith(
-      message: message,
-      status: status,
-      data: data,
-    );
+    return copyWith(message: message, status: status, data: data);
   }
 
   DetailedResponse patchWithDetailedResponse({
@@ -394,21 +403,22 @@ class DetailedResponse implements $$SimpleResponse {
     final _patcher = patchInput ?? DetailedResponsePatch();
     final _patchMap = _patcher.toPatch();
     return DetailedResponse(
-        message: _patchMap.containsKey(DetailedResponse$.message)
-            ? (_patchMap[DetailedResponse$.message] is Function)
+      message: _patchMap.containsKey(DetailedResponse$.message)
+          ? (_patchMap[DetailedResponse$.message] is Function)
                 ? _patchMap[DetailedResponse$.message](this.message)
                 : _patchMap[DetailedResponse$.message]
-            : this.message,
-        status: _patchMap.containsKey(DetailedResponse$.status)
-            ? (_patchMap[DetailedResponse$.status] is Function)
+          : this.message,
+      status: _patchMap.containsKey(DetailedResponse$.status)
+          ? (_patchMap[DetailedResponse$.status] is Function)
                 ? _patchMap[DetailedResponse$.status](this.status)
                 : _patchMap[DetailedResponse$.status]
-            : this.status,
-        data: _patchMap.containsKey(DetailedResponse$.data)
-            ? (_patchMap[DetailedResponse$.data] is Function)
+          : this.status,
+      data: _patchMap.containsKey(DetailedResponse$.data)
+          ? (_patchMap[DetailedResponse$.data] is Function)
                 ? _patchMap[DetailedResponse$.data](this.data)
                 : _patchMap[DetailedResponse$.data]
-            : this.data);
+          : this.data,
+    );
   }
 
   @override
@@ -450,8 +460,9 @@ class DetailedResponsePatch implements Patch<DetailedResponse> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              DetailedResponse$.values.firstWhere((e) => e.name == key);
+          final enumValue = DetailedResponse$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -464,7 +475,8 @@ class DetailedResponsePatch implements Patch<DetailedResponse> {
   }
 
   static DetailedResponsePatch fromPatch(
-      Map<DetailedResponse$, dynamic> patch) {
+    Map<DetailedResponse$, dynamic> patch,
+  ) {
     final _patch = DetailedResponsePatch();
     _patch._patch.addAll(patch);
     return _patch;
@@ -528,6 +540,22 @@ class DetailedResponsePatch implements Patch<DetailedResponse> {
 
 extension DetailedResponseSerialization on DetailedResponse {
   Map<String, dynamic> toJson() => _$DetailedResponseToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$DetailedResponseToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension DetailedResponseCompareE on DetailedResponse {
@@ -595,26 +623,27 @@ class ConcreteResponse implements $$SimpleResponse {
     final _patcher = patchInput ?? ConcreteResponsePatch();
     final _patchMap = _patcher.toPatch();
     return ConcreteResponse(
-        message: _patchMap.containsKey(ConcreteResponse$.message)
-            ? (_patchMap[ConcreteResponse$.message] is Function)
+      message: _patchMap.containsKey(ConcreteResponse$.message)
+          ? (_patchMap[ConcreteResponse$.message] is Function)
                 ? _patchMap[ConcreteResponse$.message](this.message)
                 : _patchMap[ConcreteResponse$.message]
-            : this.message,
-        status: _patchMap.containsKey(ConcreteResponse$.status)
-            ? (_patchMap[ConcreteResponse$.status] is Function)
+          : this.message,
+      status: _patchMap.containsKey(ConcreteResponse$.status)
+          ? (_patchMap[ConcreteResponse$.status] is Function)
                 ? _patchMap[ConcreteResponse$.status](this.status)
                 : _patchMap[ConcreteResponse$.status]
-            : this.status,
-        timestamp: _patchMap.containsKey(ConcreteResponse$.timestamp)
-            ? (_patchMap[ConcreteResponse$.timestamp] is Function)
+          : this.status,
+      timestamp: _patchMap.containsKey(ConcreteResponse$.timestamp)
+          ? (_patchMap[ConcreteResponse$.timestamp] is Function)
                 ? _patchMap[ConcreteResponse$.timestamp](this.timestamp)
                 : _patchMap[ConcreteResponse$.timestamp]
-            : this.timestamp,
-        isSuccess: _patchMap.containsKey(ConcreteResponse$.isSuccess)
-            ? (_patchMap[ConcreteResponse$.isSuccess] is Function)
+          : this.timestamp,
+      isSuccess: _patchMap.containsKey(ConcreteResponse$.isSuccess)
+          ? (_patchMap[ConcreteResponse$.isSuccess] is Function)
                 ? _patchMap[ConcreteResponse$.isSuccess](this.isSuccess)
                 : _patchMap[ConcreteResponse$.isSuccess]
-            : this.isSuccess);
+          : this.isSuccess,
+    );
   }
 
   @override
@@ -630,7 +659,11 @@ class ConcreteResponse implements $$SimpleResponse {
   @override
   int get hashCode {
     return Object.hash(
-        this.message, this.status, this.timestamp, this.isSuccess);
+      this.message,
+      this.status,
+      this.timestamp,
+      this.isSuccess,
+    );
   }
 
   @override
@@ -660,8 +693,9 @@ class ConcreteResponsePatch implements Patch<ConcreteResponse> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue =
-              ConcreteResponse$.values.firstWhere((e) => e.name == key);
+          final enumValue = ConcreteResponse$.values.firstWhere(
+            (e) => e.name == key,
+          );
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -674,7 +708,8 @@ class ConcreteResponsePatch implements Patch<ConcreteResponse> {
   }
 
   static ConcreteResponsePatch fromPatch(
-      Map<ConcreteResponse$, dynamic> patch) {
+    Map<ConcreteResponse$, dynamic> patch,
+  ) {
     final _patch = ConcreteResponsePatch();
     _patch._patch.addAll(patch);
     return _patch;
@@ -743,6 +778,22 @@ class ConcreteResponsePatch implements Patch<ConcreteResponse> {
 
 extension ConcreteResponseSerialization on ConcreteResponse {
   Map<String, dynamic> toJson() => _$ConcreteResponseToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$ConcreteResponseToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension ConcreteResponseCompareE on ConcreteResponse {

@@ -12,37 +12,26 @@ class A extends $A {
   @override
   final String id;
 
-  A({
-    required this.id,
-  });
+  A({required this.id});
 
-  A copyWith({
-    String? id,
-  }) {
-    return A(
-      id: id ?? this.id,
-    );
+  A copyWith({String? id}) {
+    return A(id: id ?? this.id);
   }
 
-  A copyWithA({
-    String? id,
-  }) {
-    return copyWith(
-      id: id,
-    );
+  A copyWithA({String? id}) {
+    return copyWith(id: id);
   }
 
-  A patchWithA({
-    APatch? patchInput,
-  }) {
+  A patchWithA({APatch? patchInput}) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return A(
-        id: _patchMap.containsKey(A$.id)
-            ? (_patchMap[A$.id] is Function)
+      id: _patchMap.containsKey(A$.id)
+          ? (_patchMap[A$.id] is Function)
                 ? _patchMap[A$.id](this.id)
                 : _patchMap[A$.id]
-            : this.id);
+          : this.id,
+    );
   }
 
   @override
@@ -153,12 +142,13 @@ extension AChangeToE on A {
     _patcher.withBlah(blah);
     final _patchMap = _patcher.toPatch();
     return B(
-        blah: _patchMap[B$.blah],
-        id: _patchMap.containsKey(B$.id)
-            ? (_patchMap[B$.id] is Function)
-                ? _patchMap[B$.id](this.id)
+      blah: _patchMap[B$.blah],
+      id: _patchMap.containsKey(B$.id)
+          ? (_patchMap[B$.id] is Function)
+                ? _patchMap[B$.id](id)
                 : _patchMap[B$.id]
-            : this.id);
+          : id,
+    );
   }
 
   C changeToC({required String xyz}) {
@@ -166,62 +156,64 @@ extension AChangeToE on A {
     _patcher.withXyz(xyz);
     final _patchMap = _patcher.toPatch();
     return C(
-        xyz: _patchMap[C$.xyz],
-        id: _patchMap.containsKey(C$.id)
-            ? (_patchMap[C$.id] is Function)
-                ? _patchMap[C$.id](this.id)
+      xyz: _patchMap[C$.xyz],
+      id: _patchMap.containsKey(C$.id)
+          ? (_patchMap[C$.id] is Function)
+                ? _patchMap[C$.id](id)
                 : _patchMap[C$.id]
-            : this.id);
+          : id,
+    );
   }
 }
 
-class B extends $B implements $A {
+class B extends $B implements A {
   @override
   final String id;
   @override
   final String blah;
 
-  B({
-    required this.id,
-    required this.blah,
-  });
+  B({required this.id, required this.blah});
 
-  B copyWith({
-    String? id,
-    String? blah,
-  }) {
-    return B(
-      id: id ?? this.id,
-      blah: blah ?? this.blah,
-    );
+  B copyWith({String? id, String? blah}) {
+    return B(id: id ?? this.id, blah: blah ?? this.blah);
   }
 
-  B copyWithB({
-    String? id,
-    String? blah,
-  }) {
-    return copyWith(
-      id: id,
-      blah: blah,
-    );
+  B copyWithB({String? id, String? blah}) {
+    return copyWith(id: id, blah: blah);
   }
 
-  B patchWithB({
-    BPatch? patchInput,
-  }) {
+  B patchWithB({BPatch? patchInput}) {
     final _patcher = patchInput ?? BPatch();
     final _patchMap = _patcher.toPatch();
     return B(
-        id: _patchMap.containsKey(B$.id)
-            ? (_patchMap[B$.id] is Function)
+      id: _patchMap.containsKey(B$.id)
+          ? (_patchMap[B$.id] is Function)
                 ? _patchMap[B$.id](this.id)
                 : _patchMap[B$.id]
-            : this.id,
-        blah: _patchMap.containsKey(B$.blah)
-            ? (_patchMap[B$.blah] is Function)
+          : this.id,
+      blah: _patchMap.containsKey(B$.blah)
+          ? (_patchMap[B$.blah] is Function)
                 ? _patchMap[B$.blah](this.blah)
                 : _patchMap[B$.blah]
-            : this.blah);
+          : this.blah,
+    );
+  }
+
+  B copyWithA({String? id}) {
+    return copyWith(id: id);
+  }
+
+  B patchWithA({APatch? patchInput}) {
+    final _patcher = patchInput ?? APatch();
+    final _patchMap = _patcher.toPatch();
+    return B(
+      id: _patchMap.containsKey(A$.id)
+          ? (_patchMap[A$.id] is Function)
+                ? _patchMap[A$.id](this.id)
+                : _patchMap[A$.id]
+          : this.id,
+      blah: this.blah,
+    );
   }
 
   @override
@@ -334,53 +326,54 @@ extension BCompareE on B {
   }
 }
 
-class C extends $C implements $A {
+class C extends $C implements A {
   @override
   final String id;
   @override
   final String xyz;
 
-  C({
-    required this.id,
-    required this.xyz,
-  });
+  C({required this.id, required this.xyz});
 
-  C copyWith({
-    String? id,
-    String? xyz,
-  }) {
-    return C(
-      id: id ?? this.id,
-      xyz: xyz ?? this.xyz,
-    );
+  C copyWith({String? id, String? xyz}) {
+    return C(id: id ?? this.id, xyz: xyz ?? this.xyz);
   }
 
-  C copyWithC({
-    String? id,
-    String? xyz,
-  }) {
-    return copyWith(
-      id: id,
-      xyz: xyz,
-    );
+  C copyWithC({String? id, String? xyz}) {
+    return copyWith(id: id, xyz: xyz);
   }
 
-  C patchWithC({
-    CPatch? patchInput,
-  }) {
+  C patchWithC({CPatch? patchInput}) {
     final _patcher = patchInput ?? CPatch();
     final _patchMap = _patcher.toPatch();
     return C(
-        id: _patchMap.containsKey(C$.id)
-            ? (_patchMap[C$.id] is Function)
+      id: _patchMap.containsKey(C$.id)
+          ? (_patchMap[C$.id] is Function)
                 ? _patchMap[C$.id](this.id)
                 : _patchMap[C$.id]
-            : this.id,
-        xyz: _patchMap.containsKey(C$.xyz)
-            ? (_patchMap[C$.xyz] is Function)
+          : this.id,
+      xyz: _patchMap.containsKey(C$.xyz)
+          ? (_patchMap[C$.xyz] is Function)
                 ? _patchMap[C$.xyz](this.xyz)
                 : _patchMap[C$.xyz]
-            : this.xyz);
+          : this.xyz,
+    );
+  }
+
+  C copyWithA({String? id}) {
+    return copyWith(id: id);
+  }
+
+  C patchWithA({APatch? patchInput}) {
+    final _patcher = patchInput ?? APatch();
+    final _patchMap = _patcher.toPatch();
+    return C(
+      id: _patchMap.containsKey(A$.id)
+          ? (_patchMap[A$.id] is Function)
+                ? _patchMap[A$.id](this.id)
+                : _patchMap[A$.id]
+          : this.id,
+      xyz: this.xyz,
+    );
   }
 
   @override

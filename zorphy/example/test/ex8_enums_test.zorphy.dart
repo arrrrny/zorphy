@@ -15,47 +15,31 @@ class Pet extends $Pet {
   @override
   final eBlim blim;
 
-  Pet({
-    required this.type,
-    required this.blim,
-  });
+  Pet({required this.type, required this.blim});
 
-  Pet copyWith({
-    String? type,
-    eBlim? blim,
-  }) {
-    return Pet(
-      type: type ?? this.type,
-      blim: blim ?? this.blim,
-    );
+  Pet copyWith({String? type, eBlim? blim}) {
+    return Pet(type: type ?? this.type, blim: blim ?? this.blim);
   }
 
-  Pet copyWithPet({
-    String? type,
-    eBlim? blim,
-  }) {
-    return copyWith(
-      type: type,
-      blim: blim,
-    );
+  Pet copyWithPet({String? type, eBlim? blim}) {
+    return copyWith(type: type, blim: blim);
   }
 
-  Pet patchWithPet({
-    PetPatch? patchInput,
-  }) {
+  Pet patchWithPet({PetPatch? patchInput}) {
     final _patcher = patchInput ?? PetPatch();
     final _patchMap = _patcher.toPatch();
     return Pet(
-        type: _patchMap.containsKey(Pet$.type)
-            ? (_patchMap[Pet$.type] is Function)
+      type: _patchMap.containsKey(Pet$.type)
+          ? (_patchMap[Pet$.type] is Function)
                 ? _patchMap[Pet$.type](this.type)
                 : _patchMap[Pet$.type]
-            : this.type,
-        blim: _patchMap.containsKey(Pet$.blim)
-            ? (_patchMap[Pet$.blim] is Function)
+          : this.type,
+      blim: _patchMap.containsKey(Pet$.blim)
+          ? (_patchMap[Pet$.blim] is Function)
                 ? _patchMap[Pet$.blim](this.blim)
                 : _patchMap[Pet$.blim]
-            : this.blim);
+          : this.blim,
+    );
   }
 
   @override
@@ -159,6 +143,22 @@ class PetPatch implements Patch<Pet> {
 
 extension PetSerialization on Pet {
   Map<String, dynamic> toJson() => _$PetToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$PetToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension PetCompareE on Pet {

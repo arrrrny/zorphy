@@ -26,6 +26,8 @@ class EulaState extends $EulaState {
   }
 
 
+
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -70,7 +72,7 @@ extension EulaStateChangeToE on EulaState {
 
 
 
-class AgreedEulaState extends $AgreedEulaState implements $EulaState {
+class AgreedEulaState extends $AgreedEulaState implements EulaState {
   @override
   final bool test;
 
@@ -103,6 +105,8 @@ class AgreedEulaState extends $AgreedEulaState implements $EulaState {
       test: _patchMap.containsKey(AgreedEulaState$.test) ? (_patchMap[AgreedEulaState$.test] is Function) ? _patchMap[AgreedEulaState$.test](this.test) : _patchMap[AgreedEulaState$.test] : this.test
     );
   }
+
+
 
   @override
   bool operator ==(Object other) {

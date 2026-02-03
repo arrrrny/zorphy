@@ -22,8 +22,8 @@ class Pet extends $Pet {
     String?? type,
     String? name,
   }) : 
-    type = type ?? throw ArgumentError("type is required"),
-    name = name ?? throw ArgumentError("name is required");
+    type = type ?? (() { throw ArgumentError("type is required"); })(),
+    name = name ?? (() { throw ArgumentError("name is required"); })();
 
   Pet copyWith({
     String? type,
@@ -64,6 +64,8 @@ class Pet extends $Pet {
       name: _patchMap.containsKey(Pet$.name) ? (_patchMap[Pet$.name] is Function) ? _patchMap[Pet$.name](this.name) : _patchMap[Pet$.name] : this.name
     );
   }
+
+
 
   @override
   bool operator ==(Object other) {
