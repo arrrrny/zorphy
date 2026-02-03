@@ -36,26 +36,23 @@ main() {
       ],
     );
 
-    expect(
-      a.toJson(),
-      {
-        'id': '1',
-        'x': {
-          'items': [1, 2, 3],
-          '_className_': 'X'
-        },
-        'xs': [
-          {
-            'items': [1],
-            '_className_': 'X'
-          },
-          {
-            'items': [2],
-            '_className_': 'X'
-          }
-        ],
-        '_className_': 'A'
+    expect(a.toJson(), {
+      'id': '1',
+      'x': {
+        'items': [1, 2, 3],
+        '_className_': 'X',
       },
-    );
+      'xs': [
+        {
+          'items': [1],
+          '_className_': 'X',
+        },
+        {
+          'items': [2],
+          '_className_': 'X',
+        },
+      ],
+      '_className_': 'A',
+    });
   });
 }

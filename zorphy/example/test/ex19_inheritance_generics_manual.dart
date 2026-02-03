@@ -33,7 +33,5 @@ abstract class D extends $$D {
 
 class E extends $E implements C<$$B>, D {
   final List<B> items;
-  E({
-    required this.items,
-  });
+  E({required this.items});
 }

@@ -31,16 +31,25 @@ abstract class $Todo2_complete_assigned implements $Todo2_complete {
 }
 
 String getDescription(Todo2 todo) => switch (todo) {
-      Todo2_incomplete() => "incomplete",
-      Todo2_complete_assigned(managerId: var managerId) => "assigned to: $managerId",
-      Todo2_complete(completedDate: var completedDate) => "completed on $completedDate",
-      Todo2() => "this code will never be hit because Todo2 is abstract and there are no other subclasses",
-    };
+  Todo2_incomplete() => "incomplete",
+  Todo2_complete_assigned(managerId: var managerId) =>
+    "assigned to: $managerId",
+  Todo2_complete(completedDate: var completedDate) =>
+    "completed on $completedDate",
+  Todo2() =>
+    "this code will never be hit because Todo2 is abstract and there are no other subclasses",
+};
 
 void main() {
   group("abstract class", () {
     test("0 ", () {
-      var todo = Todo2_complete_assigned(title: "title", id: "id", description: "description", completedDate: DateTime.now(), managerId: "5");
+      var todo = Todo2_complete_assigned(
+        title: "title",
+        id: "id",
+        description: "description",
+        completedDate: DateTime.now(),
+        managerId: "5",
+      );
       var description = getDescription(todo);
       var expected = "assigned to: 5";
 

@@ -53,8 +53,8 @@ class A<T> {
   factory A.fromJson(
     Map<String, dynamic> json,
     T Function(Object? json) fromJsonT,
-  ) =>
-      _$AFromJson(json, fromJsonT);
+  ) => _$AFromJson(json, fromJsonT);
 
-  Map<String, dynamic> toJson(Object Function(T value) toJsonT) => _$AToJson(this, toJsonT);
+  Map<String, dynamic> toJson(Object Function(T value) toJsonT) =>
+      _$AToJson(this, toJsonT);
 }
