@@ -9,7 +9,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
 
-const String _version = '1.1.0';
+const String _version = '1.1.1';
 
 void main() {
   stderr.writeln('Zorphy MCP Server v$_version starting...');

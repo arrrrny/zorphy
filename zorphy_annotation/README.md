@@ -35,14 +35,14 @@ Add this package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zorphy_annotation: ^1.1.0
+  zorphy_annotation: ^1.1.1
 ```
 
 Then add the builder package as a development dependency:
 
 ```yaml
 dev_dependencies:
-  zorphy: ^1.1.0
+  zorphy: ^1.1.1
   build_runner: ^2.0.0
 ```
 

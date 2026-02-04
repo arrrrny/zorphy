@@ -10,7 +10,7 @@ import 'dart:convert';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
-const String _version = '1.1.0';
+const String _version = '1.1.1';
 
 Future<void> main(List<String> args) async {
   final parser = ArgParser()
