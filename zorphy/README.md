@@ -1266,7 +1266,7 @@ Inspired by and designed to improve upon the Morphy code generation package.
 
 ---
 
-**Made with 🔥 for the Dart/Flutter community and AI agents**
+**Made with 🔥 by the ZikZak AI team for the community and AI agents**
 
 ## 🦒 Related Projects
 

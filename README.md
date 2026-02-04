@@ -1249,18 +1249,14 @@ abstract class $Derived implements $Base {
 }
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
-
-## 📄 License
+##  License
 
 MIT License - see LICENSE file for details
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 Inspired by and designed to improve upon the Morphy code generation package.
 
 ---
 
-**Made with ❤️ for the Dart/Flutter community and AI agents**
+**Made with 🔥 by the ZikZak AI team for the community and AI agents**

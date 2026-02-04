@@ -398,4 +398,4 @@ For issues, questions, or suggestions, please visit:
 
 ---
 
-Made with 🔥 by the ZikZak AI team
+**Made with 🔥 by the ZikZak AI team for the community and AI agents**
