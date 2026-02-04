@@ -1,4 +1,3 @@
-import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:build/build.dart';
@@ -41,7 +40,8 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
 
     var hasConstConstructor = classElement.constructors.any((e) => e.isConst);
     var nonSealed = annotation.read('nonSealed').boolValue;
-    var isAbstract = className.startsWith("\$\$") && !nonSealed;
+    // Classes with $$ prefix are always abstract, nonSealed only controls sealed vs abstract modifier
+    var isAbstract = className.startsWith("\$\$");
 
     if (classElement.supertype?.element.name != "Object") {
       throw Exception("you must use implements, not extends");
@@ -72,10 +72,38 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
       addInterface(supertype);
     }
 
+    // Store nonSealed flag for this class
+    var nonSealedMap = <String, bool>{};
+    nonSealedMap[className] = nonSealed;
+
     var interfaces = allInterfaces.map((e) {
       var interfaceName = e.element.name ?? "";
       // Don't strip $ prefix - interfaces should keep the $ to reference abstract classes
       var implementedName = interfaceName;
+
+      // Check if interface has @Zorphy annotation with nonSealed: true
+      // For now, assume $$ prefix means sealed unless we find it in our map
+      var isSealed = interfaceName.startsWith("\$\$");
+      if (isSealed && e.element is ClassElement) {
+        // Check if the interface has @Zorphy(nonSealed: true) by reading its annotation
+        var classElement = e.element as ClassElement;
+        for (var annotation in classElement.metadata.annotations) {
+          var annotationElement = annotation.element;
+          if (annotationElement is ConstructorElement) {
+            var enclosingElement = annotationElement.enclosingElement;
+            if (enclosingElement.name == 'Zorphy') {
+              // Try to read the nonSealed parameter
+              try {
+                var constantValue = annotation.computeConstantValue();
+                var nonSealedField = constantValue?.getField('nonSealed');
+                if (nonSealedField?.toBoolValue() == true) {
+                  isSealed = false;
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      }
 
       return InterfaceWithComment(
         implementedName,
@@ -85,7 +113,7 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
             .map((f) => NameType(f.name ?? "", typeToString(f.type)))
             .toList(),
         comment: e.element.documentationComment,
-        isSealed: interfaceName.startsWith("\$\$"),
+        isSealed: isSealed,
         hidePublicConstructor: false,
       );
     }).toList();

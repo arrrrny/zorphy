@@ -44,8 +44,9 @@ String getProperties(
   bool hidePublicConstructor,
   bool generateCopyWithFn,
   bool generateJson,
-  bool hasExtends,
-) {
+  bool hasExtends, {
+  bool extendsAbstractClass = false,
+}) {
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
 
@@ -87,11 +88,22 @@ String getProperties(
 
       // Check if field is nullable - if it ends with ?, don't add required
       // Use the transformed fieldType to check for nullability
-      var isNullable = fieldType != null && fieldType!.endsWith('?');
+      var isNullable = fieldType != null && fieldType.endsWith('?');
       var requiredKeyword = isNullable ? "" : "required ";
       sb.writeln("    ${requiredKeyword}this.${f.name},");
     }
-    sb.writeln("  });");
+    sb.writeln("  })");
+    
+    // Add super() call only if extending a concrete class (not abstract)
+    if (hasExtends && !extendsAbstractClass) {
+      sb.writeln("  : super(");
+      for (var f in fields) {
+        sb.writeln("      ${f.name}: ${f.name},");
+      }
+      sb.writeln("    );");
+    } else {
+      sb.writeln("  ;");
+    }
 
     // Named constructor for copyWith
     if (generateCopyWithFn) {
@@ -416,8 +428,10 @@ String _replaceDollarTypesWithConcrete(String type) {
 String getPropertiesAbstract(
   List<NameTypeClassComment> fields,
   String className,
-  bool generateCopyWithFn,
-) {
+  bool generateCopyWithFn, {
+  bool isSealedWithSubtypes = false,
+  bool isNonSealedWithSubtypes = false,
+}) {
   var sb = StringBuffer();
 
   for (var f in fields) {
@@ -425,19 +439,31 @@ String getPropertiesAbstract(
     if (f.jsonKeyInfo != null) {
       sb.writeln("  ${f.jsonKeyInfo!.toAnnotationString()}");
     }
-    sb.writeln("  ${f.type} get ${f.name};");
+    var fieldType =
+        f.type != null ? _replaceDollarTypesWithConcrete(f.type!) : f.type;
+    sb.writeln("  $fieldType get ${f.name};");
   }
 
-  // Private constructor for abstract classes
-  sb.writeln("");
-  sb.writeln("  const ${className}._internal();");
+  // Constructor for abstract classes
+  if (isNonSealedWithSubtypes) {
+    // Non-sealed abstract class with subtypes - add public constructor for subclasses
+    sb.writeln("");
+    sb.writeln("  ${className}();");
+  } else if (!isSealedWithSubtypes) {
+    // Regular abstract class without subtypes - add private constructor
+    sb.writeln("");
+    sb.writeln("  const ${className}._internal();");
+  }
+  // Sealed classes with subtypes don't need a constructor
 
   // Named constructor for copyWith
   if (generateCopyWithFn) {
     sb.writeln("");
     sb.writeln("  factory ${className}._copyWith({");
     for (var f in fields) {
-      sb.writeln("    ${f.type}? ${f.name},");
+      var cwFieldType =
+          f.type != null ? _replaceDollarTypesWithConcrete(f.type!) : f.type;
+      sb.writeln("    $cwFieldType? ${f.name},");
     }
     sb.writeln("  }) = _\$${className}CopyWith;");
   }
@@ -844,7 +870,6 @@ String getPatchClass(
     // Generate cross-file nested patch methods for Zorphy types
     var fieldType = field.type ?? "";
     var fieldTypeWithoutDollars = getDataTypeWithoutDollars(fieldType);
-    var isNullable = fieldType.endsWith("?");
     var innerType = fieldTypeWithoutDollars.replaceAll("?", "");
 
     // Check if this is a Zorphy type (starts with $ and not a generic)

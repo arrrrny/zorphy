@@ -31,7 +31,10 @@ String createZorphy(
     sb.writeln(docComment);
   }
 
-  if (generateJson) {
+  // Don't add @JsonSerializable to sealed classes ($$prefix) - they can't be instantiated directly
+  // But if nonSealed: true, treat it as a regular abstract class
+  var isSealedClass = elementName.startsWith("\$\$") && !nonSealed;
+  if (generateJson && !isSealedClass) {
     sb.writeln("@JsonSerializable(explicitToJson: $explicitToJson)");
   }
 
@@ -91,17 +94,55 @@ String createZorphy(
       );
 
       if (sealedParent.interfaceName.isNotEmpty) {
-        // Concrete class in sealed hierarchy - implements the sealed interface directly
-        // Add $$ prefix if the interface doesn't already have it
-        var sealedInterfaceName = sealedParent.interfaceName.startsWith("\$\$")
-            ? sealedParent.interfaceName
-            : "\$\$" + sealedParent.interfaceName;
-        implementsStr = " implements $sealedInterfaceName";
-      } else {
-        // Non-sealed - extend abstract parent
-        extendsStr = " extends $abstractClassName";
+        // Concrete class in sealed hierarchy - implement the generated sealed class
+        // Sealed classes only have factory constructors, so we must implement, not extend
+        var sealedClassName = sealedParent.interfaceName.replaceAll("\$", "");
+        var allImplements = <String>[sealedClassName];
         if (implementsClauseTrimmed.isNotEmpty) {
-          implementsStr = " implements $implementsClauseTrimmed";
+          // Add other interfaces, but avoid duplicating the sealed parent
+          var otherInterfaces = implementsClauseTrimmed
+              .split(", ")
+              .where((name) => name != sealedClassName)
+              .toList();
+          allImplements.addAll(otherInterfaces);
+        }
+        implementsStr = " implements ${allImplements.join(', ')}";
+      } else {
+        // Non-sealed - check if we have a non-sealed abstract parent with explicitSubTypes
+        // If so, extend the generated concrete parent class instead of our own abstract class
+        var nonSealedParentWithSubtypes = interfaces.firstWhere(
+          (i) => !i.isSealed && i.interfaceName.startsWith("\$\$"),
+          orElse: () => InterfaceWithComment(
+            "", // type
+            [], // typeArgsTypes
+            [], // typeParamsNames
+            [], // fields
+            comment: null,
+            isSealed: false,
+            hidePublicConstructor: false,
+          ),
+        );
+        
+        if (nonSealedParentWithSubtypes.interfaceName.isNotEmpty) {
+          // Extend the generated concrete parent class
+          var parentClassName = nonSealedParentWithSubtypes.interfaceName.replaceAll("\$", "");
+          extendsStr = " extends $parentClassName";
+          // Add other interfaces to implements clause
+          if (implementsClauseTrimmed.isNotEmpty) {
+            var otherInterfaces = implementsClauseTrimmed
+                .split(", ")
+                .where((name) => name != parentClassName)
+                .toList();
+            if (otherInterfaces.isNotEmpty) {
+              implementsStr = " implements ${otherInterfaces.join(', ')}";
+            }
+          }
+        } else {
+          // Regular case - extend abstract parent
+          extendsStr = " extends $abstractClassName";
+          if (implementsClauseTrimmed.isNotEmpty) {
+            implementsStr = " implements $implementsClauseTrimmed";
+          }
         }
       }
     }
@@ -116,16 +157,44 @@ String createZorphy(
   if (isAbstract) {
     var sealedModifier = nonSealed ? "" : "sealed ";
     var abstractModifier = nonSealed ? "abstract " : "";
+    // For sealed classes ($$prefix), use className directly; for abstract ($prefix), add $ prefix
+    var generatedClassName =
+        elementName.startsWith("\$\$") ? className : "\$$className";
+    // For sealed classes ($$prefix), implement the source abstract class
+    var sealedImplementsStr = implementsStr;
+    if (elementName.startsWith("\$\$")) {
+      var sourceClassName = elementName; // e.g., $$Attachment
+      if (sealedImplementsStr.isEmpty) {
+        sealedImplementsStr = " implements $sourceClassName";
+      } else {
+        sealedImplementsStr =
+            sealedImplementsStr.replaceFirst(" implements ", " implements $sourceClassName, ");
+      }
+    }
     sb.writeln(
-        "${sealedModifier}${abstractModifier}class \$$className$genericsStr$implementsStr {");
+        "${sealedModifier}${abstractModifier}class $generatedClassName$genericsStr$sealedImplementsStr {");
+    // Check if this abstract class has subtypes (sealed or non-sealed)
+    var hasSubtypes = typesExplicit.isNotEmpty;
+    var isSealedWithSubtypes = isSealedClass && hasSubtypes;
+    var isNonSealedWithSubtypes = !isSealedClass && hasSubtypes;
     sb.writeln(getPropertiesAbstract(
-        allFieldsDistinct, "\$$className", generateCopyWithFn));
+        allFieldsDistinct, generatedClassName, generateCopyWithFn,
+        isSealedWithSubtypes: isSealedWithSubtypes,
+        isNonSealedWithSubtypes: isNonSealedWithSubtypes));
   } else {
     // Don't add const modifier to concrete classes - only abstract classes can be const
     sb.writeln("class $className$genericsStr$extendsStr$implementsStr {");
     // Determine if class extends abstract parent (needs @override) or just implements (no @override)
     // hasExtends is true only when we actually extend, false when we only implement
     var hasExtendsParam = extendsStr.isNotEmpty && factoryMethods.isEmpty;
+    
+    // Check if we're extending an abstract class (starts with $$) - if so, don't call super()
+    var extendsAbstractClass = false;
+    if (hasExtendsParam) {
+      // Check if any interface starts with $$ (abstract class)
+      extendsAbstractClass = interfaces.any((i) => i.interfaceName.startsWith("\$\$"));
+    }
+    
     sb.writeln(getProperties(
         allFieldsDistinct,
         className,
@@ -133,12 +202,16 @@ String createZorphy(
         hidePublicConstructor,
         generateCopyWithFn,
         generateJson,
-        hasExtendsParam));
+        hasExtendsParam,
+        extendsAbstractClass: extendsAbstractClass));
   }
 
   if (!isAbstract || generateCopyWithFn) {
-    sb.writeln(getCopyWith(allFieldsDistinct,
-        isAbstract ? "\$$className" : className, generateCopyWithFn));
+    var copyWithClassName = isAbstract
+        ? (elementName.startsWith("\$\$") ? className : "\$$className")
+        : className;
+    sb.writeln(
+        getCopyWith(allFieldsDistinct, copyWithClassName, generateCopyWithFn));
   }
 
   if (!isAbstract && factoryMethods.isNotEmpty) {
@@ -169,13 +242,49 @@ String createZorphy(
   }
 
   // Add factory fromJson constructor for JSON serialization
-  if (generateJson && !isAbstract) {
+  // For sealed classes ($$prefix) with explicitSubTypes, generate fromJson that dispatches to subtypes
+  var shouldGenerateJson = generateJson && !isAbstract;
+  var shouldGenerateSealedJson =
+      generateJson && isSealedClass && typesExplicit.isNotEmpty;
+  if (shouldGenerateJson || shouldGenerateSealedJson) {
     var classNameTrimmed = className.replaceAll("\$", "");
     sb.writeln();
     sb.writeln("  /// Creates a [${classNameTrimmed}] instance from JSON");
     if (typesExplicit.isEmpty && classGenerics.isEmpty) {
       sb.writeln(
           "  factory ${classNameTrimmed}.fromJson(Map<String, dynamic> json) => _\$${classNameTrimmed}FromJson(json);");
+    } else if (shouldGenerateSealedJson) {
+      // Sealed class with explicit subtypes - dispatch to subtypes only, no fallback
+      sb.writeln(
+          "  factory ${classNameTrimmed}.fromJson(Map<String, dynamic> json) {");
+      for (var i = 0; i < typesExplicit.length; i++) {
+        var c = typesExplicit[i];
+        var interfaceName = c.interfaceName.replaceAll("\$", "");
+        var genericTypes = c.typeParams.map((e) => "'_${e.name}_'").join(",");
+        var prefix = i == 0 ? "if" : "} else if";
+        if (c.typeParams.isNotEmpty) {
+          sb.writeln(
+              "    $prefix (json['_className_'] == \"$interfaceName\") {");
+          sb.writeln("      var fn_fromJson = getFromJsonToGenericFn(");
+          sb.writeln("        ${interfaceName}_Generics_Sing().fns,");
+          sb.writeln("        json,");
+          sb.writeln("        [$genericTypes],");
+          sb.writeln("      );");
+          sb.writeln("      return fn_fromJson(json);");
+        } else {
+          sb.writeln(
+              "    $prefix (json['_className_'] == \"$interfaceName\") {");
+          sb.writeln("      return $interfaceName.fromJson(json);");
+        }
+      }
+      sb.writeln("    }");
+      sb.writeln("    throw UnsupportedError(\"The _className_ '" +
+          r"${json['_className_']}" +
+          "' is not supported by the ${classNameTrimmed}.fromJson constructor.\");");
+      sb.writeln("  }");
+      // Add abstract toJson for sealed classes so subtypes must implement it
+      sb.writeln("");
+      sb.writeln("  Map<String, dynamic> toJson();");
     } else {
       sb.writeln(
           "  factory ${classNameTrimmed}.fromJson(Map<String, dynamic> json) {");
@@ -220,24 +329,27 @@ String createZorphy(
       sb.writeln("  }");
     }
 
-    sb.writeln("");
-    sb.writeln("  Map<String, dynamic> toJsonLean() {");
-    sb.writeln(
-        "    final Map<String, dynamic> data = _\$${className}ToJson(this);");
-    sb.writeln("    return _sanitizeJson(data);");
-    sb.writeln("  }");
-    sb.writeln("");
-    sb.writeln("  dynamic _sanitizeJson(dynamic json) {");
-    sb.writeln("    if (json is Map<String, dynamic>) {");
-    sb.writeln("      json.remove('_className_');");
-    sb.writeln("      return json..forEach((key, value) {");
-    sb.writeln("        json[key] = _sanitizeJson(value);");
-    sb.writeln("      });");
-    sb.writeln("    } else if (json is List) {");
-    sb.writeln("      return json.map((e) => _sanitizeJson(e)).toList();");
-    sb.writeln("    }");
-    sb.writeln("    return json;");
-    sb.writeln("  }");
+    // Don't generate toJsonLean for sealed classes - they don't have @JsonSerializable
+    if (!shouldGenerateSealedJson) {
+      sb.writeln("");
+      sb.writeln("  Map<String, dynamic> toJsonLean() {");
+      sb.writeln(
+          "    final Map<String, dynamic> data = _\$${className}ToJson(this);");
+      sb.writeln("    return _sanitizeJson(data);");
+      sb.writeln("  }");
+      sb.writeln("");
+      sb.writeln("  dynamic _sanitizeJson(dynamic json) {");
+      sb.writeln("    if (json is Map<String, dynamic>) {");
+      sb.writeln("      json.remove('_className_');");
+      sb.writeln("      return json..forEach((key, value) {");
+      sb.writeln("        json[key] = _sanitizeJson(value);");
+      sb.writeln("      });");
+      sb.writeln("    } else if (json is List) {");
+      sb.writeln("      return json.map((e) => _sanitizeJson(e)).toList();");
+      sb.writeln("    }");
+      sb.writeln("    return json;");
+      sb.writeln("  }");
+    }
   }
 
   sb.writeln("}");

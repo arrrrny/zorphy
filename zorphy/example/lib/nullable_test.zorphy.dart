@@ -51,7 +51,21 @@ class ErrorLog extends $ErrorLog {
     this.platform,
     required this.timestamp,
     required this.createdAt,
-  });
+  }) : super(
+         id: id,
+         message: message,
+         stackTrace: stackTrace,
+         logLevel: logLevel,
+         loggerName: loggerName,
+         userId: userId,
+         customerId: customerId,
+         deviceInfo: deviceInfo,
+         ipAddress: ipAddress,
+         appVersion: appVersion,
+         platform: platform,
+         timestamp: timestamp,
+         createdAt: createdAt,
+       );
 
   ErrorLog copyWith({
     String? id,
@@ -117,77 +131,76 @@ class ErrorLog extends $ErrorLog {
     );
   }
 
-  ErrorLog patchWithErrorLog({
-    ErrorLogPatch? patchInput,
-  }) {
+  ErrorLog patchWithErrorLog({ErrorLogPatch? patchInput}) {
     final _patcher = patchInput ?? ErrorLogPatch();
     final _patchMap = _patcher.toPatch();
     return ErrorLog(
-        id: _patchMap.containsKey(ErrorLog$.id)
-            ? (_patchMap[ErrorLog$.id] is Function)
+      id: _patchMap.containsKey(ErrorLog$.id)
+          ? (_patchMap[ErrorLog$.id] is Function)
                 ? _patchMap[ErrorLog$.id](this.id)
                 : _patchMap[ErrorLog$.id]
-            : this.id,
-        message: _patchMap.containsKey(ErrorLog$.message)
-            ? (_patchMap[ErrorLog$.message] is Function)
+          : this.id,
+      message: _patchMap.containsKey(ErrorLog$.message)
+          ? (_patchMap[ErrorLog$.message] is Function)
                 ? _patchMap[ErrorLog$.message](this.message)
                 : _patchMap[ErrorLog$.message]
-            : this.message,
-        stackTrace: _patchMap.containsKey(ErrorLog$.stackTrace)
-            ? (_patchMap[ErrorLog$.stackTrace] is Function)
+          : this.message,
+      stackTrace: _patchMap.containsKey(ErrorLog$.stackTrace)
+          ? (_patchMap[ErrorLog$.stackTrace] is Function)
                 ? _patchMap[ErrorLog$.stackTrace](this.stackTrace)
                 : _patchMap[ErrorLog$.stackTrace]
-            : this.stackTrace,
-        logLevel: _patchMap.containsKey(ErrorLog$.logLevel)
-            ? (_patchMap[ErrorLog$.logLevel] is Function)
+          : this.stackTrace,
+      logLevel: _patchMap.containsKey(ErrorLog$.logLevel)
+          ? (_patchMap[ErrorLog$.logLevel] is Function)
                 ? _patchMap[ErrorLog$.logLevel](this.logLevel)
                 : _patchMap[ErrorLog$.logLevel]
-            : this.logLevel,
-        loggerName: _patchMap.containsKey(ErrorLog$.loggerName)
-            ? (_patchMap[ErrorLog$.loggerName] is Function)
+          : this.logLevel,
+      loggerName: _patchMap.containsKey(ErrorLog$.loggerName)
+          ? (_patchMap[ErrorLog$.loggerName] is Function)
                 ? _patchMap[ErrorLog$.loggerName](this.loggerName)
                 : _patchMap[ErrorLog$.loggerName]
-            : this.loggerName,
-        userId: _patchMap.containsKey(ErrorLog$.userId)
-            ? (_patchMap[ErrorLog$.userId] is Function)
+          : this.loggerName,
+      userId: _patchMap.containsKey(ErrorLog$.userId)
+          ? (_patchMap[ErrorLog$.userId] is Function)
                 ? _patchMap[ErrorLog$.userId](this.userId)
                 : _patchMap[ErrorLog$.userId]
-            : this.userId,
-        customerId: _patchMap.containsKey(ErrorLog$.customerId)
-            ? (_patchMap[ErrorLog$.customerId] is Function)
+          : this.userId,
+      customerId: _patchMap.containsKey(ErrorLog$.customerId)
+          ? (_patchMap[ErrorLog$.customerId] is Function)
                 ? _patchMap[ErrorLog$.customerId](this.customerId)
                 : _patchMap[ErrorLog$.customerId]
-            : this.customerId,
-        deviceInfo: _patchMap.containsKey(ErrorLog$.deviceInfo)
-            ? (_patchMap[ErrorLog$.deviceInfo] is Function)
+          : this.customerId,
+      deviceInfo: _patchMap.containsKey(ErrorLog$.deviceInfo)
+          ? (_patchMap[ErrorLog$.deviceInfo] is Function)
                 ? _patchMap[ErrorLog$.deviceInfo](this.deviceInfo)
                 : _patchMap[ErrorLog$.deviceInfo]
-            : this.deviceInfo,
-        ipAddress: _patchMap.containsKey(ErrorLog$.ipAddress)
-            ? (_patchMap[ErrorLog$.ipAddress] is Function)
+          : this.deviceInfo,
+      ipAddress: _patchMap.containsKey(ErrorLog$.ipAddress)
+          ? (_patchMap[ErrorLog$.ipAddress] is Function)
                 ? _patchMap[ErrorLog$.ipAddress](this.ipAddress)
                 : _patchMap[ErrorLog$.ipAddress]
-            : this.ipAddress,
-        appVersion: _patchMap.containsKey(ErrorLog$.appVersion)
-            ? (_patchMap[ErrorLog$.appVersion] is Function)
+          : this.ipAddress,
+      appVersion: _patchMap.containsKey(ErrorLog$.appVersion)
+          ? (_patchMap[ErrorLog$.appVersion] is Function)
                 ? _patchMap[ErrorLog$.appVersion](this.appVersion)
                 : _patchMap[ErrorLog$.appVersion]
-            : this.appVersion,
-        platform: _patchMap.containsKey(ErrorLog$.platform)
-            ? (_patchMap[ErrorLog$.platform] is Function)
+          : this.appVersion,
+      platform: _patchMap.containsKey(ErrorLog$.platform)
+          ? (_patchMap[ErrorLog$.platform] is Function)
                 ? _patchMap[ErrorLog$.platform](this.platform)
                 : _patchMap[ErrorLog$.platform]
-            : this.platform,
-        timestamp: _patchMap.containsKey(ErrorLog$.timestamp)
-            ? (_patchMap[ErrorLog$.timestamp] is Function)
+          : this.platform,
+      timestamp: _patchMap.containsKey(ErrorLog$.timestamp)
+          ? (_patchMap[ErrorLog$.timestamp] is Function)
                 ? _patchMap[ErrorLog$.timestamp](this.timestamp)
                 : _patchMap[ErrorLog$.timestamp]
-            : this.timestamp,
-        createdAt: _patchMap.containsKey(ErrorLog$.createdAt)
-            ? (_patchMap[ErrorLog$.createdAt] is Function)
+          : this.timestamp,
+      createdAt: _patchMap.containsKey(ErrorLog$.createdAt)
+          ? (_patchMap[ErrorLog$.createdAt] is Function)
                 ? _patchMap[ErrorLog$.createdAt](this.createdAt)
                 : _patchMap[ErrorLog$.createdAt]
-            : this.createdAt);
+          : this.createdAt,
+    );
   }
 
   @override
@@ -212,19 +225,20 @@ class ErrorLog extends $ErrorLog {
   @override
   int get hashCode {
     return Object.hash(
-        this.id,
-        this.message,
-        this.stackTrace,
-        this.logLevel,
-        this.loggerName,
-        this.userId,
-        this.customerId,
-        this.deviceInfo,
-        this.ipAddress,
-        this.appVersion,
-        this.platform,
-        this.timestamp,
-        this.createdAt);
+      this.id,
+      this.message,
+      this.stackTrace,
+      this.logLevel,
+      this.loggerName,
+      this.userId,
+      this.customerId,
+      this.deviceInfo,
+      this.ipAddress,
+      this.appVersion,
+      this.platform,
+      this.timestamp,
+      this.createdAt,
+    );
   }
 
   @override
@@ -269,10 +283,9 @@ class ErrorLog extends $ErrorLog {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json
-        ..forEach((key, value) {
-          json[key] = _sanitizeJson(value);
-        });
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -293,7 +306,7 @@ enum ErrorLog$ {
   appVersion,
   platform,
   timestamp,
-  createdAt
+  createdAt,
 }
 
 class ErrorLogPatch implements Patch<ErrorLog> {
@@ -438,10 +451,9 @@ extension ErrorLogSerialization on ErrorLog {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json
-        ..forEach((key, value) {
-          json[key] = _sanitizeJson(value);
-        });
+      return json..forEach((key, value) {
+        json[key] = _sanitizeJson(value);
+      });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
