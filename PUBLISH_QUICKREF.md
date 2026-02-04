@@ -3,21 +3,21 @@
 ## One Command to Publish Both Packages
 
 ```bash
-./publish.sh <version> [description] [--type]
+./scripts/publish.sh <version> [description] [--type]
 ```
 
 ## Examples
 
 ```bash
 # Standard release
-./publish.sh 1.0.0 "Initial release"
+./scripts/publish.sh 1.0.0 "Initial release"
 
 # With category
-./publish.sh 1.1.0 "Added new feature" --feat
-./publish.sh 1.1.1 "Fixed bug" --fix
+./scripts/publish.sh 1.1.0 "Added new feature" --feat
+./scripts/publish.sh 1.1.1 "Fixed bug" --fix
 
 # Promote [Unreleased] section
-./publish.sh 1.2.0
+./scripts/publish.sh 1.2.0
 ```
 
 ## What It Does
@@ -85,7 +85,7 @@ Must be semantic versioning: `X.Y.Z`
 ### At Release
 
 ```bash
-./publish.sh 1.0.0
+./scripts/publish.sh 1.0.0
 ```
 
 ### Result

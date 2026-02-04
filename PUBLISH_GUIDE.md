@@ -11,7 +11,7 @@ The top-level `publish.sh` script publishes both packages in the correct order:
 ### 1. Version Input
 
 ```bash
-./publish.sh 1.0.0 "Initial release"
+./scripts/publish.sh 1.0.0 "Initial release"
 ```
 
 **Arguments:**
@@ -68,7 +68,7 @@ The script validates:
 ### Example 1: Standard Release
 
 ```bash
-./publish.sh 1.0.0 "Initial release"
+./scripts/publish.sh 1.0.0 "Initial release"
 ```
 
 **Output:**
@@ -142,7 +142,7 @@ If you've been adding entries to `[Unreleased]` in CHANGELOG:
 
 ```bash
 # Before: CHANGELOG has [Unreleased] section
-./publish.sh 1.0.1
+./scripts/publish.sh 1.0.1
 ```
 
 **Result:** Converts `[Unreleased]` → `[1.0.1] - 2025-02-04`
@@ -150,7 +150,7 @@ If you've been adding entries to `[Unreleased]` in CHANGELOG:
 ### Example 3: With Type Category
 
 ```bash
-./publish.sh 1.1.0 "Fixed critical bug" --fix
+./scripts/publish.sh 1.1.0 "Fixed critical bug" --fix
 ```
 
 **Result in CHANGELOG:**
@@ -233,7 +233,7 @@ The PR includes:
 2. **Release Time** - Run publish script:
 
 ```bash
-./publish.sh 1.0.0 "Release feature X and fix Y"
+./scripts/publish.sh 1.0.0 "Release feature X and fix Y"
 ```
 
 3. **Result** - Script promotes `[Unreleased]`:
@@ -255,7 +255,7 @@ The PR includes:
 If you don't use `[Unreleased]`, provide a description:
 
 ```bash
-./publish.sh 1.0.0 "Initial stable release"
+./scripts/publish.sh 1.0.0 "Initial stable release"
 ```
 
 **Result:**
@@ -276,7 +276,7 @@ If you don't use `[Unreleased]`, provide a description:
 
 ```bash
 # Option 1: Add description
-./publish.sh 1.0.0 "My release notes"
+./scripts/publish.sh 1.0.0 "My release notes"
 
 # Option 2: Use [Unreleased] in CHANGELOG first
 ```
@@ -287,13 +287,13 @@ If you don't use `[Unreleased]`, provide a description:
 
 ```bash
 # ✅ Correct
-./publish.sh 1.0.0
-./publish.sh 2.3.15
+./scripts/publish.sh 1.0.0
+./scripts/publish.sh 2.3.15
 
 # ❌ Wrong
-./publish.sh 1.0
-./publish.sh v1.0.0
-./publish.sh 1.0.0-beta
+./scripts/publish.sh 1.0
+./scripts/publish.sh v1.0.0
+./scripts/publish.sh 1.0.0-beta
 ```
 
 ### Problem: Publish fails mid-way
@@ -302,7 +302,7 @@ If you don't use `[Unreleased]`, provide a description:
 
 ```bash
 # If annotation succeeded but zorphy failed:
-./publish.sh 1.0.0 "Resume zorphy publish"
+./scripts/publish.sh 1.0.0 "Resume zorphy publish"
 ```
 
 The script will detect existing tags and skip completed steps.
@@ -316,7 +316,7 @@ cd zorphy
 dart test  # Run tests manually
 # Fix issues...
 cd ..
-./publish.sh 1.0.0 "Retry publish"
+./scripts/publish.sh 1.0.0 "Retry publish"
 ```
 
 ## Advanced Usage
@@ -325,7 +325,7 @@ cd ..
 
 ```bash
 git checkout -b release/1.0.0
-./publish.sh 1.0.0 "Release from feature branch"
+./scripts/publish.sh 1.0.0 "Release from feature branch"
 ```
 
 ### Dry Run (Test Without Publishing)
@@ -374,13 +374,13 @@ The annotation package must be published first because:
 
 ```bash
 # Standard release
-./publish.sh 1.0.0 "Description"
+./scripts/publish.sh 1.0.0 "Description"
 
 # With type
-./publish.sh 1.0.0 "Description" --feat
+./scripts/publish.sh 1.0.0 "Description" --feat
 
 # Promote unreleased
-./publish.sh 1.0.1
+./scripts/publish.sh 1.0.1
 ```
 
 The script handles:

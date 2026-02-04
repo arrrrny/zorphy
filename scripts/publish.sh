@@ -1,14 +1,19 @@
 #!/bin/bash
 
 # Monorepo publish script for zorphy - publishes zorphy_annotation first, then zorphy
-# Usage: ./publish.sh <version> [description]
-# Example: ./publish.sh 1.2.0 "Add new features and bug fixes"
+# Usage: ./scripts/publish.sh <version> [description]
+# Example: ./scripts/publish.sh 1.2.0 "Add new features and bug fixes"
 #
 # Order of operations:
 #   1. Publish zorphy_annotation (tag: annotation-vX.Y.Z)
 #   2. Publish zorphy (tag: vX.Y.Z)
 
 set -e
+
+# Get script directory and navigate to monorepo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$REPO_ROOT"
 
 VERSION="$1"
 PROMOTE_MODE=false
@@ -55,6 +60,7 @@ fi
 DATE=$(date +%Y-%m-%d)
 
 echo "🚀 Publishing zorphy monorepo version $VERSION..."
+echo "📍 Working directory: $REPO_ROOT"
 echo ""
 echo "📦 Publishing order:"
 echo "   1. zorphy_annotation (tag: annotation-v$VERSION)"
@@ -65,7 +71,6 @@ echo ""
 update_changelog() {
     local package_dir="$1"
     local package_name="$2"
-    local tag_prefix="$3"
     
     echo "📝 Updating $package_name CHANGELOG..."
     cd "$package_dir"
@@ -109,7 +114,7 @@ update_changelog() {
     fi
     
     echo "  ✓ CHANGELOG.md updated"
-    cd - > /dev/null
+    cd "$REPO_ROOT" > /dev/null
 }
 
 # Function to update pubspec.yaml
@@ -127,7 +132,7 @@ update_pubspec() {
     fi
     
     echo "  ✓ Version updated to $VERSION"
-    cd - > /dev/null
+    cd "$REPO_ROOT" > /dev/null
 }
 
 # ========================================================================
@@ -140,7 +145,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 update_pubspec "zorphy_annotation" "zorphy_annotation"
-update_changelog "zorphy_annotation" "zorphy_annotation" "annotation-v"
+update_changelog "zorphy_annotation" "zorphy_annotation"
 
 cd zorphy_annotation
 
@@ -190,7 +195,7 @@ echo ""
 echo "✅ Successfully published zorphy_annotation version $VERSION!"
 echo ""
 
-cd ..
+cd "$REPO_ROOT"
 
 # ========================================================================
 # STEP 2: Publish zorphy
@@ -202,7 +207,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 update_pubspec "zorphy" "zorphy"
-update_changelog "zorphy" "zorphy" "v"
+update_changelog "zorphy" "zorphy"
 
 cd zorphy
 
@@ -267,7 +272,7 @@ echo ""
 echo "✅ Successfully published zorphy version $VERSION!"
 echo ""
 
-cd ..
+cd "$REPO_ROOT"
 
 # ========================================================================
 # SUMMARY
