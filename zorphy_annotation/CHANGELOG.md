@@ -1,10 +1,9 @@
-## [1.0.0] - 2026-02-04
+## [Unreleased]
 
-## [1.0.0] - 2026-02-04
+## [1.1.0] - 2026-02-05
 
-## [1.0.0] - 2026-02-04
-
-## [1.0.0] - 2026-02-04
+### Change
+- Fixed an edge case where a class extends a sealed class and implements another class was causing parameters not passed in super constructor
 
 ## [1.0.0] - 2026-02-04
 
