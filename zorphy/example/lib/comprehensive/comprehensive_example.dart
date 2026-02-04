@@ -189,12 +189,12 @@ abstract class $ListResponse<T> {
 
 /// Shape with explicit subtypes for polymorphism
 @Zorphy(explicitSubTypes: [$Circle, $Rectangle])
-abstract class $Shape {
+abstract class $$Shape {
   String get name;
 }
 
 @Zorphy()
-abstract class $Circle implements $Shape {
+abstract class $Circle implements $$Shape {
   double get radius;
 
   @override
@@ -202,7 +202,7 @@ abstract class $Circle implements $Shape {
 }
 
 @Zorphy()
-abstract class $Rectangle implements $Shape {
+abstract class $Rectangle implements $$Shape {
   double get width;
   double get height;
 
@@ -243,7 +243,7 @@ abstract class $Company {
   String get name;
   String get industry;
   List<String> get locations;
-  List<Employee> get employees;
+  List<$Employee> get employees;
 }
 
 // =============================================================================
@@ -303,6 +303,8 @@ void demonstrateSealedClasses() {
   PaymentMethod payment = creditCard;
   print('Payment method: ${payment.displayName}');
 
+  payment = payPal;
+  print('Payment method: ${payment.displayName}');
   // JSON serialization with type discriminator
   final json = creditCard.toJson();
   print('Credit Card JSON: $json');
@@ -334,15 +336,15 @@ void demonstrateFunctionCopyWith() {
   final counter = Counter(value: 0, label: 'Clicks');
 
   // Increment using function
-  final incremented = counter.copyWithCounterFn(value: () => counter.value + 1);
+  final incremented = counter.copyWithFn(value: (current) => current + 1);
 
   print('Original: ${counter.value}');
   print('Incremented: ${incremented.value}');
 
   // Double value
-  final doubled = counter.copyWithCounterFn(
-    value: () => counter.value * 2,
-    label: () => '${counter.label} (doubled)',
+  final doubled = counter.copyWithFn(
+    value: (current) => current * 2,
+    label: (current) => '${current} (doubled)',
   );
 
   print('Doubled: ${doubled.value}');
@@ -385,11 +387,11 @@ void demonstrateTreeStructure() {
         id: '2',
         name: 'Programming',
         children: [
-          CategoryNode(id: '3', name: 'Dart'),
-          CategoryNode(id: '4', name: 'Flutter'),
+          CategoryNode(id: '3', name: 'Dart', children: []),
+          CategoryNode(id: '4', name: 'Flutter', children: []),
         ],
       ),
-      CategoryNode(id: '5', name: 'Hardware'),
+      CategoryNode(id: '5', name: 'Hardware', children: []),
     ],
   );
 
@@ -400,10 +402,8 @@ void demonstrateTreeStructure() {
   // Count nodes
   int countNodes(CategoryNode node) {
     int count = 1;
-    if (node.children != null) {
-      for (var child in node.children!) {
-        count += countNodes(child);
-      }
+    for (var child in node.children) {
+      count += countNodes(child);
     }
     return count;
   }
@@ -502,13 +502,13 @@ void demonstrateChangeTo() {
 
 /// Demonstrates constant constructors
 void demonstrateConstants() {
-  const red = Color(red: 255, green: 0, blue: 0);
-  const blue = Color(red: 0, green: 0, blue: 255);
+  final red = Color(red: 255, green: 0, blue: 0);
+  final blue = Color(red: 0, green: 0, blue: 255);
 
   print('Red color: ${red.red}, ${red.green}, ${blue.blue}');
 
   // Constants are identical
-  const red2 = Color(red: 255, green: 0, blue: 0);
+  final red2 = Color(red: 255, green: 0, blue: 0);
   print('Same red: ${identical(red, red2)}');
 }
 

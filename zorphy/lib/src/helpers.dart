@@ -519,8 +519,9 @@ String getCopyWith(
     sb.writeln("  $classNameTrimmed copyWithFn({");
     for (var f in fields) {
       var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
-      var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
-      sb.writeln("    $nullableType Function($nullableType)? ${f.name},");
+      // Function parameter and return type match the field type exactly
+      // Only the function itself is nullable
+      sb.writeln("    $fieldType Function($fieldType)? ${f.name},");
     }
     sb.writeln("  }) {");
     sb.writeln("    return $classNameTrimmed(");
