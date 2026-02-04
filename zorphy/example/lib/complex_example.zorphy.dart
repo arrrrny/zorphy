@@ -11,7 +11,7 @@ part of 'complex_example.dart';
 sealed class Shape implements $$Shape {
   double get area;
 
-  const Shape._internal();
+  Shape();
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -407,15 +407,12 @@ extension RectangleCompareE on Rectangle {
 
 @JsonSerializable(explicitToJson: true)
 class TreeNode extends $TreeNode {
-  @override
   final String value;
-  @override
   final List<TreeNode> children;
-  @override
   final TreeNode? parent;
 
   TreeNode({required this.value, required this.children, this.parent})
-    : super(value: value, children: children, parent: parent);
+    : super();
 
   TreeNode copyWith({
     String? value,

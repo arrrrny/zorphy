@@ -9,12 +9,10 @@ part of 'compare_test.dart';
 // **************************************************************************
 
 class Person extends $Person {
-  @override
   final String name;
-  @override
   final int age;
 
-  Person({required this.name, required this.age}) : super(name: name, age: age);
+  Person({required this.name, required this.age}) : super();
 
   Person copyWith({String? name, int? age}) {
     return Person(name: name ?? this.name, age: age ?? this.age);

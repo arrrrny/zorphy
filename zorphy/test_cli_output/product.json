@@ -1,0 +1,19 @@
+{
+  "id": "prod_001",
+  "name": "Laptop",
+  "price": 999.99,
+  "inStock": true,
+  "description?": "High performance laptop",
+  "tags": ["electronics", "computers"],
+  "manufacturer": {
+    "name": "TechCorp",
+    "country": "USA"
+  },
+  "reviews": [
+    {
+      "rating": 5,
+      "comment": "Great product",
+      "author": "John Doe"
+    }
+  ]
+}

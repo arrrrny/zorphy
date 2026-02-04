@@ -46,6 +46,9 @@ String getProperties(
   bool generateJson,
   bool hasExtends, {
   bool extendsAbstractClass = false,
+  Set<String> parentFields = const {},
+  Set<String> ownFields = const {},
+  Set<String> allInheritedFields = const {},
 }) {
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
@@ -66,9 +69,8 @@ String getProperties(
     if (isAbstract) {
       sb.writeln("  ${fieldType} get ${f.name};");
     } else {
-      // Only add @override if the class extends an abstract parent
-      // If it only implements interfaces, don't add @override for fields
-      if (hasExtends) {
+      // Add @override if field exists in any parent interface
+      if (hasExtends && allInheritedFields.contains(f.name)) {
         sb.writeln("  @override");
       }
       sb.writeln("  final ${fieldType} ${f.name};");
@@ -94,11 +96,17 @@ String getProperties(
     }
     sb.writeln("  })");
     
-    // Add super() call only if extending a concrete class (not abstract)
-    if (hasExtends && !extendsAbstractClass) {
+    // Add super call when extending abstract class
+    if (hasExtends && extendsAbstractClass) {
+      // Extending abstract class - call super()
+      sb.writeln("  : super();");
+    } else if (hasExtends && !extendsAbstractClass) {
+      // Extending concrete class - call super() with parent fields only
       sb.writeln("  : super(");
       for (var f in fields) {
-        sb.writeln("      ${f.name}: ${f.name},");
+        if (parentFields.contains(f.name)) {
+          sb.writeln("      ${f.name}: ${f.name},");
+        }
       }
       sb.writeln("    );");
     } else {
@@ -430,7 +438,6 @@ String getPropertiesAbstract(
   String className,
   bool generateCopyWithFn, {
   bool isSealedWithSubtypes = false,
-  bool isNonSealedWithSubtypes = false,
 }) {
   var sb = StringBuffer();
 
@@ -445,14 +452,10 @@ String getPropertiesAbstract(
   }
 
   // Constructor for abstract classes
-  if (isNonSealedWithSubtypes) {
-    // Non-sealed abstract class with subtypes - add public constructor for subclasses
+  if (!isSealedWithSubtypes) {
+    // Abstract class - add public constructor (can't use _internal as it's library-private)
     sb.writeln("");
     sb.writeln("  ${className}();");
-  } else if (!isSealedWithSubtypes) {
-    // Regular abstract class without subtypes - add private constructor
-    sb.writeln("");
-    sb.writeln("  const ${className}._internal();");
   }
   // Sealed classes with subtypes don't need a constructor
 
@@ -896,7 +899,10 @@ String getPatchClass(
               getDataTypeWithoutDollars(elementType);
           var elementTypeIsZorphy = elementType.startsWith("\$") ||
               knownClasses.contains(elementTypeWithoutDollars);
-          if (elementTypeIsZorphy) {
+          // Don't generate updateAt for abstract classes ($$) as they don't have Patch classes
+          // Check the original field type to see if it had $$
+          var isAbstractType = fieldType.contains("\$\$");
+          if (elementTypeIsZorphy && !isAbstractType) {
             var elementPatchType = elementTypeWithoutDollars + "Patch";
             sb.writeln(
               "  ${classNameTrimmed}Patch update${capitalizedName}At(int index, $elementPatchType Function($elementPatchType) patch) {",

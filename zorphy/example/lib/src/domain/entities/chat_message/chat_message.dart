@@ -6,7 +6,11 @@ import '../user_message/user_message.dart';
 
 part 'chat_message.zorphy.dart';
 
-@Zorphy(generateJson: true, explicitSubTypes: [$UserMessage, $AssistantMessage], nonSealed: true)
+@Zorphy(
+  generateJson: true,
+  explicitSubTypes: [$UserMessage, $AssistantMessage],
+  nonSealed: true,
+)
 abstract class $$ChatMessage {
   String? get id;
   String get text;

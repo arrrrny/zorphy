@@ -10,49 +10,27 @@ part of 'hash_code_test.dart';
 
 @JsonSerializable(explicitToJson: true)
 class LargeClass extends $LargeClass {
-  @override
   final String f1;
-  @override
   final String f2;
-  @override
   final String f3;
-  @override
   final String f4;
-  @override
   final String f5;
-  @override
   final String f6;
-  @override
   final String f7;
-  @override
   final String f8;
-  @override
   final String f9;
-  @override
   final String f10;
-  @override
   final String f11;
-  @override
   final String f12;
-  @override
   final String f13;
-  @override
   final String f14;
-  @override
   final String f15;
-  @override
   final String f16;
-  @override
   final String f17;
-  @override
   final String f18;
-  @override
   final String f19;
-  @override
   final String f20;
-  @override
   final String f21;
-  @override
   final String f22;
 
   LargeClass({
@@ -78,30 +56,7 @@ class LargeClass extends $LargeClass {
     required this.f20,
     required this.f21,
     required this.f22,
-  }) : super(
-         f1: f1,
-         f2: f2,
-         f3: f3,
-         f4: f4,
-         f5: f5,
-         f6: f6,
-         f7: f7,
-         f8: f8,
-         f9: f9,
-         f10: f10,
-         f11: f11,
-         f12: f12,
-         f13: f13,
-         f14: f14,
-         f15: f15,
-         f16: f16,
-         f17: f17,
-         f18: f18,
-         f19: f19,
-         f20: f20,
-         f21: f21,
-         f22: f22,
-       );
+  }) : super();
 
   LargeClass copyWith({
     String? f1,

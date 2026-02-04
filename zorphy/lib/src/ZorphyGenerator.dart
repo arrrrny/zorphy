@@ -18,8 +18,8 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
 
   @override
   TypeChecker get typeChecker => const TypeChecker.fromUrl(
-        'package:zorphy_annotation/src/annotations.dart#Zorphy',
-      );
+    'package:zorphy_annotation/src/annotations.dart#Zorphy',
+  );
 
   @override
   dynamic generateForAnnotatedElement(
@@ -40,7 +40,8 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
 
     var hasConstConstructor = classElement.constructors.any((e) => e.isConst);
     var nonSealed = annotation.read('nonSealed').boolValue;
-    // Classes with $$ prefix are always abstract, nonSealed only controls sealed vs abstract modifier
+    // var hasExplicitSubTypes = !annotation.read('explicitSubTypes').isNull;
+    // Only $$ prefix makes it abstract, single $ is always concrete
     var isAbstract = className.startsWith("\$\$");
 
     if (classElement.supertype?.element.name != "Object") {
@@ -121,6 +122,12 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
     var allFields = getAllFieldsIncludingSubtypes(classElement);
     var allFieldsDistinct = getDistinctFields(allFields, interfaces);
 
+    // Get own fields (defined directly on this class, not inherited)
+    var ownFields = classElement.fields
+        .where((f) => f.name != "hashCode" && f.name != "runtimeType")
+        .map((f) => f.name ?? "")
+        .toSet();
+
     var classGenerics = classElement.typeParameters.map((e) {
       final bound = e.bound;
       return NameTypeClassComment(
@@ -141,18 +148,21 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
         var el = typeValue!.element as ClassElement;
         _allAnnotatedClasses[el.name ?? ""] = el;
 
-        var fields = getAllFieldsIncludingSubtypes(el)
-            .where((f) => f.name != "hashCode")
+        var fields = getAllFieldsIncludingSubtypes(
+          el,
+        ).where((f) => f.name != "hashCode").toList();
+        var nameTypeFields = fields
+            .map((f) => NameType(f.name, f.type ?? ""))
             .toList();
-        var nameTypeFields =
-            fields.map((f) => NameType(f.name, f.type ?? "")).toList();
 
         return Interface.fromGenerics(
           el.name ?? "",
           el.typeParameters.map((tp) {
             final bound = tp.bound;
             return NameType(
-                tp.name ?? "", bound == null ? null : typeToString(bound));
+              tp.name ?? "",
+              bound == null ? null : typeToString(bound),
+            );
           }).toList(),
           nameTypeFields,
           true,
@@ -163,11 +173,12 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
     var allValueTInterfaces = allInterfaces
         .map((e) {
           var interfaceName = e.element.name ?? "";
-          var fields = getAllFieldsIncludingSubtypes(e.element as ClassElement)
-              .where((f) => f.name != "hashCode")
+          var fields = getAllFieldsIncludingSubtypes(
+            e.element as ClassElement,
+          ).where((f) => f.name != "hashCode").toList();
+          var nameTypeFields = fields
+              .map((f) => NameType(f.name, f.type ?? ""))
               .toList();
-          var nameTypeFields =
-              fields.map((f) => NameType(f.name, f.type ?? "")).toList();
           return Interface.fromGenerics(
             interfaceName, // Keep the original interface name with $ prefix
             e.typeArguments.asMap().entries.map((entry) {
@@ -175,7 +186,7 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
               final typeArg = entry.value;
               final paramName = e.element.typeParameters.length > index
                   ? e.element.typeParameters[index].name ??
-                      "T" + index.toString()
+                        "T" + index.toString()
                   : "T" + index.toString();
               return NameType(paramName, typeToString(typeArg));
             }).toList(),
@@ -207,6 +218,7 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
         annotation.read('generateCopyWithFn').boolValue,
         factoryMethods,
         _allAnnotatedClasses,
+        ownFields,
       ),
     );
 
@@ -214,7 +226,8 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
   }
 
   List<NameTypeClassComment> getAllFieldsIncludingSubtypes(
-      ClassElement element) {
+    ClassElement element,
+  ) {
     var fields = <NameTypeClassComment>[];
     var processedTypes = <String>{};
 

@@ -10,31 +10,18 @@ part of 'nullable_test.dart';
 
 @JsonSerializable(explicitToJson: true)
 class ErrorLog extends $ErrorLog {
-  @override
   final String? id;
-  @override
   final String message;
-  @override
   final String stackTrace;
-  @override
   final String logLevel;
-  @override
   final String? loggerName;
-  @override
   final String? userId;
-  @override
   final String? customerId;
-  @override
   final Map<String, dynamic>? deviceInfo;
-  @override
   final String? ipAddress;
-  @override
   final String? appVersion;
-  @override
   final String? platform;
-  @override
   final DateTime timestamp;
-  @override
   final DateTime createdAt;
 
   ErrorLog({
@@ -51,21 +38,7 @@ class ErrorLog extends $ErrorLog {
     this.platform,
     required this.timestamp,
     required this.createdAt,
-  }) : super(
-         id: id,
-         message: message,
-         stackTrace: stackTrace,
-         logLevel: logLevel,
-         loggerName: loggerName,
-         userId: userId,
-         customerId: customerId,
-         deviceInfo: deviceInfo,
-         ipAddress: ipAddress,
-         appVersion: appVersion,
-         platform: platform,
-         timestamp: timestamp,
-         createdAt: createdAt,
-       );
+  }) : super();
 
   ErrorLog copyWith({
     String? id,
