@@ -232,9 +232,19 @@ String createZorphy(
     // Get parent fields if extending a concrete parent
     var parentFields = <String>{};
     if (hasExtendsParam && !extendsAbstractClass) {
-      // Parent fields = all fields - own fields
-      parentFields = allFieldsDistinct.map((f) => f.name).toSet()
-        .difference(ownFields);
+      // Find the specific parent class we're extending
+      final extendsMatch = RegExp(r'extends\s+(\S+)').firstMatch(extendsStr);
+      if (extendsMatch != null) {
+        final parentName = extendsMatch.group(1)!;
+        // Find the interface for this specific parent and get only its fields
+        for (final iface in interfaces) {
+          final ifaceName = iface.interfaceName.replaceAll('\$', '');
+          if (ifaceName == parentName) {
+            parentFields = iface.fields.map((f) => f.name).toSet();
+            break;
+          }
+        }
+      }
     }
     
     // All fields from parent interfaces (for @override detection)
@@ -333,19 +343,7 @@ String createZorphy(
           r"${json['_className_']}" +
           "' is not supported by the ${classNameTrimmed}.fromJson constructor.\");");
       sb.writeln("  }");
-      // Generate concrete toJson that delegates to the actual instance
-      sb.writeln("");
-      sb.writeln("  Map<String, dynamic> toJson() {");
-      sb.writeln("    if (this is ${typesExplicit[0].interfaceName.replaceAll('\$', '')}) {");
-      sb.writeln("      return (this as ${typesExplicit[0].interfaceName.replaceAll('\$', '')}).toJson();");
-      for (var i = 1; i < typesExplicit.length; i++) {
-        var subtype = typesExplicit[i].interfaceName.replaceAll('\$', '');
-        sb.writeln("    } else if (this is $subtype) {");
-        sb.writeln("      return (this as $subtype).toJson();");
-      }
-      sb.writeln("    }");
-      sb.writeln("    throw UnsupportedError(\"Unknown subtype: \$runtimeType\");");
-      sb.writeln("  }");
+      // Abstract classes with explicitSubTypes don't need concrete toJson - only factory fromJson
     } else {
       sb.writeln(
           "  factory ${classNameTrimmed}.fromJson(Map<String, dynamic> json) {");
@@ -466,7 +464,8 @@ String createZorphy(
   }
 
   // Add changeTo extension for explicitSubTypes
-  if (typesExplicit.isNotEmpty && !isAbstract) {
+  // Generate for abstract classes with explicitSubTypes so all subtypes can use it
+  if (typesExplicit.isNotEmpty) {
     var knownClasses =
         allAnnotatedClasses.keys.map((k) => k.replaceAll('\$', '')).toList();
     sb.writeln(getChangeToExtension(
