@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## [1.1.1] - 2026-02-05
+
+### Change
+- Fixed copyWith method name generation
+
 ## [1.1.0] - 2026-02-05
 
 ### Change
