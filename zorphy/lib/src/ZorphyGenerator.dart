@@ -108,10 +108,10 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
 
       return InterfaceWithComment(
         implementedName,
-        e.typeArguments.map(typeToString).toList(),
+        e.typeArguments.map((t) => typeToString(t, currentClassName: className)).toList(),
         e.element.typeParameters.map((x) => x.name ?? "").toList(),
         e.element.fields
-            .map((f) => NameType(f.name ?? "", typeToString(f.type)))
+            .map((f) => NameType(f.name ?? "", typeToString(f.type, currentClassName: className)))
             .toList(),
         comment: e.element.documentationComment,
         isSealed: isSealed,
@@ -132,7 +132,7 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
       final bound = e.bound;
       return NameTypeClassComment(
         e.name ?? "",
-        bound == null ? null : typeToString(bound),
+        bound == null ? null : typeToString(bound, currentClassName: className),
         null,
       );
     }).toList();
@@ -161,7 +161,7 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
             final bound = tp.bound;
             return NameType(
               tp.name ?? "",
-              bound == null ? null : typeToString(bound),
+              bound == null ? null : typeToString(bound, currentClassName: className),
             );
           }).toList(),
           nameTypeFields,
@@ -188,7 +188,7 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
                   ? e.element.typeParameters[index].name ??
                         "T" + index.toString()
                   : "T" + index.toString();
-              return NameType(paramName, typeToString(typeArg));
+              return NameType(paramName, typeToString(typeArg, currentClassName: className));
             }).toList(),
             nameTypeFields,
             false,

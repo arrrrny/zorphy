@@ -40,7 +40,7 @@ abstract class $Product {
 
 /// Sealed abstract class for payment methods
 /// Enables exhaustiveness checking in switch statements
-@Zorphy()
+@Zorphy(generateJson: true, explicitSubTypes: [$CreditCard, $PayPal])
 abstract class $$PaymentMethod {
   String get displayName;
 }
@@ -107,7 +107,7 @@ abstract class $Address {
 @Zorphy()
 abstract class $PersonWithAddress {
   String get name;
-  Address get address;
+  $Address get address;
   String? get phone;
 }
 
@@ -120,8 +120,8 @@ abstract class $PersonWithAddress {
 abstract class $CategoryNode {
   String get id;
   String get name;
-  List<CategoryNode>? get children;
-  CategoryNode? get parent;
+  List<$CategoryNode>? get children;
+  $CategoryNode? get parent;
 }
 
 // =============================================================================
@@ -167,7 +167,7 @@ abstract class $Document {
 // =============================================================================
 
 /// Generic result wrapper
-@Zorphy()
+@Zorphy(generateJson: false)
 abstract class $Result<T> {
   bool get success;
   T? get data;
@@ -365,9 +365,9 @@ void demonstrateNestedPatching() {
     patchInput: PersonWithAddressPatch.create()
       ..withName('Jane Doe')
       ..withAddressPatch(
-        (addrPatch) => addrPatch
-          ..withStreet('456 Oak Ave')
-          ..withCity('Los Angeles'),
+        AddressPatch.create()
+          ..withCity('Moscow')
+          ..withCountry('Russia'),
       ),
   );
 
