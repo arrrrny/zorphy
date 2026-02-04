@@ -32,7 +32,7 @@ if [ $# -eq 1 ]; then
 else
     DESCRIPTION="${2:-Release $VERSION}"
     TYPE="change"
-    
+
     shift 2 2>/dev/null || true
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -45,7 +45,7 @@ else
                 ;;
         esac
     done
-    
+
     # Capitalize the type for CHANGELOG
     TYPE_CAPITALIZED=$(echo "$TYPE" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
 fi
@@ -71,10 +71,10 @@ echo ""
 update_changelog() {
     local package_dir="$1"
     local package_name="$2"
-    
+
     echo "📝 Updating $package_name CHANGELOG..."
     cd "$package_dir"
-    
+
     # Check if [Unreleased] section exists
     if ! grep -q "^## \[Unreleased\]" CHANGELOG.md; then
         echo "  ⚠️  No [Unreleased] section found, adding it..."
@@ -84,7 +84,7 @@ update_changelog() {
             sed -i "1s/^/## [Unreleased]\n\n/" CHANGELOG.md
         fi
     fi
-    
+
     if [ "$PROMOTE_MODE" = true ]; then
         # Replace [Unreleased] with version and date
         if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -112,7 +112,7 @@ update_changelog() {
 " CHANGELOG.md
         fi
     fi
-    
+
     echo "  ✓ CHANGELOG.md updated"
     cd "$REPO_ROOT" > /dev/null
 }
@@ -121,16 +121,16 @@ update_changelog() {
 update_pubspec() {
     local package_dir="$1"
     local package_name="$2"
-    
+
     echo "📝 Updating $package_name pubspec.yaml..."
     cd "$package_dir"
-    
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' "s/^version: .*/version: $VERSION/" pubspec.yaml
     else
         sed -i "s/^version: .*/version: $VERSION/" pubspec.yaml
     fi
-    
+
     echo "  ✓ Version updated to $VERSION"
     cd "$REPO_ROOT" > /dev/null
 }
@@ -159,7 +159,7 @@ echo "  ✓ Changes committed"
 if command -v gh &> /dev/null; then
     echo "🔄 Creating pull request to master..."
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    
+
     if gh pr list --head "$CURRENT_BRANCH" --json number | grep -q "\"number\""; then
         echo "  ⚠️  PR already exists for branch $CURRENT_BRANCH"
     else
@@ -179,13 +179,6 @@ Please review and merge this PR to master before proceeding with the release."
         echo "  ✓ PR created"
     fi
 fi
-
-# Create and push tag
-echo "🏷️  Creating git tag for zorphy_annotation..."
-git tag -a "annotation-v$VERSION" -m "Release zorphy_annotation $VERSION"
-git push origin "$(git rev-parse --abbrev-ref HEAD)"
-git push origin "annotation-v$VERSION"
-echo "  ✓ Tag annotation-v$VERSION pushed"
 
 # Publish to pub.dev
 echo "📦 Publishing zorphy_annotation to pub.dev..."
@@ -230,7 +223,7 @@ echo "  ✓ Changes committed"
 if command -v gh &> /dev/null; then
     echo "🔄 Creating pull request to master..."
     CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    
+
     if gh pr list --head "$CURRENT_BRANCH" --json number | grep -q "\"number\""; then
         echo "  ⚠️  PR already exists for branch $CURRENT_BRANCH"
     else
