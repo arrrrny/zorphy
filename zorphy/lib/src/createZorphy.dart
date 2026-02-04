@@ -232,16 +232,29 @@ String createZorphy(
     // Get parent fields if extending a concrete parent
     var parentFields = <String>{};
     if (hasExtendsParam && !extendsAbstractClass) {
-      // Find the specific parent class we're extending
-      final extendsMatch = RegExp(r'extends\s+(\S+)').firstMatch(extendsStr);
-      if (extendsMatch != null) {
-        final parentName = extendsMatch.group(1)!;
-        // Find the interface for this specific parent and get only its fields
-        for (final iface in interfaces) {
-          final ifaceName = iface.interfaceName.replaceAll('\$', '');
-          if (ifaceName == parentName) {
-            parentFields = iface.fields.map((f) => f.name).toSet();
-            break;
+      // For concrete parents, pass all inherited fields
+      // This handles inheritance chains where parent gets fields from its parents
+      parentFields = allFieldsDistinct.map((f) => f.name).toSet()
+        .difference(ownFields);
+        
+      // If we have multiple source interfaces, be more selective
+      if (interfaces.length > 1) {
+        // Find the specific parent class we're extending
+        final extendsMatch = RegExp(r'extends\s+(\S+)').firstMatch(extendsStr);
+        if (extendsMatch != null) {
+          final parentName = extendsMatch.group(1)!;
+          // Only pass fields from the specific parent interface
+          var specificParentFields = <String>{};
+          for (final iface in interfaces) {
+            final ifaceName = iface.interfaceName.replaceAll('\$', '');
+            if (ifaceName == parentName) {
+              specificParentFields = iface.fields.map((f) => f.name).toSet();
+              break;
+            }
+          }
+          // Use specific parent fields if found, otherwise use all inherited
+          if (specificParentFields.isNotEmpty) {
+            parentFields = specificParentFields;
           }
         }
       }
