@@ -112,7 +112,7 @@ String getProperties(
     // Named constructor for copyWith
     if (generateCopyWithFn) {
       sb.writeln("");
-      sb.writeln("  ${classNameTrimmed}._copyWith({");
+      sb.writeln("  ${classNameTrimmed}.copyWith({");
       for (var f in fields) {
         var fieldType = f.type != null
             ? _replaceDollarTypesWithConcrete(f.type!)
@@ -471,7 +471,7 @@ String getPropertiesAbstract(
   // Named constructor for copyWith
   if (generateCopyWithFn) {
     sb.writeln("");
-    sb.writeln("  factory ${className}._copyWith({");
+    sb.writeln("  factory ${className}.copyWith({");
     for (var f in fields) {
       var cwFieldType = f.type != null
           ? _replaceDollarTypesWithConcrete(f.type!)

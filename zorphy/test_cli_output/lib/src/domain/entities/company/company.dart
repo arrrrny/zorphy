@@ -10,10 +10,8 @@ part 'company.zorphy.dart';
 /// Company entity
 @Zorphy(generateJson: true, generateCompareTo: true)
 abstract class $Company {
-
   String get name;
   String? get description;
   $Address? get mainAddress;
   List<$Address>? get branches;
 }
-

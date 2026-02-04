@@ -22,14 +22,14 @@ class Interface {
     this.isExplicitSubType = false,
     this.isSealed = false,
     this.hidePublicConstructor = false,
-  ])  : assert(
-          genericExtends.length == genericName.length,
-          "typeArgs must have same length as typeParams",
-        ),
-        typeParams = List.generate(
-          genericName.length,
-          (i) => NameType(genericName[i] ?? "", genericExtends[i] ?? ""),
-        ) {}
+  ]) : assert(
+         genericExtends.length == genericName.length,
+         "typeArgs must have same length as typeParams",
+       ),
+       typeParams = List.generate(
+         genericName.length,
+         (i) => NameType(genericName[i] ?? "", genericExtends[i] ?? ""),
+       ) {}
 
   Interface.fromGenerics(
     this.interfaceName,
@@ -56,14 +56,14 @@ class InterfaceWithComment extends Interface {
     bool isSealed = false,
     bool hidePublicConstructor = false,
   }) : super(
-          type,
-          typeArgsTypes.map((e) => e ?? "").toList(),
-          typeParamsNames.map((e) => e ?? "").toList(),
-          fields,
-          false,
-          isSealed,
-          hidePublicConstructor,
-        );
+         type,
+         typeArgsTypes.map((e) => e ?? "").toList(),
+         typeParamsNames.map((e) => e ?? "").toList(),
+         fields,
+         false,
+         isSealed,
+         hidePublicConstructor,
+       );
 
   toString() =>
       "${this.interfaceName.toString()}|${this.typeParams.toString()}|${this.fields.toString()}";

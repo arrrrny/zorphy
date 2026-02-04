@@ -17,8 +17,8 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
 
   @override
   TypeChecker get typeChecker => const TypeChecker.fromUrl(
-        'package:zorphy_annotation/src/annotations.dart#Zorphy2',
-      );
+    'package:zorphy_annotation/src/annotations.dart#Zorphy2',
+  );
 
   @override
   dynamic generateForAnnotatedElement(
@@ -108,18 +108,21 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
         var el = typeValue!.element as ClassElement;
         _allAnnotatedClasses[el.name ?? ""] = el;
 
-        var fields = getAllFieldsIncludingSubtypes(el)
-            .where((f) => f.name != "hashCode")
+        var fields = getAllFieldsIncludingSubtypes(
+          el,
+        ).where((f) => f.name != "hashCode").toList();
+        var nameTypeFields = fields
+            .map((f) => NameType(f.name, f.type ?? ""))
             .toList();
-        var nameTypeFields =
-            fields.map((f) => NameType(f.name, f.type ?? "")).toList();
 
         return Interface.fromGenerics(
           el.name ?? "",
           el.typeParameters.map((tp) {
             final bound = tp.bound;
             return NameType(
-                tp.name ?? "", bound == null ? null : typeToString(bound));
+              tp.name ?? "",
+              bound == null ? null : typeToString(bound),
+            );
           }).toList(),
           nameTypeFields,
           true,
@@ -130,11 +133,12 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
     var allValueTInterfaces = allInterfaces
         .map((e) {
           var interfaceName = e.element.name ?? "";
-          var fields = getAllFieldsIncludingSubtypes(e.element as ClassElement)
-              .where((f) => f.name != "hashCode")
+          var fields = getAllFieldsIncludingSubtypes(
+            e.element as ClassElement,
+          ).where((f) => f.name != "hashCode").toList();
+          var nameTypeFields = fields
+              .map((f) => NameType(f.name, f.type ?? ""))
               .toList();
-          var nameTypeFields =
-              fields.map((f) => NameType(f.name, f.type ?? "")).toList();
           return Interface.fromGenerics(
             interfaceName.startsWith("\$\$")
                 ? interfaceName.replaceAll("\$\$", "")
@@ -144,7 +148,7 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
               final typeArg = entry.value;
               final paramName = e.element.typeParameters.length > index
                   ? e.element.typeParameters[index].name ??
-                      "T" + index.toString()
+                        "T" + index.toString()
                   : "T" + index.toString();
               return NameType(paramName, typeToString(typeArg));
             }).toList(),
@@ -176,7 +180,7 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
         annotation.read('generateCopyWithFn').boolValue,
         [],
         _allAnnotatedClasses,
-        {},  // ownFields - empty for builder2
+        {}, // ownFields - empty for builder2
       ),
     );
 
@@ -184,7 +188,8 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
   }
 
   List<NameTypeClassComment> getAllFieldsIncludingSubtypes(
-      ClassElement element) {
+    ClassElement element,
+  ) {
     var fields = <NameTypeClassComment>[];
     var processedTypes = <String>{};
 
@@ -214,11 +219,11 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
 }
 
 Builder zorphy2Builder(BuilderOptions options) => //
-    PartBuilder(
-      [Zorphy2Generator()],
-      '.zorphy2.dart',
-      header: '''
+PartBuilder(
+  [Zorphy2Generator()],
+  '.zorphy2.dart',
+  header: '''
 // ignore_for_file: UNNECESSARY_CAST
 // ignore_for_file: type=lint
     ''',
-    );
+);

@@ -9,27 +9,28 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
 
-const String _version = '1.0.0';
+const String _version = '1.1.1';
 
 void main() {
   stderr.writeln('Zorphy MCP Server v$_version starting...');
-  
-  stdin
-      .transform(utf8.decoder)
-      .transform(const LineSplitter())
-      .listen((line) async {
+
+  stdin.transform(utf8.decoder).transform(const LineSplitter()).listen((
+    line,
+  ) async {
     if (line.trim().isEmpty) return;
-    
+
     try {
       final request = jsonDecode(line);
       final response = await _handleRequest(request);
       stdout.writeln(jsonEncode(response));
     } catch (e, stack) {
       stderr.writeln('Error: $e\n$stack');
-      stdout.writeln(jsonEncode({
-        'jsonrpc': '2.0',
-        'error': {'code': -32603, 'message': 'Internal error: $e'},
-      }));
+      stdout.writeln(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'error': {'code': -32603, 'message': 'Internal error: $e'},
+        }),
+      );
     }
   });
 }
@@ -64,7 +65,8 @@ List<Map<String, dynamic>> _getTools() {
   return [
     {
       'name': 'create_entity',
-      'description': 'Create a Zorphy entity in lib/src/domain/entities/entity_snake/entity_snake.dart',
+      'description':
+          'Create a Zorphy entity in lib/src/domain/entities/entity_snake/entity_snake.dart',
       'inputSchema': {
         'type': 'object',
         'properties': {
@@ -85,14 +87,18 @@ List<Map<String, dynamic>> _getTools() {
           'sealed': {'type': 'boolean', 'default': false},
           'nonSealed': {'type': 'boolean', 'default': false},
           'extends': {'type': 'string'},
-          'explicitSubTypes': {'type': 'array', 'items': {'type': 'string'}},
+          'explicitSubTypes': {
+            'type': 'array',
+            'items': {'type': 'string'},
+          },
         },
         'required': ['name'],
       },
     },
     {
       'name': 'create_enum',
-      'description': 'Create an enum in lib/src/domain/entities/enums/enum_snake.dart',
+      'description':
+          'Create an enum in lib/src/domain/entities/enums/enum_snake.dart',
       'inputSchema': {
         'type': 'object',
         'properties': {
@@ -136,7 +142,10 @@ List<Map<String, dynamic>> _getTools() {
   ];
 }
 
-Future<Map<String, dynamic>> _callTool(String? name, Map<String, dynamic>? args) async {
+Future<Map<String, dynamic>> _callTool(
+  String? name,
+  Map<String, dynamic>? args,
+) async {
   try {
     switch (name) {
       case 'create_entity':
@@ -151,7 +160,11 @@ Future<Map<String, dynamic>> _callTool(String? name, Map<String, dynamic>? args)
         throw 'Unknown tool: $name';
     }
   } catch (e) {
-    return {'content': [{'type': 'text', 'text': 'Error: $e'}]};
+    return {
+      'content': [
+        {'type': 'text', 'text': 'Error: $e'},
+      ],
+    };
   }
 }
 
@@ -177,7 +190,7 @@ Future<Map<String, dynamic>> _createEntity(Map<String, dynamic> args) async {
     for (final ref in refs) {
       if (_isPrimitive(ref)) continue;
       if (ref.replaceAll(RegExp(r'^\$+'), '') == className) continue;
-      
+
       if (ref.startsWith(r'$')) {
         final refSnake = _toSnakeCase(ref.replaceAll(RegExp(r'^\$+'), ''));
         imports.add("import '../$refSnake/$refSnake.dart';");
@@ -188,7 +201,9 @@ Future<Map<String, dynamic>> _createEntity(Map<String, dynamic> args) async {
   }
 
   if (extendsInterface != null) {
-    final extSnake = _toSnakeCase(extendsInterface.replaceAll(RegExp(r'^\$+'), ''));
+    final extSnake = _toSnakeCase(
+      extendsInterface.replaceAll(RegExp(r'^\$+'), ''),
+    );
     imports.add("import '../$extSnake/$extSnake.dart';");
   }
 
@@ -219,7 +234,9 @@ Future<Map<String, dynamic>> _createEntity(Map<String, dynamic> args) async {
   if (generateCompareTo) opts.add('generateCompareTo: true');
   if (nonSealed) opts.add('nonSealed: true');
   if (explicitSubTypes != null && explicitSubTypes.isNotEmpty) {
-    opts.add('explicitSubTypes: [${explicitSubTypes.map((s) => '\$$s').join(', ')}]');
+    opts.add(
+      'explicitSubTypes: [${explicitSubTypes.map((s) => '\$$s').join(', ')}]',
+    );
   }
 
   buf.writeln('@Zorphy(${opts.join(', ')})');
@@ -229,11 +246,11 @@ Future<Map<String, dynamic>> _createEntity(Map<String, dynamic> args) async {
     buf.write(' implements $extendsInterface');
   }
   buf.writeln(' {');
-  
+
   for (final field in fields) {
     buf.writeln('  ${field['type']} get ${field['name']};');
   }
-  
+
   buf.writeln('}');
 
   final file = File('${dir.path}/$snakeName.dart');
@@ -241,8 +258,12 @@ Future<Map<String, dynamic>> _createEntity(Map<String, dynamic> args) async {
 
   return {
     'content': [
-      {'type': 'text', 'text': '✓ Created entity: $className\n  Path: ${file.path}\n  Fields: ${fields.length}'}
-    ]
+      {
+        'type': 'text',
+        'text':
+            '✓ Created entity: $className\n  Path: ${file.path}\n  Fields: ${fields.length}',
+      },
+    ],
   };
 }
 
@@ -270,7 +291,9 @@ Future<Map<String, dynamic>> _createEnum(Map<String, dynamic> args) async {
   // Update index.dart
   final allEnums = <String>[];
   await for (final entity in dir.list()) {
-    if (entity is File && entity.path.endsWith('.dart') && !entity.path.contains('index.dart')) {
+    if (entity is File &&
+        entity.path.endsWith('.dart') &&
+        !entity.path.contains('index.dart')) {
       allEnums.add(p.basenameWithoutExtension(entity.path));
     }
   }
@@ -287,8 +310,12 @@ Future<Map<String, dynamic>> _createEnum(Map<String, dynamic> args) async {
 
   return {
     'content': [
-      {'type': 'text', 'text': '✓ Created enum: $enumName\n  Path: ${file.path}\n  Values: ${values.join(', ')}'}
-    ]
+      {
+        'type': 'text',
+        'text':
+            '✓ Created enum: $enumName\n  Path: ${file.path}\n  Values: ${values.join(', ')}',
+      },
+    ],
   };
 }
 
@@ -305,17 +332,19 @@ Future<Map<String, dynamic>> _addField(Map<String, dynamic> args) async {
   }
 
   var content = await file.readAsString();
-  
+
   // Find class definition
-  final classPattern = RegExp(r'abstract class \$+' + className + r'\s*(?:implements[^{]*)?\{');
+  final classPattern = RegExp(
+    r'abstract class \$+' + className + r'\s*(?:implements[^{]*)?\{',
+  );
   final match = classPattern.firstMatch(content);
   if (match == null) throw 'Could not find class definition';
 
   // Find insert position
   final lastFieldPattern = RegExp(r'^\s*\S+\s+get\s+\w+;', multiLine: true);
   final allMatches = lastFieldPattern.allMatches(content).toList();
-  
-  final insertPos = allMatches.isEmpty 
+
+  final insertPos = allMatches.isEmpty
       ? content.indexOf('{', match.end) + 1
       : allMatches.last.end;
 
@@ -327,7 +356,7 @@ Future<Map<String, dynamic>> _addField(Map<String, dynamic> args) async {
     for (final ref in refs) {
       if (_isPrimitive(ref)) continue;
       if (ref.replaceAll(RegExp(r'^\$+'), '') == className) continue;
-      
+
       if (ref.startsWith(r'$')) {
         final refSnake = _toSnakeCase(ref.replaceAll(RegExp(r'^\$+'), ''));
         newImports.add("import '../$refSnake/$refSnake.dart';");
@@ -342,10 +371,13 @@ Future<Map<String, dynamic>> _addField(Map<String, dynamic> args) async {
     final partMatch = partPattern.firstMatch(content);
     if (partMatch != null) {
       final existing = content.substring(0, partMatch.start);
-      final toAdd = newImports.where((i) => !existing.contains(i)).toList()..sort();
+      final toAdd = newImports.where((i) => !existing.contains(i)).toList()
+        ..sort();
       if (toAdd.isNotEmpty) {
-        content = content.substring(0, partMatch.start) +
-            toAdd.join('\n') + '\n' +
+        content =
+            content.substring(0, partMatch.start) +
+            toAdd.join('\n') +
+            '\n' +
             content.substring(partMatch.start);
       }
     }
@@ -358,7 +390,8 @@ Future<Map<String, dynamic>> _addField(Map<String, dynamic> args) async {
     fieldBuf.writeln('  ${field['type']} get ${field['name']};');
   }
 
-  final newContent = content.substring(0, insertPos) +
+  final newContent =
+      content.substring(0, insertPos) +
       fieldBuf.toString() +
       content.substring(insertPos);
 
@@ -366,15 +399,22 @@ Future<Map<String, dynamic>> _addField(Map<String, dynamic> args) async {
 
   return {
     'content': [
-      {'type': 'text', 'text': '✓ Added ${fields.length} field(s) to $className'}
-    ]
+      {
+        'type': 'text',
+        'text': '✓ Added ${fields.length} field(s) to $className',
+      },
+    ],
   };
 }
 
 Future<Map<String, dynamic>> _listEntities() async {
   final dir = Directory('lib/src/domain/entities');
   if (!await dir.exists()) {
-    return {'content': [{'type': 'text', 'text': 'No entities found'}]};
+    return {
+      'content': [
+        {'type': 'text', 'text': 'No entities found'},
+      ],
+    };
   }
 
   final entities = <String>[];
@@ -385,7 +425,9 @@ Future<Map<String, dynamic>> _listEntities() async {
       final name = p.basename(entity.path);
       if (name == 'enums') {
         await for (final enumFile in entity.list()) {
-          if (enumFile is File && enumFile.path.endsWith('.dart') && !enumFile.path.contains('index.dart')) {
+          if (enumFile is File &&
+              enumFile.path.endsWith('.dart') &&
+              !enumFile.path.contains('index.dart')) {
             enums.add(p.basenameWithoutExtension(enumFile.path));
           }
         }
@@ -409,7 +451,11 @@ Future<Map<String, dynamic>> _listEntities() async {
     buf.writeln('  - $e');
   }
 
-  return {'content': [{'type': 'text', 'text': buf.toString()}]};
+  return {
+    'content': [
+      {'type': 'text', 'text': buf.toString()},
+    ],
+  };
 }
 
 Map<String, dynamic> _success(dynamic id, Map<String, dynamic> result) {
@@ -417,13 +463,19 @@ Map<String, dynamic> _success(dynamic id, Map<String, dynamic> result) {
 }
 
 Map<String, dynamic> _error(dynamic id, int code, String message) {
-  return {'jsonrpc': '2.0', 'id': id, 'error': {'code': code, 'message': message}};
+  return {
+    'jsonrpc': '2.0',
+    'id': id,
+    'error': {'code': code, 'message': message},
+  };
 }
 
 String _formatClassName(String name) {
   name = name.replaceAll(RegExp(r'^\$+'), '');
   final parts = name.split(RegExp(r'[_\s\-]+'));
-  return parts.map((p) => p.isEmpty ? '' : p[0].toUpperCase() + p.substring(1)).join('');
+  return parts
+      .map((p) => p.isEmpty ? '' : p[0].toUpperCase() + p.substring(1))
+      .join('');
 }
 
 String _toSnakeCase(String text) {
@@ -435,10 +487,24 @@ String _toSnakeCase(String text) {
 
 Set<String> _extractTypeRefs(String type) {
   type = type.replaceAll('?', '');
-  return RegExp(r'\$*[A-Z][a-zA-Z0-9]*').allMatches(type).map((m) => m.group(0)!).toSet();
+  return RegExp(
+    r'\$*[A-Z][a-zA-Z0-9]*',
+  ).allMatches(type).map((m) => m.group(0)!).toSet();
 }
 
 bool _isPrimitive(String type) {
-  const primitives = {'String', 'int', 'double', 'bool', 'num', 'DateTime', 'List', 'Set', 'Map', 'dynamic', 'Object'};
+  const primitives = {
+    'String',
+    'int',
+    'double',
+    'bool',
+    'num',
+    'DateTime',
+    'List',
+    'Set',
+    'Map',
+    'dynamic',
+    'Object',
+  };
   return primitives.contains(type);
 }
