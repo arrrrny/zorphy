@@ -14,8 +14,18 @@ const String _version = '1.0.0';
 
 Future<void> main(List<String> args) async {
   final parser = ArgParser()
-    ..addFlag('version', abbr: 'v', help: 'Show version information', negatable: false)
-    ..addFlag('help', abbr: 'h', help: 'Show this help message', negatable: false)
+    ..addFlag(
+      'version',
+      abbr: 'v',
+      help: 'Show version information',
+      negatable: false,
+    )
+    ..addFlag(
+      'help',
+      abbr: 'h',
+      help: 'Show this help message',
+      negatable: false,
+    )
     ..addCommand('create', _createCommandParser())
     ..addCommand('build', _buildCommandParser())
     ..addCommand('new', _newCommandParser())
@@ -78,24 +88,62 @@ Future<void> main(List<String> args) async {
 ArgParser _createCommandParser() {
   return ArgParser()
     ..addOption('name', abbr: 'n', help: 'Name of the entity class (required)')
-    ..addOption('output', abbr: 'o', help: r'Output base directory (default: lib/src/domain/entities)')
-    ..addOption('package', abbr: 'p', help: 'Package name for imports (default: uses pubspec.yaml)')
+    ..addOption(
+      'output',
+      abbr: 'o',
+      help: r'Output base directory (default: lib/src/domain/entities)',
+    )
+    ..addOption(
+      'package',
+      abbr: 'p',
+      help: 'Package name for imports (default: uses pubspec.yaml)',
+    )
     ..addFlag('json', help: 'Enable JSON serialization', defaultsTo: true)
-    ..addFlag('copywith-fn', help: 'Enable function-based copyWith', defaultsTo: false)
+    ..addFlag(
+      'copywith-fn',
+      help: 'Enable function-based copyWith',
+      defaultsTo: false,
+    )
     ..addFlag('compare', help: 'Enable compareTo generation', defaultsTo: true)
-    ..addFlag('sealed', help: r'Create a sealed abstract class (use $$ prefix)', defaultsTo: false)
-    ..addFlag('non-sealed', help: 'Create non-sealed abstract class', defaultsTo: false)
-    ..addFlag('fields', abbr: 'f', help: 'Interactive field prompts', defaultsTo: true)
-    ..addMultiOption('field', help: r'Add fields in format: "name:type" or "name:type?" for nullable')
+    ..addFlag(
+      'sealed',
+      help: r'Create a sealed abstract class (use $$ prefix)',
+      defaultsTo: false,
+    )
+    ..addFlag(
+      'non-sealed',
+      help: 'Create non-sealed abstract class',
+      defaultsTo: false,
+    )
+    ..addFlag(
+      'fields',
+      abbr: 'f',
+      help: 'Interactive field prompts',
+      defaultsTo: true,
+    )
+    ..addMultiOption(
+      'field',
+      help: r'Add fields in format: "name:type" or "name:type?" for nullable',
+    )
     ..addOption('extends', help: r'Interface to extend (e.g., "\$BaseEntity")')
-    ..addMultiOption('subtype', help: r'Explicit subtypes for polymorphism (e.g., "\$Dog,\$Cat")');
+    ..addMultiOption(
+      'subtype',
+      help: r'Explicit subtypes for polymorphism (e.g., "\$Dog,\$Cat")',
+    );
 }
 
 ArgParser _createEnumCommandParser() {
   return ArgParser()
     ..addOption('name', abbr: 'n', help: 'Name of the enum (required)')
-    ..addOption('output', abbr: 'o', help: r'Output base directory (default: lib/src/domain/entities)')
-    ..addMultiOption('value', help: 'Enum values (e.g., "active,inactive,pending")');
+    ..addOption(
+      'output',
+      abbr: 'o',
+      help: r'Output base directory (default: lib/src/domain/entities)',
+    )
+    ..addMultiOption(
+      'value',
+      help: 'Enum values (e.g., "active,inactive,pending")',
+    );
 }
 
 ArgParser _buildCommandParser() {
@@ -108,28 +156,54 @@ ArgParser _buildCommandParser() {
 ArgParser _newCommandParser() {
   return ArgParser()
     ..addOption('name', abbr: 'n', help: 'Name of the entity class (required)')
-    ..addOption('output', abbr: 'o', help: r'Output base directory (default: lib/src/domain/entities)')
+    ..addOption(
+      'output',
+      abbr: 'o',
+      help: r'Output base directory (default: lib/src/domain/entities)',
+    )
     ..addFlag('json', help: 'Enable JSON serialization', defaultsTo: true);
 }
 
 ArgParser _listCommandParser() {
-  return ArgParser()
-    ..addOption('output', abbr: 'o', help: r'Directory to search (default: lib/src/domain/entities)');
+  return ArgParser()..addOption(
+    'output',
+    abbr: 'o',
+    help: r'Directory to search (default: lib/src/domain/entities)',
+  );
 }
 
 ArgParser _addFieldCommandParser() {
   return ArgParser()
     ..addOption('name', abbr: 'n', help: 'Name of the entity (required)')
-    ..addOption('output', abbr: 'o', help: r'Output base directory (default: lib/src/domain/entities)')
-    ..addMultiOption('field', help: r'Fields to add in format: "name:type" or "name:type?"');
+    ..addOption(
+      'output',
+      abbr: 'o',
+      help: r'Output base directory (default: lib/src/domain/entities)',
+    )
+    ..addMultiOption(
+      'field',
+      help: r'Fields to add in format: "name:type" or "name:type?"',
+    );
 }
 
 ArgParser _fromJsonCommandParser() {
   return ArgParser()
-    ..addOption('name', abbr: 'n', help: 'Entity name (inferred from file if not provided)')
-    ..addOption('output', abbr: 'o', help: r'Output base directory (default: lib/src/domain/entities)')
+    ..addOption(
+      'name',
+      abbr: 'n',
+      help: 'Entity name (inferred from file if not provided)',
+    )
+    ..addOption(
+      'output',
+      abbr: 'o',
+      help: r'Output base directory (default: lib/src/domain/entities)',
+    )
     ..addFlag('json', help: 'Enable JSON serialization', defaultsTo: true)
-    ..addFlag('prefix-nested', help: 'Prefix nested entities with parent name', defaultsTo: true);
+    ..addFlag(
+      'prefix-nested',
+      help: 'Prefix nested entities with parent name',
+      defaultsTo: true,
+    );
 }
 
 String _getFullUsage(ArgParser parser) {
@@ -281,7 +355,9 @@ Future<void> _handleCreate(ArgResults args) async {
     for (var fieldDef in providedFields) {
       final parts = fieldDef.split(':');
       if (parts.length != 2) {
-        print('Warning: Invalid field format "$fieldDef". Expected "name:type"');
+        print(
+          'Warning: Invalid field format "$fieldDef". Expected "name:type"',
+        );
         continue;
       }
       final fieldName = parts[0].trim();
@@ -337,30 +413,33 @@ Future<void> _handleCreate(ArgResults args) async {
 
   // Add imports for nested Zorphy objects and enums
   final entityImports = <String>{};
-  final needsEnumImport = false;
+  bool needsEnumImport = false;
 
   for (final field in fields) {
     final type = field.type;
 
     // Extract all type references (including generics)
     final typeRefs = _extractTypeReferences(type);
-    
+
     for (final typeRef in typeRefs) {
       // Skip primitive types
       if (_isPrimitiveType(typeRef)) continue;
-      
+
       // Skip self-reference
       final cleanTypeRef = typeRef.replaceAll(RegExp(r'^\$+'), '');
       if (cleanTypeRef == className) continue;
-      
+
       // Check if it's a Zorphy entity (starts with $ or $$)
       if (typeRef.startsWith(r'$')) {
         final typeSnakeName = _toSnakeCase(cleanTypeRef);
         entityImports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
       } else {
+        needsEnumImport = true;
         // Assume it's an enum - will be imported from enums/index.dart
-        entityImports.add("import '../enums/index.dart';");
       }
+    }
+    if (needsEnumImport) {
+      entityImports.add("import '../enums/index.dart';");
     }
   }
 
@@ -369,7 +448,9 @@ Future<void> _handleCreate(ArgResults args) async {
     final cleanExtends = extendsInterface.replaceAll(RegExp(r'^\$+'), '');
     if (cleanExtends != className) {
       final extendsSnakeName = _toSnakeCase(cleanExtends);
-      entityImports.add("import '../$extendsSnakeName/$extendsSnakeName.dart';");
+      entityImports.add(
+        "import '../$extendsSnakeName/$extendsSnakeName.dart';",
+      );
     }
   }
 
@@ -379,7 +460,9 @@ Future<void> _handleCreate(ArgResults args) async {
       final cleanSubtype = subtype.replaceAll(RegExp(r'^\$+'), '');
       if (cleanSubtype != className) {
         final subtypeSnakeName = _toSnakeCase(cleanSubtype);
-        entityImports.add("import '../$subtypeSnakeName/$subtypeSnakeName.dart';");
+        entityImports.add(
+          "import '../$subtypeSnakeName/$subtypeSnakeName.dart';",
+        );
       }
     }
   }
@@ -460,27 +543,38 @@ Future<void> _handleCreate(ArgResults args) async {
 /// Extract all type references from a type string (including generics)
 Set<String> _extractTypeReferences(String type) {
   final refs = <String>{};
-  
+
   // Remove nullable marker
   type = type.replaceAll('?', '');
-  
+
   // Extract all identifiers (including those with $ prefix)
   final pattern = RegExp(r'\$*[A-Z][a-zA-Z0-9]*');
   final matches = pattern.allMatches(type);
-  
+
   for (final match in matches) {
     refs.add(match.group(0)!);
   }
-  
+
   return refs;
 }
 
 /// Check if a type is a primitive Dart type
 bool _isPrimitiveType(String type) {
   const primitives = {
-    'String', 'int', 'double', 'bool', 'num', 
-    'DateTime', 'List', 'Set', 'Map', 'dynamic',
-    'Object', 'Iterable', 'Future', 'Stream'
+    'String',
+    'int',
+    'double',
+    'bool',
+    'num',
+    'DateTime',
+    'List',
+    'Set',
+    'Map',
+    'dynamic',
+    'Object',
+    'Iterable',
+    'Future',
+    'Stream',
   };
   return primitives.contains(type);
 }
@@ -498,7 +592,9 @@ Future<void> _handleCreateEnum(ArgResults args) async {
   final values = providedValues ?? <String>[];
 
   if (values.isEmpty) {
-    print('Error: Enum values are required. Use --value with comma-separated values.');
+    print(
+      'Error: Enum values are required. Use --value with comma-separated values.',
+    );
     exit(1);
   }
 
@@ -522,7 +618,9 @@ Future<void> _handleCreateEnum(ArgResults args) async {
   if (await indexFile.exists()) {
     final indexContent = await indexFile.readAsString();
     // Extract existing enum names from exports
-    final exportMatches = RegExp(r"export '([^']+)\.dart';").allMatches(indexContent);
+    final exportMatches = RegExp(
+      r"export '([^']+)\.dart';",
+    ).allMatches(indexContent);
     for (final match in exportMatches) {
       existingEnums.add(match.group(1)!);
     }
@@ -562,13 +660,18 @@ Future<void> _handleCreateEnum(ArgResults args) async {
 }
 
 /// Update the enum barrel file
-Future<void> _updateEnumIndexFile(String enumsDir, List<String> existingEnums) async {
+Future<void> _updateEnumIndexFile(
+  String enumsDir,
+  List<String> existingEnums,
+) async {
   final indexFile = File(p.join(enumsDir, 'index.dart'));
 
   // Get all enum files in the directory
   final allEnums = <String>[];
   await for (final entity in Directory(enumsDir).list()) {
-    if (entity is File && entity.path.endsWith('.dart') && !entity.path.contains('index.dart')) {
+    if (entity is File &&
+        entity.path.endsWith('.dart') &&
+        !entity.path.contains('index.dart')) {
       final enumName = p.basenameWithoutExtension(entity.path);
       allEnums.add(enumName);
     }
@@ -612,11 +715,13 @@ Future<void> _handleBuild(ArgResults args) async {
   }
 
   // Check if build_runner is available
-  final process = await Process.start(
-    'dart',
-    ['run', 'build_runner', if (clean) 'clean', 'build', if (watch) '--watch'],
-    mode: ProcessStartMode.inheritStdio,
-  );
+  final process = await Process.start('dart', [
+    'run',
+    'build_runner',
+    if (clean) 'clean',
+    'build',
+    if (watch) '--watch',
+  ], mode: ProcessStartMode.inheritStdio);
 
   final exitCode = await process.exitCode;
   if (exitCode == 0) {
@@ -715,7 +820,9 @@ Future<void> _handleList(ArgResults args) async {
   if (await enumsDir.exists()) {
     print('📂 Enums:\n');
     await for (final entity in enumsDir.list()) {
-      if (entity is File && entity.path.endsWith('.dart') && !entity.path.contains('index.dart')) {
+      if (entity is File &&
+          entity.path.endsWith('.dart') &&
+          !entity.path.contains('index.dart')) {
         final enumName = p.basenameWithoutExtension(entity.path);
         print('  📋 $enumName');
         print('     Path: ${entity.path}');
@@ -784,11 +891,11 @@ Future<void> _handleAddField(ArgResults args) async {
 
   // Read existing file
   final content = await file.readAsString();
-  
+
   // Find the closing brace of the class
   final classPattern = RegExp(r'abstract class \$+' + className + r'\s*\{');
   final classMatch = classPattern.firstMatch(content);
-  
+
   if (classMatch == null) {
     print('Error: Could not find class definition in $filePath');
     exit(1);
@@ -797,7 +904,7 @@ Future<void> _handleAddField(ArgResults args) async {
   // Find last field or class opening brace
   final lastFieldPattern = RegExp(r'^\s*\S+\s+get\s+\w+;', multiLine: true);
   final allMatches = lastFieldPattern.allMatches(content).toList();
-  
+
   int insertPosition;
   if (allMatches.isEmpty) {
     // No fields yet, insert after class opening brace
@@ -815,7 +922,7 @@ Future<void> _handleAddField(ArgResults args) async {
       if (_isPrimitiveType(typeRef)) continue;
       final cleanTypeRef = typeRef.replaceAll(RegExp(r'^\$+'), '');
       if (cleanTypeRef == className) continue;
-      
+
       if (typeRef.startsWith(r'$')) {
         final typeSnakeName = _toSnakeCase(cleanTypeRef);
         newImports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
@@ -831,17 +938,21 @@ Future<void> _handleAddField(ArgResults args) async {
     // Find where to insert imports (after existing imports, before part directives)
     final partPattern = RegExp(r"^part\s+'", multiLine: true);
     final partMatch = partPattern.firstMatch(content);
-    
+
     if (partMatch != null) {
       final existingImports = content.substring(0, partMatch.start);
-      final newImportLines = newImports.where((imp) => !existingImports.contains(imp)).toList()..sort();
-      
+      final newImportLines =
+          newImports.where((imp) => !existingImports.contains(imp)).toList()
+            ..sort();
+
       if (newImportLines.isNotEmpty) {
         final importInsertPos = partMatch.start;
-        updatedContent = content.substring(0, importInsertPos) +
-            newImportLines.join('\n') + '\n' +
+        updatedContent =
+            content.substring(0, importInsertPos) +
+            newImportLines.join('\n') +
+            '\n' +
             content.substring(importInsertPos);
-        
+
         // Recalculate insert position after adding imports
         insertPosition += newImportLines.join('\n').length + 1;
       }
@@ -856,26 +967,27 @@ Future<void> _handleAddField(ArgResults args) async {
   }
 
   // Insert fields
-  final finalContent = updatedContent.substring(0, insertPosition) +
+  final finalContent =
+      updatedContent.substring(0, insertPosition) +
       fieldBuffer.toString() +
       updatedContent.substring(insertPosition);
 
   // Write back
   await file.writeAsString(finalContent);
-  
+
   print('✓ Added ${fields.length} field(s) to $className');
   print('  File: $filePath');
   for (final field in fields) {
     print('  + ${field.name}: ${field.type}');
   }
-  
+
   if (newImports.isNotEmpty) {
     print('\n📦 Added imports:');
     for (final imp in newImports) {
       print('  - $imp');
     }
   }
-  
+
   print('\n📋 Next step: Run build to regenerate code');
 }
 
@@ -894,22 +1006,27 @@ Future<void> _handleFromJson(ArgResults args) async {
 
   final content = await jsonFile.readAsString();
   final json = jsonDecode(content) as Map<String, dynamic>;
-  
-  final name = args['name'] as String? ?? p.basenameWithoutExtension(jsonFile.path);
+
+  final name =
+      args['name'] as String? ?? p.basenameWithoutExtension(jsonFile.path);
   final baseOutputDir = args['output'] as String? ?? 'lib/src/domain/entities';
   final useJson = args['json'] as bool? ?? true;
   final prefixNested = args['prefix-nested'] as bool? ?? true;
 
   // Parse JSON
-  final result = _parseJson(json, _formatClassName(name), prefixNested: prefixNested);
-  
+  final result = _parseJson(
+    json,
+    _formatClassName(name),
+    prefixNested: prefixNested,
+  );
+
   // Create all entities (main + nested)
   final allEntities = [result, ...result.nested];
-  
+
   for (final entity in allEntities) {
     await _createEntityFromResult(entity, baseOutputDir, useJson);
   }
-  
+
   print('\n✓ Created ${allEntities.length} entity/entities from JSON');
   print('  Main: ${result.name}');
   if (result.nested.isNotEmpty) {
@@ -917,18 +1034,22 @@ Future<void> _handleFromJson(ArgResults args) async {
   }
 }
 
-Future<void> _createEntityFromResult(_EntityResult entity, String baseDir, bool useJson) async {
+Future<void> _createEntityFromResult(
+  _EntityResult entity,
+  String baseDir,
+  bool useJson,
+) async {
   final snakeName = _toSnakeCase(entity.name);
   final entityDir = p.join(baseDir, snakeName);
   await Directory(entityDir).create(recursive: true);
-  
+
   final imports = <String>{};
   for (final field in entity.fields) {
     final refs = _extractTypeReferences(field.fullType);
     for (final ref in refs) {
       if (_isPrimitiveType(ref)) continue;
       if (ref.replaceAll(RegExp(r'^\$+'), '') == entity.name) continue;
-      
+
       if (ref.startsWith(r'$')) {
         final refSnake = _toSnakeCase(ref.replaceAll(RegExp(r'^\$+'), ''));
         imports.add("import '../$refSnake/$refSnake.dart';");
@@ -937,7 +1058,7 @@ Future<void> _createEntityFromResult(_EntityResult entity, String baseDir, bool 
       }
     }
   }
-  
+
   final buf = StringBuffer();
   buf.writeln("import 'package:zorphy_annotation/zorphy_annotation.dart';");
   if (imports.isNotEmpty) {
@@ -958,30 +1079,49 @@ Future<void> _createEntityFromResult(_EntityResult entity, String baseDir, bool 
     buf.writeln('  ${field.fullType} get ${field.name};');
   }
   buf.writeln('}');
-  
-  await File(p.join(entityDir, '$snakeName.dart')).writeAsString(buf.toString());
+
+  await File(
+    p.join(entityDir, '$snakeName.dart'),
+  ).writeAsString(buf.toString());
 }
 
-_EntityResult _parseJson(Map<String, dynamic> json, String name, {bool prefixNested = true, String? parentPrefix}) {
-  final fullName = prefixNested && parentPrefix != null ? '$parentPrefix$name' : name;
+_EntityResult _parseJson(
+  Map<String, dynamic> json,
+  String name, {
+  bool prefixNested = true,
+  String? parentPrefix,
+}) {
+  final fullName = prefixNested && parentPrefix != null
+      ? '$parentPrefix$name'
+      : name;
   final fields = <_Field>[];
   final nested = <_EntityResult>[];
-  
+
   for (final entry in json.entries) {
     final key = entry.key;
     final value = entry.value;
-    
+
     final isNullable = key.endsWith('?');
     final fieldName = isNullable ? key.substring(0, key.length - 1) : key;
-    
+
     if (value is Map<String, dynamic>) {
       final nestedName = _formatClassName(fieldName);
-      final nestedResult = _parseJson(value, nestedName, prefixNested: prefixNested, parentPrefix: prefixNested ? fullName : null);
+      final nestedResult = _parseJson(
+        value,
+        nestedName,
+        prefixNested: prefixNested,
+        parentPrefix: prefixNested ? fullName : null,
+      );
       nested.add(nestedResult);
       fields.add(_Field(fieldName, '\$${nestedResult.name}', isNullable));
     } else if (value is List && value.isNotEmpty && value.first is Map) {
       final nestedName = _formatClassName(_singularize(fieldName));
-      final nestedResult = _parseJson(value.first as Map<String, dynamic>, nestedName, prefixNested: prefixNested, parentPrefix: prefixNested ? fullName : null);
+      final nestedResult = _parseJson(
+        value.first as Map<String, dynamic>,
+        nestedName,
+        prefixNested: prefixNested,
+        parentPrefix: prefixNested ? fullName : null,
+      );
       nested.add(nestedResult);
       fields.add(_Field(fieldName, 'List<\$${nestedResult.name}>', isNullable));
     } else {
@@ -989,7 +1129,7 @@ _EntityResult _parseJson(Map<String, dynamic> json, String name, {bool prefixNes
       fields.add(_Field(fieldName, type, isNullable || value == null));
     }
   }
-  
+
   return _EntityResult(fullName, fields, nested);
 }
 
@@ -1036,7 +1176,10 @@ String _getPackageName() {
   final pubspecFile = File('pubspec.yaml');
   if (pubspecFile.existsSync()) {
     final contents = pubspecFile.readAsStringSync();
-    final nameMatch = RegExp(r'^name:\s*(.+)$', multiLine: true).firstMatch(contents);
+    final nameMatch = RegExp(
+      r'^name:\s*(.+)$',
+      multiLine: true,
+    ).firstMatch(contents);
     if (nameMatch != null) {
       return nameMatch.group(1)!.trim();
     }
@@ -1051,10 +1194,12 @@ String _formatClassName(String name) {
 
   // Convert to PascalCase
   final parts = name.split(RegExp(r'[_\s\-]+'));
-  return parts.map((part) {
-    if (part.isEmpty) return '';
-    return part[0].toUpperCase() + part.substring(1);
-  }).join('');
+  return parts
+      .map((part) {
+        if (part.isEmpty) return '';
+        return part[0].toUpperCase() + part.substring(1);
+      })
+      .join('');
 }
 
 /// Convert PascalCase to snake_case

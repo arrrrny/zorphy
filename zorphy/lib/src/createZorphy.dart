@@ -343,7 +343,23 @@ String createZorphy(
           r"${json['_className_']}" +
           "' is not supported by the ${classNameTrimmed}.fromJson constructor.\");");
       sb.writeln("  }");
-      // Abstract classes with explicitSubTypes don't need concrete toJson - only factory fromJson
+      
+      // Generate concrete toJson for non-sealed abstract classes with explicitSubTypes
+      // Sealed classes don't need toJson (only factory fromJson)
+      if (nonSealed) {
+        sb.writeln("");
+        sb.writeln("  Map<String, dynamic> toJson() {");
+        sb.writeln("    if (this is ${typesExplicit[0].interfaceName.replaceAll('\$', '')}) {");
+        sb.writeln("      return (this as ${typesExplicit[0].interfaceName.replaceAll('\$', '')}).toJson();");
+        for (var i = 1; i < typesExplicit.length; i++) {
+          var subtype = typesExplicit[i].interfaceName.replaceAll('\$', '');
+          sb.writeln("    } else if (this is $subtype) {");
+          sb.writeln("      return (this as $subtype).toJson();");
+        }
+        sb.writeln("    }");
+        sb.writeln("    throw UnsupportedError(\"Unknown subtype: \$runtimeType\");");
+        sb.writeln("  }");
+      }
     } else {
       sb.writeln(
           "  factory ${classNameTrimmed}.fromJson(Map<String, dynamic> json) {");
