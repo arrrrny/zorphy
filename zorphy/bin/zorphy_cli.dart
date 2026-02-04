@@ -342,10 +342,10 @@ Future<void> _handleCreate(ArgResults args) async {
   final explicitSubtypes = args['subtype'] as List<String>?;
 
   // Get package name
-  String packageName = _getPackageName();
-  if (args['package'] != null) {
-    packageName = args['package'] as String;
-  }
+  // String packageName = _getPackageName();
+  // if (args['package'] != null) {
+  //   packageName = args['package'] as String;
+  // }
 
   // Collect fields from command line
   final providedFields = args['field'] as List<String>?;
@@ -1171,21 +1171,21 @@ class _Field {
   String get fullType => nullable && !type.endsWith('?') ? '$type?' : type;
 }
 
-/// Get package name from pubspec.yaml
-String _getPackageName() {
-  final pubspecFile = File('pubspec.yaml');
-  if (pubspecFile.existsSync()) {
-    final contents = pubspecFile.readAsStringSync();
-    final nameMatch = RegExp(
-      r'^name:\s*(.+)$',
-      multiLine: true,
-    ).firstMatch(contents);
-    if (nameMatch != null) {
-      return nameMatch.group(1)!.trim();
-    }
-  }
-  return 'my_app';
-}
+// /// Get package name from pubspec.yaml
+// String _getPackageName() {
+//   final pubspecFile = File('pubspec.yaml');
+//   if (pubspecFile.existsSync()) {
+//     final contents = pubspecFile.readAsStringSync();
+//     final nameMatch = RegExp(
+//       r'^name:\s*(.+)$',
+//       multiLine: true,
+//     ).firstMatch(contents);
+//     if (nameMatch != null) {
+//       return nameMatch.group(1)!.trim();
+//     }
+//   }
+//   return 'my_app';
+// }
 
 /// Format class name (PascalCase)
 String _formatClassName(String name) {

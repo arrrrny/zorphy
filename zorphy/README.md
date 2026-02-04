@@ -8,6 +8,13 @@
 - 🔄 **CopyWith Methods** - Generate `copyWith` methods for creating modified copies
 - 🎯 **Function-based CopyWith** - Optional function-based copyWith for computed updates
 - 🔧 **Patch System** - Advanced patching mechanism for partial updates with nested support
+
+## 📚 Documentation & Resources
+
+- **[Website](https://zuraffa.com)** - Official documentation and landing page
+- **[Zuraffa](https://pub.dev/packages/zuraffa)** - Clean Architecture framework for Flutter
+- **[GitHub](https://github.com/arrrrny/zorphy)** - Source code and examples
+- **[Examples](./example)** - Complete working examples
 - 📦 **JSON Serialization** - Full `toJson`/`fromJson` support with polymorphic type handling
 - ⚖️ **Equality** - Auto-generated `==` operator and `hashCode`
 - 📝 **toString** - Meaningful string representations for debugging
@@ -1249,18 +1256,28 @@ abstract class $Derived implements $Base {
 }
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
-
-## 📄 License
+## License
 
 MIT License - see LICENSE file for details
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Inspired by and designed to improve upon the Morphy code generation package.
 
 ---
 
-**Made with ❤️ for the Dart/Flutter community and AI agents**
+**Made with 🔥 for the Dart/Flutter community and AI agents**
+
+## 🦒 Related Projects
+
+**[Zuraffa](https://pub.dev/packages/zuraffa)** - Clean Architecture framework for Flutter with Zorphy entities as the foundation.
+
+- ✅ Entity-based Clean Architecture
+- ✅ UseCase pattern (single-shot, streaming, background)
+- ✅ State management with Zorphy entities
+- ✅ ZFA CLI for code generation
+- ✅ Result-based error handling
+- ✅ Comprehensive caching support
+- ✅ MCP server for AI/IDE integration
+
+Visit **[zuraffa.com](https://zuraffa.com)** for complete documentation and guides.

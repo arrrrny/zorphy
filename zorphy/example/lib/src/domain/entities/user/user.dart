@@ -3,7 +3,7 @@
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-import 'address.dart';
+import '../address/address.dart';
 part 'user.g.dart';
 part 'user.zorphy.dart';
 
