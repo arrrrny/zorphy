@@ -8,7 +8,5 @@ part 'test_order.g.dart';
 /// TestOrder entity
 @Zorphy(generateJson: true, generateCompareTo: true)
 abstract class $TestOrder {
-
   String get name;
 }
-

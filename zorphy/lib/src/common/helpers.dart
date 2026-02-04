@@ -8,7 +8,9 @@ import 'NameType.dart';
 import 'classes.dart';
 
 ElementAnnotation? findAnnotation(
-    List<ElementAnnotation> annotations, String name) {
+  List<ElementAnnotation> annotations,
+  String name,
+) {
   for (final annotation in annotations) {
     final element = annotation.element;
     if (element != null && (element.name == name || element.name == name)) {
@@ -23,14 +25,14 @@ JsonKeyInfo? extractJsonKeyInfo(FieldElement field) {
     var metadata = field.metadata;
     var annotation = metadata.annotations.isNotEmpty
         ? findAnnotation(metadata.annotations, 'JsonKey') ??
-            findAnnotation(metadata.annotations, 'jsonKey')
+              findAnnotation(metadata.annotations, 'jsonKey')
         : null;
 
     if (annotation == null && field.getter != null) {
       var getterMetadata = field.getter!.metadata;
       annotation = getterMetadata.annotations.isNotEmpty
           ? findAnnotation(getterMetadata.annotations, 'JsonKey') ??
-              findAnnotation(getterMetadata.annotations, 'jsonKey')
+                findAnnotation(getterMetadata.annotations, 'jsonKey')
           : null;
     }
 
@@ -141,10 +143,12 @@ String getClassComment(List<Interface> interfaces, String? classComment) {
   var a = interfaces
       .where((e) => e is InterfaceWithComment && e.comment != classComment)
       .map((e) {
-    var interfaceComment =
-        e is InterfaceWithComment && e.comment != null ? "\n${e.comment}" : "";
-    return "///implements [${e.interfaceName}]\n///\n$interfaceComment\n///";
-  }).toList();
+        var interfaceComment = e is InterfaceWithComment && e.comment != null
+            ? "\n${e.comment}"
+            : "";
+        return "///implements [${e.interfaceName}]\n///\n$interfaceComment\n///";
+      })
+      .toList();
 
   if (classComment != null) a.insert(0, classComment + "\n///");
 
@@ -156,7 +160,7 @@ List<NameTypeClassComment> getAllFields(
   ClassElement element,
 ) {
   var currentClassName = element.name?.replaceAll('\$', '');
-  
+
   var superTypeFields = interfaceTypes
       .where((x) => x.element.name != "Object")
       .flatMap(
@@ -193,8 +197,8 @@ String typeToString(DartType type, {String? currentClassName}) {
   final nullMarker = type.nullabilitySuffix == NullabilitySuffix.question
       ? '?'
       : type.nullabilitySuffix == NullabilitySuffix.star
-          ? '*'
-          : '';
+      ? '*'
+      : '';
 
   final alias = type.alias;
   String? manual;
@@ -213,14 +217,67 @@ String typeToString(DartType type, {String? currentClassName}) {
 
     // Reserved keywords that cannot be used as identifiers
     const reservedKeywords = {
-      'abstract', 'as', 'base', 'break', 'case', 'catch', 'class', 'const',
-      'continue', 'covariant', 'default', 'deferred', 'do', 'dynamic', 'else',
-      'enum', 'export', 'extends', 'extension', 'external', 'factory', 'false',
-      'final', 'finally', 'for', 'Function', 'get', 'hide', 'if', 'implements',
-      'import', 'in', 'interface', 'is', 'late', 'library', 'mixin', 'new',
-      'null', 'on', 'operator', 'part', 'rethrow', 'return', 'set', 'show',
-      'static', 'super', 'switch', 'sync', 'this', 'throw', 'true', 'try',
-      'type', 'typedef', 'var', 'void', 'while', 'with', 'yield'
+      'abstract',
+      'as',
+      'base',
+      'break',
+      'case',
+      'catch',
+      'class',
+      'const',
+      'continue',
+      'covariant',
+      'default',
+      'deferred',
+      'do',
+      'dynamic',
+      'else',
+      'enum',
+      'export',
+      'extends',
+      'extension',
+      'external',
+      'factory',
+      'false',
+      'final',
+      'finally',
+      'for',
+      'Function',
+      'get',
+      'hide',
+      'if',
+      'implements',
+      'import',
+      'in',
+      'interface',
+      'is',
+      'late',
+      'library',
+      'mixin',
+      'new',
+      'null',
+      'on',
+      'operator',
+      'part',
+      'rethrow',
+      'return',
+      'set',
+      'show',
+      'static',
+      'super',
+      'switch',
+      'sync',
+      'this',
+      'throw',
+      'true',
+      'try',
+      'type',
+      'typedef',
+      'var',
+      'void',
+      'while',
+      'with',
+      'yield',
     };
 
     String sanitizeParameterName(String? name) {
@@ -265,17 +322,22 @@ String typeToString(DartType type, {String? currentClassName}) {
       if (named.isNotEmpty) "{$named}",
       if (optional.isNotEmpty) "[$optional]",
     ].join(', ');
-    manual = "${typeToString(type.returnType, currentClassName: currentClassName)} Function$generics($parts)";
+    manual =
+        "${typeToString(type.returnType, currentClassName: currentClassName)} Function$generics($parts)";
   } else if (type is RecordType) {
-    final positional =
-        type.positionalFields.map((e) => typeToString(e.type, currentClassName: currentClassName)).join(', ');
+    final positional = type.positionalFields
+        .map((e) => typeToString(e.type, currentClassName: currentClassName))
+        .join(', ');
     final named = type.namedFields
-        .map((e) => "${typeToString(e.type, currentClassName: currentClassName)} ${e.name}")
+        .map(
+          (e) =>
+              "${typeToString(e.type, currentClassName: currentClassName)} ${e.name}",
+        )
         .join(', ');
     final trailing =
         type.positionalFields.length == 1 && type.namedFields.isEmpty
-            ? ','
-            : '';
+        ? ','
+        : '';
     final parts = [
       if (positional.isNotEmpty) positional,
       if (named.isNotEmpty) "{$named}",

@@ -11,7 +11,6 @@ part 'user.zorphy.dart';
 /// User entity
 @Zorphy(generateJson: true, generateCompareTo: true)
 abstract class $User {
-
   String get name;
   int get age;
   Status get status;
@@ -19,7 +18,4 @@ abstract class $User {
 
   DateTime get createdAt;
   $Address get address;
-
-
 }
-

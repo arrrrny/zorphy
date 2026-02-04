@@ -8,8 +8,6 @@ part 'simple_person.g.dart';
 /// SimplePerson entity
 @Zorphy(generateJson: true, generateCompareTo: true)
 abstract class $SimplePerson {
-
   String get name;
   int get age;
 }
-

@@ -11,9 +11,7 @@ part 'profile.zorphy.dart';
 /// Profile entity
 @Zorphy(generateJson: true, generateCompareTo: true)
 abstract class $Profile {
-
   $User get user;
   $Address get address;
   List<String> get tags;
 }
-
