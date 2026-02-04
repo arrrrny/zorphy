@@ -38,6 +38,7 @@ main() {
         profile: testProfile,
         profiles: [testProfile],
         profileHistory: {'current': testProfile},
+        age: 30,
       );
     });
 

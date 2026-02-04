@@ -15,31 +15,47 @@ class User extends $User {
   @override
   final String email;
 
-  User({required this.name, required this.email});
+  User({
+    required this.name,
+    required this.email,
+  });
 
-  User copyWith({String? name, String? email}) {
-    return User(name: name ?? this.name, email: email ?? this.email);
+  User copyWith({
+    String? name,
+    String? email,
+  }) {
+    return User(
+      name: name ?? this.name,
+      email: email ?? this.email,
+    );
   }
 
-  User copyWithUser({String? name, String? email}) {
-    return copyWith(name: name, email: email);
+  User copyWithUser({
+    String? name,
+    String? email,
+  }) {
+    return copyWith(
+      name: name,
+      email: email,
+    );
   }
 
-  User patchWithUser({UserPatch? patchInput}) {
+  User patchWithUser({
+    UserPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? UserPatch();
     final _patchMap = _patcher.toPatch();
     return User(
-      name: _patchMap.containsKey(User$.name)
-          ? (_patchMap[User$.name] is Function)
+        name: _patchMap.containsKey(User$.name)
+            ? (_patchMap[User$.name] is Function)
                 ? _patchMap[User$.name](this.name)
                 : _patchMap[User$.name]
-          : this.name,
-      email: _patchMap.containsKey(User$.email)
-          ? (_patchMap[User$.email] is Function)
+            : this.name,
+        email: _patchMap.containsKey(User$.email)
+            ? (_patchMap[User$.email] is Function)
                 ? _patchMap[User$.email](this.email)
                 : _patchMap[User$.email]
-          : this.email,
-    );
+            : this.email);
   }
 
   @override
@@ -69,9 +85,10 @@ class User extends $User {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -168,9 +185,10 @@ extension UserSerialization on User {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }

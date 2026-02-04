@@ -1,4 +1,10 @@
 analyzer:
   exclude:
+    - bin/**
+    - lib/*.g.dart
+    - example/test/_unsupported/**
     - example/build_output/**
-    - example/test/**.zorphy.dart
+    - .dart_tool/**
+    - example/lib/_unsupported/**
+    - test/**
+    - test_builder.dart

@@ -15,31 +15,47 @@ class Profile extends $Profile {
   @override
   final int age;
 
-  Profile({required this.name, required this.age});
+  Profile({
+    required this.name,
+    required this.age,
+  });
 
-  Profile copyWith({String? name, int? age}) {
-    return Profile(name: name ?? this.name, age: age ?? this.age);
+  Profile copyWith({
+    String? name,
+    int? age,
+  }) {
+    return Profile(
+      name: name ?? this.name,
+      age: age ?? this.age,
+    );
   }
 
-  Profile copyWithProfile({String? name, int? age}) {
-    return copyWith(name: name, age: age);
+  Profile copyWithProfile({
+    String? name,
+    int? age,
+  }) {
+    return copyWith(
+      name: name,
+      age: age,
+    );
   }
 
-  Profile patchWithProfile({ProfilePatch? patchInput}) {
+  Profile patchWithProfile({
+    ProfilePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? ProfilePatch();
     final _patchMap = _patcher.toPatch();
     return Profile(
-      name: _patchMap.containsKey(Profile$.name)
-          ? (_patchMap[Profile$.name] is Function)
+        name: _patchMap.containsKey(Profile$.name)
+            ? (_patchMap[Profile$.name] is Function)
                 ? _patchMap[Profile$.name](this.name)
                 : _patchMap[Profile$.name]
-          : this.name,
-      age: _patchMap.containsKey(Profile$.age)
-          ? (_patchMap[Profile$.age] is Function)
+            : this.name,
+        age: _patchMap.containsKey(Profile$.age)
+            ? (_patchMap[Profile$.age] is Function)
                 ? _patchMap[Profile$.age](this.age)
                 : _patchMap[Profile$.age]
-          : this.age,
-    );
+            : this.age);
   }
 
   @override
@@ -70,9 +86,10 @@ class Profile extends $Profile {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -169,9 +186,10 @@ extension ProfileSerialization on Profile {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -200,31 +218,47 @@ class User extends $User {
   @override
   final Profile profile;
 
-  User({required this.email, required this.profile});
+  User({
+    required this.email,
+    required this.profile,
+  });
 
-  User copyWith({String? email, Profile? profile}) {
-    return User(email: email ?? this.email, profile: profile ?? this.profile);
+  User copyWith({
+    String? email,
+    Profile? profile,
+  }) {
+    return User(
+      email: email ?? this.email,
+      profile: profile ?? this.profile,
+    );
   }
 
-  User copyWithUser({String? email, Profile? profile}) {
-    return copyWith(email: email, profile: profile);
+  User copyWithUser({
+    String? email,
+    Profile? profile,
+  }) {
+    return copyWith(
+      email: email,
+      profile: profile,
+    );
   }
 
-  User patchWithUser({UserPatch? patchInput}) {
+  User patchWithUser({
+    UserPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? UserPatch();
     final _patchMap = _patcher.toPatch();
     return User(
-      email: _patchMap.containsKey(User$.email)
-          ? (_patchMap[User$.email] is Function)
+        email: _patchMap.containsKey(User$.email)
+            ? (_patchMap[User$.email] is Function)
                 ? _patchMap[User$.email](this.email)
                 : _patchMap[User$.email]
-          : this.email,
-      profile: _patchMap.containsKey(User$.profile)
-          ? (_patchMap[User$.profile] is Function)
+            : this.email,
+        profile: _patchMap.containsKey(User$.profile)
+            ? (_patchMap[User$.profile] is Function)
                 ? _patchMap[User$.profile](this.profile)
                 : _patchMap[User$.profile]
-          : this.profile,
-    );
+            : this.profile);
   }
 
   @override
@@ -254,9 +288,10 @@ class User extends $User {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -369,9 +404,10 @@ extension UserSerialization on User {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }

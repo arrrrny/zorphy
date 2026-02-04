@@ -101,7 +101,8 @@ String getProperties(
         var fieldType =
             f.type != null ? _replaceDollarTypesWithConcrete(f.type!) : f.type;
         // For copyWith, we want all parameters to be nullable, so add ? if not already present
-        var nullableFieldType = fieldType!.endsWith('?') ? fieldType : '${fieldType}?';
+        var nullableFieldType =
+            fieldType!.endsWith('?') ? fieldType : '${fieldType}?';
         sb.writeln("    $nullableFieldType ${f.name},");
       }
       sb.writeln("  }) : ");
@@ -544,6 +545,49 @@ String getInterfaceCopyWithMethods(
   return sb.toString();
 }
 
+String getInterfaceCopyWithFnMethods(
+  List<Interface> interfaces,
+  List<NameTypeClassComment> classFields,
+  String className,
+  List<NameTypeClassComment> allFieldsDistinct,
+) {
+  var sb = StringBuffer();
+  var classNameTrimmed = className.replaceAll("\$", "");
+
+  for (var i in interfaces) {
+    var interfaceName = i.interfaceName;
+    if (!interfaceName.startsWith("\$") || interfaceName.startsWith("\$\$")) {
+      continue;
+    }
+    var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
+    if (interfaceNameTrimmed == classNameTrimmed) continue;
+
+    var interfaceFields = i.fields
+        .where((f) => allFieldsDistinct.any((af) => af.name == f.name))
+        .toList();
+    if (interfaceFields.isEmpty) continue;
+
+    sb.writeln("");
+    sb.writeln("  $classNameTrimmed copyWith${interfaceNameTrimmed}Fn({");
+    for (var f in interfaceFields) {
+      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+      var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
+      sb.writeln("    $nullableType Function()? ${f.name},");
+    }
+    sb.writeln("  }) {");
+    sb.writeln("    return copyWith(");
+    var params = interfaceFields
+        .map((f) =>
+            "${f.name}: ${f.name} != null ? ${f.name}() : this.${f.name}")
+        .join(", ");
+    sb.writeln("      $params,");
+    sb.writeln("    );");
+    sb.writeln("  }");
+  }
+
+  return sb.toString();
+}
+
 String getEqualsAndHashCode(
   List<NameTypeClassComment> fields,
   String className,
@@ -796,6 +840,114 @@ String getPatchClass(
     sb.writeln("    return this;");
     sb.writeln("  }");
     sb.writeln();
+
+    // Generate cross-file nested patch methods for Zorphy types
+    var fieldType = field.type ?? "";
+    var fieldTypeWithoutDollars = getDataTypeWithoutDollars(fieldType);
+    var isNullable = fieldType.endsWith("?");
+    var innerType = fieldTypeWithoutDollars.replaceAll("?", "");
+
+    // Check if this is a Zorphy type (starts with $ and not a generic)
+    bool isKnownClassType(String type) {
+      if (type.startsWith("\$")) return true;
+      return knownClasses.any((k) => type == k);
+    }
+
+    var isZorphyType = isKnownClassType(innerType) ||
+        (innerType.startsWith("List<") &&
+            isKnownClassType(
+                innerType.replaceAll(RegExp(r'^List<(.+)>$'), r'$1'))) ||
+        (innerType.startsWith("Map<") &&
+            isKnownClassType(
+                innerType.replaceAll(RegExp(r'^Map<(.+, .+)>$'), r'$2')));
+
+    if (isZorphyType && !isGenericType) {
+      // Handle List types
+      if (innerType.startsWith("List<")) {
+        var listMatch = RegExp(r'^List<(.+)>$').firstMatch(innerType);
+        if (listMatch != null) {
+          var elementType = listMatch.group(1) ?? "";
+          var elementTypeWithoutDollars =
+              getDataTypeWithoutDollars(elementType);
+          var elementTypeIsZorphy = elementType.startsWith("\$") ||
+              knownClasses.contains(elementTypeWithoutDollars);
+          if (elementTypeIsZorphy) {
+            var elementPatchType = elementTypeWithoutDollars + "Patch";
+            sb.writeln(
+              "  ${classNameTrimmed}Patch update${capitalizedName}At(int index, $elementPatchType Function($elementPatchType) patch) {",
+            );
+            sb.writeln("    _patch[$enumName.$name] = (List<dynamic> list) {");
+            sb.writeln("      var updatedList = List.from(list);");
+            sb.writeln("      if (index >= 0 && index < updatedList.length) {");
+            sb.writeln(
+                "        updatedList[index] = patch(updatedList[index] as $elementPatchType);");
+            sb.writeln("      }");
+            sb.writeln("      return updatedList;");
+            sb.writeln("    };");
+            sb.writeln("    return this;");
+            sb.writeln("  }");
+            sb.writeln();
+          }
+        }
+      }
+      // Handle Map types
+      else if (innerType.startsWith("Map<")) {
+        var mapMatch = RegExp(r'^Map<(.+), (.+)>$').firstMatch(innerType);
+        if (mapMatch != null) {
+          var keyType = mapMatch.group(1) ?? "";
+          var valueType = mapMatch.group(2) ?? "";
+          var valueTypeWithoutDollars = getDataTypeWithoutDollars(valueType);
+          var valueTypeIsZorphy = valueType.startsWith("\$") ||
+              knownClasses.contains(valueTypeWithoutDollars);
+          if (valueTypeIsZorphy) {
+            var valuePatchType = valueTypeWithoutDollars + "Patch";
+            sb.writeln(
+              "  ${classNameTrimmed}Patch update${capitalizedName}Value($keyType key, $valuePatchType Function($valuePatchType) patch) {",
+            );
+            sb.writeln(
+                "    _patch[$enumName.$name] = (Map<dynamic, dynamic> map) {");
+            sb.writeln("      var updatedMap = Map.from(map);");
+            sb.writeln("      if (updatedMap.containsKey(key)) {");
+            sb.writeln(
+                "        updatedMap[key] = patch(updatedMap[key] as $valuePatchType);");
+            sb.writeln("      }");
+            sb.writeln("      return updatedMap;");
+            sb.writeln("    };");
+            sb.writeln("    return this;");
+            sb.writeln("  }");
+            sb.writeln();
+          }
+        }
+      }
+      // Handle single object types (nullable and non-nullable)
+      else {
+        var patchType = innerType + "Patch";
+        // with{CapitalizedName}Patch method for direct patch application
+        sb.writeln(
+          "  ${classNameTrimmed}Patch with${capitalizedName}Patch($patchType patch) {",
+        );
+        sb.writeln("    _patch[$enumName.$name] = patch;");
+        sb.writeln("    return this;");
+        sb.writeln("  }");
+        sb.writeln();
+
+        // with{CapitalizedName}PatchFunc method for function-based patching
+        var funcParamType = "$patchType Function($patchType)";
+        sb.writeln(
+          "  ${classNameTrimmed}Patch with${capitalizedName}PatchFunc($funcParamType patch) {",
+        );
+        sb.writeln("    _patch[$enumName.$name] = (dynamic current) {");
+        sb.writeln("      var currentPatch = $patchType();");
+        sb.writeln("      if (current != null) {");
+        sb.writeln("        currentPatch = current as $patchType;");
+        sb.writeln("      }");
+        sb.writeln("      return patch(currentPatch);");
+        sb.writeln("    };");
+        sb.writeln("    return this;");
+        sb.writeln("  }");
+        sb.writeln();
+      }
+    }
   }
 
   sb.writeln("}");

@@ -18,26 +18,37 @@ class Super extends $Super {
   @override
   final String id;
 
-  Super({required this.id});
+  Super({
+    required this.id,
+  });
 
-  Super copyWith({String? id}) {
-    return Super(id: id ?? this.id);
+  Super copyWith({
+    String? id,
+  }) {
+    return Super(
+      id: id ?? this.id,
+    );
   }
 
-  Super copyWithSuper({String? id}) {
-    return copyWith(id: id);
+  Super copyWithSuper({
+    String? id,
+  }) {
+    return copyWith(
+      id: id,
+    );
   }
 
-  Super patchWithSuper({SuperPatch? patchInput}) {
+  Super patchWithSuper({
+    SuperPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? SuperPatch();
     final _patchMap = _patcher.toPatch();
     return Super(
-      id: _patchMap.containsKey(Super$.id)
-          ? (_patchMap[Super$.id] is Function)
+        id: _patchMap.containsKey(Super$.id)
+            ? (_patchMap[Super$.id] is Function)
                 ? _patchMap[Super$.id](this.id)
                 : _patchMap[Super$.id]
-          : this.id,
-    );
+            : this.id);
   }
 
   @override
@@ -148,13 +159,12 @@ extension SuperChangeToE on Super {
     _patcher.withDescription(description);
     final _patchMap = _patcher.toPatch();
     return Sub(
-      description: _patchMap[Sub$.description],
-      id: _patchMap.containsKey(Sub$.id)
-          ? (_patchMap[Sub$.id] is Function)
+        description: _patchMap[Sub$.description],
+        id: _patchMap.containsKey(Sub$.id)
+            ? (_patchMap[Sub$.id] is Function)
                 ? _patchMap[Sub$.id](id)
                 : _patchMap[Sub$.id]
-          : id,
-    );
+            : id);
   }
 }
 
@@ -164,45 +174,67 @@ class Sub extends $Sub implements Super {
   @override
   final String description;
 
-  Sub({required this.id, required this.description});
+  Sub({
+    required this.id,
+    required this.description,
+  });
 
-  Sub copyWith({String? id, String? description}) {
-    return Sub(id: id ?? this.id, description: description ?? this.description);
-  }
-
-  Sub copyWithSub({String? id, String? description}) {
-    return copyWith(id: id, description: description);
-  }
-
-  Sub patchWithSub({SubPatch? patchInput}) {
-    final _patcher = patchInput ?? SubPatch();
-    final _patchMap = _patcher.toPatch();
+  Sub copyWith({
+    String? id,
+    String? description,
+  }) {
     return Sub(
-      id: _patchMap.containsKey(Sub$.id)
-          ? (_patchMap[Sub$.id] is Function)
-                ? _patchMap[Sub$.id](this.id)
-                : _patchMap[Sub$.id]
-          : this.id,
-      description: _patchMap.containsKey(Sub$.description)
-          ? (_patchMap[Sub$.description] is Function)
-                ? _patchMap[Sub$.description](this.description)
-                : _patchMap[Sub$.description]
-          : this.description,
+      id: id ?? this.id,
+      description: description ?? this.description,
     );
   }
 
-  Sub copyWithSuper({String? id}) {
-    return copyWith(id: id);
+  Sub copyWithSub({
+    String? id,
+    String? description,
+  }) {
+    return copyWith(
+      id: id,
+      description: description,
+    );
   }
 
-  Sub patchWithSuper({SuperPatch? patchInput}) {
+  Sub patchWithSub({
+    SubPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? SubPatch();
+    final _patchMap = _patcher.toPatch();
+    return Sub(
+        id: _patchMap.containsKey(Sub$.id)
+            ? (_patchMap[Sub$.id] is Function)
+                ? _patchMap[Sub$.id](this.id)
+                : _patchMap[Sub$.id]
+            : this.id,
+        description: _patchMap.containsKey(Sub$.description)
+            ? (_patchMap[Sub$.description] is Function)
+                ? _patchMap[Sub$.description](this.description)
+                : _patchMap[Sub$.description]
+            : this.description);
+  }
+
+  Sub copyWithSuper({
+    String? id,
+  }) {
+    return copyWith(
+      id: id,
+    );
+  }
+
+  Sub patchWithSuper({
+    SuperPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? SuperPatch();
     final _patchMap = _patcher.toPatch();
     return Sub(
       id: _patchMap.containsKey(Super$.id)
           ? (_patchMap[Super$.id] is Function)
-                ? _patchMap[Super$.id](this.id)
-                : _patchMap[Super$.id]
+              ? _patchMap[Super$.id](this.id)
+              : _patchMap[Super$.id]
           : this.id,
       description: this.description,
     );

@@ -154,7 +154,7 @@ String createZorphy(
         getInterfaceCopyWithMethods(interfaces, allFieldsDistinct, className));
     if (generateCopyWithFn) {
       sb.writeln(getInterfaceCopyWithFnMethods(
-          interfaces, allFieldsDistinct, className));
+          interfaces, allFieldsDistinct, className, allFieldsDistinct));
     }
     sb.writeln(
         getInterfacePatchWithMethods(interfaces, allFieldsDistinct, className));

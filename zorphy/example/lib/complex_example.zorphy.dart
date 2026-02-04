@@ -19,35 +19,47 @@ class Circle implements $$Shape {
   final double area;
   final double radius;
 
-  Circle({required this.area, required this.radius});
+  Circle({
+    required this.area,
+    required this.radius,
+  });
 
-  Circle copyWith({double? area, double? radius}) {
-    return Circle(area: area ?? this.area, radius: radius ?? this.radius);
-  }
-
-  Circle copyWithCircle({double? area, double? radius}) {
-    return copyWith(area: area, radius: radius);
-  }
-
-  Circle patchWithCircle({CirclePatch? patchInput}) {
-    final _patcher = patchInput ?? CirclePatch();
-    final _patchMap = _patcher.toPatch();
+  Circle copyWith({
+    double? area,
+    double? radius,
+  }) {
     return Circle(
-      area: _patchMap.containsKey(Circle$.area)
-          ? (_patchMap[Circle$.area] is Function)
-                ? _patchMap[Circle$.area](this.area)
-                : _patchMap[Circle$.area]
-          : this.area,
-      radius: _patchMap.containsKey(Circle$.radius)
-          ? (_patchMap[Circle$.radius] is Function)
-                ? _patchMap[Circle$.radius](this.radius)
-                : _patchMap[Circle$.radius]
-          : this.radius,
+      area: area ?? this.area,
+      radius: radius ?? this.radius,
     );
   }
 
-  Circle copyWithShape({double? area}) {
-    return copyWith(area: area);
+  Circle copyWithCircle({
+    double? area,
+    double? radius,
+  }) {
+    return copyWith(
+      area: area,
+      radius: radius,
+    );
+  }
+
+  Circle patchWithCircle({
+    CirclePatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? CirclePatch();
+    final _patchMap = _patcher.toPatch();
+    return Circle(
+        area: _patchMap.containsKey(Circle$.area)
+            ? (_patchMap[Circle$.area] is Function)
+                ? _patchMap[Circle$.area](this.area)
+                : _patchMap[Circle$.area]
+            : this.area,
+        radius: _patchMap.containsKey(Circle$.radius)
+            ? (_patchMap[Circle$.radius] is Function)
+                ? _patchMap[Circle$.radius](this.radius)
+                : _patchMap[Circle$.radius]
+            : this.radius);
   }
 
   @override
@@ -77,9 +89,10 @@ class Circle implements $$Shape {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -176,9 +189,10 @@ extension CircleSerialization on Circle {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -206,9 +220,17 @@ class Rectangle implements $$Shape {
   final double width;
   final double height;
 
-  Rectangle({required this.area, required this.width, required this.height});
+  Rectangle({
+    required this.area,
+    required this.width,
+    required this.height,
+  });
 
-  Rectangle copyWith({double? area, double? width, double? height}) {
+  Rectangle copyWith({
+    double? area,
+    double? width,
+    double? height,
+  }) {
     return Rectangle(
       area: area ?? this.area,
       width: width ?? this.width,
@@ -216,34 +238,39 @@ class Rectangle implements $$Shape {
     );
   }
 
-  Rectangle copyWithRectangle({double? area, double? width, double? height}) {
-    return copyWith(area: area, width: width, height: height);
-  }
-
-  Rectangle patchWithRectangle({RectanglePatch? patchInput}) {
-    final _patcher = patchInput ?? RectanglePatch();
-    final _patchMap = _patcher.toPatch();
-    return Rectangle(
-      area: _patchMap.containsKey(Rectangle$.area)
-          ? (_patchMap[Rectangle$.area] is Function)
-                ? _patchMap[Rectangle$.area](this.area)
-                : _patchMap[Rectangle$.area]
-          : this.area,
-      width: _patchMap.containsKey(Rectangle$.width)
-          ? (_patchMap[Rectangle$.width] is Function)
-                ? _patchMap[Rectangle$.width](this.width)
-                : _patchMap[Rectangle$.width]
-          : this.width,
-      height: _patchMap.containsKey(Rectangle$.height)
-          ? (_patchMap[Rectangle$.height] is Function)
-                ? _patchMap[Rectangle$.height](this.height)
-                : _patchMap[Rectangle$.height]
-          : this.height,
+  Rectangle copyWithRectangle({
+    double? area,
+    double? width,
+    double? height,
+  }) {
+    return copyWith(
+      area: area,
+      width: width,
+      height: height,
     );
   }
 
-  Rectangle copyWithShape({double? area}) {
-    return copyWith(area: area);
+  Rectangle patchWithRectangle({
+    RectanglePatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? RectanglePatch();
+    final _patchMap = _patcher.toPatch();
+    return Rectangle(
+        area: _patchMap.containsKey(Rectangle$.area)
+            ? (_patchMap[Rectangle$.area] is Function)
+                ? _patchMap[Rectangle$.area](this.area)
+                : _patchMap[Rectangle$.area]
+            : this.area,
+        width: _patchMap.containsKey(Rectangle$.width)
+            ? (_patchMap[Rectangle$.width] is Function)
+                ? _patchMap[Rectangle$.width](this.width)
+                : _patchMap[Rectangle$.width]
+            : this.width,
+        height: _patchMap.containsKey(Rectangle$.height)
+            ? (_patchMap[Rectangle$.height] is Function)
+                ? _patchMap[Rectangle$.height](this.height)
+                : _patchMap[Rectangle$.height]
+            : this.height);
   }
 
   @override
@@ -282,9 +309,10 @@ class Rectangle implements $$Shape {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -386,9 +414,10 @@ extension RectangleSerialization on Rectangle {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -422,7 +451,11 @@ class TreeNode extends $TreeNode {
   @override
   final TreeNode? parent;
 
-  TreeNode({required this.value, required this.children, this.parent});
+  TreeNode({
+    required this.value,
+    required this.children,
+    this.parent,
+  });
 
   TreeNode copyWith({
     String? value,
@@ -441,29 +474,34 @@ class TreeNode extends $TreeNode {
     List<TreeNode>? children,
     TreeNode? parent,
   }) {
-    return copyWith(value: value, children: children, parent: parent);
+    return copyWith(
+      value: value,
+      children: children,
+      parent: parent,
+    );
   }
 
-  TreeNode patchWithTreeNode({TreeNodePatch? patchInput}) {
+  TreeNode patchWithTreeNode({
+    TreeNodePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? TreeNodePatch();
     final _patchMap = _patcher.toPatch();
     return TreeNode(
-      value: _patchMap.containsKey(TreeNode$.value)
-          ? (_patchMap[TreeNode$.value] is Function)
+        value: _patchMap.containsKey(TreeNode$.value)
+            ? (_patchMap[TreeNode$.value] is Function)
                 ? _patchMap[TreeNode$.value](this.value)
                 : _patchMap[TreeNode$.value]
-          : this.value,
-      children: _patchMap.containsKey(TreeNode$.children)
-          ? (_patchMap[TreeNode$.children] is Function)
+            : this.value,
+        children: _patchMap.containsKey(TreeNode$.children)
+            ? (_patchMap[TreeNode$.children] is Function)
                 ? _patchMap[TreeNode$.children](this.children)
                 : _patchMap[TreeNode$.children]
-          : this.children,
-      parent: _patchMap.containsKey(TreeNode$.parent)
-          ? (_patchMap[TreeNode$.parent] is Function)
+            : this.children,
+        parent: _patchMap.containsKey(TreeNode$.parent)
+            ? (_patchMap[TreeNode$.parent] is Function)
                 ? _patchMap[TreeNode$.parent](this.parent)
                 : _patchMap[TreeNode$.parent]
-          : this.parent,
-    );
+            : this.parent);
   }
 
   @override
@@ -502,9 +540,10 @@ class TreeNode extends $TreeNode {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -591,9 +630,7 @@ class TreeNodePatch implements Patch<TreeNode> {
   }
 
   TreeNodePatch updateChildrenAt(
-    int index,
-    TreeNodePatch Function(TreeNodePatch) patch,
-  ) {
+      int index, TreeNodePatch Function(TreeNodePatch) patch) {
     _patch[TreeNode$.children] = (List<dynamic> list) {
       var updatedList = List.from(list);
       if (index >= 0 && index < updatedList.length) {
@@ -615,8 +652,7 @@ class TreeNodePatch implements Patch<TreeNode> {
   }
 
   TreeNodePatch withParentPatchFunc(
-    TreeNodePatch Function(TreeNodePatch) patch,
-  ) {
+      TreeNodePatch Function(TreeNodePatch) patch) {
     _patch[TreeNode$.parent] = (dynamic current) {
       var currentPatch = TreeNodePatch();
       if (current != null) {
@@ -638,9 +674,10 @@ extension TreeNodeSerialization on TreeNode {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }

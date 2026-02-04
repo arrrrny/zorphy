@@ -180,121 +180,122 @@ class LargeClass extends $LargeClass {
     );
   }
 
-  LargeClass patchWithLargeClass({LargeClassPatch? patchInput}) {
+  LargeClass patchWithLargeClass({
+    LargeClassPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? LargeClassPatch();
     final _patchMap = _patcher.toPatch();
     return LargeClass(
-      f1: _patchMap.containsKey(LargeClass$.f1)
-          ? (_patchMap[LargeClass$.f1] is Function)
+        f1: _patchMap.containsKey(LargeClass$.f1)
+            ? (_patchMap[LargeClass$.f1] is Function)
                 ? _patchMap[LargeClass$.f1](this.f1)
                 : _patchMap[LargeClass$.f1]
-          : this.f1,
-      f2: _patchMap.containsKey(LargeClass$.f2)
-          ? (_patchMap[LargeClass$.f2] is Function)
+            : this.f1,
+        f2: _patchMap.containsKey(LargeClass$.f2)
+            ? (_patchMap[LargeClass$.f2] is Function)
                 ? _patchMap[LargeClass$.f2](this.f2)
                 : _patchMap[LargeClass$.f2]
-          : this.f2,
-      f3: _patchMap.containsKey(LargeClass$.f3)
-          ? (_patchMap[LargeClass$.f3] is Function)
+            : this.f2,
+        f3: _patchMap.containsKey(LargeClass$.f3)
+            ? (_patchMap[LargeClass$.f3] is Function)
                 ? _patchMap[LargeClass$.f3](this.f3)
                 : _patchMap[LargeClass$.f3]
-          : this.f3,
-      f4: _patchMap.containsKey(LargeClass$.f4)
-          ? (_patchMap[LargeClass$.f4] is Function)
+            : this.f3,
+        f4: _patchMap.containsKey(LargeClass$.f4)
+            ? (_patchMap[LargeClass$.f4] is Function)
                 ? _patchMap[LargeClass$.f4](this.f4)
                 : _patchMap[LargeClass$.f4]
-          : this.f4,
-      f5: _patchMap.containsKey(LargeClass$.f5)
-          ? (_patchMap[LargeClass$.f5] is Function)
+            : this.f4,
+        f5: _patchMap.containsKey(LargeClass$.f5)
+            ? (_patchMap[LargeClass$.f5] is Function)
                 ? _patchMap[LargeClass$.f5](this.f5)
                 : _patchMap[LargeClass$.f5]
-          : this.f5,
-      f6: _patchMap.containsKey(LargeClass$.f6)
-          ? (_patchMap[LargeClass$.f6] is Function)
+            : this.f5,
+        f6: _patchMap.containsKey(LargeClass$.f6)
+            ? (_patchMap[LargeClass$.f6] is Function)
                 ? _patchMap[LargeClass$.f6](this.f6)
                 : _patchMap[LargeClass$.f6]
-          : this.f6,
-      f7: _patchMap.containsKey(LargeClass$.f7)
-          ? (_patchMap[LargeClass$.f7] is Function)
+            : this.f6,
+        f7: _patchMap.containsKey(LargeClass$.f7)
+            ? (_patchMap[LargeClass$.f7] is Function)
                 ? _patchMap[LargeClass$.f7](this.f7)
                 : _patchMap[LargeClass$.f7]
-          : this.f7,
-      f8: _patchMap.containsKey(LargeClass$.f8)
-          ? (_patchMap[LargeClass$.f8] is Function)
+            : this.f7,
+        f8: _patchMap.containsKey(LargeClass$.f8)
+            ? (_patchMap[LargeClass$.f8] is Function)
                 ? _patchMap[LargeClass$.f8](this.f8)
                 : _patchMap[LargeClass$.f8]
-          : this.f8,
-      f9: _patchMap.containsKey(LargeClass$.f9)
-          ? (_patchMap[LargeClass$.f9] is Function)
+            : this.f8,
+        f9: _patchMap.containsKey(LargeClass$.f9)
+            ? (_patchMap[LargeClass$.f9] is Function)
                 ? _patchMap[LargeClass$.f9](this.f9)
                 : _patchMap[LargeClass$.f9]
-          : this.f9,
-      f10: _patchMap.containsKey(LargeClass$.f10)
-          ? (_patchMap[LargeClass$.f10] is Function)
+            : this.f9,
+        f10: _patchMap.containsKey(LargeClass$.f10)
+            ? (_patchMap[LargeClass$.f10] is Function)
                 ? _patchMap[LargeClass$.f10](this.f10)
                 : _patchMap[LargeClass$.f10]
-          : this.f10,
-      f11: _patchMap.containsKey(LargeClass$.f11)
-          ? (_patchMap[LargeClass$.f11] is Function)
+            : this.f10,
+        f11: _patchMap.containsKey(LargeClass$.f11)
+            ? (_patchMap[LargeClass$.f11] is Function)
                 ? _patchMap[LargeClass$.f11](this.f11)
                 : _patchMap[LargeClass$.f11]
-          : this.f11,
-      f12: _patchMap.containsKey(LargeClass$.f12)
-          ? (_patchMap[LargeClass$.f12] is Function)
+            : this.f11,
+        f12: _patchMap.containsKey(LargeClass$.f12)
+            ? (_patchMap[LargeClass$.f12] is Function)
                 ? _patchMap[LargeClass$.f12](this.f12)
                 : _patchMap[LargeClass$.f12]
-          : this.f12,
-      f13: _patchMap.containsKey(LargeClass$.f13)
-          ? (_patchMap[LargeClass$.f13] is Function)
+            : this.f12,
+        f13: _patchMap.containsKey(LargeClass$.f13)
+            ? (_patchMap[LargeClass$.f13] is Function)
                 ? _patchMap[LargeClass$.f13](this.f13)
                 : _patchMap[LargeClass$.f13]
-          : this.f13,
-      f14: _patchMap.containsKey(LargeClass$.f14)
-          ? (_patchMap[LargeClass$.f14] is Function)
+            : this.f13,
+        f14: _patchMap.containsKey(LargeClass$.f14)
+            ? (_patchMap[LargeClass$.f14] is Function)
                 ? _patchMap[LargeClass$.f14](this.f14)
                 : _patchMap[LargeClass$.f14]
-          : this.f14,
-      f15: _patchMap.containsKey(LargeClass$.f15)
-          ? (_patchMap[LargeClass$.f15] is Function)
+            : this.f14,
+        f15: _patchMap.containsKey(LargeClass$.f15)
+            ? (_patchMap[LargeClass$.f15] is Function)
                 ? _patchMap[LargeClass$.f15](this.f15)
                 : _patchMap[LargeClass$.f15]
-          : this.f15,
-      f16: _patchMap.containsKey(LargeClass$.f16)
-          ? (_patchMap[LargeClass$.f16] is Function)
+            : this.f15,
+        f16: _patchMap.containsKey(LargeClass$.f16)
+            ? (_patchMap[LargeClass$.f16] is Function)
                 ? _patchMap[LargeClass$.f16](this.f16)
                 : _patchMap[LargeClass$.f16]
-          : this.f16,
-      f17: _patchMap.containsKey(LargeClass$.f17)
-          ? (_patchMap[LargeClass$.f17] is Function)
+            : this.f16,
+        f17: _patchMap.containsKey(LargeClass$.f17)
+            ? (_patchMap[LargeClass$.f17] is Function)
                 ? _patchMap[LargeClass$.f17](this.f17)
                 : _patchMap[LargeClass$.f17]
-          : this.f17,
-      f18: _patchMap.containsKey(LargeClass$.f18)
-          ? (_patchMap[LargeClass$.f18] is Function)
+            : this.f17,
+        f18: _patchMap.containsKey(LargeClass$.f18)
+            ? (_patchMap[LargeClass$.f18] is Function)
                 ? _patchMap[LargeClass$.f18](this.f18)
                 : _patchMap[LargeClass$.f18]
-          : this.f18,
-      f19: _patchMap.containsKey(LargeClass$.f19)
-          ? (_patchMap[LargeClass$.f19] is Function)
+            : this.f18,
+        f19: _patchMap.containsKey(LargeClass$.f19)
+            ? (_patchMap[LargeClass$.f19] is Function)
                 ? _patchMap[LargeClass$.f19](this.f19)
                 : _patchMap[LargeClass$.f19]
-          : this.f19,
-      f20: _patchMap.containsKey(LargeClass$.f20)
-          ? (_patchMap[LargeClass$.f20] is Function)
+            : this.f19,
+        f20: _patchMap.containsKey(LargeClass$.f20)
+            ? (_patchMap[LargeClass$.f20] is Function)
                 ? _patchMap[LargeClass$.f20](this.f20)
                 : _patchMap[LargeClass$.f20]
-          : this.f20,
-      f21: _patchMap.containsKey(LargeClass$.f21)
-          ? (_patchMap[LargeClass$.f21] is Function)
+            : this.f20,
+        f21: _patchMap.containsKey(LargeClass$.f21)
+            ? (_patchMap[LargeClass$.f21] is Function)
                 ? _patchMap[LargeClass$.f21](this.f21)
                 : _patchMap[LargeClass$.f21]
-          : this.f21,
-      f22: _patchMap.containsKey(LargeClass$.f22)
-          ? (_patchMap[LargeClass$.f22] is Function)
+            : this.f21,
+        f22: _patchMap.containsKey(LargeClass$.f22)
+            ? (_patchMap[LargeClass$.f22] is Function)
                 ? _patchMap[LargeClass$.f22](this.f22)
                 : _patchMap[LargeClass$.f22]
-          : this.f22,
-    );
+            : this.f22);
   }
 
   @override
@@ -328,27 +329,26 @@ class LargeClass extends $LargeClass {
   @override
   int get hashCode {
     return Object.hash(
-          this.f1,
-          this.f2,
-          this.f3,
-          this.f4,
-          this.f5,
-          this.f6,
-          this.f7,
-          this.f8,
-          this.f9,
-          this.f10,
-          this.f11,
-          this.f12,
-          this.f13,
-          this.f14,
-          this.f15,
-          this.f16,
-          this.f17,
-          this.f18,
-          this.f19,
-          this.f20,
-        ) ^
+            this.f1,
+            this.f2,
+            this.f3,
+            this.f4,
+            this.f5,
+            this.f6,
+            this.f7,
+            this.f8,
+            this.f9,
+            this.f10,
+            this.f11,
+            this.f12,
+            this.f13,
+            this.f14,
+            this.f15,
+            this.f16,
+            this.f17,
+            this.f18,
+            this.f19,
+            this.f20) ^
         Object.hash(this.f21, this.f22);
   }
 
@@ -412,9 +412,10 @@ class LargeClass extends $LargeClass {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -444,7 +445,7 @@ enum LargeClass$ {
   f19,
   f20,
   f21,
-  f22,
+  f22
 }
 
 class LargeClassPatch implements Patch<LargeClass> {
@@ -634,9 +635,10 @@ extension LargeClassSerialization on LargeClass {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }

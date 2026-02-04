@@ -12,24 +12,33 @@ class A extends $A {
   @override
   final String a;
 
-  A copyWith({String? a}) {
-    return A(a: a ?? this.a);
+  A copyWith({
+    String? a,
+  }) {
+    return A(
+      a: a ?? this.a,
+    );
   }
 
-  A copyWithA({String? a}) {
-    return copyWith(a: a);
+  A copyWithA({
+    String? a,
+  }) {
+    return copyWith(
+      a: a,
+    );
   }
 
-  A patchWithA({APatch? patchInput}) {
+  A patchWithA({
+    APatch? patchInput,
+  }) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return A(
-      a: _patchMap.containsKey(A$.a)
-          ? (_patchMap[A$.a] is Function)
+        a: _patchMap.containsKey(A$.a)
+            ? (_patchMap[A$.a] is Function)
                 ? _patchMap[A$.a](this.a)
                 : _patchMap[A$.a]
-          : this.a,
-    );
+            : this.a);
   }
 
   @override

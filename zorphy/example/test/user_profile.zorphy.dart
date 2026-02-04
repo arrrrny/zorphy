@@ -61,39 +61,39 @@ class UserProfile extends $UserProfile {
     );
   }
 
-  UserProfile patchWithUserProfile({UserProfilePatch? patchInput}) {
+  UserProfile patchWithUserProfile({
+    UserProfilePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? UserProfilePatch();
     final _patchMap = _patcher.toPatch();
     return UserProfile(
-      userId: _patchMap.containsKey(UserProfile$.userId)
-          ? (_patchMap[UserProfile$.userId] is Function)
+        userId: _patchMap.containsKey(UserProfile$.userId)
+            ? (_patchMap[UserProfile$.userId] is Function)
                 ? _patchMap[UserProfile$.userId](this.userId)
                 : _patchMap[UserProfile$.userId]
-          : this.userId,
-      name: _patchMap.containsKey(UserProfile$.name)
-          ? (_patchMap[UserProfile$.name] is Function)
+            : this.userId,
+        name: _patchMap.containsKey(UserProfile$.name)
+            ? (_patchMap[UserProfile$.name] is Function)
                 ? _patchMap[UserProfile$.name](this.name)
                 : _patchMap[UserProfile$.name]
-          : this.name,
-      demographics: _patchMap.containsKey(UserProfile$.demographics)
-          ? (_patchMap[UserProfile$.demographics] is Function)
+            : this.name,
+        demographics: _patchMap.containsKey(UserProfile$.demographics)
+            ? (_patchMap[UserProfile$.demographics] is Function)
                 ? _patchMap[UserProfile$.demographics](this.demographics)
                 : _patchMap[UserProfile$.demographics]
-          : this.demographics,
-      demographicsHistory:
-          _patchMap.containsKey(UserProfile$.demographicsHistory)
-          ? (_patchMap[UserProfile$.demographicsHistory] is Function)
-                ? _patchMap[UserProfile$.demographicsHistory](
-                    this.demographicsHistory,
-                  )
-                : _patchMap[UserProfile$.demographicsHistory]
-          : this.demographicsHistory,
-      savedProfiles: _patchMap.containsKey(UserProfile$.savedProfiles)
-          ? (_patchMap[UserProfile$.savedProfiles] is Function)
+            : this.demographics,
+        demographicsHistory:
+            _patchMap.containsKey(UserProfile$.demographicsHistory)
+                ? (_patchMap[UserProfile$.demographicsHistory] is Function)
+                    ? _patchMap[UserProfile$.demographicsHistory](
+                        this.demographicsHistory)
+                    : _patchMap[UserProfile$.demographicsHistory]
+                : this.demographicsHistory,
+        savedProfiles: _patchMap.containsKey(UserProfile$.savedProfiles)
+            ? (_patchMap[UserProfile$.savedProfiles] is Function)
                 ? _patchMap[UserProfile$.savedProfiles](this.savedProfiles)
                 : _patchMap[UserProfile$.savedProfiles]
-          : this.savedProfiles,
-    );
+            : this.savedProfiles);
   }
 
   @override
@@ -109,13 +109,8 @@ class UserProfile extends $UserProfile {
 
   @override
   int get hashCode {
-    return Object.hash(
-      this.userId,
-      this.name,
-      this.demographics,
-      this.demographicsHistory,
-      this.savedProfiles,
-    );
+    return Object.hash(this.userId, this.name, this.demographics,
+        this.demographicsHistory, this.savedProfiles);
   }
 
   @override
@@ -144,9 +139,10 @@ class UserProfile extends $UserProfile {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -159,7 +155,7 @@ enum UserProfile$ {
   name,
   demographics,
   demographicsHistory,
-  savedProfiles,
+  savedProfiles
 }
 
 class UserProfilePatch implements Patch<UserProfile> {
@@ -170,9 +166,8 @@ class UserProfilePatch implements Patch<UserProfile> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue = UserProfile$.values.firstWhere(
-            (e) => e.name == key,
-          );
+          final enumValue =
+              UserProfile$.values.firstWhere((e) => e.name == key);
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -251,8 +246,7 @@ class UserProfilePatch implements Patch<UserProfile> {
   }
 
   UserProfilePatch withDemographicsPatchFunc(
-    DemographicsPatch Function(DemographicsPatch) patch,
-  ) {
+      DemographicsPatch Function(DemographicsPatch) patch) {
     _patch[UserProfile$.demographics] = (dynamic current) {
       var currentPatch = DemographicsPatch();
       if (current != null) {
@@ -269,9 +263,7 @@ class UserProfilePatch implements Patch<UserProfile> {
   }
 
   UserProfilePatch updateDemographicsHistoryValue(
-    String key,
-    DemographicsPatch Function(DemographicsPatch) patch,
-  ) {
+      String key, DemographicsPatch Function(DemographicsPatch) patch) {
     _patch[UserProfile$.demographicsHistory] = (Map<dynamic, dynamic> map) {
       var updatedMap = Map.from(map);
       if (updatedMap.containsKey(key)) {
@@ -288,9 +280,7 @@ class UserProfilePatch implements Patch<UserProfile> {
   }
 
   UserProfilePatch updateSavedProfilesAt(
-    int index,
-    DemographicsPatch Function(DemographicsPatch) patch,
-  ) {
+      int index, DemographicsPatch Function(DemographicsPatch) patch) {
     _patch[UserProfile$.savedProfiles] = (List<dynamic> list) {
       var updatedList = List.from(list);
       if (index >= 0 && index < updatedList.length) {
@@ -312,9 +302,10 @@ extension UserProfileSerialization on UserProfile {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }

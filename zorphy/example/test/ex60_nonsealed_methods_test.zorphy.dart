@@ -53,31 +53,32 @@ class ChatMessage extends $ChatMessage {
     );
   }
 
-  ChatMessage patchWithChatMessage({ChatMessagePatch? patchInput}) {
+  ChatMessage patchWithChatMessage({
+    ChatMessagePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? ChatMessagePatch();
     final _patchMap = _patcher.toPatch();
     return ChatMessage(
-      id: _patchMap.containsKey(ChatMessage$.id)
-          ? (_patchMap[ChatMessage$.id] is Function)
+        id: _patchMap.containsKey(ChatMessage$.id)
+            ? (_patchMap[ChatMessage$.id] is Function)
                 ? _patchMap[ChatMessage$.id](this.id)
                 : _patchMap[ChatMessage$.id]
-          : this.id,
-      createdAt: _patchMap.containsKey(ChatMessage$.createdAt)
-          ? (_patchMap[ChatMessage$.createdAt] is Function)
+            : this.id,
+        createdAt: _patchMap.containsKey(ChatMessage$.createdAt)
+            ? (_patchMap[ChatMessage$.createdAt] is Function)
                 ? _patchMap[ChatMessage$.createdAt](this.createdAt)
                 : _patchMap[ChatMessage$.createdAt]
-          : this.createdAt,
-      conversationId: _patchMap.containsKey(ChatMessage$.conversationId)
-          ? (_patchMap[ChatMessage$.conversationId] is Function)
+            : this.createdAt,
+        conversationId: _patchMap.containsKey(ChatMessage$.conversationId)
+            ? (_patchMap[ChatMessage$.conversationId] is Function)
                 ? _patchMap[ChatMessage$.conversationId](this.conversationId)
                 : _patchMap[ChatMessage$.conversationId]
-          : this.conversationId,
-      content: _patchMap.containsKey(ChatMessage$.content)
-          ? (_patchMap[ChatMessage$.content] is Function)
+            : this.conversationId,
+        content: _patchMap.containsKey(ChatMessage$.content)
+            ? (_patchMap[ChatMessage$.content] is Function)
                 ? _patchMap[ChatMessage$.content](this.content)
                 : _patchMap[ChatMessage$.content]
-          : this.content,
-    );
+            : this.content);
   }
 
   @override
@@ -93,11 +94,7 @@ class ChatMessage extends $ChatMessage {
   @override
   int get hashCode {
     return Object.hash(
-      this.id,
-      this.createdAt,
-      this.conversationId,
-      this.content,
-    );
+        this.id, this.createdAt, this.conversationId, this.content);
   }
 
   @override
@@ -123,9 +120,8 @@ class ChatMessagePatch implements Patch<ChatMessage> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue = ChatMessage$.values.firstWhere(
-            (e) => e.name == key,
-          );
+          final enumValue =
+              ChatMessage$.values.firstWhere((e) => e.name == key);
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -283,41 +279,42 @@ class SystemMessage extends $$SystemMessage implements ChatMessage {
     );
   }
 
-  SystemMessage patchWithSystemMessage({SystemMessagePatch? patchInput}) {
+  SystemMessage patchWithSystemMessage({
+    SystemMessagePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? SystemMessagePatch();
     final _patchMap = _patcher.toPatch();
     return SystemMessage(
-      id: _patchMap.containsKey(SystemMessage$.id)
-          ? (_patchMap[SystemMessage$.id] is Function)
+        id: _patchMap.containsKey(SystemMessage$.id)
+            ? (_patchMap[SystemMessage$.id] is Function)
                 ? _patchMap[SystemMessage$.id](this.id)
                 : _patchMap[SystemMessage$.id]
-          : this.id,
-      createdAt: _patchMap.containsKey(SystemMessage$.createdAt)
-          ? (_patchMap[SystemMessage$.createdAt] is Function)
+            : this.id,
+        createdAt: _patchMap.containsKey(SystemMessage$.createdAt)
+            ? (_patchMap[SystemMessage$.createdAt] is Function)
                 ? _patchMap[SystemMessage$.createdAt](this.createdAt)
                 : _patchMap[SystemMessage$.createdAt]
-          : this.createdAt,
-      conversationId: _patchMap.containsKey(SystemMessage$.conversationId)
-          ? (_patchMap[SystemMessage$.conversationId] is Function)
+            : this.createdAt,
+        conversationId: _patchMap.containsKey(SystemMessage$.conversationId)
+            ? (_patchMap[SystemMessage$.conversationId] is Function)
                 ? _patchMap[SystemMessage$.conversationId](this.conversationId)
                 : _patchMap[SystemMessage$.conversationId]
-          : this.conversationId,
-      content: _patchMap.containsKey(SystemMessage$.content)
-          ? (_patchMap[SystemMessage$.content] is Function)
+            : this.conversationId,
+        content: _patchMap.containsKey(SystemMessage$.content)
+            ? (_patchMap[SystemMessage$.content] is Function)
                 ? _patchMap[SystemMessage$.content](this.content)
                 : _patchMap[SystemMessage$.content]
-          : this.content,
-      systemType: _patchMap.containsKey(SystemMessage$.systemType)
-          ? (_patchMap[SystemMessage$.systemType] is Function)
+            : this.content,
+        systemType: _patchMap.containsKey(SystemMessage$.systemType)
+            ? (_patchMap[SystemMessage$.systemType] is Function)
                 ? _patchMap[SystemMessage$.systemType](this.systemType)
                 : _patchMap[SystemMessage$.systemType]
-          : this.systemType,
-      metadata: _patchMap.containsKey(SystemMessage$.metadata)
-          ? (_patchMap[SystemMessage$.metadata] is Function)
+            : this.systemType,
+        metadata: _patchMap.containsKey(SystemMessage$.metadata)
+            ? (_patchMap[SystemMessage$.metadata] is Function)
                 ? _patchMap[SystemMessage$.metadata](this.metadata)
                 : _patchMap[SystemMessage$.metadata]
-          : this.metadata,
-    );
+            : this.metadata);
   }
 
   SystemMessage copyWithChatMessage({
@@ -334,29 +331,31 @@ class SystemMessage extends $$SystemMessage implements ChatMessage {
     );
   }
 
-  SystemMessage patchWithChatMessage({ChatMessagePatch? patchInput}) {
+  SystemMessage patchWithChatMessage({
+    ChatMessagePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? ChatMessagePatch();
     final _patchMap = _patcher.toPatch();
     return SystemMessage(
       id: _patchMap.containsKey(ChatMessage$.id)
           ? (_patchMap[ChatMessage$.id] is Function)
-                ? _patchMap[ChatMessage$.id](this.id)
-                : _patchMap[ChatMessage$.id]
+              ? _patchMap[ChatMessage$.id](this.id)
+              : _patchMap[ChatMessage$.id]
           : this.id,
       createdAt: _patchMap.containsKey(ChatMessage$.createdAt)
           ? (_patchMap[ChatMessage$.createdAt] is Function)
-                ? _patchMap[ChatMessage$.createdAt](this.createdAt)
-                : _patchMap[ChatMessage$.createdAt]
+              ? _patchMap[ChatMessage$.createdAt](this.createdAt)
+              : _patchMap[ChatMessage$.createdAt]
           : this.createdAt,
       conversationId: _patchMap.containsKey(ChatMessage$.conversationId)
           ? (_patchMap[ChatMessage$.conversationId] is Function)
-                ? _patchMap[ChatMessage$.conversationId](this.conversationId)
-                : _patchMap[ChatMessage$.conversationId]
+              ? _patchMap[ChatMessage$.conversationId](this.conversationId)
+              : _patchMap[ChatMessage$.conversationId]
           : this.conversationId,
       content: _patchMap.containsKey(ChatMessage$.content)
           ? (_patchMap[ChatMessage$.content] is Function)
-                ? _patchMap[ChatMessage$.content](this.content)
-                : _patchMap[ChatMessage$.content]
+              ? _patchMap[ChatMessage$.content](this.content)
+              : _patchMap[ChatMessage$.content]
           : this.content,
       systemType: this.systemType,
       metadata: this.metadata,
@@ -377,14 +376,8 @@ class SystemMessage extends $$SystemMessage implements ChatMessage {
 
   @override
   int get hashCode {
-    return Object.hash(
-      this.id,
-      this.createdAt,
-      this.conversationId,
-      this.content,
-      this.systemType,
-      this.metadata,
-    );
+    return Object.hash(this.id, this.createdAt, this.conversationId,
+        this.content, this.systemType, this.metadata);
   }
 
   @override
@@ -410,7 +403,7 @@ enum SystemMessage$ {
   conversationId,
   content,
   systemType,
-  metadata,
+  metadata
 }
 
 class SystemMessagePatch implements Patch<SystemMessage> {
@@ -421,9 +414,8 @@ class SystemMessagePatch implements Patch<SystemMessage> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue = SystemMessage$.values.firstWhere(
-            (e) => e.name == key,
-          );
+          final enumValue =
+              SystemMessage$.values.firstWhere((e) => e.name == key);
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -597,50 +589,47 @@ class SparkMessage implements $$SystemMessage {
     );
   }
 
-  SparkMessage patchWithSparkMessage({SparkMessagePatch? patchInput}) {
+  SparkMessage patchWithSparkMessage({
+    SparkMessagePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? SparkMessagePatch();
     final _patchMap = _patcher.toPatch();
     return SparkMessage(
-      systemType: _patchMap.containsKey(SparkMessage$.systemType)
-          ? (_patchMap[SparkMessage$.systemType] is Function)
+        systemType: _patchMap.containsKey(SparkMessage$.systemType)
+            ? (_patchMap[SparkMessage$.systemType] is Function)
                 ? _patchMap[SparkMessage$.systemType](this.systemType)
                 : _patchMap[SparkMessage$.systemType]
-          : this.systemType,
-      metadata: _patchMap.containsKey(SparkMessage$.metadata)
-          ? (_patchMap[SparkMessage$.metadata] is Function)
+            : this.systemType,
+        metadata: _patchMap.containsKey(SparkMessage$.metadata)
+            ? (_patchMap[SparkMessage$.metadata] is Function)
                 ? _patchMap[SparkMessage$.metadata](this.metadata)
                 : _patchMap[SparkMessage$.metadata]
-          : this.metadata,
-      id: _patchMap.containsKey(SparkMessage$.id)
-          ? (_patchMap[SparkMessage$.id] is Function)
+            : this.metadata,
+        id: _patchMap.containsKey(SparkMessage$.id)
+            ? (_patchMap[SparkMessage$.id] is Function)
                 ? _patchMap[SparkMessage$.id](this.id)
                 : _patchMap[SparkMessage$.id]
-          : this.id,
-      createdAt: _patchMap.containsKey(SparkMessage$.createdAt)
-          ? (_patchMap[SparkMessage$.createdAt] is Function)
+            : this.id,
+        createdAt: _patchMap.containsKey(SparkMessage$.createdAt)
+            ? (_patchMap[SparkMessage$.createdAt] is Function)
                 ? _patchMap[SparkMessage$.createdAt](this.createdAt)
                 : _patchMap[SparkMessage$.createdAt]
-          : this.createdAt,
-      conversationId: _patchMap.containsKey(SparkMessage$.conversationId)
-          ? (_patchMap[SparkMessage$.conversationId] is Function)
+            : this.createdAt,
+        conversationId: _patchMap.containsKey(SparkMessage$.conversationId)
+            ? (_patchMap[SparkMessage$.conversationId] is Function)
                 ? _patchMap[SparkMessage$.conversationId](this.conversationId)
                 : _patchMap[SparkMessage$.conversationId]
-          : this.conversationId,
-      content: _patchMap.containsKey(SparkMessage$.content)
-          ? (_patchMap[SparkMessage$.content] is Function)
+            : this.conversationId,
+        content: _patchMap.containsKey(SparkMessage$.content)
+            ? (_patchMap[SparkMessage$.content] is Function)
                 ? _patchMap[SparkMessage$.content](this.content)
                 : _patchMap[SparkMessage$.content]
-          : this.content,
-      spark: _patchMap.containsKey(SparkMessage$.spark)
-          ? (_patchMap[SparkMessage$.spark] is Function)
+            : this.content,
+        spark: _patchMap.containsKey(SparkMessage$.spark)
+            ? (_patchMap[SparkMessage$.spark] is Function)
                 ? _patchMap[SparkMessage$.spark](this.spark)
                 : _patchMap[SparkMessage$.spark]
-          : this.spark,
-    );
-  }
-
-  SparkMessage copyWithSystemMessage({String? systemType, String? metadata}) {
-    return copyWith(systemType: systemType, metadata: metadata);
+            : this.spark);
   }
 
   SparkMessage copyWithChatMessage({
@@ -657,7 +646,9 @@ class SparkMessage implements $$SystemMessage {
     );
   }
 
-  SparkMessage patchWithChatMessage({ChatMessagePatch? patchInput}) {
+  SparkMessage patchWithChatMessage({
+    ChatMessagePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? ChatMessagePatch();
     final _patchMap = _patcher.toPatch();
     return SparkMessage(
@@ -665,23 +656,23 @@ class SparkMessage implements $$SystemMessage {
       metadata: this.metadata,
       id: _patchMap.containsKey(ChatMessage$.id)
           ? (_patchMap[ChatMessage$.id] is Function)
-                ? _patchMap[ChatMessage$.id](this.id)
-                : _patchMap[ChatMessage$.id]
+              ? _patchMap[ChatMessage$.id](this.id)
+              : _patchMap[ChatMessage$.id]
           : this.id,
       createdAt: _patchMap.containsKey(ChatMessage$.createdAt)
           ? (_patchMap[ChatMessage$.createdAt] is Function)
-                ? _patchMap[ChatMessage$.createdAt](this.createdAt)
-                : _patchMap[ChatMessage$.createdAt]
+              ? _patchMap[ChatMessage$.createdAt](this.createdAt)
+              : _patchMap[ChatMessage$.createdAt]
           : this.createdAt,
       conversationId: _patchMap.containsKey(ChatMessage$.conversationId)
           ? (_patchMap[ChatMessage$.conversationId] is Function)
-                ? _patchMap[ChatMessage$.conversationId](this.conversationId)
-                : _patchMap[ChatMessage$.conversationId]
+              ? _patchMap[ChatMessage$.conversationId](this.conversationId)
+              : _patchMap[ChatMessage$.conversationId]
           : this.conversationId,
       content: _patchMap.containsKey(ChatMessage$.content)
           ? (_patchMap[ChatMessage$.content] is Function)
-                ? _patchMap[ChatMessage$.content](this.content)
-                : _patchMap[ChatMessage$.content]
+              ? _patchMap[ChatMessage$.content](this.content)
+              : _patchMap[ChatMessage$.content]
           : this.content,
       spark: this.spark,
     );
@@ -702,15 +693,8 @@ class SparkMessage implements $$SystemMessage {
 
   @override
   int get hashCode {
-    return Object.hash(
-      this.systemType,
-      this.metadata,
-      this.id,
-      this.createdAt,
-      this.conversationId,
-      this.content,
-      this.spark,
-    );
+    return Object.hash(this.systemType, this.metadata, this.id, this.createdAt,
+        this.conversationId, this.content, this.spark);
   }
 
   @override
@@ -739,7 +723,7 @@ enum SparkMessage$ {
   createdAt,
   conversationId,
   content,
-  spark,
+  spark
 }
 
 class SparkMessagePatch implements Patch<SparkMessage> {
@@ -750,9 +734,8 @@ class SparkMessagePatch implements Patch<SparkMessage> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue = SparkMessage$.values.firstWhere(
-            (e) => e.name == key,
-          );
+          final enumValue =
+              SparkMessage$.values.firstWhere((e) => e.name == key);
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {

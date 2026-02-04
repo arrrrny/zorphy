@@ -17,9 +17,17 @@ class Person extends $Person {
   @override
   final String? email;
 
-  Person({required this.name, required this.age, this.email});
+  Person({
+    required this.name,
+    required this.age,
+    this.email,
+  });
 
-  Person copyWith({String? name, int? age, String? email}) {
+  Person copyWith({
+    String? name,
+    int? age,
+    String? email,
+  }) {
     return Person(
       name: name ?? this.name,
       age: age ?? this.age,
@@ -27,30 +35,39 @@ class Person extends $Person {
     );
   }
 
-  Person copyWithPerson({String? name, int? age, String? email}) {
-    return copyWith(name: name, age: age, email: email);
+  Person copyWithPerson({
+    String? name,
+    int? age,
+    String? email,
+  }) {
+    return copyWith(
+      name: name,
+      age: age,
+      email: email,
+    );
   }
 
-  Person patchWithPerson({PersonPatch? patchInput}) {
+  Person patchWithPerson({
+    PersonPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? PersonPatch();
     final _patchMap = _patcher.toPatch();
     return Person(
-      name: _patchMap.containsKey(Person$.name)
-          ? (_patchMap[Person$.name] is Function)
+        name: _patchMap.containsKey(Person$.name)
+            ? (_patchMap[Person$.name] is Function)
                 ? _patchMap[Person$.name](this.name)
                 : _patchMap[Person$.name]
-          : this.name,
-      age: _patchMap.containsKey(Person$.age)
-          ? (_patchMap[Person$.age] is Function)
+            : this.name,
+        age: _patchMap.containsKey(Person$.age)
+            ? (_patchMap[Person$.age] is Function)
                 ? _patchMap[Person$.age](this.age)
                 : _patchMap[Person$.age]
-          : this.age,
-      email: _patchMap.containsKey(Person$.email)
-          ? (_patchMap[Person$.email] is Function)
+            : this.age,
+        email: _patchMap.containsKey(Person$.email)
+            ? (_patchMap[Person$.email] is Function)
                 ? _patchMap[Person$.email](this.email)
                 : _patchMap[Person$.email]
-          : this.email,
-    );
+            : this.email);
   }
 
   @override
@@ -79,6 +96,24 @@ class Person extends $Person {
 
   /// Creates a [Person] instance from JSON
   factory Person.fromJson(Map<String, dynamic> json) => _$PersonFromJson(json);
+
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$PersonToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 enum Person$ { name, age, email }
@@ -167,6 +202,23 @@ class PersonPatch implements Patch<Person> {
 
 extension PersonSerialization on Person {
   Map<String, dynamic> toJson() => _$PersonToJson(this);
+  Map<String, dynamic> toJsonLean() {
+    final Map<String, dynamic> data = _$PersonToJson(this);
+    return _sanitizeJson(data);
+  }
+
+  dynamic _sanitizeJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      json.remove('_className_');
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
+    } else if (json is List) {
+      return json.map((e) => _sanitizeJson(e)).toList();
+    }
+    return json;
+  }
 }
 
 extension PersonCompareE on Person {

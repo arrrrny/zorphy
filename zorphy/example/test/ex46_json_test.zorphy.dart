@@ -13,26 +13,37 @@ class Pet extends $Pet {
   @override
   final String kind;
 
-  Pet({required this.kind});
+  Pet({
+    required this.kind,
+  });
 
-  Pet copyWith({String? kind}) {
-    return Pet(kind: kind ?? this.kind);
+  Pet copyWith({
+    String? kind,
+  }) {
+    return Pet(
+      kind: kind ?? this.kind,
+    );
   }
 
-  Pet copyWithPet({String? kind}) {
-    return copyWith(kind: kind);
+  Pet copyWithPet({
+    String? kind,
+  }) {
+    return copyWith(
+      kind: kind,
+    );
   }
 
-  Pet patchWithPet({PetPatch? patchInput}) {
+  Pet patchWithPet({
+    PetPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? PetPatch();
     final _patchMap = _patcher.toPatch();
     return Pet(
-      kind: _patchMap.containsKey(Pet$.kind)
-          ? (_patchMap[Pet$.kind] is Function)
+        kind: _patchMap.containsKey(Pet$.kind)
+            ? (_patchMap[Pet$.kind] is Function)
                 ? _patchMap[Pet$.kind](this.kind)
                 : _patchMap[Pet$.kind]
-          : this.kind,
-    );
+            : this.kind);
   }
 
   @override
@@ -62,9 +73,10 @@ class Pet extends $Pet {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -156,9 +168,10 @@ extension PetSerialization on Pet {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }

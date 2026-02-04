@@ -96,61 +96,62 @@ class Test extends $Test {
     );
   }
 
-  Test patchWithTest({TestPatch? patchInput}) {
+  Test patchWithTest({
+    TestPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? TestPatch();
     final _patchMap = _patcher.toPatch();
     return Test(
-      String: _patchMap.containsKey(Test$.String)
-          ? (_patchMap[Test$.String] is Function)
+        String: _patchMap.containsKey(Test$.String)
+            ? (_patchMap[Test$.String] is Function)
                 ? _patchMap[Test$.String](this.String)
                 : _patchMap[Test$.String]
-          : this.String,
-      Object: _patchMap.containsKey(Test$.Object)
-          ? (_patchMap[Test$.Object] is Function)
+            : this.String,
+        Object: _patchMap.containsKey(Test$.Object)
+            ? (_patchMap[Test$.Object] is Function)
                 ? _patchMap[Test$.Object](this.Object)
                 : _patchMap[Test$.Object]
-          : this.Object,
-      List: _patchMap.containsKey(Test$.List)
-          ? (_patchMap[Test$.List] is Function)
+            : this.Object,
+        List: _patchMap.containsKey(Test$.List)
+            ? (_patchMap[Test$.List] is Function)
                 ? _patchMap[Test$.List](this.List)
                 : _patchMap[Test$.List]
-          : this.List,
-      Map: _patchMap.containsKey(Test$.Map)
-          ? (_patchMap[Test$.Map] is Function)
+            : this.List,
+        Map: _patchMap.containsKey(Test$.Map)
+            ? (_patchMap[Test$.Map] is Function)
                 ? _patchMap[Test$.Map](this.Map)
                 : _patchMap[Test$.Map]
-          : this.Map,
-      Never: _patchMap.containsKey(Test$.Never)
-          ? (_patchMap[Test$.Never] is Function)
+            : this.Map,
+        Never: _patchMap.containsKey(Test$.Never)
+            ? (_patchMap[Test$.Never] is Function)
                 ? _patchMap[Test$.Never](this.Never)
                 : _patchMap[Test$.Never]
-          : this.Never,
-      Type: _patchMap.containsKey(Test$.Type)
-          ? (_patchMap[Test$.Type] is Function)
+            : this.Never,
+        Type: _patchMap.containsKey(Test$.Type)
+            ? (_patchMap[Test$.Type] is Function)
                 ? _patchMap[Test$.Type](this.Type)
                 : _patchMap[Test$.Type]
-          : this.Type,
-      int: _patchMap.containsKey(Test$.int)
-          ? (_patchMap[Test$.int] is Function)
+            : this.Type,
+        int: _patchMap.containsKey(Test$.int)
+            ? (_patchMap[Test$.int] is Function)
                 ? _patchMap[Test$.int](this.int)
                 : _patchMap[Test$.int]
-          : this.int,
-      bool: _patchMap.containsKey(Test$.bool)
-          ? (_patchMap[Test$.bool] is Function)
+            : this.int,
+        bool: _patchMap.containsKey(Test$.bool)
+            ? (_patchMap[Test$.bool] is Function)
                 ? _patchMap[Test$.bool](this.bool)
                 : _patchMap[Test$.bool]
-          : this.bool,
-      hashObjects: _patchMap.containsKey(Test$.hashObjects)
-          ? (_patchMap[Test$.hashObjects] is Function)
+            : this.bool,
+        hashObjects: _patchMap.containsKey(Test$.hashObjects)
+            ? (_patchMap[Test$.hashObjects] is Function)
                 ? _patchMap[Test$.hashObjects](this.hashObjects)
                 : _patchMap[Test$.hashObjects]
-          : this.hashObjects,
-      identical: _patchMap.containsKey(Test$.identical)
-          ? (_patchMap[Test$.identical] is Function)
+            : this.hashObjects,
+        identical: _patchMap.containsKey(Test$.identical)
+            ? (_patchMap[Test$.identical] is Function)
                 ? _patchMap[Test$.identical](this.identical)
                 : _patchMap[Test$.identical]
-          : this.identical,
-    );
+            : this.identical);
   }
 
   @override
@@ -172,17 +173,16 @@ class Test extends $Test {
   @override
   int get hashCode {
     return Object.hash(
-      this.String,
-      this.Object,
-      this.List,
-      this.Map,
-      this.Never,
-      this.Type,
-      this.int,
-      this.bool,
-      this.hashObjects,
-      this.identical,
-    );
+        this.String,
+        this.Object,
+        this.List,
+        this.Map,
+        this.Never,
+        this.Type,
+        this.int,
+        this.bool,
+        this.hashObjects,
+        this.identical);
   }
 
   @override
@@ -220,9 +220,10 @@ class Test extends $Test {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -240,7 +241,7 @@ enum Test$ {
   int,
   bool,
   hashObjects,
-  identical,
+  identical
 }
 
 class TestPatch implements Patch<Test> {
@@ -370,9 +371,10 @@ extension TestSerialization on Test {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -424,7 +426,10 @@ class Test2 extends $Test2 {
   @override
   final Int Function(Int p1, [Int p2, Int p3]) PositionalFunction;
 
-  Test2({this.Function, required this.PositionalFunction});
+  Test2({
+    this.Function,
+    required this.PositionalFunction,
+  });
 
   Test2 copyWith({
     Int Function(Int p1, {Int n1, required Int n2})? Function,
@@ -440,24 +445,28 @@ class Test2 extends $Test2 {
     Int Function(Int p1, {Int n1, required Int n2})? Function,
     Int Function(Int p1, [Int p2, Int p3])? PositionalFunction,
   }) {
-    return copyWith(Function: Function, PositionalFunction: PositionalFunction);
+    return copyWith(
+      Function: Function,
+      PositionalFunction: PositionalFunction,
+    );
   }
 
-  Test2 patchWithTest2({Test2Patch? patchInput}) {
+  Test2 patchWithTest2({
+    Test2Patch? patchInput,
+  }) {
     final _patcher = patchInput ?? Test2Patch();
     final _patchMap = _patcher.toPatch();
     return Test2(
-      Function: _patchMap.containsKey(Test2$.Function)
-          ? (_patchMap[Test2$.Function] is Function)
+        Function: _patchMap.containsKey(Test2$.Function)
+            ? (_patchMap[Test2$.Function] is Function)
                 ? _patchMap[Test2$.Function](this.Function)
                 : _patchMap[Test2$.Function]
-          : this.Function,
-      PositionalFunction: _patchMap.containsKey(Test2$.PositionalFunction)
-          ? (_patchMap[Test2$.PositionalFunction] is Function)
+            : this.Function,
+        PositionalFunction: _patchMap.containsKey(Test2$.PositionalFunction)
+            ? (_patchMap[Test2$.PositionalFunction] is Function)
                 ? _patchMap[Test2$.PositionalFunction](this.PositionalFunction)
                 : _patchMap[Test2$.PositionalFunction]
-          : this.PositionalFunction,
-    );
+            : this.PositionalFunction);
   }
 
   @override
@@ -551,15 +560,13 @@ class Test2Patch implements Patch<Test2> {
   }
 
   Test2Patch withFunction(
-    Int Function(Int p1, {Int n1, required Int n2})? value,
-  ) {
+      Int Function(Int p1, {Int n1, required Int n2})? value) {
     _patch[Test2$.Function] = value;
     return this;
   }
 
   Test2Patch withPositionalFunction(
-    Int Function(Int p1, [Int p2, Int p3])? value,
-  ) {
+      Int Function(Int p1, [Int p2, Int p3])? value) {
     _patch[Test2$.PositionalFunction] = value;
     return this;
   }

@@ -18,36 +18,57 @@ class A extends $A {
   @override
   final List<X> xs;
 
-  A({required this.id, required this.x, required this.xs});
+  A({
+    required this.id,
+    required this.x,
+    required this.xs,
+  });
 
-  A copyWith({String? id, X? x, List<X>? xs}) {
-    return A(id: id ?? this.id, x: x ?? this.x, xs: xs ?? this.xs);
+  A copyWith({
+    String? id,
+    X? x,
+    List<X>? xs,
+  }) {
+    return A(
+      id: id ?? this.id,
+      x: x ?? this.x,
+      xs: xs ?? this.xs,
+    );
   }
 
-  A copyWithA({String? id, X? x, List<X>? xs}) {
-    return copyWith(id: id, x: x, xs: xs);
+  A copyWithA({
+    String? id,
+    X? x,
+    List<X>? xs,
+  }) {
+    return copyWith(
+      id: id,
+      x: x,
+      xs: xs,
+    );
   }
 
-  A patchWithA({APatch? patchInput}) {
+  A patchWithA({
+    APatch? patchInput,
+  }) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return A(
-      id: _patchMap.containsKey(A$.id)
-          ? (_patchMap[A$.id] is Function)
+        id: _patchMap.containsKey(A$.id)
+            ? (_patchMap[A$.id] is Function)
                 ? _patchMap[A$.id](this.id)
                 : _patchMap[A$.id]
-          : this.id,
-      x: _patchMap.containsKey(A$.x)
-          ? (_patchMap[A$.x] is Function)
+            : this.id,
+        x: _patchMap.containsKey(A$.x)
+            ? (_patchMap[A$.x] is Function)
                 ? _patchMap[A$.x](this.x)
                 : _patchMap[A$.x]
-          : this.x,
-      xs: _patchMap.containsKey(A$.xs)
-          ? (_patchMap[A$.xs] is Function)
+            : this.x,
+        xs: _patchMap.containsKey(A$.xs)
+            ? (_patchMap[A$.xs] is Function)
                 ? _patchMap[A$.xs](this.xs)
                 : _patchMap[A$.xs]
-          : this.xs,
-    );
+            : this.xs);
   }
 
   @override
@@ -77,9 +98,10 @@ class A extends $A {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -208,9 +230,10 @@ extension ASerialization on A {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -240,26 +263,37 @@ class X extends $X {
   @override
   final List<int> items;
 
-  X({required this.items});
+  X({
+    required this.items,
+  });
 
-  X copyWith({List<int>? items}) {
-    return X(items: items ?? this.items);
+  X copyWith({
+    List<int>? items,
+  }) {
+    return X(
+      items: items ?? this.items,
+    );
   }
 
-  X copyWithX({List<int>? items}) {
-    return copyWith(items: items);
+  X copyWithX({
+    List<int>? items,
+  }) {
+    return copyWith(
+      items: items,
+    );
   }
 
-  X patchWithX({XPatch? patchInput}) {
+  X patchWithX({
+    XPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? XPatch();
     final _patchMap = _patcher.toPatch();
     return X(
-      items: _patchMap.containsKey(X$.items)
-          ? (_patchMap[X$.items] is Function)
+        items: _patchMap.containsKey(X$.items)
+            ? (_patchMap[X$.items] is Function)
                 ? _patchMap[X$.items](this.items)
                 : _patchMap[X$.items]
-          : this.items,
-    );
+            : this.items);
   }
 
   @override
@@ -289,9 +323,10 @@ class X extends $X {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -383,9 +418,10 @@ extension XSerialization on X {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }

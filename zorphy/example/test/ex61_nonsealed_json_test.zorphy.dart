@@ -20,7 +20,11 @@ class ApiResponse implements $$ApiResponse {
     required this.timestamp,
   });
 
-  ApiResponse copyWith({String? status, String? message, DateTime? timestamp}) {
+  ApiResponse copyWith({
+    String? status,
+    String? message,
+    DateTime? timestamp,
+  }) {
     return ApiResponse(
       status: status ?? this.status,
       message: message ?? this.message,
@@ -33,33 +37,38 @@ class ApiResponse implements $$ApiResponse {
     String? message,
     DateTime? timestamp,
   }) {
-    return copyWith(status: status, message: message, timestamp: timestamp);
+    return copyWith(
+      status: status,
+      message: message,
+      timestamp: timestamp,
+    );
   }
 
   factory ApiResponse.success(String message) => ApiResponse.success(message);
 
   factory ApiResponse.error(String error) => ApiResponse.error(error);
 
-  ApiResponse patchWithApiResponse({ApiResponsePatch? patchInput}) {
+  ApiResponse patchWithApiResponse({
+    ApiResponsePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? ApiResponsePatch();
     final _patchMap = _patcher.toPatch();
     return ApiResponse(
-      status: _patchMap.containsKey(ApiResponse$.status)
-          ? (_patchMap[ApiResponse$.status] is Function)
+        status: _patchMap.containsKey(ApiResponse$.status)
+            ? (_patchMap[ApiResponse$.status] is Function)
                 ? _patchMap[ApiResponse$.status](this.status)
                 : _patchMap[ApiResponse$.status]
-          : this.status,
-      message: _patchMap.containsKey(ApiResponse$.message)
-          ? (_patchMap[ApiResponse$.message] is Function)
+            : this.status,
+        message: _patchMap.containsKey(ApiResponse$.message)
+            ? (_patchMap[ApiResponse$.message] is Function)
                 ? _patchMap[ApiResponse$.message](this.message)
                 : _patchMap[ApiResponse$.message]
-          : this.message,
-      timestamp: _patchMap.containsKey(ApiResponse$.timestamp)
-          ? (_patchMap[ApiResponse$.timestamp] is Function)
+            : this.message,
+        timestamp: _patchMap.containsKey(ApiResponse$.timestamp)
+            ? (_patchMap[ApiResponse$.timestamp] is Function)
                 ? _patchMap[ApiResponse$.timestamp](this.timestamp)
                 : _patchMap[ApiResponse$.timestamp]
-          : this.timestamp,
-    );
+            : this.timestamp);
   }
 
   @override
@@ -98,9 +107,10 @@ class ApiResponse implements $$ApiResponse {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -118,9 +128,8 @@ class ApiResponsePatch implements Patch<ApiResponse> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue = ApiResponse$.values.firstWhere(
-            (e) => e.name == key,
-          );
+          final enumValue =
+              ApiResponse$.values.firstWhere((e) => e.name == key);
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -204,9 +213,10 @@ extension ApiResponseSerialization on ApiResponse {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -279,35 +289,26 @@ class DetailedApiResponse implements $$ApiResponse {
     final _patcher = patchInput ?? DetailedApiResponsePatch();
     final _patchMap = _patcher.toPatch();
     return DetailedApiResponse(
-      status: _patchMap.containsKey(DetailedApiResponse$.status)
-          ? (_patchMap[DetailedApiResponse$.status] is Function)
+        status: _patchMap.containsKey(DetailedApiResponse$.status)
+            ? (_patchMap[DetailedApiResponse$.status] is Function)
                 ? _patchMap[DetailedApiResponse$.status](this.status)
                 : _patchMap[DetailedApiResponse$.status]
-          : this.status,
-      message: _patchMap.containsKey(DetailedApiResponse$.message)
-          ? (_patchMap[DetailedApiResponse$.message] is Function)
+            : this.status,
+        message: _patchMap.containsKey(DetailedApiResponse$.message)
+            ? (_patchMap[DetailedApiResponse$.message] is Function)
                 ? _patchMap[DetailedApiResponse$.message](this.message)
                 : _patchMap[DetailedApiResponse$.message]
-          : this.message,
-      timestamp: _patchMap.containsKey(DetailedApiResponse$.timestamp)
-          ? (_patchMap[DetailedApiResponse$.timestamp] is Function)
+            : this.message,
+        timestamp: _patchMap.containsKey(DetailedApiResponse$.timestamp)
+            ? (_patchMap[DetailedApiResponse$.timestamp] is Function)
                 ? _patchMap[DetailedApiResponse$.timestamp](this.timestamp)
                 : _patchMap[DetailedApiResponse$.timestamp]
-          : this.timestamp,
-      data: _patchMap.containsKey(DetailedApiResponse$.data)
-          ? (_patchMap[DetailedApiResponse$.data] is Function)
+            : this.timestamp,
+        data: _patchMap.containsKey(DetailedApiResponse$.data)
+            ? (_patchMap[DetailedApiResponse$.data] is Function)
                 ? _patchMap[DetailedApiResponse$.data](this.data)
                 : _patchMap[DetailedApiResponse$.data]
-          : this.data,
-    );
-  }
-
-  DetailedApiResponse copyWithApiResponse({
-    String? status,
-    String? message,
-    DateTime? timestamp,
-  }) {
-    return copyWith(status: status, message: message, timestamp: timestamp);
+            : this.data);
   }
 
   @override
@@ -349,9 +350,10 @@ class DetailedApiResponse implements $$ApiResponse {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -369,9 +371,8 @@ class DetailedApiResponsePatch implements Patch<DetailedApiResponse> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue = DetailedApiResponse$.values.firstWhere(
-            (e) => e.name == key,
-          );
+          final enumValue =
+              DetailedApiResponse$.values.firstWhere((e) => e.name == key);
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -384,8 +385,7 @@ class DetailedApiResponsePatch implements Patch<DetailedApiResponse> {
   }
 
   static DetailedApiResponsePatch fromPatch(
-    Map<DetailedApiResponse$, dynamic> patch,
-  ) {
+      Map<DetailedApiResponse$, dynamic> patch) {
     final _patch = DetailedApiResponsePatch();
     _patch._patch.addAll(patch);
     return _patch;
@@ -462,9 +462,10 @@ extension DetailedApiResponseSerialization on DetailedApiResponse {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -501,9 +502,17 @@ class BaseEntity extends $$BaseEntity {
   @override
   final DateTime? updatedAt;
 
-  BaseEntity({required this.id, required this.createdAt, this.updatedAt});
+  BaseEntity({
+    required this.id,
+    required this.createdAt,
+    this.updatedAt,
+  });
 
-  BaseEntity copyWith({String? id, DateTime? createdAt, DateTime? updatedAt}) {
+  BaseEntity copyWith({
+    String? id,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
     return BaseEntity(
       id: id ?? this.id,
       createdAt: createdAt ?? this.createdAt,
@@ -516,29 +525,34 @@ class BaseEntity extends $$BaseEntity {
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
-    return copyWith(id: id, createdAt: createdAt, updatedAt: updatedAt);
+    return copyWith(
+      id: id,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
   }
 
-  BaseEntity patchWithBaseEntity({BaseEntityPatch? patchInput}) {
+  BaseEntity patchWithBaseEntity({
+    BaseEntityPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? BaseEntityPatch();
     final _patchMap = _patcher.toPatch();
     return BaseEntity(
-      id: _patchMap.containsKey(BaseEntity$.id)
-          ? (_patchMap[BaseEntity$.id] is Function)
+        id: _patchMap.containsKey(BaseEntity$.id)
+            ? (_patchMap[BaseEntity$.id] is Function)
                 ? _patchMap[BaseEntity$.id](this.id)
                 : _patchMap[BaseEntity$.id]
-          : this.id,
-      createdAt: _patchMap.containsKey(BaseEntity$.createdAt)
-          ? (_patchMap[BaseEntity$.createdAt] is Function)
+            : this.id,
+        createdAt: _patchMap.containsKey(BaseEntity$.createdAt)
+            ? (_patchMap[BaseEntity$.createdAt] is Function)
                 ? _patchMap[BaseEntity$.createdAt](this.createdAt)
                 : _patchMap[BaseEntity$.createdAt]
-          : this.createdAt,
-      updatedAt: _patchMap.containsKey(BaseEntity$.updatedAt)
-          ? (_patchMap[BaseEntity$.updatedAt] is Function)
+            : this.createdAt,
+        updatedAt: _patchMap.containsKey(BaseEntity$.updatedAt)
+            ? (_patchMap[BaseEntity$.updatedAt] is Function)
                 ? _patchMap[BaseEntity$.updatedAt](this.updatedAt)
                 : _patchMap[BaseEntity$.updatedAt]
-          : this.updatedAt,
-    );
+            : this.updatedAt);
   }
 
   @override
@@ -577,9 +591,10 @@ class BaseEntity extends $$BaseEntity {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -681,9 +696,10 @@ extension BaseEntitySerialization on BaseEntity {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -756,44 +772,37 @@ class User implements $$BaseEntity {
     );
   }
 
-  User patchWithUser({UserPatch? patchInput}) {
+  User patchWithUser({
+    UserPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? UserPatch();
     final _patchMap = _patcher.toPatch();
     return User(
-      id: _patchMap.containsKey(User$.id)
-          ? (_patchMap[User$.id] is Function)
+        id: _patchMap.containsKey(User$.id)
+            ? (_patchMap[User$.id] is Function)
                 ? _patchMap[User$.id](this.id)
                 : _patchMap[User$.id]
-          : this.id,
-      createdAt: _patchMap.containsKey(User$.createdAt)
-          ? (_patchMap[User$.createdAt] is Function)
+            : this.id,
+        createdAt: _patchMap.containsKey(User$.createdAt)
+            ? (_patchMap[User$.createdAt] is Function)
                 ? _patchMap[User$.createdAt](this.createdAt)
                 : _patchMap[User$.createdAt]
-          : this.createdAt,
-      updatedAt: _patchMap.containsKey(User$.updatedAt)
-          ? (_patchMap[User$.updatedAt] is Function)
+            : this.createdAt,
+        updatedAt: _patchMap.containsKey(User$.updatedAt)
+            ? (_patchMap[User$.updatedAt] is Function)
                 ? _patchMap[User$.updatedAt](this.updatedAt)
                 : _patchMap[User$.updatedAt]
-          : this.updatedAt,
-      name: _patchMap.containsKey(User$.name)
-          ? (_patchMap[User$.name] is Function)
+            : this.updatedAt,
+        name: _patchMap.containsKey(User$.name)
+            ? (_patchMap[User$.name] is Function)
                 ? _patchMap[User$.name](this.name)
                 : _patchMap[User$.name]
-          : this.name,
-      email: _patchMap.containsKey(User$.email)
-          ? (_patchMap[User$.email] is Function)
+            : this.name,
+        email: _patchMap.containsKey(User$.email)
+            ? (_patchMap[User$.email] is Function)
                 ? _patchMap[User$.email](this.email)
                 : _patchMap[User$.email]
-          : this.email,
-    );
-  }
-
-  User copyWithBaseEntity({
-    String? id,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return copyWith(id: id, createdAt: createdAt, updatedAt: updatedAt);
+            : this.email);
   }
 
   @override
@@ -810,12 +819,7 @@ class User implements $$BaseEntity {
   @override
   int get hashCode {
     return Object.hash(
-      this.id,
-      this.createdAt,
-      this.updatedAt,
-      this.name,
-      this.email,
-    );
+        this.id, this.createdAt, this.updatedAt, this.name, this.email);
   }
 
   @override
@@ -843,9 +847,10 @@ class User implements $$BaseEntity {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -957,9 +962,10 @@ extension UserSerialization on User {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }

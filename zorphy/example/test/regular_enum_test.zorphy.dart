@@ -61,36 +61,37 @@ class Task extends $Task {
     );
   }
 
-  Task patchWithTask({TaskPatch? patchInput}) {
+  Task patchWithTask({
+    TaskPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? TaskPatch();
     final _patchMap = _patcher.toPatch();
     return Task(
-      title: _patchMap.containsKey(Task$.title)
-          ? (_patchMap[Task$.title] is Function)
+        title: _patchMap.containsKey(Task$.title)
+            ? (_patchMap[Task$.title] is Function)
                 ? _patchMap[Task$.title](this.title)
                 : _patchMap[Task$.title]
-          : this.title,
-      description: _patchMap.containsKey(Task$.description)
-          ? (_patchMap[Task$.description] is Function)
+            : this.title,
+        description: _patchMap.containsKey(Task$.description)
+            ? (_patchMap[Task$.description] is Function)
                 ? _patchMap[Task$.description](this.description)
                 : _patchMap[Task$.description]
-          : this.description,
-      priority: _patchMap.containsKey(Task$.priority)
-          ? (_patchMap[Task$.priority] is Function)
+            : this.description,
+        priority: _patchMap.containsKey(Task$.priority)
+            ? (_patchMap[Task$.priority] is Function)
                 ? _patchMap[Task$.priority](this.priority)
                 : _patchMap[Task$.priority]
-          : this.priority,
-      status: _patchMap.containsKey(Task$.status)
-          ? (_patchMap[Task$.status] is Function)
+            : this.priority,
+        status: _patchMap.containsKey(Task$.status)
+            ? (_patchMap[Task$.status] is Function)
                 ? _patchMap[Task$.status](this.status)
                 : _patchMap[Task$.status]
-          : this.status,
-      createdAt: _patchMap.containsKey(Task$.createdAt)
-          ? (_patchMap[Task$.createdAt] is Function)
+            : this.status,
+        createdAt: _patchMap.containsKey(Task$.createdAt)
+            ? (_patchMap[Task$.createdAt] is Function)
                 ? _patchMap[Task$.createdAt](this.createdAt)
                 : _patchMap[Task$.createdAt]
-          : this.createdAt,
-    );
+            : this.createdAt);
   }
 
   @override
@@ -106,13 +107,8 @@ class Task extends $Task {
 
   @override
   int get hashCode {
-    return Object.hash(
-      this.title,
-      this.description,
-      this.priority,
-      this.status,
-      this.createdAt,
-    );
+    return Object.hash(this.title, this.description, this.priority, this.status,
+        this.createdAt);
   }
 
   @override
@@ -140,9 +136,10 @@ class Task extends $Task {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -254,9 +251,10 @@ extension TaskSerialization on Task {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -326,26 +324,27 @@ class Project extends $Project {
     );
   }
 
-  Project patchWithProject({ProjectPatch? patchInput}) {
+  Project patchWithProject({
+    ProjectPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? ProjectPatch();
     final _patchMap = _patcher.toPatch();
     return Project(
-      name: _patchMap.containsKey(Project$.name)
-          ? (_patchMap[Project$.name] is Function)
+        name: _patchMap.containsKey(Project$.name)
+            ? (_patchMap[Project$.name] is Function)
                 ? _patchMap[Project$.name](this.name)
                 : _patchMap[Project$.name]
-          : this.name,
-      tasks: _patchMap.containsKey(Project$.tasks)
-          ? (_patchMap[Project$.tasks] is Function)
+            : this.name,
+        tasks: _patchMap.containsKey(Project$.tasks)
+            ? (_patchMap[Project$.tasks] is Function)
                 ? _patchMap[Project$.tasks](this.tasks)
                 : _patchMap[Project$.tasks]
-          : this.tasks,
-      defaultPriorities: _patchMap.containsKey(Project$.defaultPriorities)
-          ? (_patchMap[Project$.defaultPriorities] is Function)
+            : this.tasks,
+        defaultPriorities: _patchMap.containsKey(Project$.defaultPriorities)
+            ? (_patchMap[Project$.defaultPriorities] is Function)
                 ? _patchMap[Project$.defaultPriorities](this.defaultPriorities)
                 : _patchMap[Project$.defaultPriorities]
-          : this.defaultPriorities,
-    );
+            : this.defaultPriorities);
   }
 
   @override
@@ -384,9 +383,10 @@ class Project extends $Project {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -499,9 +499,10 @@ extension ProjectSerialization on Project {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }

@@ -14,31 +14,47 @@ class Person extends $Person {
   @override
   final int age;
 
-  Person({required this.name, required this.age});
+  Person({
+    required this.name,
+    required this.age,
+  });
 
-  Person copyWith({String? name, int? age}) {
-    return Person(name: name ?? this.name, age: age ?? this.age);
+  Person copyWith({
+    String? name,
+    int? age,
+  }) {
+    return Person(
+      name: name ?? this.name,
+      age: age ?? this.age,
+    );
   }
 
-  Person copyWithPerson({String? name, int? age}) {
-    return copyWith(name: name, age: age);
+  Person copyWithPerson({
+    String? name,
+    int? age,
+  }) {
+    return copyWith(
+      name: name,
+      age: age,
+    );
   }
 
-  Person patchWithPerson({PersonPatch? patchInput}) {
+  Person patchWithPerson({
+    PersonPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? PersonPatch();
     final _patchMap = _patcher.toPatch();
     return Person(
-      name: _patchMap.containsKey(Person$.name)
-          ? (_patchMap[Person$.name] is Function)
+        name: _patchMap.containsKey(Person$.name)
+            ? (_patchMap[Person$.name] is Function)
                 ? _patchMap[Person$.name](this.name)
                 : _patchMap[Person$.name]
-          : this.name,
-      age: _patchMap.containsKey(Person$.age)
-          ? (_patchMap[Person$.age] is Function)
+            : this.name,
+        age: _patchMap.containsKey(Person$.age)
+            ? (_patchMap[Person$.age] is Function)
                 ? _patchMap[Person$.age](this.age)
                 : _patchMap[Person$.age]
-          : this.age,
-    );
+            : this.age);
   }
 
   @override

@@ -19,30 +19,37 @@ sealed class $Super {
 class SubA implements $$Super {
   final String x;
 
-  SubA({required this.x});
+  SubA({
+    required this.x,
+  });
 
-  SubA copyWith({String? x}) {
-    return SubA(x: x ?? this.x);
-  }
-
-  SubA copyWithSubA({String? x}) {
-    return copyWith(x: x);
-  }
-
-  SubA patchWithSubA({SubAPatch? patchInput}) {
-    final _patcher = patchInput ?? SubAPatch();
-    final _patchMap = _patcher.toPatch();
+  SubA copyWith({
+    String? x,
+  }) {
     return SubA(
-      x: _patchMap.containsKey(SubA$.x)
-          ? (_patchMap[SubA$.x] is Function)
-                ? _patchMap[SubA$.x](this.x)
-                : _patchMap[SubA$.x]
-          : this.x,
+      x: x ?? this.x,
     );
   }
 
-  SubA copyWithSuper({String? x}) {
-    return copyWith(x: x);
+  SubA copyWithSubA({
+    String? x,
+  }) {
+    return copyWith(
+      x: x,
+    );
+  }
+
+  SubA patchWithSubA({
+    SubAPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? SubAPatch();
+    final _patchMap = _patcher.toPatch();
+    return SubA(
+        x: _patchMap.containsKey(SubA$.x)
+            ? (_patchMap[SubA$.x] is Function)
+                ? _patchMap[SubA$.x](this.x)
+                : _patchMap[SubA$.x]
+            : this.x);
   }
 
   @override
@@ -154,14 +161,13 @@ extension SubAChangeToE on SubA {
     _patcher.withCs(cs);
     final _patchMap = _patcher.toPatch();
     return SubB(
-      z: _patchMap[SubB$.z],
-      cs: _patchMap[SubB$.cs],
-      x: _patchMap.containsKey(SubB$.x)
-          ? (_patchMap[SubB$.x] is Function)
+        z: _patchMap[SubB$.z],
+        cs: _patchMap[SubB$.cs],
+        x: _patchMap.containsKey(SubB$.x)
+            ? (_patchMap[SubB$.x] is Function)
                 ? _patchMap[SubB$.x](x)
                 : _patchMap[SubB$.x]
-          : x,
-    );
+            : x);
   }
 }
 
@@ -170,73 +176,86 @@ class SubB implements $$Super {
   final String z;
   final List<C> cs;
 
-  SubB({required this.x, required this.z, required this.cs});
+  SubB({
+    required this.x,
+    required this.z,
+    required this.cs,
+  });
 
-  SubB._copyWith({String? x, String? z, List<C>? cs})
-    : x =
-          x ??
-          (() {
-            throw ArgumentError("x is required");
-          })(),
-      z =
-          z ??
-          (() {
-            throw ArgumentError("z is required");
-          })(),
-      cs =
-          cs ??
-          (() {
-            throw ArgumentError("cs is required");
-          })();
+  SubB._copyWith({
+    String? x,
+    String? z,
+    List<C>? cs,
+  })  : x = x ??
+            (() {
+              throw ArgumentError("x is required");
+            })(),
+        z = z ??
+            (() {
+              throw ArgumentError("z is required");
+            })(),
+        cs = cs ??
+            (() {
+              throw ArgumentError("cs is required");
+            })();
 
-  SubB copyWith({String? x, String? z, List<C>? cs}) {
-    return SubB(x: x ?? this.x, z: z ?? this.z, cs: cs ?? this.cs);
-  }
-
-  SubB copyWithSubB({String? x, String? z, List<C>? cs}) {
-    return copyWith(x: x, z: z, cs: cs);
-  }
-
-  SubB copyWithSubBFn({
-    String? Function()? x,
-    String? Function()? z,
-    List<C>? Function()? cs,
+  SubB copyWith({
+    String? x,
+    String? z,
+    List<C>? cs,
   }) {
     return SubB(
-      x: x != null ? x() : this.x,
-      z: z != null ? z() : this.z,
-      cs: cs != null ? cs() : this.cs,
+      x: x ?? this.x,
+      z: z ?? this.z,
+      cs: cs ?? this.cs,
     );
   }
 
-  SubB patchWithSubB({SubBPatch? patchInput}) {
+  SubB copyWithSubB({
+    String? x,
+    String? z,
+    List<C>? cs,
+  }) {
+    return copyWith(
+      x: x,
+      z: z,
+      cs: cs,
+    );
+  }
+
+  SubB copyWithFn({
+    String? Function(String?)? x,
+    String? Function(String?)? z,
+    List<C>? Function(List<C>?)? cs,
+  }) {
+    return SubB(
+      x: x != null ? x(this.x) : this.x,
+      z: z != null ? z(this.z) : this.z,
+      cs: cs != null ? cs(this.cs) : this.cs,
+    );
+  }
+
+  SubB patchWithSubB({
+    SubBPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? SubBPatch();
     final _patchMap = _patcher.toPatch();
     return SubB(
-      x: _patchMap.containsKey(SubB$.x)
-          ? (_patchMap[SubB$.x] is Function)
+        x: _patchMap.containsKey(SubB$.x)
+            ? (_patchMap[SubB$.x] is Function)
                 ? _patchMap[SubB$.x](this.x)
                 : _patchMap[SubB$.x]
-          : this.x,
-      z: _patchMap.containsKey(SubB$.z)
-          ? (_patchMap[SubB$.z] is Function)
+            : this.x,
+        z: _patchMap.containsKey(SubB$.z)
+            ? (_patchMap[SubB$.z] is Function)
                 ? _patchMap[SubB$.z](this.z)
                 : _patchMap[SubB$.z]
-          : this.z,
-      cs: _patchMap.containsKey(SubB$.cs)
-          ? (_patchMap[SubB$.cs] is Function)
+            : this.z,
+        cs: _patchMap.containsKey(SubB$.cs)
+            ? (_patchMap[SubB$.cs] is Function)
                 ? _patchMap[SubB$.cs](this.cs)
                 : _patchMap[SubB$.cs]
-          : this.cs,
-    );
-  }
-
-  SubB copyWithSuper({String? x}) {
-    return copyWith(x: x);
-  }
-
-  SubB copyWithSuperFn({String? Function()? x}) {
-    return copyWith(x: x != null ? x() : this.x);
+            : this.cs);
   }
 
   @override
@@ -372,26 +391,37 @@ class C extends $C {
   @override
   final String m;
 
-  C({required this.m});
+  C({
+    required this.m,
+  });
 
-  C copyWith({String? m}) {
-    return C(m: m ?? this.m);
+  C copyWith({
+    String? m,
+  }) {
+    return C(
+      m: m ?? this.m,
+    );
   }
 
-  C copyWithC({String? m}) {
-    return copyWith(m: m);
+  C copyWithC({
+    String? m,
+  }) {
+    return copyWith(
+      m: m,
+    );
   }
 
-  C patchWithC({CPatch? patchInput}) {
+  C patchWithC({
+    CPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? CPatch();
     final _patchMap = _patcher.toPatch();
     return C(
-      m: _patchMap.containsKey(C$.m)
-          ? (_patchMap[C$.m] is Function)
+        m: _patchMap.containsKey(C$.m)
+            ? (_patchMap[C$.m] is Function)
                 ? _patchMap[C$.m](this.m)
                 : _patchMap[C$.m]
-          : this.m,
-    );
+            : this.m);
   }
 
   @override

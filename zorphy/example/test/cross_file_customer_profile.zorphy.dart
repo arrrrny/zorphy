@@ -17,7 +17,11 @@ class CustomerProfile extends $CustomerProfile {
   @override
   final String? operatingSystem;
 
-  CustomerProfile({this.yearOfBirth, this.occupation, this.operatingSystem});
+  CustomerProfile({
+    this.yearOfBirth,
+    this.occupation,
+    this.operatingSystem,
+  });
 
   CustomerProfile copyWith({
     int? yearOfBirth,
@@ -43,28 +47,28 @@ class CustomerProfile extends $CustomerProfile {
     );
   }
 
-  CustomerProfile patchWithCustomerProfile({CustomerProfilePatch? patchInput}) {
+  CustomerProfile patchWithCustomerProfile({
+    CustomerProfilePatch? patchInput,
+  }) {
     final _patcher = patchInput ?? CustomerProfilePatch();
     final _patchMap = _patcher.toPatch();
     return CustomerProfile(
-      yearOfBirth: _patchMap.containsKey(CustomerProfile$.yearOfBirth)
-          ? (_patchMap[CustomerProfile$.yearOfBirth] is Function)
+        yearOfBirth: _patchMap.containsKey(CustomerProfile$.yearOfBirth)
+            ? (_patchMap[CustomerProfile$.yearOfBirth] is Function)
                 ? _patchMap[CustomerProfile$.yearOfBirth](this.yearOfBirth)
                 : _patchMap[CustomerProfile$.yearOfBirth]
-          : this.yearOfBirth,
-      occupation: _patchMap.containsKey(CustomerProfile$.occupation)
-          ? (_patchMap[CustomerProfile$.occupation] is Function)
+            : this.yearOfBirth,
+        occupation: _patchMap.containsKey(CustomerProfile$.occupation)
+            ? (_patchMap[CustomerProfile$.occupation] is Function)
                 ? _patchMap[CustomerProfile$.occupation](this.occupation)
                 : _patchMap[CustomerProfile$.occupation]
-          : this.occupation,
-      operatingSystem: _patchMap.containsKey(CustomerProfile$.operatingSystem)
-          ? (_patchMap[CustomerProfile$.operatingSystem] is Function)
+            : this.occupation,
+        operatingSystem: _patchMap.containsKey(CustomerProfile$.operatingSystem)
+            ? (_patchMap[CustomerProfile$.operatingSystem] is Function)
                 ? _patchMap[CustomerProfile$.operatingSystem](
-                    this.operatingSystem,
-                  )
+                    this.operatingSystem)
                 : _patchMap[CustomerProfile$.operatingSystem]
-          : this.operatingSystem,
-    );
+            : this.operatingSystem);
   }
 
   @override
@@ -103,9 +107,10 @@ class CustomerProfile extends $CustomerProfile {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -123,9 +128,8 @@ class CustomerProfilePatch implements Patch<CustomerProfile> {
     if (diff != null) {
       diff.forEach((key, value) {
         try {
-          final enumValue = CustomerProfile$.values.firstWhere(
-            (e) => e.name == key,
-          );
+          final enumValue =
+              CustomerProfile$.values.firstWhere((e) => e.name == key);
           if (value is Function) {
             patch._patch[enumValue] = value();
           } else {
@@ -209,9 +213,10 @@ extension CustomerProfileSerialization on CustomerProfile {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -248,6 +253,8 @@ class Customer extends $Customer implements User {
   final List<CustomerProfile> profiles;
   @override
   final Map<String, CustomerProfile> profileHistory;
+  @override
+  final int age;
 
   Customer({
     required this.name,
@@ -255,6 +262,7 @@ class Customer extends $Customer implements User {
     this.profile,
     required this.profiles,
     required this.profileHistory,
+    required this.age,
   });
 
   Customer copyWith({
@@ -263,6 +271,7 @@ class Customer extends $Customer implements User {
     CustomerProfile? profile,
     List<CustomerProfile>? profiles,
     Map<String, CustomerProfile>? profileHistory,
+    int? age,
   }) {
     return Customer(
       name: name ?? this.name,
@@ -270,6 +279,7 @@ class Customer extends $Customer implements User {
       profile: profile ?? this.profile,
       profiles: profiles ?? this.profiles,
       profileHistory: profileHistory ?? this.profileHistory,
+      age: age ?? this.age,
     );
   }
 
@@ -279,6 +289,7 @@ class Customer extends $Customer implements User {
     CustomerProfile? profile,
     List<CustomerProfile>? profiles,
     Map<String, CustomerProfile>? profileHistory,
+    int? age,
   }) {
     return copyWith(
       name: name,
@@ -286,62 +297,78 @@ class Customer extends $Customer implements User {
       profile: profile,
       profiles: profiles,
       profileHistory: profileHistory,
+      age: age,
     );
   }
 
-  Customer patchWithCustomer({CustomerPatch? patchInput}) {
+  Customer patchWithCustomer({
+    CustomerPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? CustomerPatch();
     final _patchMap = _patcher.toPatch();
     return Customer(
-      name: _patchMap.containsKey(Customer$.name)
-          ? (_patchMap[Customer$.name] is Function)
+        name: _patchMap.containsKey(Customer$.name)
+            ? (_patchMap[Customer$.name] is Function)
                 ? _patchMap[Customer$.name](this.name)
                 : _patchMap[Customer$.name]
-          : this.name,
-      email: _patchMap.containsKey(Customer$.email)
-          ? (_patchMap[Customer$.email] is Function)
+            : this.name,
+        email: _patchMap.containsKey(Customer$.email)
+            ? (_patchMap[Customer$.email] is Function)
                 ? _patchMap[Customer$.email](this.email)
                 : _patchMap[Customer$.email]
-          : this.email,
-      profile: _patchMap.containsKey(Customer$.profile)
-          ? (_patchMap[Customer$.profile] is Function)
+            : this.email,
+        profile: _patchMap.containsKey(Customer$.profile)
+            ? (_patchMap[Customer$.profile] is Function)
                 ? _patchMap[Customer$.profile](this.profile)
                 : _patchMap[Customer$.profile]
-          : this.profile,
-      profiles: _patchMap.containsKey(Customer$.profiles)
-          ? (_patchMap[Customer$.profiles] is Function)
+            : this.profile,
+        profiles: _patchMap.containsKey(Customer$.profiles)
+            ? (_patchMap[Customer$.profiles] is Function)
                 ? _patchMap[Customer$.profiles](this.profiles)
                 : _patchMap[Customer$.profiles]
-          : this.profiles,
-      profileHistory: _patchMap.containsKey(Customer$.profileHistory)
-          ? (_patchMap[Customer$.profileHistory] is Function)
+            : this.profiles,
+        profileHistory: _patchMap.containsKey(Customer$.profileHistory)
+            ? (_patchMap[Customer$.profileHistory] is Function)
                 ? _patchMap[Customer$.profileHistory](this.profileHistory)
                 : _patchMap[Customer$.profileHistory]
-          : this.profileHistory,
+            : this.profileHistory,
+        age: _patchMap.containsKey(Customer$.age)
+            ? (_patchMap[Customer$.age] is Function)
+                ? _patchMap[Customer$.age](this.age)
+                : _patchMap[Customer$.age]
+            : this.age);
+  }
+
+  Customer copyWithUser({
+    String? name,
+    String? email,
+  }) {
+    return copyWith(
+      name: name,
+      email: email,
     );
   }
 
-  Customer copyWithUser({String? name, String? email}) {
-    return copyWith(name: name, email: email);
-  }
-
-  Customer patchWithUser({UserPatch? patchInput}) {
+  Customer patchWithUser({
+    UserPatch? patchInput,
+  }) {
     final _patcher = patchInput ?? UserPatch();
     final _patchMap = _patcher.toPatch();
     return Customer(
       name: _patchMap.containsKey(User$.name)
           ? (_patchMap[User$.name] is Function)
-                ? _patchMap[User$.name](this.name)
-                : _patchMap[User$.name]
+              ? _patchMap[User$.name](this.name)
+              : _patchMap[User$.name]
           : this.name,
       email: _patchMap.containsKey(User$.email)
           ? (_patchMap[User$.email] is Function)
-                ? _patchMap[User$.email](this.email)
-                : _patchMap[User$.email]
+              ? _patchMap[User$.email](this.email)
+              : _patchMap[User$.email]
           : this.email,
       profile: this.profile,
       profiles: this.profiles,
       profileHistory: this.profileHistory,
+      age: this.age,
     );
   }
 
@@ -353,18 +380,14 @@ class Customer extends $Customer implements User {
         email == other.email &&
         profile == other.profile &&
         profiles == other.profiles &&
-        profileHistory == other.profileHistory;
+        profileHistory == other.profileHistory &&
+        age == other.age;
   }
 
   @override
   int get hashCode {
-    return Object.hash(
-      this.name,
-      this.email,
-      this.profile,
-      this.profiles,
-      this.profileHistory,
-    );
+    return Object.hash(this.name, this.email, this.profile, this.profiles,
+        this.profileHistory, this.age);
   }
 
   @override
@@ -378,7 +401,9 @@ class Customer extends $Customer implements User {
         ', ' +
         'profiles: ${profiles}' +
         ', ' +
-        'profileHistory: ${profileHistory})';
+        'profileHistory: ${profileHistory}' +
+        ', ' +
+        'age: ${age})';
   }
 
   /// Creates a [Customer] instance from JSON
@@ -393,9 +418,10 @@ class Customer extends $Customer implements User {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -403,7 +429,7 @@ class Customer extends $Customer implements User {
   }
 }
 
-enum Customer$ { name, email, profile, profiles, profileHistory }
+enum Customer$ { name, email, profile, profiles, profileHistory, age }
 
 class CustomerPatch implements Patch<Customer> {
   final Map<Customer$, dynamic> _patch = {};
@@ -492,8 +518,7 @@ class CustomerPatch implements Patch<Customer> {
   }
 
   CustomerPatch withProfilePatchFunc(
-    CustomerProfilePatch Function(CustomerProfilePatch) patch,
-  ) {
+      CustomerProfilePatch Function(CustomerProfilePatch) patch) {
     _patch[Customer$.profile] = (dynamic current) {
       var currentPatch = CustomerProfilePatch();
       if (current != null) {
@@ -510,9 +535,7 @@ class CustomerPatch implements Patch<Customer> {
   }
 
   CustomerPatch updateProfilesAt(
-    int index,
-    CustomerProfilePatch Function(CustomerProfilePatch) patch,
-  ) {
+      int index, CustomerProfilePatch Function(CustomerProfilePatch) patch) {
     _patch[Customer$.profiles] = (List<dynamic> list) {
       var updatedList = List.from(list);
       if (index >= 0 && index < updatedList.length) {
@@ -529,9 +552,7 @@ class CustomerPatch implements Patch<Customer> {
   }
 
   CustomerPatch updateProfileHistoryValue(
-    String key,
-    CustomerProfilePatch Function(CustomerProfilePatch) patch,
-  ) {
+      String key, CustomerProfilePatch Function(CustomerProfilePatch) patch) {
     _patch[Customer$.profileHistory] = (Map<dynamic, dynamic> map) {
       var updatedMap = Map.from(map);
       if (updatedMap.containsKey(key)) {
@@ -539,6 +560,11 @@ class CustomerPatch implements Patch<Customer> {
       }
       return updatedMap;
     };
+    return this;
+  }
+
+  CustomerPatch withAge(int? value) {
+    _patch[Customer$.age] = value;
     return this;
   }
 }
@@ -553,9 +579,10 @@ extension CustomerSerialization on Customer {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -581,6 +608,9 @@ extension CustomerCompareE on Customer {
     }
     if (profileHistory != other.profileHistory) {
       diff['profileHistory'] = () => other.profileHistory;
+    }
+    if (age != other.age) {
+      diff['age'] = () => other.age;
     }
     return diff;
   }

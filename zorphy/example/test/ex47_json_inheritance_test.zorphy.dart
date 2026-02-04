@@ -13,26 +13,37 @@ class A extends $A {
   @override
   final String id;
 
-  A({required this.id});
+  A({
+    required this.id,
+  });
 
-  A copyWith({String? id}) {
-    return A(id: id ?? this.id);
+  A copyWith({
+    String? id,
+  }) {
+    return A(
+      id: id ?? this.id,
+    );
   }
 
-  A copyWithA({String? id}) {
-    return copyWith(id: id);
+  A copyWithA({
+    String? id,
+  }) {
+    return copyWith(
+      id: id,
+    );
   }
 
-  A patchWithA({APatch? patchInput}) {
+  A patchWithA({
+    APatch? patchInput,
+  }) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return A(
-      id: _patchMap.containsKey(A$.id)
-          ? (_patchMap[A$.id] is Function)
+        id: _patchMap.containsKey(A$.id)
+            ? (_patchMap[A$.id] is Function)
                 ? _patchMap[A$.id](this.id)
                 : _patchMap[A$.id]
-          : this.id,
-    );
+            : this.id);
   }
 
   @override
@@ -64,8 +75,7 @@ class A extends $A {
       return _$AFromJson(json);
     }
     throw UnsupportedError(
-      "The _className_ '${json['_className_']}' is not supported by the A.fromJson constructor.",
-    );
+        "The _className_ '${json['_className_']}' is not supported by the A.fromJson constructor.");
   }
 
   Map<String, dynamic> toJsonLean() {
@@ -76,9 +86,10 @@ class A extends $A {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -170,9 +181,10 @@ extension ASerialization on A {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -196,12 +208,11 @@ extension AChangeToE on A {
     final _patcher = BPatch();
     final _patchMap = _patcher.toPatch();
     return B(
-      id: _patchMap.containsKey(B$.id)
-          ? (_patchMap[B$.id] is Function)
+        id: _patchMap.containsKey(B$.id)
+            ? (_patchMap[B$.id] is Function)
                 ? _patchMap[B$.id](id)
                 : _patchMap[B$.id]
-          : id,
-    );
+            : id);
   }
 
   C changeToC({required List<int> items}) {
@@ -209,13 +220,12 @@ extension AChangeToE on A {
     _patcher.withItems(items);
     final _patchMap = _patcher.toPatch();
     return C(
-      items: _patchMap[C$.items],
-      id: _patchMap.containsKey(C$.id)
-          ? (_patchMap[C$.id] is Function)
+        items: _patchMap[C$.items],
+        id: _patchMap.containsKey(C$.id)
+            ? (_patchMap[C$.id] is Function)
                 ? _patchMap[C$.id](id)
                 : _patchMap[C$.id]
-          : id,
-    );
+            : id);
   }
 }
 
@@ -224,40 +234,57 @@ class B extends $B implements A {
   @override
   final String id;
 
-  B({required this.id});
+  B({
+    required this.id,
+  });
 
-  B copyWith({String? id}) {
-    return B(id: id ?? this.id);
-  }
-
-  B copyWithB({String? id}) {
-    return copyWith(id: id);
-  }
-
-  B patchWithB({BPatch? patchInput}) {
-    final _patcher = patchInput ?? BPatch();
-    final _patchMap = _patcher.toPatch();
+  B copyWith({
+    String? id,
+  }) {
     return B(
-      id: _patchMap.containsKey(B$.id)
-          ? (_patchMap[B$.id] is Function)
-                ? _patchMap[B$.id](this.id)
-                : _patchMap[B$.id]
-          : this.id,
+      id: id ?? this.id,
     );
   }
 
-  B copyWithA({String? id}) {
-    return copyWith(id: id);
+  B copyWithB({
+    String? id,
+  }) {
+    return copyWith(
+      id: id,
+    );
   }
 
-  B patchWithA({APatch? patchInput}) {
+  B patchWithB({
+    BPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? BPatch();
+    final _patchMap = _patcher.toPatch();
+    return B(
+        id: _patchMap.containsKey(B$.id)
+            ? (_patchMap[B$.id] is Function)
+                ? _patchMap[B$.id](this.id)
+                : _patchMap[B$.id]
+            : this.id);
+  }
+
+  B copyWithA({
+    String? id,
+  }) {
+    return copyWith(
+      id: id,
+    );
+  }
+
+  B patchWithA({
+    APatch? patchInput,
+  }) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return B(
       id: _patchMap.containsKey(A$.id)
           ? (_patchMap[A$.id] is Function)
-                ? _patchMap[A$.id](this.id)
-                : _patchMap[A$.id]
+              ? _patchMap[A$.id](this.id)
+              : _patchMap[A$.id]
           : this.id,
     );
   }
@@ -289,9 +316,10 @@ class B extends $B implements A {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -383,9 +411,10 @@ extension BSerialization on B {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -411,45 +440,67 @@ class C extends $C implements A {
   @override
   final List<int> items;
 
-  C({required this.id, required this.items});
+  C({
+    required this.id,
+    required this.items,
+  });
 
-  C copyWith({String? id, List<int>? items}) {
-    return C(id: id ?? this.id, items: items ?? this.items);
-  }
-
-  C copyWithC({String? id, List<int>? items}) {
-    return copyWith(id: id, items: items);
-  }
-
-  C patchWithC({CPatch? patchInput}) {
-    final _patcher = patchInput ?? CPatch();
-    final _patchMap = _patcher.toPatch();
+  C copyWith({
+    String? id,
+    List<int>? items,
+  }) {
     return C(
-      id: _patchMap.containsKey(C$.id)
-          ? (_patchMap[C$.id] is Function)
-                ? _patchMap[C$.id](this.id)
-                : _patchMap[C$.id]
-          : this.id,
-      items: _patchMap.containsKey(C$.items)
-          ? (_patchMap[C$.items] is Function)
-                ? _patchMap[C$.items](this.items)
-                : _patchMap[C$.items]
-          : this.items,
+      id: id ?? this.id,
+      items: items ?? this.items,
     );
   }
 
-  C copyWithA({String? id}) {
-    return copyWith(id: id);
+  C copyWithC({
+    String? id,
+    List<int>? items,
+  }) {
+    return copyWith(
+      id: id,
+      items: items,
+    );
   }
 
-  C patchWithA({APatch? patchInput}) {
+  C patchWithC({
+    CPatch? patchInput,
+  }) {
+    final _patcher = patchInput ?? CPatch();
+    final _patchMap = _patcher.toPatch();
+    return C(
+        id: _patchMap.containsKey(C$.id)
+            ? (_patchMap[C$.id] is Function)
+                ? _patchMap[C$.id](this.id)
+                : _patchMap[C$.id]
+            : this.id,
+        items: _patchMap.containsKey(C$.items)
+            ? (_patchMap[C$.items] is Function)
+                ? _patchMap[C$.items](this.items)
+                : _patchMap[C$.items]
+            : this.items);
+  }
+
+  C copyWithA({
+    String? id,
+  }) {
+    return copyWith(
+      id: id,
+    );
+  }
+
+  C patchWithA({
+    APatch? patchInput,
+  }) {
     final _patcher = patchInput ?? APatch();
     final _patchMap = _patcher.toPatch();
     return C(
       id: _patchMap.containsKey(A$.id)
           ? (_patchMap[A$.id] is Function)
-                ? _patchMap[A$.id](this.id)
-                : _patchMap[A$.id]
+              ? _patchMap[A$.id](this.id)
+              : _patchMap[A$.id]
           : this.id,
       items: this.items,
     );
@@ -482,9 +533,10 @@ class C extends $C implements A {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
@@ -581,9 +633,10 @@ extension CSerialization on C {
   dynamic _sanitizeJson(dynamic json) {
     if (json is Map<String, dynamic>) {
       json.remove('_className_');
-      return json..forEach((key, value) {
-        json[key] = _sanitizeJson(value);
-      });
+      return json
+        ..forEach((key, value) {
+          json[key] = _sanitizeJson(value);
+        });
     } else if (json is List) {
       return json.map((e) => _sanitizeJson(e)).toList();
     }
