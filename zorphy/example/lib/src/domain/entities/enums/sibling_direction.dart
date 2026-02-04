@@ -1,0 +1,1 @@
+enum SiblingDirection { previous, next }

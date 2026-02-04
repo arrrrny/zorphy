@@ -16,7 +16,7 @@ void main() {
       generateCompareTo: false,
       generateCopyWithFn: true,
     );
-    
+
     expect(annotation.generateJson, isTrue);
     expect(annotation.explicitSubTypes, isNull);
     expect(annotation.explicitToJson, isFalse);

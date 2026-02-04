@@ -1,0 +1,21 @@
+FIELD TYPES
+  Basic types: String, int, double, bool, num, DateTime
+  Nullable types: Add ? after type (e.g., String?, int?)
+  Generic types: List<Type>, Set<Type>, Map<KeyType, ValueType>
+  Custom types: Any other class name (including other Zorphy classes)
+
+  Zorphy Objects:
+    Single: $Address, $CreditCard, $User
+    Nullable: $Address?, $CreditCard?
+    List: List<$OrderItem>, List<$User?>
+    Map: Map<String, $Product>, Map<String, $PaymentMethod>
+
+  Examples:
+    --field name:String
+    --field age:int
+    --field email:String?
+    --field address:$Address
+    --field paymentMethod:$$PaymentMethod
+    --field items:List<$OrderItem>
+    --field metadata:Map<String, $CustomField>
+    --field tags:List<String>

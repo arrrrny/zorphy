@@ -22,6 +22,8 @@
 
 *.morphy.dart
 *.morphy2.dart
+*.zorphy.dart
+*.zorphy2.dart
 *.g.dart
 
 # Flutter/Dart/Pub related
@@ -56,3 +58,4 @@ app.*.map.json
 /android/app/release
 
 **/build
+.**

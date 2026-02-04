@@ -155,13 +155,15 @@ List<NameTypeClassComment> getAllFields(
   List<InterfaceType> interfaceTypes,
   ClassElement element,
 ) {
+  var currentClassName = element.name?.replaceAll('\$', '');
+  
   var superTypeFields = interfaceTypes
       .where((x) => x.element.name != "Object")
       .flatMap(
         (st) => st.element.fields.map(
           (f) => NameTypeClassComment(
             f.name ?? "",
-            typeToString(f.type),
+            typeToString(f.type, currentClassName: currentClassName),
             st.element.name ?? "",
             comment: f.getter?.documentationComment,
             jsonKeyInfo: extractJsonKeyInfo(f),
@@ -175,7 +177,7 @@ List<NameTypeClassComment> getAllFields(
       .map(
         (f) => NameTypeClassComment(
           f.name ?? "",
-          typeToString(f.type),
+          typeToString(f.type, currentClassName: currentClassName),
           element.name ?? "",
           comment: f.getter?.documentationComment,
           jsonKeyInfo: extractJsonKeyInfo(f),
@@ -187,7 +189,7 @@ List<NameTypeClassComment> getAllFields(
   return (classFields + superTypeFields).distinctBy((x) => x.name).toList();
 }
 
-String typeToString(DartType type) {
+String typeToString(DartType type, {String? currentClassName}) {
   final nullMarker = type.nullabilitySuffix == NullabilitySuffix.question
       ? '?'
       : type.nullabilitySuffix == NullabilitySuffix.star
@@ -199,7 +201,7 @@ String typeToString(DartType type) {
   if (alias != null) {
     final args = alias.typeArguments.isEmpty
         ? ''
-        : "<${alias.typeArguments.map(typeToString).join(', ')}>";
+        : "<${alias.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName)).join(', ')}>";
     manual = "${alias.element.name}$args";
   } else if (type is FunctionType) {
     final generics = type.typeParameters.isNotEmpty
@@ -208,32 +210,67 @@ String typeToString(DartType type) {
             return "${param.name}${bound == null ? "" : " = ${typeToString(bound)}"}";
           }).join(', ')}>"
         : '';
+
+    // Reserved keywords that cannot be used as identifiers
+    const reservedKeywords = {
+      'abstract', 'as', 'base', 'break', 'case', 'catch', 'class', 'const',
+      'continue', 'covariant', 'default', 'deferred', 'do', 'dynamic', 'else',
+      'enum', 'export', 'extends', 'extension', 'external', 'factory', 'false',
+      'final', 'finally', 'for', 'Function', 'get', 'hide', 'if', 'implements',
+      'import', 'in', 'interface', 'is', 'late', 'library', 'mixin', 'new',
+      'null', 'on', 'operator', 'part', 'rethrow', 'return', 'set', 'show',
+      'static', 'super', 'switch', 'sync', 'this', 'throw', 'true', 'try',
+      'type', 'typedef', 'var', 'void', 'while', 'with', 'yield'
+    };
+
+    String sanitizeParameterName(String? name) {
+      if (name == null || reservedKeywords.contains(name)) {
+        // If it's null or a reserved keyword, return the type without a name
+        // This is valid for function type signatures
+        return '';
+      }
+      return name;
+    }
+
     final normal = type.formalParameters
         .where((param) => param.isRequiredPositional)
-        .map((param) => "${typeToString(param.type)} ${param.name}")
+        .map((param) {
+          final paramName = sanitizeParameterName(param.name);
+          return paramName.isEmpty
+              ? typeToString(param.type, currentClassName: currentClassName)
+              : "${typeToString(param.type, currentClassName: currentClassName)} $paramName";
+        })
         .join(', ');
     final named = type.formalParameters
         .where((param) => param.isNamed)
-        .map(
-          (param) =>
-              "${param.isRequiredNamed ? 'required ' : ''}${typeToString(param.type)} ${param.name}",
-        )
+        .map((param) {
+          final paramName = sanitizeParameterName(param.name);
+          final prefix = param.isRequiredNamed ? 'required ' : '';
+          return paramName.isEmpty
+              ? "${prefix}${typeToString(param.type, currentClassName: currentClassName)}"
+              : "${prefix}${typeToString(param.type, currentClassName: currentClassName)} $paramName";
+        })
         .join(', ');
     final optional = type.formalParameters
         .where((param) => param.isOptionalPositional)
-        .map((param) => "${typeToString(param.type)} ${param.name}")
+        .map((param) {
+          final paramName = sanitizeParameterName(param.name);
+          return paramName.isEmpty
+              ? typeToString(param.type, currentClassName: currentClassName)
+              : "${typeToString(param.type, currentClassName: currentClassName)} $paramName";
+        })
         .join(', ');
     final parts = [
       if (normal.isNotEmpty) normal,
       if (named.isNotEmpty) "{$named}",
       if (optional.isNotEmpty) "[$optional]",
     ].join(', ');
-    manual = "${typeToString(type.returnType)} Function$generics($parts)";
+    manual = "${typeToString(type.returnType, currentClassName: currentClassName)} Function$generics($parts)";
   } else if (type is RecordType) {
     final positional =
-        type.positionalFields.map((e) => typeToString(e.type)).join(', ');
+        type.positionalFields.map((e) => typeToString(e.type, currentClassName: currentClassName)).join(', ');
     final named = type.namedFields
-        .map((e) => "${typeToString(e.type)} ${e.name}")
+        .map((e) => "${typeToString(e.type, currentClassName: currentClassName)} ${e.name}")
         .join(', ');
     final trailing =
         type.positionalFields.length == 1 && type.namedFields.isEmpty
@@ -247,8 +284,14 @@ String typeToString(DartType type) {
   } else if (type is ParameterizedType) {
     final arguments = type.typeArguments.isEmpty
         ? ''
-        : "<${type.typeArguments.map(typeToString).join(', ')}>";
-    manual = "${type.element?.name}$arguments";
+        : "<${type.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName)).join(', ')}>";
+    final typeName = type.element?.name ?? 'InvalidType';
+    // Handle self-reference: if type is InvalidType and we have currentClassName, use it
+    if (typeName == 'InvalidType' && currentClassName != null) {
+      manual = "\$$currentClassName$arguments";
+    } else {
+      manual = "$typeName$arguments";
+    }
   }
 
   return manual != null ? "$manual$nullMarker" : type.toString();

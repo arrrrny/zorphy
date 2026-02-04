@@ -9,5 +9,5 @@ environment:
 dependencies:
   collection: ^1.19.1
   dartx: ^1.2.0
-  json_annotation: ^4.9.0
+  json_annotation: ^4.10.0
   quiver: ^3.2.2

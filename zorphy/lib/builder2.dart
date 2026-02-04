@@ -176,6 +176,7 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
         annotation.read('generateCopyWithFn').boolValue,
         [],
         _allAnnotatedClasses,
+        {},  // ownFields - empty for builder2
       ),
     );
 

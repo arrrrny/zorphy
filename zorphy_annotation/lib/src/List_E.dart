@@ -10,7 +10,8 @@ class List_E<E> {
   factory List_E.empty() => List_E(<E>[]);
 
   /// Creates a fixed-length list
-  factory List_E.filled(int length, E fill) => List_E(List.filled(length, fill));
+  factory List_E.filled(int length, E fill) =>
+      List_E(List.filled(length, fill));
 
   /// Creates a growable list with the specified length
   factory List_E.growable([int length = 0]) {
@@ -60,7 +61,8 @@ class List_E<E> {
   List_E<E> skip(int n) => List_E(_list.skip(n).toList());
 
   /// Adds all elements of [other] to the end of this list
-  void insertAll(int index, Iterable<E> iterable) => _list.insertAll(index, iterable);
+  void insertAll(int index, Iterable<E> iterable) =>
+      _list.insertAll(index, iterable);
 
   /// Removes a range of elements from [start] to [end]
   void removeRange(int start, int end) => _list.removeRange(start, end);
@@ -77,7 +79,8 @@ class List_E<E> {
       other is List_E &&
           runtimeType == other.runtimeType &&
           _list.length == other._list.length &&
-          _list.every((element) => other._list[_list.indexOf(element)] == element);
+          _list.every(
+              (element) => other._list[_list.indexOf(element)] == element);
 
   @override
   int get hashCode => _list.hashCode;
