@@ -95,7 +95,9 @@ update_changelog() {
     else
         # Insert new version after [Unreleased]
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "/^## [$VERSION] - $DATE\\
+            sed -i '' "/^## \[Unreleased\]/a\\
+\\
+## [$VERSION] - $DATE\\
 \\
 ### $TYPE_CAPITALIZED\\
 - $DESCRIPTION
@@ -109,13 +111,20 @@ update_changelog() {
 - $DESCRIPTION
 " CHANGELOG.md
         fi
+        
+        # Remove [Unreleased] section before publishing
+        echo "  🔽 Removing [Unreleased] section before publishing..."
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # Match from [Unreleased] to the next ## header, delete [Unreleased] and blank lines
+            perl -i -0pe 's/^## \[Unreleased\]\n\n//' CHANGELOG.md
+        else
+            perl -i -0pe 's/^## \[Unreleased\]\n\n//' CHANGELOG.md
+        fi
     fi
 
     echo "  ✓ CHANGELOG.md updated"
     cd "$REPO_ROOT" > /dev/null
 }
-
-# Function to update pubspec.yaml
 update_pubspec() {
     local package_dir="$1"
     local package_name="$2"
