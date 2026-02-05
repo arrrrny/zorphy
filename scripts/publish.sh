@@ -95,9 +95,7 @@ update_changelog() {
     else
         # Insert new version after [Unreleased]
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "/^## \[Unreleased\]/a\\
-\\
-## [$VERSION] - $DATE\\
+            sed -i '' "/^## [$VERSION] - $DATE\\
 \\
 ### $TYPE_CAPITALIZED\\
 - $DESCRIPTION
