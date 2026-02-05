@@ -1,0 +1,24 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  errors:
+    missing_required_error: error
+    missing_return: error
+    todo: ignore
+
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.zorphy.dart"
+
+linter:
+  rules:
+    - prefer_single_quotes
+    - sort_constructors_first
+    - sort_pub_dependencies
+    - always_declare_return_types
+    - prefer_const_constructors
+    - prefer_const_literals_to_create_immutables
+    - prefer_final_fields
+    - prefer_final_locals
+    - unnecessary_const
+    - unnecessary_new

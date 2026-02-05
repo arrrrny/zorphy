@@ -1,0 +1,17 @@
+# build.yaml
+
+targets:
+  $default:
+    builders:
+      zorphy:
+        enabled: true
+        options:
+          generateJson: true
+      json_serializable:
+        enabled: true
+        options:
+          explicit_to_json: true
+          include_if_null: false
+          any_map: true
+      source_gen|combining_builder:
+        enabled: true
