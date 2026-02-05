@@ -4,6 +4,7 @@ import 'package:zorphy/src/analysis/analysis.dart';
 import 'package:zorphy/src/generators/generators.dart';
 import 'package:zorphy/src/models/models.dart';
 import 'package:zorphy/src/createZorphy.dart' as old_codegen;
+import 'package:zorphy/src/common/NameType.dart';
 
 /// Orchestrates the code generation pipeline
 /// Coordinates: Analysis → Models → Generation → Assembly
@@ -155,6 +156,11 @@ class Orchestrator {
     Map<String, ClassElement> allAnnotatedClasses,
     Set<String> ownFields,
   ) {
+    // Convert GenericParameterMetadata to NameTypeClassComment for compatibility
+    final classGenericsAsNameType = classGenerics.map((g) {
+      return NameTypeClassComment(g.name, g.bound, null);
+    }).toList();
+
     return old_codegen.createZorphy(
       isAbstract,
       allFieldsDistinct,
@@ -162,7 +168,7 @@ class Orchestrator {
       docComment,
       interfaces,
       allValueTInterfaces,
-      classGenerics,
+      classGenericsAsNameType,
       hasConstConstructor,
       generateJson,
       hidePublicConstructor,
@@ -177,3 +183,4 @@ class Orchestrator {
     );
   }
 }
+

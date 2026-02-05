@@ -1,4 +1,4 @@
-import '../common/helpers.dart' as helpers;
+import '../helpers.dart' as helpers;
 import '../models/class_metadata.dart';
 import 'base_generator.dart';
 

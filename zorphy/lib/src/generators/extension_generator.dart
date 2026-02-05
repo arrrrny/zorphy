@@ -1,6 +1,5 @@
-import '../common/helpers.dart' as helpers;
+import '../helpers.dart' as helpers;
 import '../models/class_metadata.dart';
-import '../models/generation_config.dart';
 import 'base_generator.dart';
 
 /// Generates compareTo extension method
@@ -11,7 +10,6 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
   @override
   String generate(GenerationContext context) {
     final metadata = context.metadata;
-    final config = context.config;
     final className = metadata.cleanName;
 
     return helpers.getCompareToExtension(

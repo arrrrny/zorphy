@@ -1,4 +1,5 @@
-import '../common/helpers.dart' as helpers;
+import '../helpers.dart' as helpers;
+import '../common/NameType.dart';
 import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
 import 'base_generator.dart';
@@ -108,7 +109,11 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
   String _buildGenericsString(ClassMetadata metadata) {
     if (metadata.generics.isEmpty) return '';
-    return '<${metadata.generics.map((g) => g.toString()).join(', ')}>';
+    // Convert GenericParameterMetadata to NameTypeClassComment format
+    final genericsAsNameType = metadata.generics.map((g) {
+      return NameTypeClassComment(g.name, g.bound, null);
+    }).toList();
+    return '<${genericsAsNameType.map((g) => g.toString()).join(', ')}>';
   }
 
   String _buildImplementsClause(ClassMetadata metadata, {required bool isAbstract}) {
@@ -132,12 +137,6 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     }
   }
 
-  String _trimInterfaceName(String name) {
-    if (name.startsWith(r'$$')) return name.substring(2);
-    if (name.startsWith(r'$')) return name.substring(1);
-    return name;
-  }
-
   String _buildExtendsClause(ClassMetadata metadata, GenerationConfig config) {
     // For concrete classes, determine what to extend
     // This is complex logic from createZorphy that handles:
@@ -149,6 +148,12 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     // For now, return empty string and will be filled in properly
     // when we integrate the full logic from createZorphy
     return '';
+  }
+
+  String _trimInterfaceName(String name) {
+    if (name.startsWith(r'$$')) return name.substring(2);
+    if (name.startsWith(r'$')) return name.substring(1);
+    return name;
   }
 
   bool _determineExtendsAbstractClass(ClassMetadata metadata, String extendsStr) {

@@ -81,6 +81,8 @@ class InterfaceCollector {
         comment: e.element.documentationComment,
         isSealed: isSealed,
         hidePublicConstructor: false,
+        element: e.element as ClassElement,
+        typeArguments: e.typeArguments,
       );
     }).toList();
   }

@@ -10,7 +10,6 @@ import '../models/class_metadata.dart';
 import '../models/interface_metadata.dart';
 import 'interface_collector.dart';
 import 'field_resolver.dart';
-import 'annotation_parser.dart';
 
 /// Analyzes a @Zorphy-annotated class and extracts all metadata
 /// This replaces the analysis phase in ZorphyGenerator.generateForAnnotatedElement
@@ -28,9 +27,6 @@ class ClassAnalyzer {
 
     // Validate that class uses implements, not extends
     _validateClassStructure(classElement);
-
-    // Parse annotation options
-    final annotationOptions = AnnotationParser.parse(annotation);
 
     // Collect interfaces (handles inheritance hierarchy)
     final interfaceMetadataList =
@@ -106,8 +102,9 @@ class ClassAnalyzer {
   ) {
     return interfaces.map((e) {
       var interfaceName = e.interfaceName;
-      var fields = helpers.getAllFieldsIncludingSubtypes(
-        e.element as ClassElement,
+      var fields = _getAllFieldsIncludingSubtypes(
+        e.element,
+        allAnnotatedClasses,
       ).where((f) => f.name != "hashCode").toList();
 
       var nameTypeFields = fields
@@ -124,7 +121,7 @@ class ClassAnalyzer {
               : "T$index";
           return NameType(
             paramName,
-            helpers.typeToString(typeArg, currentClassName: currentClassName),
+            common_helpers.typeToString(typeArg, currentClassName: currentClassName),
           );
         }).toList(),
         nameTypeFields,
@@ -157,9 +154,10 @@ class ClassAnalyzer {
       // Register this class
       allAnnotatedClasses[el.name ?? ""] = el;
 
-      var fields = codegen_helpers
-          .getAllFieldsIncludingSubtypes(el)
-          .where((f) => f.name != "hashCode")
+      var fields = _getAllFieldsIncludingSubtypes(
+        el,
+        allAnnotatedClasses,
+      ).where((f) => f.name != "hashCode")
           .toList();
 
       var nameTypeFields =
@@ -180,6 +178,38 @@ class ClassAnalyzer {
     }).toList();
   }
 
+  /// Get all fields including those from annotated supertypes
+  static List<NameTypeClassComment> _getAllFieldsIncludingSubtypes(
+    ClassElement element,
+    Map<String, ClassElement> allAnnotatedClasses,
+  ) {
+    var fields = <NameTypeClassComment>[];
+    var processedTypes = <String>{};
+
+    void addFields(ClassElement elem) {
+      var elemName = elem.name ?? "";
+      if (processedTypes.contains(elemName)) return;
+      processedTypes.add(elemName);
+
+      fields.addAll(
+        common_helpers.getAllFields(
+          elem.allSupertypes.whereType<InterfaceType>().toList(),
+          elem,
+        ).where((x) => x.name != "hashCode" && x.name != "runtimeType"),
+      );
+
+      for (var supertype in elem.allSupertypes) {
+        var supertypeName = supertype.element.name ?? "";
+        if (allAnnotatedClasses.containsKey(supertypeName)) {
+          addFields(allAnnotatedClasses[supertypeName]!);
+        }
+      }
+    }
+
+    addFields(element);
+    return fields.toSet().toList();
+  }
+
   /// Extract generic type parameters from class
   static List<GenericParameterMetadata> _extractGenerics(
     ClassElement classElement,
@@ -188,7 +218,7 @@ class ClassAnalyzer {
       final bound = e.bound;
       return GenericParameterMetadata(
         name: e.name ?? '',
-        bound: bound == null ? null : helpers.typeToString(bound),
+        bound: bound == null ? null : common_helpers.typeToString(bound),
       );
     }).toList();
   }

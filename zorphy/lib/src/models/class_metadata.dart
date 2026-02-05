@@ -104,4 +104,7 @@ class GenericParameterMetadata {
 
   @override
   String toString() => bound != null ? '$name extends $bound' : name;
+
+  // Alias for compatibility with code expecting 'type'
+  String? get type => bound;
 }
