@@ -3,10 +3,12 @@
 /// This library provides annotations used by the Zorphy code generator
 /// to create clean class definitions with advanced features.
 ///
-/// The main annotation is:
-/// - @Zorphy() - Primary annotation for code generation
+/// ## Main Annotations
 ///
-/// Usage:
+/// - **[@Zorphy()]** - Primary annotation for code generation
+/// - **[@Zorphy2()]** - For dependency-ordered generation
+///
+/// ## Usage
 /// ```dart
 /// import 'package:zorphy_annotation/zorphy_annotation.dart';
 ///
@@ -18,8 +20,22 @@
 ///   User({required this.name, required this.age});
 /// }
 /// ```
+///
+/// See also:
+/// - [Zorphy package](https://pub.dev/packages/zorphy) - Code generator
 library zorphy_annotation;
 
-// Export all annotations
-export 'zorphy.dart';
-export 'src/patch.dart';
+// Export main annotation API
+export 'src/annotations/annotations.dart';
+
+// Export core types
+export 'src/core/core.dart';
+
+// Export special types
+export 'src/types/types.dart';
+
+// Export utilities
+export 'src/utils/utils.dart';
+
+// Export the barrel file for convenience
+export 'src/src.dart';
