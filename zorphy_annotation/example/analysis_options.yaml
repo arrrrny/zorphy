@@ -2,7 +2,6 @@ include: package:lints/recommended.yaml
 
 analyzer:
   errors:
-    missing_required_error: error
     missing_return: error
     todo: ignore
 
