@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-05
+
+### Chore
+- Downgraded analyzer version to match latest flutter sdk
+
 ## [1.1.1] - 2026-02-05
 
 ### Fix
