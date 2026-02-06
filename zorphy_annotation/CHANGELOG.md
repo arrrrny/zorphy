@@ -1,4 +1,4 @@
-## [1.2.1] - 2026-02-05
+## [1.3.0] - 2026-02-06
 
 ### Changed
 - Updated to new Zorhpy Api
