@@ -1,28 +1,14 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'enum_example.zorphy.dart';
+part 'enum_example.g.dart';
 
 /// Enum definitions for the example
-enum Status {
-  active,
-  inactive,
-  pending,
-  suspended,
-}
+enum Status { active, inactive, pending, suspended }
 
-enum Priority {
-  low,
-  medium,
-  high,
-  critical,
-}
+enum Priority { low, medium, high, critical }
 
-enum UserRole {
-  admin,
-  moderator,
-  user,
-  guest,
-}
+enum UserRole { admin, moderator, user, guest }
 
 /// Example demonstrating enum field support.
 ///

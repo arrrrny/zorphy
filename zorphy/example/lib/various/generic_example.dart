@@ -1,16 +1,49 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'generic_example.zorphy.dart';
+part 'generic_example.g.dart';
+
+@Zorphy()
+abstract class $TriggerBuild {}
 
 /// Example demonstrating generic type parameter support.
 ///
 /// This example shows:
 /// - Generic entities
 /// - Type safety with generics
+/// - Custom JsonConverters for generic data
 /// - Reusable data structures
 /// - Generic constraints and usage patterns
 
-/// Generic result type - common pattern for API responses
+/// Custom converter for generic data
+class GenericConverter<T> implements JsonConverter<T?, Object?> {
+  const GenericConverter();
+
+  @override
+  T? fromJson(Object? json) {
+    if (json == null) return null;
+    if (json is T) return json as T;
+    // Here you could add complex logic to map JSON to T
+    return json as T;
+  }
+
+  @override
+  Object? toJson(T? object) => object;
+}
+
+/// Generic result type - demonstrating JsonConverter usage
+@Zorphy(generateJson: true)
+abstract class $ResultWithConverter<T> {
+  bool get success;
+
+  @JsonKey(name: 'data_field')
+  @GenericConverter()
+  T? get data;
+
+  String? get errorMessage;
+}
+
+/// Generic result type - using standard genericArgumentFactories (now supported!)
 @Zorphy(generateJson: true)
 abstract class $Result<T> {
   bool get success;
@@ -63,11 +96,7 @@ void main() {
   print('');
 
   // Result<int>
-  final intResult = Result<int>(
-    success: true,
-    data: 42,
-    errorMessage: null,
-  );
+  final intResult = Result<int>(success: true, data: 42, errorMessage: null);
 
   print('Int Result: $intResult');
   print('Data: ${intResult.data}');
@@ -123,7 +152,9 @@ void main() {
   );
 
   print('Paginated Products:');
-  productPage.items.forEach((p) => print('  - ${p.name}: \$${p.price}'));
+  for (final p in productPage.items) {
+    print('  - ${p.name}: \$${p.price}');
+  }
   print('');
 
   // KeyValue pairs
@@ -151,11 +182,20 @@ void main() {
 
   // JSON serialization of generics
   print('JSON Serialization:');
-  final resultJson = stringResult.toJson();
+  // Pass identity functions for String generics
+  final resultJson = stringResult.toJson((s) => s);
   print('Result JSON: $resultJson');
 
-  final pageJson = productPage.toJson();
+  // For complex types, pass their toJson
+  final pageJson = productPage.toJson((p) => p.toJson());
   print('Page JSON: $pageJson');
+
+  // Demonstration of ResultWithConverter (uses identity as converter handles T)
+  final converterResult = ResultWithConverter<String>(
+    success: true,
+    data: 'Converted data',
+  );
+  print('Converter Result JSON: ${converterResult.toJson((s) => s)}');
 }
 
 /// Simple product class for demonstration

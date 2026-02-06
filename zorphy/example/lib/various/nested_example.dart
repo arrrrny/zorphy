@@ -1,6 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'nested_example.zorphy.dart';
+part 'nested_example.g.dart';
 
 /// Example demonstrating nested object support.
 ///
@@ -58,11 +59,7 @@ void main() {
     zipCode: '94102',
   );
 
-  final person = Person(
-    name: 'Alice Johnson',
-    age: 30,
-    address: address,
-  );
+  final person = Person(name: 'Alice Johnson', age: 30, address: address);
 
   print('Person with nested address:');
   print('$person');
@@ -70,9 +67,7 @@ void main() {
 
   // Nested patching - update only the city in the address
   final personPatch = PersonPatch.create()
-    ..withAddressPatch(
-      AddressPatch.create()..withCity('Los Angeles'),
-    );
+    ..withAddressPatch(AddressPatch.create()..withCity('Los Angeles'));
 
   final updatedPerson = person.patchWithPerson(patchInput: personPatch);
 
@@ -105,9 +100,17 @@ void main() {
         parent: null, // Will be set by parent
         children: [
           CategoryNode(
-              id: 'flutter', name: 'Flutter', parent: null, children: []),
+            id: 'flutter',
+            name: 'Flutter',
+            parent: null,
+            children: [],
+          ),
           CategoryNode(
-              id: 'angular', name: 'Angular', parent: null, children: []),
+            id: 'angular',
+            name: 'Angular',
+            parent: null,
+            children: [],
+          ),
         ],
       ),
       CategoryNode(
@@ -135,5 +138,5 @@ void main() {
 void printCategoryTree(CategoryNode node, int depth) {
   final indent = '  ' * depth;
   print('$indent${node.name} (${node.id})');
-  node.children.forEach((child) => printCategoryTree(child, depth + 1));
+  node.children?.forEach((child) => printCategoryTree(child, depth + 1));
 }

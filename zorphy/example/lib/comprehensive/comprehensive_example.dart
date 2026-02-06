@@ -14,7 +14,7 @@ part 'comprehensive_example.g.dart';
 // =============================================================================
 
 /// A simple user class demonstrating basic Zorphy features
-@Zorphy()
+@Zorphy(generatePatch: true)
 abstract class $User {
   String get name;
   int get age;
@@ -402,8 +402,10 @@ void demonstrateTreeStructure() {
   // Count nodes
   int countNodes(CategoryNode node) {
     int count = 1;
-    for (var child in node.children) {
-      count += countNodes(child);
+    if (node.children != null) {
+      for (var child in node.children!) {
+        count += countNodes(child);
+      }
     }
     return count;
   }

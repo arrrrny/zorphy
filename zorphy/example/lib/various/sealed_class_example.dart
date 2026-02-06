@@ -1,6 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'sealed_class_example.zorphy.dart';
+part 'sealed_class_example.g.dart';
 
 /// Example demonstrating sealed class hierarchies for polymorphism.
 ///
@@ -10,6 +11,7 @@ part 'sealed_class_example.zorphy.dart';
 /// - Type-safe polymorphic operations
 /// - Explicit subtype specification
 @Zorphy(
+  generateJson: true,
   explicitSubTypes: [$CreditCard, $PayPal, $BankTransfer],
 )
 abstract class $$PaymentMethod {
@@ -83,15 +85,11 @@ void main() {
   );
 
   // Polymorphic usage
-  final paymentMethods = <$$PaymentMethod>[creditCard, payPal, bankTransfer];
+  final paymentMethods = <PaymentMethod>[creditCard, payPal, bankTransfer];
 
   print('Processing payments:');
   for (final method in paymentMethods) {
     print('  ${method.displayName}: ${method.processPayment}');
   }
   print('');
-
-  // JSON serialization of polymorphic types
-  print('JSON serialization:');
-  print('CreditCard: ${creditCard.toJson()}');
 }

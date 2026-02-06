@@ -34,10 +34,10 @@ Add the dependencies to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zorphy_annotation: ^1.1.1
+  zorphy_annotation: ^1.3.0
 
 dev_dependencies:
-  zorphy: ^1.1.1
+  zorphy: ^1.3.0
   build_runner: ^2.4.0
 ```
 
@@ -149,7 +149,7 @@ zorphy create [options]
 - `-f, --fields` - Interactive field prompts (default: true)
 - `--field` - Add fields directly (`name:type` or `name:type?`)
 - `--extends` - Interface to extend (e.g., `$BaseEntity`)
-- `--subtype` - Explicit subtypes for polymorphism
+- `--subtypes` - Explicit subtypes for polymorphism
 
 **Examples:**
 
@@ -177,7 +177,7 @@ zorphy create -n Result --sealed
 
 # With inheritance
 zorphy create -n Admin \
-  --extends '$User' \
+  --extends User \
   --field permissions:List<String>
 ```
 
@@ -285,6 +285,10 @@ Field type (e.g., String, int, List<String>): String
 Field name (or press Enter to finish): age
 Field type (e.g., String, int, List<String>): int
 ✓ Added field: age (int)
+
+Field name (or press Enter to finish): address
+Field type (e.g., String, int, Address): Address
+✓ Added field: address (Address)
 
 Field name (or press Enter to finish): 
 
@@ -765,6 +769,19 @@ final patch = CounterPatch.create()
 final updated = counter.patchWithCounter(patchInput: patch);
 ```
 
+#### Map and List Patching
+
+```dart
+// Patch specific Map entries
+final settingsPatch = SettingsPatch.create()
+  ..updateConfigValue('theme', 'dark')
+  ..updateConfigValue('fontSize', '16');
+
+// Patch specific List indices
+final todoListPatch = TodoListPatch.create()
+  ..updateTodosAt(2, (todoPatch) => todoPatch..withCompleted(true));
+```
+
 ### 5. Inheritance & Polymorphism
 
 #### Multiple Inheritance
@@ -793,11 +810,40 @@ abstract class $FrankensteinsDogCat implements $Dog, $Pet, $Cat {
 }
 ```
 
-#### Generic Inheritance
+#### Generic Inheritance and JSON
+
+Zorphy now provides full support for generic types in JSON serialization:
 
 ```dart
-@Zorphy()
-abstract class $$Repository<T> {
+@Zorphy(generateJson: true)
+abstract class $PaginatedResponse<T> {
+  List<T> get items;
+  int get total;
+}
+
+// Generated code includes genericArgumentFactories: true
+// final response = PaginatedResponse<User>.fromJson(json, (j) => User.fromJson(j as Map<String, dynamic>));
+```
+
+#### Custom JSON Converters
+
+You can now use `@JsonConverter` with Zorphy entities:
+
+```dart
+class DateTimeConverter extends JsonConverter<DateTime, String> {
+  const DateTimeConverter();
+  @override
+  DateTime fromJson(String json) => DateTime.parse(json);
+  @override
+  String toJson(DateTime object) => object.toIso8601String();
+}
+
+@Zorphy(generateJson: true)
+abstract class $Event {
+  @DateTimeConverter()
+  DateTime get timestamp;
+}
+```
   T? find(String id);
   List<T> getAll();
 }

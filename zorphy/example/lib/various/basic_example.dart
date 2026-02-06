@@ -43,7 +43,9 @@ void main() {
   print('');
 
   // Patch operations - partial updates
-  final userPatch = UserPatch.create()..withAge(32)..withEmail('alice@example.com');
+  final userPatch = UserPatch.create()
+    ..withAge(32)
+    ..withEmail('alice@example.com');
   final patchedUser = user1.patchWithUser(patchInput: userPatch);
   print('Original: $user1');
   print('Patched: $patchedUser');
@@ -51,14 +53,12 @@ void main() {
 
   // HashCode for use in Sets and Maps
   final users = {user1, user2, user1Copy};
-  print('Unique users in set: ${users.length}'); // 2 (user1 and user1Copy are equal)
+  print(
+    'Unique users in set: ${users.length}',
+  ); // 2 (user1 and user1Copy are equal)
   print('');
 
   // Named parameters make it clear what each value is
-  final user3 = User(
-    name: 'Charlie',
-    age: 35,
-    email: 'charlie@example.com',
-  );
+  final user3 = User(name: 'Charlie', age: 35, email: 'charlie@example.com');
   print('User 3: $user3');
 }
