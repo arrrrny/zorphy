@@ -1,4 +1,3 @@
-import '../common/helpers.dart' as helpers;
 import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
 import 'base_generator.dart';
@@ -19,14 +18,18 @@ class JsonGenerator extends UniversalGenerator {
     }
 
     final sb = StringBuffer();
-    final className = metadata.cleanName;
+
+    // Don't generate JSON for classes in parent's explicitSubTypes (parent handles dispatch)
+    if (metadata.isInParentExplicitSubtypes) {
+      return '';
+    }
 
     // Determine if we should generate JSON
-    final shouldGenerateJson = !metadata.isAbstract;
-    final shouldGenerateAbstractJson =
-        metadata.isAbstract && metadata.explicitSubtypes.isNotEmpty;
+    final shouldGenerateJson =
+        !metadata.isAbstract && metadata.explicitSubtypes.isEmpty;
+    final shouldGeneratePolymorphicJson = metadata.explicitSubtypes.isNotEmpty;
 
-    if (shouldGenerateJson || shouldGenerateAbstractJson) {
+    if (shouldGenerateJson || shouldGeneratePolymorphicJson) {
       // Generate fromJson factory constructor
       sb.writeln(_generateFromJson(metadata, config));
       sb.writeln(_generateToJsonLean(metadata, config));
@@ -43,7 +46,7 @@ class JsonGenerator extends UniversalGenerator {
   String _generateFromJson(ClassMetadata metadata, GenerationConfig config) {
     final sb = StringBuffer();
     final className = metadata.cleanName;
-    final genericsStr = _buildGenericsString(metadata);
+    //final genericsStr = _buildGenericsString(metadata);
 
     if (metadata.explicitSubtypes.isEmpty && metadata.generics.isEmpty) {
       // Simple case - no generics, no explicit subtypes
@@ -78,7 +81,9 @@ class JsonGenerator extends UniversalGenerator {
     for (var i = 0; i < metadata.explicitSubtypes.length; i++) {
       final subtype = metadata.explicitSubtypes[i];
       final interfaceName = subtype.interfaceName.replaceAll(r'$', '');
-      final genericTypes = subtype.typeParams.map((e) => "'_${e.name}_'").join(',');
+      final genericTypes = subtype.typeParams
+          .map((e) => "'_${e.name}_'")
+          .join(',');
       final prefix = i == 0 ? 'if' : '} else if';
 
       if (subtype.typeParams.isNotEmpty) {
@@ -98,8 +103,8 @@ class JsonGenerator extends UniversalGenerator {
     sb.writeln('    }');
     sb.writeln(
       '    throw UnsupportedError("The _className_ \' + '
-      r"${json['_className_']}" +
-      '\' is not supported by the $className.fromJson constructor.");',
+              r"${json['_className_']}" +
+          '\' is not supported by the $className.fromJson constructor.");',
     );
     sb.writeln('  }');
 
@@ -115,13 +120,18 @@ class JsonGenerator extends UniversalGenerator {
       );
 
       for (var i = 1; i < metadata.explicitSubtypes.length; i++) {
-        final subtype = metadata.explicitSubtypes[i].interfaceName.replaceAll(r'$', '');
+        final subtype = metadata.explicitSubtypes[i].interfaceName.replaceAll(
+          r'$',
+          '',
+        );
         sb.writeln('    } else if (this is $subtype) {');
         sb.writeln('      return (this as $subtype).toJson();');
       }
 
       sb.writeln('    }');
-      sb.writeln('    throw UnsupportedError("Unknown subtype: \$runtimeType");');
+      sb.writeln(
+        '    throw UnsupportedError("Unknown subtype: \$runtimeType");',
+      );
       sb.writeln('  }');
     }
 
@@ -150,7 +160,9 @@ class JsonGenerator extends UniversalGenerator {
     if (!metadata.isAbstract) {
       sb.writeln('');
       sb.writeln('  Map<String, dynamic> toJsonLean() {');
-      sb.writeln('    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);');
+      sb.writeln(
+        '    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);',
+      );
       sb.writeln('    return _sanitizeJson(data);');
       sb.writeln('  }');
       sb.writeln('');
@@ -170,10 +182,10 @@ class JsonGenerator extends UniversalGenerator {
     return sb.toString();
   }
 
-  String _buildGenericsString(ClassMetadata metadata) {
-    if (metadata.generics.isEmpty) return '';
-    return '<${metadata.generics.map((g) => g.toString()).join(', ')}>';
-  }
+  // String _buildGenericsString(ClassMetadata metadata) {
+  //   if (metadata.generics.isEmpty) return '';
+  //   return '<${metadata.generics.map((g) => g.toString()).join(', ')}>';
+  // }
 }
 
 /// Generates JSON extension for concrete classes
@@ -194,10 +206,16 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
     final sb = StringBuffer();
 
     sb.writeln('');
-    sb.writeln('extension ${className}Serialization on $className$genericsStr {');
-    sb.writeln('  Map<String, dynamic> toJson() => _\$$className' + 'ToJson(this);');
+    sb.writeln(
+      'extension ${className}Serialization on $className$genericsStr {',
+    );
+    sb.writeln(
+      '  Map<String, dynamic> toJson() => _\$$className' + 'ToJson(this);',
+    );
     sb.writeln('  Map<String, dynamic> toJsonLean() {');
-    sb.writeln('    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);');
+    sb.writeln(
+      '    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);',
+    );
     sb.writeln('    return _sanitizeJson(data);');
     sb.writeln('  }');
     sb.writeln('');
@@ -219,7 +237,12 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    return context.config.generateJson;
+    // Don't generate extension if:
+    // 1. Class has explicitSubTypes (polymorphic toJson is in the class itself)
+    // 2. Class is in parent's explicitSubTypes (parent handles dispatch)
+    return context.config.generateJson &&
+        context.metadata.explicitSubtypes.isEmpty &&
+        !context.metadata.isInParentExplicitSubtypes;
   }
 
   String _buildGenericsString(ClassMetadata metadata) {

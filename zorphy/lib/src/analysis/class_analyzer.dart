@@ -19,6 +19,7 @@ class ClassAnalyzer {
     ClassElement classElement,
     ConstantReader annotation,
     Map<String, ClassElement> allAnnotatedClasses,
+    Set<String> classesInExplicitSubtypes,
   ) {
     final className = classElement.name ?? '';
     final isAbstract = className.startsWith(r'$$');
@@ -81,6 +82,10 @@ class ClassAnalyzer {
       ownFieldNames: ownFieldNames,
       factoryMethods: factoryMethods,
       explicitSubtypes: explicitSubtypes,
+      isInParentExplicitSubtypes: _isInParentExplicitSubtypes(
+        className,
+        classesInExplicitSubtypes,
+      ),
       classElement: classElement,
       allAnnotatedClasses: allAnnotatedClasses,
     );
@@ -283,5 +288,13 @@ class ClassAnalyzer {
     }
 
     return factoryMethods;
+  }
+
+  /// Check if this class is listed in any parent's explicitSubTypes
+  static bool _isInParentExplicitSubtypes(
+    String className,
+    Set<String> classesInExplicitSubtypes,
+  ) {
+    return classesInExplicitSubtypes.contains(className);
   }
 }

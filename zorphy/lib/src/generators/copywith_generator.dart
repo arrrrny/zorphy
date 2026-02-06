@@ -1,5 +1,4 @@
 import '../helpers.dart' as helpers;
-import '../models/class_metadata.dart';
 import 'base_generator.dart';
 
 /// Generates copyWith methods
@@ -19,8 +18,8 @@ class CopyWithGenerator extends UniversalGenerator {
 
     final copyWithClassName = metadata.isAbstract
         ? (metadata.originalName.startsWith(r'$$')
-            ? metadata.cleanName
-            : '\$${metadata.cleanName}')
+              ? metadata.cleanName
+              : '\$${metadata.cleanName}')
         : metadata.cleanName;
 
     return helpers.getCopyWith(

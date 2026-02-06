@@ -9,9 +9,14 @@ List<NameTypeClassComment> getDistinctFields(
 ) {
   var allFieldsDistinct = <NameTypeClassComment>[];
 
-  // Add interface fields first
+  // Add interface fields first (deduplicate by name)
   for (var i in interfaces) {
     for (var f in i.fields) {
+      // Skip if already added from another interface
+      if (allFieldsDistinct.any((x) => x.name == f.name)) {
+        continue;
+      }
+      
       var field = allFields.firstOrNullWhere((x) => x.name == f.name);
       if (field != null) {
         allFieldsDistinct.add(field);

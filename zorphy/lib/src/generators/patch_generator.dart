@@ -1,5 +1,4 @@
 import '../helpers.dart' as helpers;
-import '../models/class_metadata.dart';
 import 'base_generator.dart';
 
 /// Generates patchWith methods and Patch class
@@ -31,8 +30,10 @@ class PatchGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    return context.config.generatePatch && 
-           context.metadata.allFields.isNotEmpty;
+    // Don't generate patchWith for classes with explicitSubTypes (can't be instantiated)
+    return context.config.generatePatch &&
+        context.metadata.allFields.isNotEmpty &&
+        !context.metadata.isAbstract;
   }
 }
 
@@ -62,8 +63,9 @@ class PatchClassGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    return context.config.generatePatch && 
-           context.metadata.allFields.isNotEmpty;
+    // Generate patch class even for explicitSubTypes (needed for changeTo methods)
+    return context.config.generatePatch &&
+        context.metadata.allFields.isNotEmpty;
   }
 }
 
@@ -79,7 +81,8 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    return context.config.generatePatch && 
-           context.metadata.allFields.isNotEmpty;
+    // Generate enum even for explicitSubTypes (needed for patch classes)
+    return context.config.generatePatch &&
+        context.metadata.allFields.isNotEmpty;
   }
 }

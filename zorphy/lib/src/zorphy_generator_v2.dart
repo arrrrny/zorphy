@@ -11,6 +11,8 @@ class ZorphyGeneratorV2 extends GeneratorForAnnotationX<Zorphy> {
   static final Map<String, ClassElement> _allAnnotatedClasses = {};
   static Map<String, ClassElement> get allAnnotatedClasses =>
       _allAnnotatedClasses;
+  
+  static Set<String>? _classesInExplicitSubtypes;
 
   @override
   TypeChecker get typeChecker => const TypeChecker.fromUrl(
@@ -57,12 +59,38 @@ class ZorphyGeneratorV2 extends GeneratorForAnnotationX<Zorphy> {
       ownFields: ownFields,
     );
 
+    // Build set of classes in explicitSubTypes
+    // Note: We rebuild this each time because _allAnnotatedClasses grows as we process more classes
+    _classesInExplicitSubtypes = <String>{};
+    final zorphyChecker = const TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/annotations.dart#Zorphy',
+    );
+    
+    for (final cls in _allAnnotatedClasses.values) {
+      final clsAnnotation = zorphyChecker.firstAnnotationOf(cls);
+      if (clsAnnotation != null) {
+        final explicitSubtypesField = clsAnnotation.getField('explicitSubTypes');
+        if (explicitSubtypesField != null && !explicitSubtypesField.isNull) {
+          final subtypes = explicitSubtypesField.toListValue();
+          if (subtypes != null) {
+            for (final subtype in subtypes) {
+              final subtypeName = subtype.toTypeValue()?.element?.name;
+              if (subtypeName != null) {
+                _classesInExplicitSubtypes!.add(subtypeName);
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Use the new orchestrator pipeline
     return Orchestrator.generate(
       classElement,
       annotation,
       _allAnnotatedClasses,
       config,
+      _classesInExplicitSubtypes!,
     );
   }
 

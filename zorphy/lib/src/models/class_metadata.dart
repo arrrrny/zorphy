@@ -49,6 +49,10 @@ class ClassMetadata {
   /// Explicit subtypes declared in @Zorphy(explicitSubTypes: [...])
   final List<Interface> explicitSubtypes;
 
+  /// Whether this class is listed in a parent's explicitSubTypes
+  /// If true, the parent handles polymorphic JSON, so this class shouldn't generate JSON methods
+  final bool isInParentExplicitSubtypes;
+
   /// The original ClassElement from Dart analyzer
   final ClassElement classElement;
 
@@ -70,6 +74,7 @@ class ClassMetadata {
     required this.ownFieldNames,
     required this.factoryMethods,
     required this.explicitSubtypes,
+    required this.isInParentExplicitSubtypes,
     required this.classElement,
     required this.allAnnotatedClasses,
   });

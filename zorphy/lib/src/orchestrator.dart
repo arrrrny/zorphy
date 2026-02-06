@@ -52,12 +52,14 @@ class Orchestrator {
     ConstantReader annotation,
     Map<String, ClassElement> allAnnotatedClasses,
     GenerationConfig config,
+    Set<String> classesInExplicitSubtypes,
   ) {
     // Phase 1: Analysis
     final metadata = ClassAnalyzer.analyze(
       classElement,
       annotation,
       allAnnotatedClasses,
+      classesInExplicitSubtypes,
     );
 
     // Phase 2: Create generation context

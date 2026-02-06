@@ -10,6 +10,7 @@ part 'sealed_class_example.zorphy.dart';
 /// - Type-safe polymorphic operations
 /// - Explicit subtype specification
 @Zorphy(
+  generateJson: true,
   explicitSubTypes: [$CreditCard, $PayPal, $BankTransfer],
 )
 abstract class $$PaymentMethod {
@@ -90,8 +91,4 @@ void main() {
     print('  ${method.displayName}: ${method.processPayment}');
   }
   print('');
-
-  // JSON serialization of polymorphic types
-  print('JSON serialization:');
-  print('CreditCard: ${creditCard.toJson()}');
 }

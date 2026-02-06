@@ -39,6 +39,17 @@ class FieldResolver {
     }
 
     addFields(classElement);
-    return fields.toSet().toList();
+    
+    // Deduplicate by field name (keep first occurrence)
+    final seen = <String>{};
+    final distinct = <NameTypeClassComment>[];
+    for (final field in fields) {
+      if (!seen.contains(field.name)) {
+        seen.add(field.name);
+        distinct.add(field);
+      }
+    }
+    
+    return distinct;
   }
 }

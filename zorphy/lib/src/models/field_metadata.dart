@@ -1,5 +1,4 @@
 import '../common/NameType.dart';
-import '../common/classes.dart';
 
 /// Re-exports Interface for backward compatibility
 export '../common/classes.dart' show Interface;

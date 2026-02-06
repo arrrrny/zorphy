@@ -7,12 +7,12 @@ part 'assistant_message.zorphy.dart';
 
 @Zorphy(generateJson: true)
 abstract class $AssistantMessage implements $$ChatMessage {
-  @override
-  ChatMessageRole get role => ChatMessageRole.assistant;
   factory $AssistantMessage.create({required String text}) => AssistantMessage(
         text: text,
         attachments: [],
         role: ChatMessageRole.assistant,
         createdAt: DateTime.now(),
       );
+  @override
+  ChatMessageRole get role => ChatMessageRole.assistant;
 }

@@ -1,6 +1,5 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'factory_test.zorphy.dart';
-part 'factory_test.g.dart';
 
 @Zorphy(generateJson: true)
 abstract class $TestWithFactory {

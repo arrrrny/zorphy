@@ -14,7 +14,7 @@ part 'comprehensive_example.g.dart';
 // =============================================================================
 
 /// A simple user class demonstrating basic Zorphy features
-@Zorphy()
+@Zorphy(generatePatch: true)
 abstract class $User {
   String get name;
   int get age;

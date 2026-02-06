@@ -1,5 +1,5 @@
 import '../helpers.dart' as helpers;
-import '../common/NameType.dart';
+
 import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
 import 'base_generator.dart';
@@ -72,28 +72,31 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final implementsStr = _buildImplementsClause(metadata, isAbstract: false);
 
     final sb = StringBuffer();
-    
+
     // Don't add @JsonSerializable if:
     // 1. There are factory methods (abstract parent handles JSON)
-    // 2. Parent has explicitSubTypes (parent handles polymorphic JSON)
-    final parentHasExplicitSubtypes = metadata.interfaces.any((iface) => 
-      iface.interfaceName.startsWith(r'$$') && !iface.isSealed
-    );
-    
-    if (config.generateJson && 
-        config.factoryMethods.isEmpty && 
-        !parentHasExplicitSubtypes) {
+    // 2. This class is in a parent's explicitSubTypes (parent handles polymorphic dispatch)
+    if (config.generateJson &&
+        config.factoryMethods.isEmpty &&
+        !metadata.isInParentExplicitSubtypes) {
       sb.writeln('@JsonSerializable(explicitToJson: ${config.explicitToJson})');
     }
-    
+
     sb.writeln('class $className$genericsStr$extendsStr$implementsStr {');
 
     // Determine if class extends abstract parent
     final hasExtendsParam = extendsStr.isNotEmpty;
-    final extendsAbstractClass = _determineExtendsAbstractClass(metadata, extendsStr);
+    final extendsAbstractClass = _determineExtendsAbstractClass(
+      metadata,
+      extendsStr,
+    );
 
     // Get parent fields if extending a concrete parent
-    final parentFields = _getParentFields(metadata, extendsStr, extendsAbstractClass);
+    final parentFields = _getParentFields(
+      metadata,
+      extendsStr,
+      extendsAbstractClass,
+    );
 
     // All fields from parent interfaces (for @override detection)
     final allParentInterfaceFields = <String>{};
@@ -123,16 +126,21 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
   String _buildGenericsString(ClassMetadata metadata) {
     if (metadata.generics.isEmpty) return '';
-    final parts = metadata.generics.map((g) {
-      if (g.bound != null && g.bound!.isNotEmpty) {
-        return '${g.name} extends ${g.bound}';
-      }
-      return g.name;
-    }).join(', ');
+    final parts = metadata.generics
+        .map((g) {
+          if (g.bound != null && g.bound!.isNotEmpty) {
+            return '${g.name} extends ${g.bound}';
+          }
+          return g.name;
+        })
+        .join(', ');
     return '<$parts>';
   }
 
-  String _buildImplementsClause(ClassMetadata metadata, {required bool isAbstract}) {
+  String _buildImplementsClause(
+    ClassMetadata metadata, {
+    required bool isAbstract,
+  }) {
     final interfaces = metadata.interfaces;
 
     if (isAbstract) {
@@ -174,7 +182,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       final abstractName = metadata.originalName; // e.g., $AssistantMessage
       return ' extends $abstractName';
     }
-    
+
     // No factory methods - check if we should extend a parent interface
     for (final iface in metadata.interfaces) {
       final name = iface.interfaceName;
@@ -187,7 +195,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         return ' extends ${_trimInterfaceName(name)}';
       }
     }
-    
+
     return '';
   }
 
@@ -197,7 +205,10 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     return name;
   }
 
-  bool _determineExtendsAbstractClass(ClassMetadata metadata, String extendsStr) {
+  bool _determineExtendsAbstractClass(
+    ClassMetadata metadata,
+    String extendsStr,
+  ) {
     // If we have factory methods, we're extending the abstract parent
     return extendsStr.contains(r'$');
   }
