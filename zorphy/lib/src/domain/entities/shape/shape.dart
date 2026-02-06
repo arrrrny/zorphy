@@ -10,7 +10,6 @@ part 'shape.g.dart';
   generateJson: true,
   generateCompareTo: true,
   explicitSubTypes: [$Circle, $Rectangle],
-  nonSealed: true,
 )
 abstract class $$Shape {
   String get color;

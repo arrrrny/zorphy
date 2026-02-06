@@ -386,6 +386,7 @@ Future<void> _handleCreate(ArgResults args) async {
   final isDryRun = args['dry-run'] as bool? ?? false;
   final extendsInterface = args['extends'] as String?;
   final explicitSubtypes = args['subtypes'] as List<String>?;
+  final generateSubs = args['generate-subs'] as bool? ?? false;
 
   // Get package name
   // String packageName = _getPackageName();
@@ -439,6 +440,36 @@ Future<void> _handleCreate(ArgResults args) async {
     print('Warning: No fields specified. Creating empty entity.');
   }
 
+  // Collect subtypes and their fields IF they will be in the same file
+  final subtypesWithFields = <String, List<_FieldInfo>>{};
+  if (generateSubs && isSealed && explicitSubtypes != null) {
+    print(
+      '\n🔄 Collecting information for ${explicitSubtypes.length} subtype(s)...\n',
+    );
+    for (final subtype in explicitSubtypes) {
+      final subtypeName = subtype.replaceAll('\$', '');
+      final subtypeClassName = _formatClassName(subtypeName);
+      final fieldsList = <_FieldInfo>[];
+
+      if (useInteractiveFields && !isDryRun) {
+        print('📝 Additional fields for $subtypeClassName:');
+        while (true) {
+          stdout.write('  Field name (or Enter to finish): ');
+          final fieldName = stdin.readLineSync()?.trim();
+          if (fieldName == null || fieldName.isEmpty) break;
+
+          stdout.write('  Field type: ');
+          final fieldType = _normalizeFieldType(
+            stdin.readLineSync()?.trim() ?? 'String',
+            baseOutputDir: baseOutputDir,
+          );
+          fieldsList.add(_FieldInfo(name: fieldName, type: fieldType));
+        }
+      }
+      subtypesWithFields[subtype] = fieldsList;
+    }
+  }
+
   // Class name formatting
   final className = _formatClassName(name);
   final entityDirName = _toSnakeCase(className);
@@ -467,7 +498,12 @@ Future<void> _handleCreate(ArgResults args) async {
   final entityImports = <String>{};
   bool needsEnumImport = false;
 
-  for (final field in fields) {
+  final allFieldsForImports = [...fields];
+  for (final subFields in subtypesWithFields.values) {
+    allFieldsForImports.addAll(subFields);
+  }
+
+  for (final field in allFieldsForImports) {
     final type = field.type;
 
     // Extract all type references (including generics)
@@ -514,10 +550,13 @@ Future<void> _handleCreate(ArgResults args) async {
     for (final subtype in explicitSubtypes) {
       final cleanSubtype = subtype.replaceAll(RegExp(r'^\$+'), '');
       if (cleanSubtype != className) {
-        final subtypeSnakeName = _toSnakeCase(cleanSubtype);
-        entityImports.add(
-          "import '../$subtypeSnakeName/$subtypeSnakeName.dart';",
-        );
+        // If we're generating subs for a sealed class, they'll be in the same file
+        if (!(generateSubs && isSealed)) {
+          final subtypeSnakeName = _toSnakeCase(cleanSubtype);
+          entityImports.add(
+            "import '../$subtypeSnakeName/$subtypeSnakeName.dart';",
+          );
+        }
       }
     }
   }
@@ -534,7 +573,9 @@ Future<void> _handleCreate(ArgResults args) async {
 
   // Add part directives - zorphy first, then g
   buffer.writeln("part '$entityDirName.zorphy.dart';");
-  if (useJson && !isSealed) {
+  final hasExplicitSubtypes =
+      explicitSubtypes != null && explicitSubtypes.isNotEmpty;
+  if (useJson && (!isSealed && !isNonSealed || hasExplicitSubtypes)) {
     buffer.writeln("part '$entityDirName.g.dart';");
   }
   buffer.writeln();
@@ -574,6 +615,40 @@ Future<void> _handleCreate(ArgResults args) async {
   buffer.writeln('}');
   buffer.writeln();
 
+  // Generate subtypes in the same file if it's a sealed class
+  if (generateSubs && isSealed && explicitSubtypes != null) {
+    print('\n🔄 Generating ${explicitSubtypes.length} subtype(s) in $filePath...');
+
+    for (final subtype in explicitSubtypes) {
+      final subtypeName = subtype.replaceAll('\$', '');
+      final subtypeClassName = _formatClassName(subtypeName);
+      final subtypeFields = subtypesWithFields[subtype] ?? [];
+
+      // Add subtype definition to the main buffer
+      final subtypeAnnotationOptions = <String>[];
+      if (useJson) subtypeAnnotationOptions.add('generateJson: true');
+      if (useCopyWithFn) {
+        subtypeAnnotationOptions.add('generateCopyWithFn: true');
+      }
+      if (useCompare) subtypeAnnotationOptions.add('generateCompareTo: true');
+
+      buffer.writeln('/// $subtypeClassName entity (subtype of $className)');
+      buffer.writeln('@Zorphy(${subtypeAnnotationOptions.join(', ')})');
+      final parentRef = isSealed ? '\$\$$className' : '\$$className';
+      buffer.writeln(
+        'abstract class \$$subtypeClassName implements $parentRef {',
+      );
+      if (subtypeFields.isNotEmpty) {
+        buffer.writeln();
+        for (final field in subtypeFields) {
+          buffer.writeln('  ${field.type} get ${field.name};');
+        }
+      }
+      buffer.writeln('}');
+      buffer.writeln();
+    }
+  }
+
   // Write file
   if (isDryRun) {
     print('\n🚀 [DRY RUN] Would create $filePath with content:\n');
@@ -603,10 +678,9 @@ Future<void> _handleCreate(ArgResults args) async {
     }
   }
 
-  // Generate subtypes if requested
-  final generateSubs = args['generate-subs'] as bool? ?? false;
-  if (generateSubs && explicitSubtypes != null && explicitSubtypes.isNotEmpty) {
-    print('\n🔄 Generating ${explicitSubtypes.length} subtype(s)...\n');
+  // Generate subtypes in separate files if NOT a sealed class
+  if (generateSubs && !isSealed && explicitSubtypes != null && explicitSubtypes.isNotEmpty) {
+    print('\n🔄 Generating ${explicitSubtypes.length} subtype(s) in separate files...\n');
 
     for (final subtype in explicitSubtypes) {
       final subtypeName = subtype.replaceAll(
