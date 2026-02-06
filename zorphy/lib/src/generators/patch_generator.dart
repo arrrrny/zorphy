@@ -65,7 +65,8 @@ class PatchClassGenerator extends ConcreteClassGenerator {
   bool shouldGenerate(GenerationContext context) {
     // Generate patch class even for explicitSubTypes (needed for changeTo methods)
     return context.config.generatePatch &&
-        context.metadata.allFields.isNotEmpty;
+        context.metadata.allFields.isNotEmpty &&
+        !context.metadata.isAbstract;
   }
 }
 

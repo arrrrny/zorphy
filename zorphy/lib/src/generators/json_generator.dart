@@ -19,11 +19,6 @@ class JsonGenerator extends UniversalGenerator {
 
     final sb = StringBuffer();
 
-    // Don't generate JSON for classes in parent's explicitSubTypes (parent handles dispatch)
-    if (metadata.isInParentExplicitSubtypes) {
-      return '';
-    }
-
     // Determine if we should generate JSON
     final shouldGenerateJson =
         !metadata.isAbstract && metadata.explicitSubtypes.isEmpty;
@@ -33,6 +28,12 @@ class JsonGenerator extends UniversalGenerator {
       // Generate fromJson factory constructor
       sb.writeln(_generateFromJson(metadata, config));
       sb.writeln(_generateToJsonLean(metadata, config));
+    }
+
+    // For concrete classes in a parent's explicitSubTypes, also generate toJson with _className_
+    // This is needed even if the class has its own explicitSubTypes (polymorphic)
+    if (!metadata.isAbstract && metadata.isInParentExplicitSubtypes) {
+      sb.writeln(_generateToJsonWithDiscriminator(metadata));
     }
 
     return sb.toString();
@@ -78,13 +79,29 @@ class JsonGenerator extends UniversalGenerator {
     sb.writeln('  /// Creates a [$className] instance from JSON');
     sb.writeln('  factory $className.fromJson(Map<String, dynamic> json) {');
 
+    // For concrete classes in parent's explicitSubTypes, check if _className_ is null first
+    // This handles parsing the class itself when there's no discriminator
+    final hasSelfCase =
+        !metadata.isAbstract && metadata.isInParentExplicitSubtypes;
+    final totalCases = metadata.explicitSubtypes.length + (hasSelfCase ? 1 : 0);
+    var caseIndex = 0;
+
+    if (hasSelfCase) {
+      sb.writeln(
+        '    if (json[\'_className_\'] == null || json[\'_className_\'] == "$className") {',
+      );
+      sb.writeln('      return _\$${className}FromJson(json);');
+      caseIndex++;
+    }
+
     for (var i = 0; i < metadata.explicitSubtypes.length; i++) {
       final subtype = metadata.explicitSubtypes[i];
       final interfaceName = subtype.interfaceName.replaceAll(r'$', '');
       final genericTypes = subtype.typeParams
           .map((e) => "'_${e.name}_'")
           .join(',');
-      final prefix = i == 0 ? 'if' : '} else if';
+      final isLast = caseIndex == totalCases - 1;
+      final prefix = caseIndex == 0 ? 'if' : '} else if';
 
       if (subtype.typeParams.isNotEmpty) {
         sb.writeln('    $prefix (json[\'_className_\'] == "$interfaceName") {');
@@ -98,9 +115,13 @@ class JsonGenerator extends UniversalGenerator {
         sb.writeln('    $prefix (json[\'_className_\'] == "$interfaceName") {');
         sb.writeln('      return $interfaceName.fromJson(json);');
       }
+
+      if (isLast) {
+        sb.writeln('    }');
+      }
+      caseIndex++;
     }
 
-    sb.writeln('    }');
     sb.writeln(
       '    throw UnsupportedError("The _className_ \' + '
               r"${json['_className_']}" +
@@ -182,6 +203,22 @@ class JsonGenerator extends UniversalGenerator {
     return sb.toString();
   }
 
+  /// Generate toJson method with _className_ discriminator for classes in parent's explicitSubTypes
+  String _generateToJsonWithDiscriminator(ClassMetadata metadata) {
+    final sb = StringBuffer();
+    final className = metadata.cleanName;
+
+    // Generate toJson method with _className_ discriminator
+    sb.writeln('');
+    sb.writeln('  Map<String, dynamic> toJson() {');
+    sb.writeln('    final json = _\$$className' + 'ToJson(this);');
+    sb.writeln('    json[\'_className_\'] = \'$className\';');
+    sb.writeln('    return json;');
+    sb.writeln('  }');
+
+    return sb.toString();
+  }
+
   // String _buildGenericsString(ClassMetadata metadata) {
   //   if (metadata.generics.isEmpty) return '';
   //   return '<${metadata.generics.map((g) => g.toString()).join(', ')}>';
@@ -237,12 +274,10 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    // Don't generate extension if:
-    // 1. Class has explicitSubTypes (polymorphic toJson is in the class itself)
-    // 2. Class is in parent's explicitSubTypes (parent handles dispatch)
+    // Don't generate extension if class has explicitSubTypes (polymorphic toJson is in the class itself)
+    // Classes in parent's explicitSubTypes are now handled by JsonGenerator, not this extension
     return context.config.generateJson &&
-        context.metadata.explicitSubtypes.isEmpty &&
-        !context.metadata.isInParentExplicitSubtypes;
+        context.metadata.explicitSubtypes.isEmpty;
   }
 
   String _buildGenericsString(ClassMetadata metadata) {

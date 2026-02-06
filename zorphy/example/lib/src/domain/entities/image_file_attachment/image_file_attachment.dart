@@ -4,6 +4,7 @@ import '../file_attachment/file_attachment.dart';
 import '../attachment/attachment.dart';
 
 part 'image_file_attachment.zorphy.dart';
+part 'image_file_attachment.g.dart';
 
 @Zorphy(generateJson: true)
 abstract class $ImageFileAttachment implements $FileAttachment {}

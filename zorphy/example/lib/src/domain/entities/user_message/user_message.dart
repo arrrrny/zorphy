@@ -5,6 +5,7 @@ import '../chat_message/chat_message.dart';
 import '../enums/index.dart';
 
 part 'user_message.zorphy.dart';
+part 'user_message.g.dart';
 
 @Zorphy(generateJson: true)
 abstract class $UserMessage implements $$ChatMessage {

@@ -75,10 +75,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
     // Don't add @JsonSerializable if:
     // 1. There are factory methods (abstract parent handles JSON)
-    // 2. This class is in a parent's explicitSubTypes (parent handles polymorphic dispatch)
-    if (config.generateJson &&
-        config.factoryMethods.isEmpty &&
-        !metadata.isInParentExplicitSubtypes) {
+    if (config.generateJson && config.factoryMethods.isEmpty) {
       sb.writeln('@JsonSerializable(explicitToJson: ${config.explicitToJson})');
     }
 
@@ -91,12 +88,18 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       extendsStr,
     );
 
-    // Get parent fields if extending a concrete parent
-    final parentFields = _getParentFields(
-      metadata,
-      extendsStr,
-      extendsAbstractClass,
-    );
+    // Determine if we're extending a concrete parent
+    final parentConcreteClassName = _getConcreteParentName(metadata);
+    final hasConcreteParent = parentConcreteClassName != null;
+
+    // When extending a concrete parent, we still generate all fields
+    // but we need to track which ones belong to the parent for the super call
+    final fieldsToGenerate = metadata.allFields;
+
+    // Get parent fields that need to be passed to super constructor
+    final parentFields = hasConcreteParent
+        ? _getParentFieldsForSuper(metadata, metadata.ownFieldNames)
+        : <String>{};
 
     // All fields from parent interfaces (for @override detection)
     final allParentInterfaceFields = <String>{};
@@ -107,7 +110,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     // Generate properties and constructor
     sb.writeln(
       helpers.getProperties(
-        metadata.allFields,
+        fieldsToGenerate,
         className,
         false,
         config.hidePublicConstructor,
@@ -191,12 +194,37 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         return ' extends ${_trimInterfaceName(name)}';
       }
       if (name.startsWith(r'$') && !name.startsWith(r'$$')) {
-        // Single-$ parent - extend it
+        // Single-$ parent - extend it (could be abstract or concrete)
         return ' extends ${_trimInterfaceName(name)}';
       }
     }
 
     return '';
+  }
+
+  /// Check if the class extends a concrete parent (not just an abstract interface)
+  String? _getConcreteParentName(ClassMetadata metadata) {
+    // Find the concrete parent we're extending
+    for (final iface in metadata.interfaces) {
+      final name = iface.interfaceName;
+      // Check if this is a single-$ prefix (concrete class marker)
+      if (name.startsWith(r'$') && !name.startsWith(r'$$')) {
+        final trimmedName = _trimInterfaceName(name);
+        // Check if the parent class name doesn't start with $$ (i.e., it's concrete, not abstract)
+        // We need to look up the parent's metadata
+        final parentElement = metadata.allAnnotatedClasses[trimmedName];
+        if (parentElement != null) {
+          final parentIsAbstract =
+              parentElement.name?.startsWith(r'$$') ?? false;
+          if (!parentIsAbstract) {
+            return trimmedName;
+          }
+        }
+        // If we can't determine, assume it could be concrete
+        return trimmedName;
+      }
+    }
+    return null;
   }
 
   String _trimInterfaceName(String name) {
@@ -213,13 +241,20 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     return extendsStr.contains(r'$');
   }
 
-  Set<String> _getParentFields(
+  Set<String> _getParentFieldsForSuper(
     ClassMetadata metadata,
-    String extendsStr,
-    bool extendsAbstractClass,
+    Set<String> ownFieldNames,
   ) {
-    // Get parent fields if extending a concrete parent
-    // This logic will be expanded when integrating with createZorphy
-    return {};
+    // Get parent fields that need to be passed to super constructor
+    // These are fields in allFields that are NOT own fields
+    final parentFields = <String>{};
+
+    for (final field in metadata.allFields) {
+      if (!ownFieldNames.contains(field.name)) {
+        parentFields.add(field.name);
+      }
+    }
+
+    return parentFields;
   }
 }
