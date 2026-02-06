@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dartx/dartx.dart';
 import 'package:zorphy/src/common/NameType.dart';
 import 'package:zorphy/src/common/classes.dart';
@@ -55,9 +56,15 @@ String getProperties(
   var classNameTrimmed = className.replaceAll("\$", "");
 
   for (var f in fields) {
+    stderr.writeln('DEBUG FIELD: ${f.name} in $className, jsonKey: ${f.jsonKeyInfo != null}, addAnnotations: ${f.additionalAnnotations}');
     // Add JsonKey annotation if present from source
     if (f.jsonKeyInfo != null) {
       sb.writeln("  ${f.jsonKeyInfo!.toAnnotationString()}");
+    }
+
+    // Add additional annotations
+    for (var a in f.additionalAnnotations) {
+      sb.writeln("  $a");
     }
 
     // Determine the field type
@@ -81,21 +88,25 @@ String getProperties(
   if (!isAbstract && !hidePublicConstructor) {
     // Constructor
     sb.writeln("");
-    sb.writeln("  ${classNameTrimmed}({");
-    for (var f in fields) {
-      // Determine the field type (same logic as above for field declarations)
-      var fieldType = f.type;
-      if (fieldType != null) {
-        fieldType = _replaceDollarTypesWithConcrete(fieldType);
-      }
+    if (fields.isEmpty) {
+      sb.writeln("  ${classNameTrimmed}()");
+    } else {
+      sb.writeln("  ${classNameTrimmed}({");
+      for (var f in fields) {
+        // Determine the field type (same logic as above for field declarations)
+        var fieldType = f.type;
+        if (fieldType != null) {
+          fieldType = _replaceDollarTypesWithConcrete(fieldType);
+        }
 
-      // Check if field is nullable - if it ends with ?, don't add required
-      // Use the transformed fieldType to check for nullability
-      var isNullable = fieldType != null && fieldType.endsWith('?');
-      var requiredKeyword = isNullable ? "" : "required ";
-      sb.writeln("    ${requiredKeyword}this.${f.name},");
+        // Check if field is nullable - if it ends with ?, don't add required
+        // Use the transformed fieldType to check for nullability
+        var isNullable = fieldType != null && fieldType.endsWith('?');
+        var requiredKeyword = isNullable ? "" : "required ";
+        sb.writeln("    ${requiredKeyword}this.${f.name},");
+      }
+      sb.writeln("  })");
     }
-    sb.writeln("  })");
 
     // Add super call when extending abstract class
     if (hasExtends && extendsAbstractClass) {
@@ -117,18 +128,22 @@ String getProperties(
     // Named constructor for copyWith
     if (generateCopyWithFn) {
       sb.writeln("");
-      sb.writeln("  ${classNameTrimmed}.copyWith({");
-      for (var f in fields) {
-        var fieldType = f.type != null
-            ? _replaceDollarTypesWithConcrete(f.type!)
-            : f.type;
-        // For copyWith, we want all parameters to be nullable, so add ? if not already present
-        var nullableFieldType = fieldType!.endsWith('?')
-            ? fieldType
-            : '${fieldType}?';
-        sb.writeln("    $nullableFieldType ${f.name},");
+      if (fields.isEmpty) {
+        sb.writeln("  ${classNameTrimmed}.copyWith() : ");
+      } else {
+        sb.writeln("  ${classNameTrimmed}.copyWith({");
+        for (var f in fields) {
+          var fieldType = f.type != null
+              ? _replaceDollarTypesWithConcrete(f.type!)
+              : f.type;
+          // For copyWith, we want all parameters to be nullable, so add ? if not already present
+          var nullableFieldType = fieldType!.endsWith('?')
+              ? fieldType
+              : '${fieldType}?';
+          sb.writeln("    $nullableFieldType ${f.name},");
+        }
+        sb.writeln("  }) : ");
       }
-      sb.writeln("  }) : ");
       for (var i = 0; i < fields.length; i++) {
         var f = fields[i];
         var comma = i == fields.length - 1 ? ";" : ",";
@@ -499,13 +514,17 @@ String getCopyWith(
   var classNameTrimmed = className.replaceAll("\$", "");
 
   // Regular copyWith method (standard convention)
-  sb.writeln("  $classNameTrimmed copyWith({");
-  for (var f in fields) {
-    var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
-    var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
-    sb.writeln("    $nullableType ${f.name},");
+  if (fields.isEmpty) {
+    sb.writeln("  $classNameTrimmed copyWith() {");
+  } else {
+    sb.writeln("  $classNameTrimmed copyWith({");
+    for (var f in fields) {
+      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+      var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
+      sb.writeln("    $nullableType ${f.name},");
+    }
+    sb.writeln("  }) {");
   }
-  sb.writeln("  }) {");
   sb.writeln("    return $classNameTrimmed(");
   for (var f in fields) {
     sb.writeln("      ${f.name}: ${f.name} ?? this.${f.name},");
@@ -516,30 +535,40 @@ String getCopyWith(
   // Alias: copyWith{Entity} for polymorphic/disambiguation cases
   // This delegates to the standard copyWith method
   sb.writeln("");
-  sb.writeln("  $classNameTrimmed copyWith$classNameTrimmed({");
-  for (var f in fields) {
-    var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
-    var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
-    sb.writeln("    $nullableType ${f.name},");
+  if (fields.isEmpty) {
+    sb.writeln("  $classNameTrimmed copyWith$classNameTrimmed() {");
+  } else {
+    sb.writeln("  $classNameTrimmed copyWith$classNameTrimmed({");
+    for (var f in fields) {
+      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+      var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
+      sb.writeln("    $nullableType ${f.name},");
+    }
+    sb.writeln("  }) {");
   }
-  sb.writeln("  }) {");
   sb.writeln("    return copyWith(");
-  var params = fields.map((f) => "${f.name}: ${f.name}").join(", ");
-  sb.writeln("      $params,");
+  if (fields.isNotEmpty) {
+    var params = fields.map((f) => "${f.name}: ${f.name}").join(", ");
+    sb.writeln("      $params,");
+  }
   sb.writeln("    );");
   sb.writeln("  }");
 
   // Function-based copyWith if enabled
   if (generateCopyWithFn) {
     sb.writeln("");
-    sb.writeln("  $classNameTrimmed copyWithFn({");
-    for (var f in fields) {
-      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
-      // Function parameter and return type match the field type exactly
-      // Only the function itself is nullable
-      sb.writeln("    $fieldType Function($fieldType)? ${f.name},");
+    if (fields.isEmpty) {
+      sb.writeln("  $classNameTrimmed copyWithFn() {");
+    } else {
+      sb.writeln("  $classNameTrimmed copyWithFn({");
+      for (var f in fields) {
+        var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+        // Function parameter and return type match the field type exactly
+        // Only the function itself is nullable
+        sb.writeln("    $fieldType Function($fieldType)? ${f.name},");
+      }
+      sb.writeln("  }) {");
     }
-    sb.writeln("  }) {");
     sb.writeln("    return $classNameTrimmed(");
     for (var f in fields) {
       sb.writeln(
@@ -647,11 +676,15 @@ String getEqualsAndHashCode(
   sb.writeln("  @override");
   sb.writeln("  bool operator ==(Object other) {");
   sb.writeln("    if (identical(this, other)) return true;");
-  sb.writeln("    return other is ${className} &&");
-  for (var i = 0; i < fields.length; i++) {
-    var f = fields[i];
-    var comma = i == fields.length - 1 ? ";" : " &&";
-    sb.writeln("        ${f.name} == other.${f.name}$comma");
+  if (fields.isEmpty) {
+    sb.writeln("    return other is $className;");
+  } else {
+    sb.writeln("    return other is $className &&");
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      var comma = i == fields.length - 1 ? ";" : " &&";
+      sb.writeln("        ${f.name} == other.${f.name}$comma");
+    }
   }
   sb.writeln("  }");
 
@@ -710,16 +743,20 @@ String getToString(List<NameTypeClassComment> fields, String className) {
 
   sb.writeln("  @override");
   sb.writeln("  String toString() {");
-  sb.writeln("    return '$className(' +");
+  if (fields.isEmpty) {
+    sb.writeln("    return '$className()';");
+  } else {
+    sb.writeln("    return '$className(' +");
 
-  for (var i = 0; i < fields.length; i++) {
-    var f = fields[i];
-    var isLast = i == fields.length - 1;
-    sb.write("        '${f.name}: \${${f.name}}");
-    if (isLast) {
-      sb.writeln(")';");
-    } else {
-      sb.writeln("' + ', ' +");
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      var isLast = i == fields.length - 1;
+      sb.write("        '${f.name}: \${${f.name}}");
+      if (isLast) {
+        sb.writeln(")';");
+      } else {
+        sb.writeln("' + ', ' +");
+      }
     }
   }
   sb.writeln("  }");

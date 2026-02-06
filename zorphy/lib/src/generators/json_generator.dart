@@ -163,10 +163,17 @@ class JsonGenerator extends UniversalGenerator {
     ClassMetadata metadata,
     GenerationConfig config,
   ) {
-    // Generics without explicit subtypes
-    // This is complex logic that needs to be extracted from createZorphy
-    // For now, return empty string
-    return '';
+    final sb = StringBuffer();
+    final className = metadata.cleanName;
+
+    final fromJsonParams = metadata.generics.map((g) => 'T Function(Object? json) fromJson${g.name}'.replaceAll('T', g.name)).join(', ');
+    final fromJsonArgs = metadata.generics.map((g) => 'fromJson${g.name}').join(', ');
+
+    sb.writeln('');
+    sb.writeln('  /// Creates a [$className] instance from JSON');
+    sb.writeln('  factory $className.fromJson(Map<String, dynamic> json, $fromJsonParams) => _\$$className' + 'FromJson(json, $fromJsonArgs);');
+
+    return sb.toString();
   }
 
   String _generateToJsonLean(ClassMetadata metadata, GenerationConfig config) {
@@ -180,10 +187,19 @@ class JsonGenerator extends UniversalGenerator {
 
     if (!metadata.isAbstract) {
       sb.writeln('');
-      sb.writeln('  Map<String, dynamic> toJsonLean() {');
-      sb.writeln(
-        '    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);',
-      );
+      if (metadata.generics.isEmpty) {
+        sb.writeln('  Map<String, dynamic> toJsonLean() {');
+        sb.writeln(
+          '    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);',
+        );
+      } else {
+        final toJsonParams = metadata.generics.map((g) => 'Object? Function(T value) toJson${g.name}'.replaceAll('T', g.name)).join(', ');
+        final toJsonArgs = metadata.generics.map((g) => 'toJson${g.name}').join(', ');
+        sb.writeln('  Map<String, dynamic> toJsonLean($toJsonParams) {');
+        sb.writeln(
+          '    final Map<String, dynamic> data = _\$$className' + 'ToJson(this, $toJsonArgs);',
+        );
+      }
       sb.writeln('    return _sanitizeJson(data);');
       sb.writeln('  }');
       sb.writeln('');
@@ -244,15 +260,33 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
 
     sb.writeln('');
     sb.writeln(
-      'extension ${className}Serialization on $className$genericsStr {',
+      'extension ${className}Serialization$genericsStr on $className$genericsStr {',
     );
-    sb.writeln(
-      '  Map<String, dynamic> toJson() => _\$$className' + 'ToJson(this);',
-    );
-    sb.writeln('  Map<String, dynamic> toJsonLean() {');
-    sb.writeln(
-      '    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);',
-    );
+    
+    if (metadata.generics.isEmpty) {
+      sb.writeln(
+        '  Map<String, dynamic> toJson() => _\$$className' + 'ToJson(this);',
+      );
+    } else {
+      final toJsonParams = metadata.generics.map((g) => 'Object? Function(${g.name} value) toJson${g.name}').join(', ');
+      final toJsonArgs = metadata.generics.map((g) => 'toJson${g.name}').join(', ');
+      sb.writeln(
+        '  Map<String, dynamic> toJson($toJsonParams) => _\$$className' + 'ToJson(this, $toJsonArgs);',
+      );
+    }
+    if (metadata.generics.isEmpty) {
+      sb.writeln('  Map<String, dynamic> toJsonLean() {');
+      sb.writeln(
+        '    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);',
+      );
+    } else {
+      final toJsonParams = metadata.generics.map((g) => 'Object? Function(${g.name} value) toJson${g.name}').join(', ');
+      final toJsonArgs = metadata.generics.map((g) => 'toJson${g.name}').join(', ');
+      sb.writeln('  Map<String, dynamic> toJsonLean($toJsonParams) {');
+      sb.writeln(
+        '    final Map<String, dynamic> data = _\$$className' + 'ToJson(this, $toJsonArgs);',
+      );
+    }
     sb.writeln('    return _sanitizeJson(data);');
     sb.writeln('  }');
     sb.writeln('');

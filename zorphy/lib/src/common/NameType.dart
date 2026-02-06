@@ -25,6 +25,7 @@ class NameTypeClassComment {
   final String? className;
   final String? comment;
   final JsonKeyInfo? jsonKeyInfo;
+  final List<String> additionalAnnotations;
   final bool isEnum;
 
   NameTypeClassComment(
@@ -33,6 +34,7 @@ class NameTypeClassComment {
     this.className, {
     this.comment,
     this.jsonKeyInfo,
+    this.additionalAnnotations = const [],
     this.isEnum = false,
   });
 
@@ -79,6 +81,7 @@ class JsonKeyInfo {
   final bool? includeToJson;
   final String? toJson;
   final String? fromJson;
+  final String? converter;
 
   const JsonKeyInfo({
     this.name,
@@ -90,6 +93,7 @@ class JsonKeyInfo {
     this.includeToJson,
     this.toJson,
     this.fromJson,
+    this.converter,
   });
 
   /// Generates the annotation string representation
@@ -106,6 +110,7 @@ class JsonKeyInfo {
     if (includeToJson != null) params.add("includeToJson: $includeToJson");
     if (toJson != null) params.add("toJson: $toJson");
     if (fromJson != null) params.add("fromJson: $fromJson");
+    if (converter != null) params.add("converter: $converter");
 
     if (params.isEmpty) return "@JsonKey()";
     return "@JsonKey(${params.join(", ")})";
@@ -124,6 +129,7 @@ class JsonKeyInfo {
     if (includeToJson != null) result.add("includeToJson");
     if (toJson != null) result.add("toJson");
     if (fromJson != null) result.add("fromJson");
+    if (converter != null) result.add("converter");
     return result;
   }
 }

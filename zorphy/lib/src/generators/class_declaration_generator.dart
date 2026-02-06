@@ -82,7 +82,8 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final shouldSkipJsonAnnotation = hasFactoryMethods && isAbstractClass;
 
     if (config.generateJson && !shouldSkipJsonAnnotation) {
-      sb.writeln('@JsonSerializable(explicitToJson: ${config.explicitToJson})');
+      final genericParams = metadata.generics.isNotEmpty ? ', genericArgumentFactories: true' : '';
+      sb.writeln('@JsonSerializable(explicitToJson: ${config.explicitToJson}$genericParams)');
     }
 
     sb.writeln('class $className$genericsStr$extendsStr$implementsStr {');

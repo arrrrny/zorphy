@@ -1,6 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'enum_example.zorphy.dart';
+part 'enum_example.g.dart';
 
 /// Enum definitions for the example
 enum Status {
