@@ -10,9 +10,7 @@ part 'account.g.dart';
 /// Account entity
 @Zorphy(generateJson: true, generateCompareTo: true)
 abstract class $Account {
-
   String get username;
   UserStatus get status;
   DateTime get createdAt;
 }
-

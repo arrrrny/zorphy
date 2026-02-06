@@ -9,9 +9,7 @@ part 'credit_card.g.dart';
 
 /// CreditCard entity
 @Zorphy(generateJson: true, generateCompareTo: true)
-abstract class $CreditCard implements PaymentMethod {
-
+abstract class $CreditCard implements $$PaymentMethod {
   String get cardNumber;
   String get expiryDate;
 }
-

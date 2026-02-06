@@ -1,5 +1,4 @@
 import 'package:analyzer/dart/element/element.dart';
-import '../common/classes.dart';
 import '../factory_method.dart';
 import 'field_metadata.dart';
 import 'interface_metadata.dart';
@@ -102,10 +101,7 @@ class GenericParameterMetadata {
   final String name;
   final String? bound;
 
-  const GenericParameterMetadata({
-    required this.name,
-    this.bound,
-  });
+  const GenericParameterMetadata({required this.name, this.bound});
 
   @override
   String toString() => bound != null ? '$name extends $bound' : name;

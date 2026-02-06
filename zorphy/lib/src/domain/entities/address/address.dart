@@ -8,9 +8,7 @@ part 'address.g.dart';
 /// Address entity
 @Zorphy(generateJson: true, generateCompareTo: true)
 abstract class $Address {
-
   String get street;
   String get city;
   String get postalCode;
 }
-

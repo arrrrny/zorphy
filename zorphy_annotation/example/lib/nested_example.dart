@@ -59,11 +59,7 @@ void main() {
     zipCode: '94102',
   );
 
-  final person = Person(
-    name: 'Alice Johnson',
-    age: 30,
-    address: address,
-  );
+  final person = Person(name: 'Alice Johnson', age: 30, address: address);
 
   print('Person with nested address:');
   print('$person');
@@ -71,9 +67,7 @@ void main() {
 
   // Nested patching - update only the city in the address
   final personPatch = PersonPatch.create()
-    ..withAddressPatch(
-      AddressPatch.create()..withCity('Los Angeles'),
-    );
+    ..withAddressPatch(AddressPatch.create()..withCity('Los Angeles'));
 
   final updatedPerson = person.patchWithPerson(patchInput: personPatch);
 
@@ -106,9 +100,17 @@ void main() {
         parent: null, // Will be set by parent
         children: [
           CategoryNode(
-              id: 'flutter', name: 'Flutter', parent: null, children: []),
+            id: 'flutter',
+            name: 'Flutter',
+            parent: null,
+            children: [],
+          ),
           CategoryNode(
-              id: 'angular', name: 'Angular', parent: null, children: []),
+            id: 'angular',
+            name: 'Angular',
+            parent: null,
+            children: [],
+          ),
         ],
       ),
       CategoryNode(

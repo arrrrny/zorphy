@@ -15,11 +15,11 @@ abstract class $Chat {
   DateTime? get updatedAt;
 
   static Chat create({required UserMessage message}) => Chat(
-        title: message.text.substring(
-          0,
-          message.text.length > 60 ? 60 : message.text.length,
-        ),
-        messages: [message],
-        createdAt: DateTime.now(),
-      );
+    title: message.text.substring(
+      0,
+      message.text.length > 60 ? 60 : message.text.length,
+    ),
+    messages: [message],
+    createdAt: DateTime.now(),
+  );
 }

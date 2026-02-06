@@ -33,7 +33,11 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final abstractModifier = metadata.nonSealed ? 'abstract ' : '';
 
     // Build implements clause
-    final implementsStr = _buildImplementsClause(metadata, config, isAbstract: true);
+    final implementsStr = _buildImplementsClause(
+      metadata,
+      config,
+      isAbstract: true,
+    );
 
     final genericsStr = _buildGenericsString(metadata);
 
@@ -69,8 +73,11 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
     // Determine extends and implements
     final extendsStr = _buildExtendsClause(metadata, config);
-    final implementsStr =
-        _buildImplementsClause(metadata, config, isAbstract: false);
+    final implementsStr = _buildImplementsClause(
+      metadata,
+      config,
+      isAbstract: false,
+    );
 
     final sb = StringBuffer();
 
@@ -82,8 +89,12 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final shouldSkipJsonAnnotation = hasFactoryMethods && isAbstractClass;
 
     if (config.generateJson && !shouldSkipJsonAnnotation) {
-      final genericParams = metadata.generics.isNotEmpty ? ', genericArgumentFactories: true' : '';
-      sb.writeln('@JsonSerializable(explicitToJson: ${config.explicitToJson}$genericParams)');
+      final genericParams = metadata.generics.isNotEmpty
+          ? ', genericArgumentFactories: true'
+          : '';
+      sb.writeln(
+        '@JsonSerializable(explicitToJson: ${config.explicitToJson}$genericParams)',
+      );
     }
 
     sb.writeln('class $className$genericsStr$extendsStr$implementsStr {');
@@ -192,11 +203,6 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       }
     }
 
-    // 2. If no parent interface to extend, check factory methods
-    if (config.factoryMethods.isNotEmpty) {
-      return metadata.originalName;
-    }
-
     return '';
   }
 
@@ -204,9 +210,6 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final parent = _getExtendedParentName(metadata, config);
     if (parent.isEmpty) return '';
 
-    if (parent == metadata.originalName) {
-      return ' extends $parent';
-    }
     return ' extends ${_trimInterfaceName(parent)}';
   }
 
@@ -250,9 +253,6 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
     // $$ classes are always abstract base classes
     if (parent.startsWith(r'$$')) return true;
-
-    // The annotated class itself ($Current) is always abstract in source
-    if (parent == metadata.originalName) return true;
 
     // Single $ parents are concrete generated classes
     return false;

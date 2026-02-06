@@ -24,8 +24,8 @@ class InterfaceMetadata extends InterfaceWithComment {
     bool hidePublicConstructor = false,
     required this.element,
     List<DartType>? typeArguments,
-  })  : _typeArguments = typeArguments ?? [],
-        super(
+  }) : _typeArguments = typeArguments ?? [],
+       super(
          type,
          typeArgsTypes,
          typeParamsNames,

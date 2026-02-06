@@ -63,10 +63,7 @@ class Orchestrator {
     );
 
     // Phase 2: Create generation context
-    final context = GenerationContext(
-      metadata: metadata,
-      config: config,
-    );
+    final context = GenerationContext(metadata: metadata, config: config);
 
     // Phase 3: Run generators
     final codeBlocks = <String>[];
@@ -89,10 +86,7 @@ class Orchestrator {
   /// - Class members (fields, constructors, methods)
   /// - Closing }
   /// - External items (enums, patch classes, extensions)
-  static String _assembleCode(
-    ClassMetadata metadata,
-    List<String> codeBlocks,
-  ) {
+  static String _assembleCode(ClassMetadata metadata, List<String> codeBlocks) {
     if (codeBlocks.isEmpty) return '';
 
     final className = metadata.cleanName;
@@ -100,21 +94,18 @@ class Orchestrator {
 
     // Find the main class declaration block
     // It's the one that declares either the clean name (concrete) or abstract name
-    final mainClassBlock = codeBlocks.firstWhere(
-      (block) {
-        final lines = block.split('\n');
-        return lines.any((line) {
-          final trimmed = line.trim();
-          return trimmed.startsWith('class $className') ||
-                 trimmed.startsWith('sealed class $className') ||
-                 trimmed.startsWith('abstract class $className') ||
-                 trimmed.startsWith('class $abstractName') ||
-                 trimmed.startsWith('sealed class $abstractName') ||
-                 trimmed.startsWith('abstract class $abstractName');
-        });
-      },
-      orElse: () => codeBlocks[0],
-    );
+    final mainClassBlock = codeBlocks.firstWhere((block) {
+      final lines = block.split('\n');
+      return lines.any((line) {
+        final trimmed = line.trim();
+        return trimmed.startsWith('class $className') ||
+            trimmed.startsWith('sealed class $className') ||
+            trimmed.startsWith('abstract class $className') ||
+            trimmed.startsWith('class $abstractName') ||
+            trimmed.startsWith('sealed class $abstractName') ||
+            trimmed.startsWith('abstract class $abstractName');
+      });
+    }, orElse: () => codeBlocks[0]);
 
     final sb = StringBuffer();
 
@@ -125,7 +116,7 @@ class Orchestrator {
     // These need to be inside the class but before the closing }
     for (final block in codeBlocks) {
       if (block == mainClassBlock) continue;
-      
+
       final trimmed = block.trim();
       // Skip top-level items (enums, other classes, extensions)
       if (trimmed.startsWith('enum ') ||
@@ -142,7 +133,7 @@ class Orchestrator {
     // 4. Add top-level items (enums, patch classes, extensions) after class closes
     for (final block in codeBlocks) {
       if (block == mainClassBlock) continue;
-      
+
       final trimmed = block.trim();
       if (trimmed.startsWith('enum ') ||
           trimmed.startsWith('class ') ||
@@ -203,4 +194,3 @@ class Orchestrator {
     );
   }
 }
-

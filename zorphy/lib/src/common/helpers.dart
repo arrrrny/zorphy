@@ -15,23 +15,26 @@ ElementAnnotation? findAnnotation(
     final element = annotation.element;
     if (element != null) {
       final String? elementName = element.name;
-      if (elementName == name || elementName?.toLowerCase() == name.toLowerCase()) {
+      if (elementName == name ||
+          elementName?.toLowerCase() == name.toLowerCase()) {
         return annotation;
       }
       // Check enclosing element for constructors
       try {
         final dynamic dynElem = element;
         final String? enclosingName = dynElem.enclosingElement?.name;
-        if (enclosingName == name || enclosingName?.toLowerCase() == name.toLowerCase()) {
-           return annotation;
+        if (enclosingName == name ||
+            enclosingName?.toLowerCase() == name.toLowerCase()) {
+          return annotation;
         }
       } catch (_) {}
     }
-    
+
     // Final fallback to source check
     try {
       final source = annotation.toSource();
-      if (source.contains('@$name') || source.contains('@${name.toLowerCase()}')) {
+      if (source.contains('@$name') ||
+          source.contains('@${name.toLowerCase()}')) {
         return annotation;
       }
     } catch (_) {}
@@ -44,28 +47,48 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
     final dynamic dynElem = element;
     final dynamic rawMetadata = dynElem.metadata;
     final List<dynamic> metadata = rawMetadata is List ? rawMetadata : [];
-    
+
     var annotation = metadata.isNotEmpty
         ? findAnnotation(metadata.cast<ElementAnnotation>(), 'JsonKey') ??
               findAnnotation(metadata.cast<ElementAnnotation>(), 'jsonKey')
         : null;
 
-    if (annotation == null && element is FieldElement && dynElem.getter != null) {
+    if (annotation == null &&
+        element is FieldElement &&
+        dynElem.getter != null) {
       final dynamic rawGetterMetadata = dynElem.getter.metadata;
-      final List<dynamic> getterMetadata = rawGetterMetadata is List ? rawGetterMetadata : [];
+      final List<dynamic> getterMetadata = rawGetterMetadata is List
+          ? rawGetterMetadata
+          : [];
       annotation = getterMetadata.isNotEmpty
-          ? findAnnotation(getterMetadata.cast<ElementAnnotation>(), 'JsonKey') ??
-                findAnnotation(getterMetadata.cast<ElementAnnotation>(), 'jsonKey')
+          ? findAnnotation(
+                  getterMetadata.cast<ElementAnnotation>(),
+                  'JsonKey',
+                ) ??
+                findAnnotation(
+                  getterMetadata.cast<ElementAnnotation>(),
+                  'jsonKey',
+                )
           : null;
     }
-    
+
     // Also check if we are a getter and the field has it
-    if (annotation == null && element is PropertyAccessorElement && dynElem.variable != null) {
-       final dynamic rawVarMetadata = dynElem.variable.metadata;
-       final List<dynamic> variableMetadata = rawVarMetadata is List ? rawVarMetadata : [];
-       annotation = variableMetadata.isNotEmpty
-          ? findAnnotation(variableMetadata.cast<ElementAnnotation>(), 'JsonKey') ??
-                findAnnotation(variableMetadata.cast<ElementAnnotation>(), 'jsonKey')
+    if (annotation == null &&
+        element is PropertyAccessorElement &&
+        dynElem.variable != null) {
+      final dynamic rawVarMetadata = dynElem.variable.metadata;
+      final List<dynamic> variableMetadata = rawVarMetadata is List
+          ? rawVarMetadata
+          : [];
+      annotation = variableMetadata.isNotEmpty
+          ? findAnnotation(
+                  variableMetadata.cast<ElementAnnotation>(),
+                  'JsonKey',
+                ) ??
+                findAnnotation(
+                  variableMetadata.cast<ElementAnnotation>(),
+                  'jsonKey',
+                )
           : null;
     }
 
@@ -149,9 +172,11 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
       final converterValue = reader.read('converter');
       if (!converterValue.isNull) {
         final revived = converterValue.revive();
-        final typeName = converterValue.objectValue.type?.getDisplayString(withNullability: false);
+        final typeName = converterValue.objectValue.type?.getDisplayString();
         if (typeName != null) {
-          final accessor = revived.accessor.isNotEmpty ? ".${revived.accessor}" : "";
+          final accessor = revived.accessor.isNotEmpty
+              ? ".${revived.accessor}"
+              : "";
           converter = "$typeName$accessor()";
         } else {
           converter = converterValue.objectValue.toString();
@@ -217,7 +242,7 @@ List<NameTypeClassComment> getAllFields(
       final dynamic rawMetadata = dynElem.metadata;
       final List<dynamic> metadata = rawMetadata is List ? rawMetadata : [];
       final List<String> annotations = [];
-      
+
       for (final m in metadata) {
         final source = m.toSource() as String;
         if (!source.startsWith('@JsonKey') && !source.startsWith('@jsonKey')) {
@@ -229,24 +254,31 @@ List<NameTypeClassComment> getAllFields(
       if (element is FieldElement && element.getter != null) {
         final dynamic dynGetter = element.getter;
         final dynamic rawGetterMetadata = dynGetter.metadata;
-        final List<dynamic> getterMetadata = rawGetterMetadata is List ? rawGetterMetadata : [];
+        final List<dynamic> getterMetadata = rawGetterMetadata is List
+            ? rawGetterMetadata
+            : [];
         for (final m in getterMetadata) {
           final source = m.toSource() as String;
-          if (!source.startsWith('@JsonKey') && !source.startsWith('@jsonKey')) {
-             if (!annotations.contains(source)) annotations.add(source);
+          if (!source.startsWith('@JsonKey') &&
+              !source.startsWith('@jsonKey')) {
+            if (!annotations.contains(source)) annotations.add(source);
           }
         }
       }
-      
+
       // If it's a getter, also check its variable
-      if (element is PropertyAccessorElement && (element as dynamic).variable != null) {
+      if (element is PropertyAccessorElement &&
+          (element as dynamic).variable != null) {
         final dynamic dynVar = (element as dynamic).variable;
         final dynamic rawVarMetadata = dynVar.metadata;
-        final List<dynamic> varMetadata = rawVarMetadata is List ? rawVarMetadata : [];
+        final List<dynamic> varMetadata = rawVarMetadata is List
+            ? rawVarMetadata
+            : [];
         for (final m in varMetadata) {
           final source = m.toSource() as String;
-          if (!source.startsWith('@JsonKey') && !source.startsWith('@jsonKey')) {
-             if (!annotations.contains(source)) annotations.add(source);
+          if (!source.startsWith('@JsonKey') &&
+              !source.startsWith('@jsonKey')) {
+            if (!annotations.contains(source)) annotations.add(source);
           }
         }
       }
@@ -274,20 +306,23 @@ List<NameTypeClassComment> getAllFields(
     final dynamic dynamicElem = elem;
     final List<dynamic> gettersList = (dynamicElem.getters as List? ?? []);
 
-    var getters = gettersList.where((a) => (a as dynamic).isSynthetic == false).map(
-      (a) {
-        final dynamic dynA = a;
-        return NameTypeClassComment(
-          dynA.name ?? "",
-          typeToString((dynA as dynamic).returnType, currentClassName: currentClassName),
-          elem.name ?? "",
-          comment: (dynA as dynamic).documentationComment,
-          jsonKeyInfo: extractJsonKeyInfo(dynA as Element),
-          additionalAnnotations: _collectAdditionalAnnotations(dynA as Element),
-          isEnum: (dynA as dynamic).returnType?.element is EnumElement,
-        );
-      },
-    );
+    var getters = gettersList
+        .where((a) => (a as dynamic).isSynthetic == false)
+        .map((a) {
+          final dynamic dynA = a;
+          return NameTypeClassComment(
+            dynA.name ?? "",
+            typeToString(
+              (dynA as dynamic).returnType,
+              currentClassName: currentClassName,
+            ),
+            elem.name ?? "",
+            comment: (dynA as dynamic).documentationComment,
+            jsonKeyInfo: extractJsonKeyInfo(dynA as Element),
+            additionalAnnotations: _collectAdditionalAnnotations(dynA),
+            isEnum: (dynA as dynamic).returnType?.element is EnumElement,
+          );
+        });
 
     return [...getters, ...fields];
   }
@@ -461,9 +496,27 @@ String typeToString(DartType type, {String? currentClassName}) {
         ? ''
         : "<${type.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName)).join(', ')}>";
     final typeName = type.element?.name ?? 'InvalidType';
-    // Handle self-reference: if type is InvalidType and we have currentClassName, use it
-    if (typeName == 'InvalidType' && currentClassName != null) {
-      manual = "\$$currentClassName$arguments";
+
+    // Handle self-reference and deps: if type is InvalidType, try to use the name from the element's display string
+    // This happens when the file is not yet generated
+    if (typeName == 'InvalidType' || typeName == 'dynamic') {
+      final displayName = type.element?.displayName;
+      if (displayName != null && displayName != 'dynamic') {
+        // Check if this is an enum - enums don't need $ prefix
+        final isEnum = type.element is EnumElement;
+        if (isEnum) {
+          manual = "$displayName$arguments";
+        } else {
+          // For Zorphy entities, add $ prefix if not already present
+          final prefix = displayName.startsWith('\$') ? '' : '\$';
+          manual = "$prefix$displayName$arguments";
+        }
+      } else if (currentClassName != null) {
+        // Fallback for direct self-references if we know the current class name
+        manual = "\$$currentClassName$arguments";
+      } else {
+        manual = "$typeName$arguments";
+      }
     } else {
       manual = "$typeName$arguments";
     }

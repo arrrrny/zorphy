@@ -23,10 +23,12 @@ class FieldResolver {
 
       // Add fields from all supertypes
       fields.addAll(
-        helpers.getAllFields(
-          elem.allSupertypes.whereType<InterfaceType>().toList(),
-          elem,
-        ).where((x) => x.name != "hashCode" && x.name != "runtimeType"),
+        helpers
+            .getAllFields(
+              elem.allSupertypes.whereType<InterfaceType>().toList(),
+              elem,
+            )
+            .where((x) => x.name != "hashCode" && x.name != "runtimeType"),
       );
 
       // Recursively add fields from annotated supertypes
@@ -39,7 +41,7 @@ class FieldResolver {
     }
 
     addFields(classElement);
-    
+
     // Deduplicate by field name (keep first occurrence)
     final seen = <String>{};
     final distinct = <NameTypeClassComment>[];
@@ -49,7 +51,7 @@ class FieldResolver {
         distinct.add(field);
       }
     }
-    
+
     return distinct;
   }
 }

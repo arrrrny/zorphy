@@ -10,9 +10,7 @@ part 'user_with_address.g.dart';
 /// UserWithAddress entity
 @Zorphy(generateJson: true, generateCompareTo: true)
 abstract class $UserWithAddress {
-
   String get name;
-  Address get address;
+  $Address get address;
   String? get phone;
 }
-

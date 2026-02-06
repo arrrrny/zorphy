@@ -32,7 +32,8 @@ Future<void> main(List<String> args) async {
     ..addCommand('list', _listCommandParser())
     ..addCommand('enum', _createEnumCommandParser())
     ..addCommand('add-field', _addFieldCommandParser())
-    ..addCommand('from-json', _fromJsonCommandParser());
+    ..addCommand('from-json', _fromJsonCommandParser())
+    ..addCommand('watch', _watchCommandParser());
 
   ArgResults results;
   try {
@@ -81,6 +82,9 @@ Future<void> main(List<String> args) async {
       break;
     case 'from-json':
       await _handleFromJson(command);
+      break;
+    case 'watch':
+      await _handleWatch(command);
       break;
   }
 }
@@ -134,6 +138,11 @@ ArgParser _createCommandParser() {
       'dry-run',
       help: 'Preview generated code without writing files',
       negatable: false,
+    )
+    ..addFlag(
+      'generate-subs',
+      help: 'Automatically generate subtype entities (use with --subtypes)',
+      negatable: false,
     );
 }
 
@@ -159,6 +168,12 @@ ArgParser _createEnumCommandParser() {
 ArgParser _buildCommandParser() {
   return ArgParser()
     ..addFlag('watch', abbr: 'w', help: 'Watch for changes', defaultsTo: false)
+    ..addFlag('clean', abbr: 'c', help: 'Clean before build', defaultsTo: false)
+    ..addOption('output', abbr: 'o', help: 'Specify build output directory');
+}
+
+ArgParser _watchCommandParser() {
+  return ArgParser()
     ..addFlag('clean', abbr: 'c', help: 'Clean before build', defaultsTo: false)
     ..addOption('output', abbr: 'o', help: 'Specify build output directory');
 }
@@ -244,6 +259,7 @@ AVAILABLE COMMANDS:
   create      Create a new Zorphy entity with fields
   new         Quick-create a simple entity (basic defaults)
   build       Run code generation for Zorphy entities
+  watch       Run code generation in watch mode (alias for build --watch)
   list        List all Zorphy entities in a directory
   enum        Create a new enum
   add-field   Add field(s) to an existing entity
@@ -289,6 +305,12 @@ BUILD COMMAND:
     -c, --clean             Clean before build (default: false)
     -o, --output            Build output directory
 
+WATCH COMMAND:
+  zorphy_cli watch [options]
+  Options:
+    -c, --clean             Clean before build (default: false)
+    -o, --output            Build output directory
+
 LIST COMMAND:
   zorphy_cli list [options]
   Options:
@@ -318,7 +340,7 @@ EXAMPLES:
   zorphy_cli build
 
   # Watch for changes
-  zorphy_cli build --watch
+  zorphy_cli watch
 
   # List entities
   zorphy_cli list
@@ -385,7 +407,10 @@ Future<void> _handleCreate(ArgResults args) async {
         continue;
       }
       final fieldName = parts[0].trim();
-      final fieldType = parts[1].trim();
+      final fieldType = _normalizeFieldType(
+        parts[1].trim(),
+        baseOutputDir: baseOutputDir,
+      );
       fields.add(_FieldInfo(name: fieldName, type: fieldType));
     }
   }
@@ -400,7 +425,10 @@ Future<void> _handleCreate(ArgResults args) async {
       if (fieldName == null || fieldName.isEmpty) break;
 
       stdout.write('Field type (e.g., String, int, List<String>, Status): ');
-      final fieldType = stdin.readLineSync()?.trim() ?? 'String';
+      final fieldType = _normalizeFieldType(
+        stdin.readLineSync()?.trim() ?? 'String',
+        baseOutputDir: baseOutputDir,
+      );
 
       fields.add(_FieldInfo(name: fieldName, type: fieldType));
       print('✓ Added field: $fieldName ($fieldType)\n');
@@ -456,8 +484,9 @@ Future<void> _handleCreate(ArgResults args) async {
       // Check if it's a Zorphy entity (starts with $ or $$ or directory exists)
       final typeSnakeName = _toSnakeCase(cleanTypeRef);
       final potentialEntityPath = p.join(baseOutputDir, typeSnakeName);
-      
-      if (typeRef.startsWith(r'$') || (!isDryRun && Directory(potentialEntityPath).existsSync())) {
+
+      if (typeRef.startsWith(r'$') ||
+          (!isDryRun && Directory(potentialEntityPath).existsSync())) {
         entityImports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
       } else {
         needsEnumImport = true;
@@ -505,7 +534,7 @@ Future<void> _handleCreate(ArgResults args) async {
 
   // Add part directives - zorphy first, then g
   buffer.writeln("part '$entityDirName.zorphy.dart';");
-  if (useJson) {
+  if (useJson && !isSealed) {
     buffer.writeln("part '$entityDirName.g.dart';");
   }
   buffer.writeln();
@@ -529,7 +558,9 @@ Future<void> _handleCreate(ArgResults args) async {
   buffer.writeln('/// $className entity');
   buffer.writeln('@Zorphy(${annotationOptions.join(', ')})');
   if (extendsInterface != null) {
-    buffer.writeln('abstract class $abstractClassName implements $extendsInterface {');
+    buffer.writeln(
+      'abstract class $abstractClassName implements $extendsInterface {',
+    );
   } else {
     buffer.writeln('abstract class $abstractClassName {');
   }
@@ -570,6 +601,147 @@ Future<void> _handleCreate(ArgResults args) async {
     for (final import in entityImports) {
       print('  - $import');
     }
+  }
+
+  // Generate subtypes if requested
+  final generateSubs = args['generate-subs'] as bool? ?? false;
+  if (generateSubs && explicitSubtypes != null && explicitSubtypes.isNotEmpty) {
+    print('\n🔄 Generating ${explicitSubtypes.length} subtype(s)...\n');
+
+    for (final subtype in explicitSubtypes) {
+      final subtypeName = subtype.replaceAll(
+        '\$',
+        '',
+      ); // Remove $ prefix if present
+      print('📝 Creating subtype: $subtypeName');
+
+      // Collect additional fields for this subtype
+      final subtypeFields = <_FieldInfo>[];
+
+      if (useInteractiveFields && !isDryRun) {
+        print(
+          '  Add additional fields for $subtypeName (inherited fields from $className will be included automatically)',
+        );
+        print('  Press Enter without input to skip.\n');
+
+        while (true) {
+          stdout.write('  Field name (or press Enter to finish): ');
+          final fieldName = stdin.readLineSync()?.trim();
+          if (fieldName == null || fieldName.isEmpty) break;
+
+          stdout.write('  Field type (e.g., String, int, List<String>): ');
+          final fieldType = _normalizeFieldType(
+            stdin.readLineSync()?.trim() ?? 'String',
+            baseOutputDir: baseOutputDir,
+          );
+
+          subtypeFields.add(_FieldInfo(name: fieldName, type: fieldType));
+          print('  ✓ Added field: $fieldName ($fieldType)\n');
+        }
+      }
+
+      // Create the subtype entity with extends
+      final subtypeClassName = _formatClassName(subtypeName);
+      final subtypeEntityDirName = _toSnakeCase(subtypeClassName);
+      final subtypeEntityDir = p.join(baseOutputDir, subtypeEntityDirName);
+      final subtypeDir = Directory(subtypeEntityDir);
+
+      if (!isDryRun && !await subtypeDir.exists()) {
+        await subtypeDir.create(recursive: true);
+      }
+
+      final subtypeFilePath = p.join(
+        subtypeEntityDir,
+        '$subtypeEntityDirName.dart',
+      );
+      final subtypeFile = File(subtypeFilePath);
+      final subtypeBuffer = StringBuffer();
+
+      // File header
+      subtypeBuffer.writeln('/// Auto-generated by Zorphy CLI');
+      subtypeBuffer.writeln('/// Generated at: ${DateTime.now()}');
+      subtypeBuffer.writeln();
+
+      // Imports
+      subtypeBuffer.writeln(
+        "import 'package:zorphy_annotation/zorphy_annotation.dart';",
+      );
+      subtypeBuffer.writeln("import '../$entityDirName/$entityDirName.dart';");
+
+      // Add imports for additional field types
+      for (final field in subtypeFields) {
+        for (final typeRef in _extractTypeReferences(field.type)) {
+          if (_isPrimitiveType(typeRef)) continue;
+
+          final typeSnakeName = _toSnakeCase(typeRef.replaceAll('\$', ''));
+          final potentialEntityPath = p.join(baseOutputDir, typeSnakeName);
+
+          if (typeRef.startsWith(r'\$') ||
+              (!isDryRun && Directory(potentialEntityPath).existsSync())) {
+            subtypeBuffer.writeln(
+              "import '../$typeSnakeName/$typeSnakeName.dart';",
+            );
+          }
+        }
+      }
+
+      subtypeBuffer.writeln();
+
+      // Part directives
+      subtypeBuffer.writeln("part '$subtypeEntityDirName.zorphy.dart';");
+      if (useJson) {
+        subtypeBuffer.writeln("part '$subtypeEntityDirName.g.dart';");
+      }
+      subtypeBuffer.writeln();
+
+      // Annotation
+      final subtypeAnnotationOptions = <String>[];
+      if (useJson) subtypeAnnotationOptions.add('generateJson: true');
+      if (useCopyWithFn)
+        subtypeAnnotationOptions.add('generateCopyWithFn: true');
+      if (useCompare) subtypeAnnotationOptions.add('generateCompareTo: true');
+
+      subtypeBuffer.writeln(
+        '/// $subtypeClassName entity (subtype of $className)',
+      );
+      subtypeBuffer.writeln('@Zorphy(${subtypeAnnotationOptions.join(', ')})');
+
+      // Class definition - implements parent
+      final parentRef = isSealed ? '\$\$$className' : '\$$className';
+      subtypeBuffer.writeln(
+        'abstract class \$$subtypeClassName implements $parentRef {',
+      );
+      subtypeBuffer.writeln();
+
+      // Additional fields only (parent fields are inherited)
+      for (final field in subtypeFields) {
+        subtypeBuffer.writeln('  ${field.type} get ${field.name};');
+      }
+
+      subtypeBuffer.writeln('}');
+      subtypeBuffer.writeln();
+
+      // Write file
+      if (isDryRun) {
+        print('  🚀 [DRY RUN] Would create $subtypeFilePath');
+        if (subtypeFields.isNotEmpty) {
+          print(
+            '  ✨ Additional fields: ${subtypeFields.map((f) => '${f.name}: ${f.type}').join(', ')}',
+          );
+        }
+      } else {
+        await subtypeFile.writeAsString(subtypeBuffer.toString());
+        print('  ✓ Created: $subtypeFilePath');
+        if (subtypeFields.isNotEmpty) {
+          print(
+            '  ✨ Additional fields: ${subtypeFields.map((f) => '${f.name}: ${f.type}').join(', ')}',
+          );
+        }
+      }
+      print('');
+    }
+
+    print('✅ Generated ${explicitSubtypes.length} subtype(s) successfully!');
   }
 }
 
@@ -771,6 +943,34 @@ Future<void> _handleBuild(ArgResults args) async {
   }
 }
 
+/// Handle the watch command
+Future<void> _handleWatch(ArgResults args) async {
+  final clean = args['clean'] as bool? ?? false;
+
+  print('👀 Starting Zorphy watch mode...');
+
+  if (clean) {
+    print('🧹 Cleaning generated files...');
+  }
+
+  print('Press Ctrl+C to stop');
+
+  // Check if build_runner is available
+  final process = await Process.start('dart', [
+    'run',
+    'build_runner',
+    if (clean) 'clean',
+    'watch',
+    '--delete-conflicting-outputs',
+  ], mode: ProcessStartMode.inheritStdio);
+
+  final exitCode = await process.exitCode;
+  if (exitCode != 0) {
+    print('\n❌ Watch failed with exit code $exitCode');
+    exit(exitCode);
+  }
+}
+
 /// Handle the new command (quick create)
 Future<void> _handleNew(ArgResults args) async {
   final name = args['name'] as String?;
@@ -913,7 +1113,10 @@ Future<void> _handleAddField(ArgResults args) async {
       continue;
     }
     final fieldName = parts[0].trim();
-    final fieldType = parts[1].trim();
+    final fieldType = _normalizeFieldType(
+      parts[1].trim(),
+      baseOutputDir: baseOutputDir,
+    );
     fields.add(_FieldInfo(name: fieldName, type: fieldType));
   }
 
@@ -936,8 +1139,8 @@ Future<void> _handleAddField(ArgResults args) async {
   }
 
   // Read existing file
-  final content = isDryRun && !await file.exists() 
-      ? 'abstract class \$$className {}' 
+  final content = isDryRun && !await file.exists()
+      ? 'abstract class \$$className {}'
       : await file.readAsString();
 
   // Find the closing brace of the class
@@ -974,7 +1177,8 @@ Future<void> _handleAddField(ArgResults args) async {
       final typeSnakeName = _toSnakeCase(cleanTypeRef);
       final potentialEntityPath = p.join(baseOutputDir, typeSnakeName);
 
-      if (typeRef.startsWith(r'$') || (!isDryRun && Directory(potentialEntityPath).existsSync())) {
+      if (typeRef.startsWith(r'$') ||
+          (!isDryRun && Directory(potentialEntityPath).existsSync())) {
         newImports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
       } else {
         newImports.add("import '../enums/index.dart';");
@@ -1080,7 +1284,12 @@ Future<void> _handleFromJson(ArgResults args) async {
   final allEntities = [result, ...result.nested];
 
   for (final entity in allEntities) {
-    await _createEntityFromResult(entity, baseOutputDir, useJson, isDryRun: isDryRun);
+    await _createEntityFromResult(
+      entity,
+      baseOutputDir,
+      useJson,
+      isDryRun: isDryRun,
+    );
   }
 
   print('\n✓ Created ${allEntities.length} entity/entities from JSON');
@@ -1140,7 +1349,9 @@ Future<void> _createEntityFromResult(
   buf.writeln('}');
 
   if (isDryRun) {
-    print('\n🚀 [DRY RUN] Would create ${p.join(entityDir, '$snakeName.dart')} with content:\n');
+    print(
+      '\n🚀 [DRY RUN] Would create ${p.join(entityDir, '$snakeName.dart')} with content:\n',
+    );
     print(buf.toString());
   } else {
     await File(
@@ -1250,6 +1461,117 @@ class _Field {
 //   }
 //   return 'my_app';
 // }
+
+/// Normalize field type by adding $ prefix for entity types (non-primitives, non-enums)
+/// Examples:
+///   "String" -> "String"
+///   "Address" -> "$Address"
+///   "$Address" -> "$Address" (already prefixed)
+///   "List<User>" -> "List<$User>"
+///   "Animal" -> "$$Animal" (if Animal is sealed)
+///   "Map<String, Product>" -> "Map<String, $Product>"
+String _normalizeFieldType(String type, {required String baseOutputDir}) {
+  // Remove nullable marker temporarily
+  final isNullable = type.endsWith('?');
+  final cleanType = isNullable ? type.substring(0, type.length - 1) : type;
+
+  // Check if already has $ or $$ prefix
+  if (cleanType.startsWith('\$')) {
+    return type; // Already normalized
+  }
+
+  // Extract base type and generic arguments
+  final genericMatch = RegExp(r'^([^<]+)(<.+>)?$').firstMatch(cleanType);
+  if (genericMatch == null) return type;
+
+  final baseType = genericMatch.group(1)!.trim();
+  final generics = genericMatch.group(2);
+
+  // Check if it's a primitive or container type
+  if (_isPrimitiveType(baseType)) {
+    // For container types, normalize the generic arguments
+    if (generics != null &&
+        (baseType == 'List' || baseType == 'Set' || baseType == 'Map')) {
+      final normalizedGenerics = _normalizeGenerics(
+        generics,
+        baseOutputDir: baseOutputDir,
+      );
+      return '$baseType$normalizedGenerics${isNullable ? '?' : ''}';
+    }
+    return type; // Primitive type, return as-is
+  }
+
+  // Check if it's an enum by looking for the file in enums directory
+  final enumsDir = Directory(p.join(baseOutputDir, 'enums'));
+  if (enumsDir.existsSync()) {
+    final enumSnakeName = _toSnakeCase(baseType);
+    final enumFile = File(p.join(enumsDir.path, '$enumSnakeName.dart'));
+    if (enumFile.existsSync()) {
+      return type; // It's an enum, don't add $
+    }
+  }
+
+  // Check if it's a sealed class by reading the entity file
+  final entitySnakeName = _toSnakeCase(baseType);
+  final entityDir = Directory(p.join(baseOutputDir, entitySnakeName));
+  final entityFile = File(p.join(entityDir.path, '$entitySnakeName.dart'));
+
+  String prefix = '\$'; // Default to single $
+  if (entityFile.existsSync()) {
+    try {
+      final content = entityFile.readAsStringSync();
+      // Check if it's a sealed class (abstract class $$ClassName)
+      if (content.contains('abstract class \$\$$baseType')) {
+        prefix = '\$\$'; // It's sealed, use $$
+      }
+    } catch (_) {
+      // If we can't read the file, default to single $
+    }
+  }
+
+  // It's an entity type, add appropriate prefix
+  final normalizedBase = '$prefix$baseType';
+  final normalizedGenerics = generics != null
+      ? _normalizeGenerics(generics, baseOutputDir: baseOutputDir)
+      : '';
+  return '$normalizedBase$normalizedGenerics${isNullable ? '?' : ''}';
+}
+
+/// Normalize generic type arguments
+String _normalizeGenerics(String generics, {required String baseOutputDir}) {
+  // Remove outer < and >
+  final inner = generics.substring(1, generics.length - 1);
+
+  // Split by comma, but respect nested generics
+  final parts = <String>[];
+  var depth = 0;
+  var current = StringBuffer();
+
+  for (var i = 0; i < inner.length; i++) {
+    final char = inner[i];
+    if (char == '<') {
+      depth++;
+      current.write(char);
+    } else if (char == '>') {
+      depth--;
+      current.write(char);
+    } else if (char == ',' && depth == 0) {
+      parts.add(current.toString().trim());
+      current = StringBuffer();
+    } else {
+      current.write(char);
+    }
+  }
+  if (current.isNotEmpty) {
+    parts.add(current.toString().trim());
+  }
+
+  // Normalize each part
+  final normalized = parts
+      .map((part) => _normalizeFieldType(part, baseOutputDir: baseOutputDir))
+      .join(', ');
+  return '<$normalized>';
+}
 
 /// Format class name (PascalCase)
 String _formatClassName(String name) {

@@ -9,8 +9,6 @@ part 'pay_pal.g.dart';
 
 /// PayPal entity
 @Zorphy(generateJson: true, generateCompareTo: true)
-abstract class $PayPal implements PaymentMethod {
-
+abstract class $PayPal implements $$PaymentMethod {
   String get email;
 }
-

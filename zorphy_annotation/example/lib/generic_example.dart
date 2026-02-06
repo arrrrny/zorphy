@@ -153,7 +153,9 @@ void main() {
   );
 
   print('Paginated Products:');
-  productPage.items.forEach((p) => print('  - ${p.name}: \$${p.price}'));
+  for (final p in productPage.items) {
+    print('  - ${p.name}: \$${p.price}');
+  }
   print('');
 
   // KeyValue pairs

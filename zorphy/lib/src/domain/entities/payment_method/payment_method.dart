@@ -2,13 +2,18 @@
 /// Generated at: 2026-02-06T20:16:40.382117
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+import '../credit_card/credit_card.dart';
+import '../pay_pal/pay_pal.dart';
 part 'payment_method.zorphy.dart';
-part 'payment_method.g.dart';
 
 /// PaymentMethod entity
-@Zorphy(generateJson: true, generateCompareTo: true)
+@Zorphy(
+  generateJson: true,
+  generateCompareTo: true,
+  nonSealed: true,
+  explicitSubTypes: [$CreditCard, $PayPal],
+)
 abstract class $$PaymentMethod {
-
   String get displayName;
 }
-

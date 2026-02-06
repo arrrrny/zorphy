@@ -2,7 +2,6 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:source_gen/source_gen.dart';
 import '../common/NameType.dart';
-import '../common/classes.dart';
 import '../common/helpers.dart' as common_helpers;
 import '../helpers.dart' as codegen_helpers;
 import '../factory_method.dart';
@@ -30,8 +29,10 @@ class ClassAnalyzer {
     _validateClassStructure(classElement);
 
     // Collect interfaces (handles inheritance hierarchy)
-    final interfaceMetadataList =
-        InterfaceCollector.collect(classElement, allAnnotatedClasses);
+    final interfaceMetadataList = InterfaceCollector.collect(
+      classElement,
+      allAnnotatedClasses,
+    );
 
     // Convert to Interface objects for JSON serialization
     final allValueTInterfaces = _convertToValueTInterfaces(
@@ -47,10 +48,7 @@ class ClassAnalyzer {
     );
 
     // Resolve all fields (inherited + own)
-    final allFields = FieldResolver.resolve(
-      classElement,
-      allAnnotatedClasses,
-    );
+    final allFields = FieldResolver.resolve(classElement, allAnnotatedClasses);
 
     // Get distinct fields (no duplicates, interface fields first)
     final allFieldsDistinct = codegen_helpers.getDistinctFields(
@@ -126,7 +124,10 @@ class ClassAnalyzer {
               : "T$index";
           return NameType(
             paramName,
-            common_helpers.typeToString(typeArg, currentClassName: currentClassName),
+            common_helpers.typeToString(
+              typeArg,
+              currentClassName: currentClassName,
+            ),
           );
         }).toList(),
         nameTypeFields,
@@ -162,11 +163,11 @@ class ClassAnalyzer {
       var fields = _getAllFieldsIncludingSubtypes(
         el,
         allAnnotatedClasses,
-      ).where((f) => f.name != "hashCode")
-          .toList();
+      ).where((f) => f.name != "hashCode").toList();
 
-      var nameTypeFields =
-          fields.map((f) => NameType(f.name, f.type ?? "")).toList();
+      var nameTypeFields = fields
+          .map((f) => NameType(f.name, f.type ?? ""))
+          .toList();
 
       return Interface.fromGenerics(
         el.name ?? "",
@@ -197,10 +198,12 @@ class ClassAnalyzer {
       processedTypes.add(elemName);
 
       fields.addAll(
-        common_helpers.getAllFields(
-          elem.allSupertypes.whereType<InterfaceType>().toList(),
-          elem,
-        ).where((x) => x.name != "hashCode" && x.name != "runtimeType"),
+        common_helpers
+            .getAllFields(
+              elem.allSupertypes.whereType<InterfaceType>().toList(),
+              elem,
+            )
+            .where((x) => x.name != "hashCode" && x.name != "runtimeType"),
       );
 
       for (var supertype in elem.allSupertypes) {
@@ -247,8 +250,11 @@ class ClassAnalyzer {
       if (constructor.isFactory &&
           constructor.name != null &&
           constructor.name!.isNotEmpty) {
-        var parameters =
-            _extractParameters(constructor.formalParameters, className, classElement);
+        var parameters = _extractParameters(
+          constructor.formalParameters,
+          className,
+          classElement,
+        );
         factoryMethods.add(
           FactoryMethodInfo(
             name: constructor.name!,
@@ -264,18 +270,20 @@ class ClassAnalyzer {
     final classNameTrimmed = className.replaceAll(r'$', '');
     for (var method in classElement.methods) {
       if (method.isStatic && !method.isOperator) {
-        final returnType = method.returnType.getDisplayString(withNullability: false);
+        final returnType = method.returnType.getDisplayString();
         final returnTypeString = method.returnType.toString();
 
-        bool matchesType = returnType == className || 
-                          returnType == classNameTrimmed ||
-                          returnTypeString == className ||
-                          returnTypeString == classNameTrimmed;
+        bool matchesType =
+            returnType == className ||
+            returnType == classNameTrimmed ||
+            returnTypeString == className ||
+            returnTypeString == classNameTrimmed;
 
         // If it's an unresolved type, check the element display name
-        if (!matchesType && (returnType == 'dynamic' || returnType.contains('InvalidType'))) {
+        if (!matchesType &&
+            (returnType == 'dynamic' || returnType.contains('InvalidType'))) {
           final elementDisplayName = method.returnType.element?.displayName;
-          if (elementDisplayName == classElement.displayName || 
+          if (elementDisplayName == classElement.displayName ||
               elementDisplayName == classNameTrimmed ||
               elementDisplayName == className) {
             matchesType = true;
@@ -283,8 +291,11 @@ class ClassAnalyzer {
         }
 
         if (matchesType) {
-          var parameters =
-              _extractParameters(method.formalParameters, className, classElement);
+          var parameters = _extractParameters(
+            method.formalParameters,
+            className,
+            classElement,
+          );
           factoryMethods.add(
             FactoryMethodInfo(
               name: method.name as String,
@@ -293,10 +304,15 @@ class ClassAnalyzer {
               className: className,
             ),
           );
-        } else if (method.isStatic && method.name == 'create' && (returnType.contains('InvalidType') || returnType == 'dynamic')) {
+        } else if (method.isStatic &&
+            method.name == 'create' &&
+            (returnType.contains('InvalidType') || returnType == 'dynamic')) {
           // Special fallback for 'create' method if return type is unresolved
-          var parameters =
-              _extractParameters(method.formalParameters, className, classElement);
+          var parameters = _extractParameters(
+            method.formalParameters,
+            className,
+            classElement,
+          );
           factoryMethods.add(
             FactoryMethodInfo(
               name: method.name as String,

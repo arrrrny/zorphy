@@ -6,10 +6,7 @@ class GenerationContext {
   final ClassMetadata metadata;
   final GenerationConfig config;
 
-  const GenerationContext({
-    required this.metadata,
-    required this.config,
-  });
+  const GenerationContext({required this.metadata, required this.config});
 }
 
 /// Base interface for code generators
@@ -33,8 +30,7 @@ abstract class ConcreteClassGenerator implements CodeGenerator {
 /// Base class for generators that only run for abstract classes
 abstract class AbstractClassGenerator implements CodeGenerator {
   @override
-  bool shouldGenerate(GenerationContext context) =>
-      context.metadata.isAbstract;
+  bool shouldGenerate(GenerationContext context) => context.metadata.isAbstract;
 }
 
 /// Base class for generators that run for both abstract and concrete

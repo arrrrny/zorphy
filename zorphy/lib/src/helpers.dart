@@ -203,7 +203,8 @@ String generateFactoryMethod(
     var callArgs = factory.parameters
         .map((p) => p.isNamed ? "${p.name}: ${p.name}" : p.name)
         .join(", ");
-    var abstractClassName = factory.className; // Use original name (e.g. $AssistantMessage)
+    var abstractClassName =
+        factory.className; // Use original name (e.g. $AssistantMessage)
     bodyCode = "${abstractClassName}.${factory.name}($callArgs)";
   }
 

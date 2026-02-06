@@ -22,11 +22,37 @@ class CopyWithGenerator extends UniversalGenerator {
               : '\$${metadata.cleanName}')
         : metadata.cleanName;
 
-    return helpers.getCopyWith(
-      metadata.allFields,
-      copyWithClassName,
-      config.generateCopyWithFn,
+    final sb = StringBuffer();
+    sb.writeln(
+      helpers.getCopyWith(
+        metadata.allFields,
+        copyWithClassName,
+        config.generateCopyWithFn,
+      ),
     );
+
+    // Generate interface-specific copyWith methods
+    sb.writeln(
+      helpers.getInterfaceCopyWithMethods(
+        metadata.allValueTInterfaces,
+        metadata.allFields,
+        metadata.cleanName,
+      ),
+    );
+
+    // Generate interface-specific copyWithFn methods if enabled
+    if (config.generateCopyWithFn) {
+      sb.writeln(
+        helpers.getInterfaceCopyWithFnMethods(
+          metadata.allValueTInterfaces,
+          metadata.allFields,
+          metadata.cleanName,
+          metadata.allFields,
+        ),
+      );
+    }
+
+    return sb.toString();
   }
 
   @override
