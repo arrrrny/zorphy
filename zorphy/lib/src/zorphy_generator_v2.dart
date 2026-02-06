@@ -1,6 +1,7 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
 import 'package:source_gen/source_gen.dart';
+import 'package:zorphy/src/analysis/analysis.dart';
 import 'package:zorphy/src/common/GeneratorForAnnotationX.dart';
 import 'package:zorphy/src/factory_method.dart';
 import 'package:zorphy/src/models/models.dart';
@@ -38,8 +39,14 @@ class ZorphyGeneratorV2 extends GeneratorForAnnotationX<Zorphy> {
       throw Exception("you must use implements, not extends");
     }
 
-    // Collect factory methods
-    var factoryMethods = _getFactoryMethods(classElement);
+    // Collect factory methods using the unified analyzer
+    final metadata = ClassAnalyzer.analyze(
+      classElement,
+      annotation,
+      _allAnnotatedClasses,
+      _classesInExplicitSubtypes ?? {},
+    );
+    final factoryMethods = metadata.factoryMethods;
 
     // Get own fields (defined directly on this class, not inherited)
     var ownFields = classElement.fields
@@ -94,56 +101,5 @@ class ZorphyGeneratorV2 extends GeneratorForAnnotationX<Zorphy> {
       config,
       _classesInExplicitSubtypes!,
     );
-  }
-
-  List<FactoryMethodInfo> _getFactoryMethods(ClassElement element) {
-    var factoryMethods = <FactoryMethodInfo>[];
-    var className = element.name ?? "";
-
-    for (var constructor in element.constructors) {
-      var constructorName = constructor.name;
-      if (constructor.isFactory &&
-          constructorName != null &&
-          constructorName.isNotEmpty) {
-        var methodName = constructorName;
-        var parameters = constructor.formalParameters.map((param) {
-          var paramType = param.type.toString();
-
-          // Handle self-referencing types
-          if (paramType.contains('InvalidType') || paramType == 'dynamic') {
-            var classNameTrimmed = className.replaceAll('\$', '');
-
-            // Check if this is a self-reference to the current class
-            if (param.type.element?.displayName == element.name ||
-                param.type.element?.displayName == classNameTrimmed) {
-              paramType = classNameTrimmed;
-            } else {
-              // For InvalidType, try to resolve from the source code
-              paramType = 'dynamic';
-            }
-          }
-
-          return FactoryParameterInfo(
-            name: param.name ?? "",
-            type: paramType,
-            isRequired: param.isRequiredNamed || param.isRequiredPositional,
-            isNamed: param.isNamed,
-            hasDefaultValue: param.hasDefaultValue,
-            defaultValue: param.defaultValueCode,
-          );
-        }).toList();
-
-        factoryMethods.add(
-          FactoryMethodInfo(
-            name: methodName,
-            parameters: parameters,
-            bodyCode: "",
-            className: className,
-          ),
-        );
-      }
-    }
-
-    return factoryMethods;
   }
 }

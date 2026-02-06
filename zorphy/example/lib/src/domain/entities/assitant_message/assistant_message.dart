@@ -11,10 +11,14 @@ part 'assistant_message.g.dart';
 abstract class $AssistantMessage implements $$ChatMessage {
   @override
   ChatMessageRole get role => ChatMessageRole.assistant;
-  factory $AssistantMessage.create({required String text}) => AssistantMessage(
-    text: text,
-    attachments: [],
-    role: ChatMessageRole.assistant,
-    createdAt: DateTime.now(),
-  );
+
+  /// Delegated factory logic
+  static AssistantMessage create({required String text}) {
+    return AssistantMessage(
+      text: text,
+      attachments: [],
+      role: ChatMessageRole.assistant,
+      createdAt: DateTime.now(),
+    );
+  }
 }

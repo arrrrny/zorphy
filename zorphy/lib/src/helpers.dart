@@ -190,7 +190,7 @@ String generateFactoryMethod(
     var callArgs = factory.parameters
         .map((p) => p.isNamed ? "${p.name}: ${p.name}" : p.name)
         .join(", ");
-    var abstractClassName = factory.className.replaceAll('\$', '');
+    var abstractClassName = factory.className; // Use original name (e.g. $AssistantMessage)
     bodyCode = "${abstractClassName}.${factory.name}($callArgs)";
   }
 
@@ -398,49 +398,50 @@ bool _needsPatchHandling(String baseType, List<String> knownClasses) {
 /// Replace $-prefixed types with concrete class names for JSON serialization
 /// For example: $TreeNode -> TreeNode, List<$TreeNode> -> List<TreeNode>
 String _replaceDollarTypesWithConcrete(String type) {
+  // Handle outer nullability
+  final isOuterNullable = type.endsWith('?');
+  final baseType = isOuterNullable ? type.substring(0, type.length - 1) : type;
+
   // Handle List<$Type> or List<$Type?>
-  if (type.startsWith('List<') && type.contains('>')) {
-    var innerType = type.substring(5, type.lastIndexOf('>'));
-    var isNullable = innerType.endsWith('?');
-    var baseInnerType = isNullable
+  if (baseType.startsWith('List<') && baseType.endsWith('>')) {
+    final innerType = baseType.substring(5, baseType.length - 1);
+    final isInnerNullable = innerType.endsWith('?');
+    final baseInnerType = isInnerNullable
         ? innerType.substring(0, innerType.length - 1)
         : innerType;
 
-    // If the inner type starts with $, remove it
     if (baseInnerType.startsWith('\$')) {
-      var trimmedType = baseInnerType.replaceAll('\$', '');
-      return 'List<$trimmedType${isNullable ? '?' : ''}>';
+      final trimmedType = baseInnerType.replaceAll('\$', '');
+      return 'List<$trimmedType${isInnerNullable ? '?' : ''}>${isOuterNullable ? '?' : ''}';
     }
     return type;
   }
 
   // Handle Map<K, $Type> or Map<K, $Type?>
-  if (type.startsWith('Map<') && type.contains('>')) {
-    var parts = type.substring(4, type.lastIndexOf('>')).split(',');
-    if (parts.length >= 2) {
-      var keyType = parts[0].trim();
-      var valueType = parts[1].trim();
-      var isValueNullable = valueType.endsWith('?');
-      var baseValueType = isValueNullable
-          ? valueType.substring(0, valueType.length - 1)
-          : valueType;
+  if (baseType.startsWith('Map<') && baseType.endsWith('>')) {
+    final content = baseType.substring(4, baseType.length - 1);
+    final commaIndex = content.lastIndexOf(',');
+    if (commaIndex != -1) {
+      final keyPart = content.substring(0, commaIndex).trim();
+      final valuePart = content.substring(commaIndex + 1).trim();
 
-      // If the value type starts with $, remove it
+      final isValueNullable = valuePart.endsWith('?');
+      final baseValueType = isValueNullable
+          ? valuePart.substring(0, valuePart.length - 1)
+          : valuePart;
+
       if (baseValueType.startsWith('\$')) {
-        var trimmedType = baseValueType.replaceAll('\$', '');
-        return 'Map<$keyType, $trimmedType${isValueNullable ? '?' : ''}>';
+        final trimmedType = baseValueType.replaceAll('\$', '');
+        return 'Map<$keyPart, $trimmedType${isValueNullable ? '?' : ''}>${isOuterNullable ? '?' : ''}';
       }
     }
     return type;
   }
 
   // Handle direct $Type or $Type?
-  var isNullable = type.endsWith('?');
-  var baseType = isNullable ? type.substring(0, type.length - 1) : type;
-
   if (baseType.startsWith('\$')) {
-    var trimmedType = baseType.replaceAll('\$', '');
-    return '$trimmedType${isNullable ? '?' : ''}';
+    final trimmedType = baseType.replaceAll('\$', '');
+    return '$trimmedType${isOuterNullable ? '?' : ''}';
   }
 
   return type;

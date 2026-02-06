@@ -166,15 +166,10 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       final clauseParts = interfaces
           .map((i) => _trimInterfaceName(i.interfaceName))
           .where(
-            (name) => name.isNotEmpty && name != _trimInterfaceName(extendedParent),
+            (name) =>
+                name.isNotEmpty && name != _trimInterfaceName(extendedParent),
           )
           .toList();
-
-      // If we have factory methods and we didn't extend the annotated class, we should implement it
-      if (config.factoryMethods.isNotEmpty &&
-          metadata.originalName != extendedParent) {
-        clauseParts.add(metadata.originalName);
-      }
 
       final clause = clauseParts.join(', ');
       return clause.isNotEmpty ? ' implements $clause' : '';

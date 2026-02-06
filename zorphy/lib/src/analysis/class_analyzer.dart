@@ -244,41 +244,14 @@ class ClassAnalyzer {
     var className = classElement.name ?? "";
 
     for (var constructor in classElement.constructors) {
-      var constructorName = constructor.name;
       if (constructor.isFactory &&
-          constructorName != null &&
-          constructorName.isNotEmpty) {
-        var methodName = constructorName;
-        var parameters = constructor.formalParameters.map((param) {
-          var paramType = param.type.toString();
-
-          // Handle self-referencing types
-          if (paramType.contains('InvalidType') || paramType == 'dynamic') {
-            var classNameTrimmed = className.replaceAll(r'$', '');
-
-            // Check if this is a self-reference to the current class
-            if (param.type.element?.displayName == classElement.name ||
-                param.type.element?.displayName == classNameTrimmed) {
-              paramType = classNameTrimmed;
-            } else {
-              // For InvalidType, try to resolve from the source code
-              paramType = 'dynamic';
-            }
-          }
-
-          return FactoryParameterInfo(
-            name: param.name ?? "",
-            type: paramType,
-            isRequired: param.isRequiredNamed || param.isRequiredPositional,
-            isNamed: param.isNamed,
-            hasDefaultValue: param.hasDefaultValue,
-            defaultValue: param.defaultValueCode,
-          );
-        }).toList();
-
+          constructor.name != null &&
+          constructor.name!.isNotEmpty) {
+        var parameters =
+            _extractParameters(constructor.formalParameters, className, classElement);
         factoryMethods.add(
           FactoryMethodInfo(
-            name: methodName,
+            name: constructor.name!,
             parameters: parameters,
             bodyCode: "",
             className: className,
@@ -287,7 +260,102 @@ class ClassAnalyzer {
       }
     }
 
+    // Also extract static methods that return the class's type (clean or original)
+    final classNameTrimmed = className.replaceAll(r'$', '');
+    for (var method in classElement.methods) {
+      if (method.isStatic && !method.isOperator) {
+        final returnType = method.returnType.getDisplayString(withNullability: false);
+        final returnTypeString = method.returnType.toString();
+
+        bool matchesType = returnType == className || 
+                          returnType == classNameTrimmed ||
+                          returnTypeString == className ||
+                          returnTypeString == classNameTrimmed;
+
+        // If it's an unresolved type, check the element display name
+        if (!matchesType && (returnType == 'dynamic' || returnType.contains('InvalidType'))) {
+          final elementDisplayName = method.returnType.element?.displayName;
+          if (elementDisplayName == classElement.displayName || 
+              elementDisplayName == classNameTrimmed ||
+              elementDisplayName == className) {
+            matchesType = true;
+          }
+        }
+
+        if (matchesType) {
+          var parameters =
+              _extractParameters(method.formalParameters, className, classElement);
+          factoryMethods.add(
+            FactoryMethodInfo(
+              name: method.name as String,
+              parameters: parameters,
+              bodyCode: "",
+              className: className,
+            ),
+          );
+        } else if (method.isStatic && method.name == 'create' && (returnType.contains('InvalidType') || returnType == 'dynamic')) {
+          // Special fallback for 'create' method if return type is unresolved
+          var parameters =
+              _extractParameters(method.formalParameters, className, classElement);
+          factoryMethods.add(
+            FactoryMethodInfo(
+              name: method.name as String,
+              parameters: parameters,
+              bodyCode: "",
+              className: className,
+            ),
+          );
+        }
+      }
+    }
+
     return factoryMethods;
+  }
+
+  static List<FactoryParameterInfo> _extractParameters(
+    List<dynamic> parameters,
+    String className,
+    ClassElement classElement,
+  ) {
+    return parameters.map((param) {
+      final paramType = param.type.getDisplayString(withNullability: false);
+
+      // Handle self-referencing types
+      if (paramType.contains('InvalidType') || paramType == 'dynamic') {
+        final classNameTrimmed = className.replaceAll(r'$', '');
+
+        // Check if this is a self-reference to the current class
+        if (param.type.element?.displayName == classElement.displayName ||
+            param.type.element?.displayName == classNameTrimmed) {
+          return FactoryParameterInfo(
+            name: param.name as String,
+            type: classNameTrimmed,
+            isRequired: param.isRequiredNamed || param.isRequiredPositional,
+            isNamed: param.isNamed,
+            hasDefaultValue: param.hasDefaultValue,
+            defaultValue: param.defaultValueCode,
+          );
+        } else {
+          return FactoryParameterInfo(
+            name: param.name as String,
+            type: 'dynamic',
+            isRequired: param.isRequiredNamed || param.isRequiredPositional,
+            isNamed: param.isNamed,
+            hasDefaultValue: param.hasDefaultValue,
+            defaultValue: param.defaultValueCode,
+          );
+        }
+      }
+
+      return FactoryParameterInfo(
+        name: param.name as String,
+        type: paramType,
+        isRequired: param.isRequiredNamed || param.isRequiredPositional,
+        isNamed: param.isNamed,
+        hasDefaultValue: param.hasDefaultValue,
+        defaultValue: param.defaultValueCode as String?,
+      );
+    }).toList();
   }
 
   /// Check if this class is listed in any parent's explicitSubTypes

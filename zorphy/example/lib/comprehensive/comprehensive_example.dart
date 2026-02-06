@@ -402,8 +402,10 @@ void demonstrateTreeStructure() {
   // Count nodes
   int countNodes(CategoryNode node) {
     int count = 1;
-    for (var child in node.children) {
-      count += countNodes(child);
+    if (node.children != null) {
+      for (var child in node.children!) {
+        count += countNodes(child);
+      }
     }
     return count;
   }

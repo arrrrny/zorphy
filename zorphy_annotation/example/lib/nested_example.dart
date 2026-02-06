@@ -136,5 +136,5 @@ void main() {
 void printCategoryTree(CategoryNode node, int depth) {
   final indent = '  ' * depth;
   print('$indent${node.name} (${node.id})');
-  node.children.forEach((child) => printCategoryTree(child, depth + 1));
+  node.children?.forEach((child) => printCategoryTree(child, depth + 1));
 }

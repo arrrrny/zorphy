@@ -9,28 +9,17 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
   @override
   String generate(GenerationContext context) {
     final metadata = context.metadata;
-    final config = context.config;
     final sb = StringBuffer();
 
-    if (config.factoryMethods.isNotEmpty) {
+    if (metadata.factoryMethods.isNotEmpty) {
       final className = metadata.cleanName;
-      for (var factory in config.factoryMethods) {
-        // Only generate factory if:
-        // 1. It was defined in this exact class (factory.className == metadata.originalName)
-        // 2. The class doesn't extend another concrete class (to avoid recursive calls)
-        //
-        // When a factory is defined in $AssistantMessage and we generate AssistantMessage,
-        // both names resolve to the same thing, so we need an additional check.
-        // The key is: don't generate factories that would call themselves recursively.
-
+      for (var factory in metadata.factoryMethods) {
         var factoryClass = factory.className;
-        var currentClass = metadata.originalName;
 
-        // Check if this factory would be recursive
-        // A factory is recursive if: factory X.create calls X.create
-        var wouldBeRecursive = factoryClass.replaceAll('\$', '') == className;
+        // A factory is truly recursive if it's in the same class it tried to create
+        var isTrulyRecursive = factoryClass == className;
 
-        if (factoryClass == currentClass && !wouldBeRecursive) {
+        if (!isTrulyRecursive) {
           sb.writeln(
             helpers.generateFactoryMethod(
               factory,
@@ -50,12 +39,13 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
     final metadata = context.metadata;
     final className = metadata.cleanName;
 
-    // Only generate if there's at least one non-recursive factory defined in this class
-    return context.config.factoryMethods.any((f) {
+    // Run if it's a concrete class (handled by base class) AND has factory methods
+    if (metadata.isAbstract) return false;
+
+    return metadata.factoryMethods.any((f) {
       var factoryClass = f.className;
-      var currentClass = metadata.originalName;
-      var wouldBeRecursive = factoryClass.replaceAll('\$', '') == className;
-      return factoryClass == currentClass && !wouldBeRecursive;
+      var isTrulyRecursive = factoryClass == className;
+      return !isTrulyRecursive;
     });
   }
 }
