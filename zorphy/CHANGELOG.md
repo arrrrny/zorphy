@@ -1,3 +1,16 @@
+## [1.3.0] - 2026-02-06
+
+### Features
+- Added `--dry-run` flag to CLI commands (`create`, `new`, `enum`, `add-field`, `from-json`) to preview generated code without writing files.
+- Added support for generating `explicitSubTypes` annotation without extending an interface.
+
+### Changed
+- Renamed `--subtype` flag to `--subtypes` in `create` command.
+- Updated `zorphy_annotation` dependency to 1.3.0.
+
+### Fix
+- Fixed handling of special characters (like `<` and `>`) in CLI `List` and `Map` type arguments.
+
 ## [1.2.1] - 2026-02-05
 
 ### Chore

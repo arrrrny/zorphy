@@ -10,7 +10,7 @@ import 'dart:convert';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
-const String _version = '1.1.1';
+const String _version = '1.3.0';
 
 Future<void> main(List<String> args) async {
   final parser = ArgParser()
@@ -127,8 +127,13 @@ ArgParser _createCommandParser() {
     )
     ..addOption('extends', help: r'Interface to extend (e.g., "\$BaseEntity")')
     ..addMultiOption(
-      'subtype',
+      'subtypes',
       help: r'Explicit subtypes for polymorphism (e.g., "\$Dog,\$Cat")',
+    )
+    ..addFlag(
+      'dry-run',
+      help: 'Preview generated code without writing files',
+      negatable: false,
     );
 }
 
@@ -143,6 +148,11 @@ ArgParser _createEnumCommandParser() {
     ..addMultiOption(
       'value',
       help: 'Enum values (e.g., "active,inactive,pending")',
+    )
+    ..addFlag(
+      'dry-run',
+      help: 'Preview generated code without writing files',
+      negatable: false,
     );
 }
 
@@ -161,7 +171,12 @@ ArgParser _newCommandParser() {
       abbr: 'o',
       help: r'Output base directory (default: lib/src/domain/entities)',
     )
-    ..addFlag('json', help: 'Enable JSON serialization', defaultsTo: true);
+    ..addFlag('json', help: 'Enable JSON serialization', defaultsTo: true)
+    ..addFlag(
+      'dry-run',
+      help: 'Preview generated code without writing files',
+      negatable: false,
+    );
 }
 
 ArgParser _listCommandParser() {
@@ -183,6 +198,11 @@ ArgParser _addFieldCommandParser() {
     ..addMultiOption(
       'field',
       help: r'Fields to add in format: "name:type" or "name:type?"',
+    )
+    ..addFlag(
+      'dry-run',
+      help: 'Preview generated code without writing files',
+      negatable: false,
     );
 }
 
@@ -203,6 +223,11 @@ ArgParser _fromJsonCommandParser() {
       'prefix-nested',
       help: 'Prefix nested entities with parent name',
       defaultsTo: true,
+    )
+    ..addFlag(
+      'dry-run',
+      help: 'Preview generated code without writing files',
+      negatable: false,
     );
 }
 
@@ -241,7 +266,7 @@ CREATE COMMAND:
     -f, --fields            Interactive field prompts (default: true)
     --field                 Add fields directly ("name:type" or "name:type?")
     --extends               Interface to extend
-    --subtype               Explicit subtypes
+    --subtypes              Explicit subtypes
 
 ENUM COMMAND:
   zorphy_cli enum [options]
@@ -306,10 +331,8 @@ FIELD TYPES:
   Nullable types: Add ? after type (e.g., String?, int?)
   Generic types: List<Type>, Set<Type>, Map<KeyType, ValueType>
   Custom types: Any other class name
-  Zorphy Objects: \$TypeName (concrete), \$\$TypeName (sealed/polymorphic)
+  Zorphy Objects: TypeName (e.g., User, Address). The CLI now automatically detects entities.
   Enums: TypeName (will be imported from enums/index.dart)
-
-  Note: In shell, use --field address:\\\$Address (escape the \$)
 
 DIRECTORY STRUCTURE:
   Entities:     lib/src/domain/entities/entity_name/entity_name.dart
@@ -338,8 +361,9 @@ Future<void> _handleCreate(ArgResults args) async {
   final isSealed = args['sealed'] as bool? ?? false;
   final isNonSealed = args['non-sealed'] as bool? ?? false;
   final useInteractiveFields = args['fields'] as bool? ?? true;
+  final isDryRun = args['dry-run'] as bool? ?? false;
   final extendsInterface = args['extends'] as String?;
-  final explicitSubtypes = args['subtype'] as List<String>?;
+  final explicitSubtypes = args['subtypes'] as List<String>?;
 
   // Get package name
   // String packageName = _getPackageName();
@@ -394,7 +418,7 @@ Future<void> _handleCreate(ArgResults args) async {
   // Create directory structure: lib/src/domain/entities/entity_name/
   final entityDir = p.join(baseOutputDir, entityDirName);
   final dir = Directory(entityDir);
-  if (!await dir.exists()) {
+  if (!isDryRun && !await dir.exists()) {
     await dir.create(recursive: true);
     print('✓ Created entity directory: $entityDir');
   }
@@ -429,18 +453,20 @@ Future<void> _handleCreate(ArgResults args) async {
       final cleanTypeRef = typeRef.replaceAll(RegExp(r'^\$+'), '');
       if (cleanTypeRef == className) continue;
 
-      // Check if it's a Zorphy entity (starts with $ or $$)
-      if (typeRef.startsWith(r'$')) {
-        final typeSnakeName = _toSnakeCase(cleanTypeRef);
+      // Check if it's a Zorphy entity (starts with $ or $$ or directory exists)
+      final typeSnakeName = _toSnakeCase(cleanTypeRef);
+      final potentialEntityPath = p.join(baseOutputDir, typeSnakeName);
+      
+      if (typeRef.startsWith(r'$') || (!isDryRun && Directory(potentialEntityPath).existsSync())) {
         entityImports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
       } else {
         needsEnumImport = true;
         // Assume it's an enum - will be imported from enums/index.dart
       }
     }
-    if (needsEnumImport) {
-      entityImports.add("import '../enums/index.dart';");
-    }
+  }
+  if (needsEnumImport) {
+    entityImports.add("import '../enums/index.dart';");
   }
 
   // Add extends interface import if specified
@@ -491,12 +517,10 @@ Future<void> _handleCreate(ArgResults args) async {
   if (useCompare) annotationOptions.add('generateCompareTo: true');
   if (isNonSealed) annotationOptions.add('nonSealed: true');
 
-  if (extendsInterface != null) {
-    // Add explicitSubTypes if provided
-    if (explicitSubtypes != null && explicitSubtypes.isNotEmpty) {
-      final subtypes = explicitSubtypes.map((s) => '\$$s').join(', ');
-      annotationOptions.add("explicitSubTypes: [$subtypes]");
-    }
+  // Add explicitSubTypes if provided
+  if (explicitSubtypes != null && explicitSubtypes.isNotEmpty) {
+    final subtypes = explicitSubtypes.map((s) => '\$$s').join(', ');
+    annotationOptions.add("explicitSubTypes: [$subtypes]");
   }
 
   // Class definition - Use raw string to avoid interpolation
@@ -504,7 +528,11 @@ Future<void> _handleCreate(ArgResults args) async {
 
   buffer.writeln('/// $className entity');
   buffer.writeln('@Zorphy(${annotationOptions.join(', ')})');
-  buffer.writeln('abstract class $abstractClassName {');
+  if (extendsInterface != null) {
+    buffer.writeln('abstract class $abstractClassName implements $extendsInterface {');
+  } else {
+    buffer.writeln('abstract class $abstractClassName {');
+  }
   buffer.writeln();
 
   // Fields
@@ -516,8 +544,13 @@ Future<void> _handleCreate(ArgResults args) async {
   buffer.writeln();
 
   // Write file
-  await file.writeAsString(buffer.toString());
-  print('✓ Created entity file: $filePath');
+  if (isDryRun) {
+    print('\n🚀 [DRY RUN] Would create $filePath with content:\n');
+    print(buffer.toString());
+  } else {
+    await file.writeAsString(buffer.toString());
+    print('✓ Created entity file: $filePath');
+  }
 
   // Print instructions
   print('\n📋 Next steps:');
@@ -590,6 +623,7 @@ Future<void> _handleCreateEnum(ArgResults args) async {
   final baseOutputDir = args['output'] as String? ?? 'lib/src/domain/entities';
   final providedValues = args['value'] as List<String>?;
   final values = providedValues ?? <String>[];
+  final isDryRun = args['dry-run'] as bool? ?? false;
 
   if (values.isEmpty) {
     print(
@@ -601,7 +635,7 @@ Future<void> _handleCreateEnum(ArgResults args) async {
   // Create enums directory
   final enumsDir = p.join(baseOutputDir, 'enums');
   final dir = Directory(enumsDir);
-  if (!await dir.exists()) {
+  if (!isDryRun && !await dir.exists()) {
     await dir.create(recursive: true);
     print('✓ Created enums directory: $enumsDir');
   }
@@ -615,7 +649,7 @@ Future<void> _handleCreateEnum(ArgResults args) async {
   // Read existing enums to check for duplicates
   final existingEnums = <String>[];
   final indexFile = File(p.join(enumsDir, 'index.dart'));
-  if (await indexFile.exists()) {
+  if (!isDryRun && await indexFile.exists()) {
     final indexContent = await indexFile.readAsString();
     // Extract existing enum names from exports
     final exportMatches = RegExp(
@@ -649,11 +683,16 @@ Future<void> _handleCreateEnum(ArgResults args) async {
   buffer.writeln('}');
   buffer.writeln();
 
-  await file.writeAsString(buffer.toString());
-  print('✓ Created enum file: $filePath');
+  if (isDryRun) {
+    print('\n🚀 [DRY RUN] Would create $filePath with content:\n');
+    print(buffer.toString());
+  } else {
+    await file.writeAsString(buffer.toString());
+    print('✓ Created enum file: $filePath');
 
-  // Update the index.dart barrel file
-  await _updateEnumIndexFile(enumsDir, existingEnums);
+    // Update the index.dart barrel file
+    await _updateEnumIndexFile(enumsDir, existingEnums);
+  }
 
   print('\n📋 Enum exported to: lib/src/domain/entities/enums/index.dart');
   print('   Import in entities: import \'../../enums/index.dart\';');
@@ -742,6 +781,7 @@ Future<void> _handleNew(ArgResults args) async {
 
   final baseOutputDir = args['output'] as String? ?? 'lib/src/domain/entities';
   final useJson = args['json'] as bool? ?? true;
+  final isDryRun = args['dry-run'] as bool? ?? false;
 
   print('📝 Creating quick entity: $name');
 
@@ -752,7 +792,7 @@ Future<void> _handleNew(ArgResults args) async {
   // Create directory structure
   final entityDir = p.join(baseOutputDir, entityDirName);
   final dir = Directory(entityDir);
-  if (!await dir.exists()) {
+  if (!isDryRun && !await dir.exists()) {
     await dir.create(recursive: true);
   }
 
@@ -772,8 +812,13 @@ Future<void> _handleNew(ArgResults args) async {
   buffer.writeln('abstract class \$$className {');
   buffer.writeln('}');
 
-  await file.writeAsString(buffer.toString());
-  print('✓ Created entity file: $filePath');
+  if (isDryRun) {
+    print('\n🚀 [DRY RUN] Would create $filePath with content:\n');
+    print(buffer.toString());
+  } else {
+    await file.writeAsString(buffer.toString());
+    print('✓ Created entity file: $filePath');
+  }
   print('\n📋 Next steps:');
   print('   1. Run: dart run build_runner build');
 }
@@ -852,6 +897,7 @@ Future<void> _handleAddField(ArgResults args) async {
 
   final baseOutputDir = args['output'] as String? ?? 'lib/src/domain/entities';
   final providedFields = args['field'] as List<String>?;
+  final isDryRun = args['dry-run'] as bool? ?? false;
 
   if (providedFields == null || providedFields.isEmpty) {
     print('Error: At least one field is required. Use --field to specify.');
@@ -883,14 +929,16 @@ Future<void> _handleAddField(ArgResults args) async {
   final filePath = p.join(entityDir, '$entityDirName.dart');
   final file = File(filePath);
 
-  if (!await file.exists()) {
+  if (!isDryRun && !await file.exists()) {
     print('Error: Entity not found at $filePath');
     print('Use "zorphy_cli create -n $name" to create it first.');
     exit(1);
   }
 
   // Read existing file
-  final content = await file.readAsString();
+  final content = isDryRun && !await file.exists() 
+      ? 'abstract class \$$className {}' 
+      : await file.readAsString();
 
   // Find the closing brace of the class
   final classPattern = RegExp(r'abstract class \$+' + className + r'\s*\{');
@@ -923,8 +971,10 @@ Future<void> _handleAddField(ArgResults args) async {
       final cleanTypeRef = typeRef.replaceAll(RegExp(r'^\$+'), '');
       if (cleanTypeRef == className) continue;
 
-      if (typeRef.startsWith(r'$')) {
-        final typeSnakeName = _toSnakeCase(cleanTypeRef);
+      final typeSnakeName = _toSnakeCase(cleanTypeRef);
+      final potentialEntityPath = p.join(baseOutputDir, typeSnakeName);
+
+      if (typeRef.startsWith(r'$') || (!isDryRun && Directory(potentialEntityPath).existsSync())) {
         newImports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
       } else {
         newImports.add("import '../enums/index.dart';");
@@ -973,7 +1023,12 @@ Future<void> _handleAddField(ArgResults args) async {
       updatedContent.substring(insertPosition);
 
   // Write back
-  await file.writeAsString(finalContent);
+  if (isDryRun) {
+    print('\n🚀 [DRY RUN] Would update $filePath with content:\n');
+    print(finalContent);
+  } else {
+    await file.writeAsString(finalContent);
+  }
 
   print('✓ Added ${fields.length} field(s) to $className');
   print('  File: $filePath');
@@ -1012,6 +1067,7 @@ Future<void> _handleFromJson(ArgResults args) async {
   final baseOutputDir = args['output'] as String? ?? 'lib/src/domain/entities';
   final useJson = args['json'] as bool? ?? true;
   final prefixNested = args['prefix-nested'] as bool? ?? true;
+  final isDryRun = args['dry-run'] as bool? ?? false;
 
   // Parse JSON
   final result = _parseJson(
@@ -1024,7 +1080,7 @@ Future<void> _handleFromJson(ArgResults args) async {
   final allEntities = [result, ...result.nested];
 
   for (final entity in allEntities) {
-    await _createEntityFromResult(entity, baseOutputDir, useJson);
+    await _createEntityFromResult(entity, baseOutputDir, useJson, isDryRun: isDryRun);
   }
 
   print('\n✓ Created ${allEntities.length} entity/entities from JSON');
@@ -1037,11 +1093,14 @@ Future<void> _handleFromJson(ArgResults args) async {
 Future<void> _createEntityFromResult(
   _EntityResult entity,
   String baseDir,
-  bool useJson,
-) async {
+  bool useJson, {
+  bool isDryRun = false,
+}) async {
   final snakeName = _toSnakeCase(entity.name);
   final entityDir = p.join(baseDir, snakeName);
-  await Directory(entityDir).create(recursive: true);
+  if (!isDryRun) {
+    await Directory(entityDir).create(recursive: true);
+  }
 
   final imports = <String>{};
   for (final field in entity.fields) {
@@ -1080,9 +1139,14 @@ Future<void> _createEntityFromResult(
   }
   buf.writeln('}');
 
-  await File(
-    p.join(entityDir, '$snakeName.dart'),
-  ).writeAsString(buf.toString());
+  if (isDryRun) {
+    print('\n🚀 [DRY RUN] Would create ${p.join(entityDir, '$snakeName.dart')} with content:\n');
+    print(buf.toString());
+  } else {
+    await File(
+      p.join(entityDir, '$snakeName.dart'),
+    ).writeAsString(buf.toString());
+  }
 }
 
 _EntityResult _parseJson(

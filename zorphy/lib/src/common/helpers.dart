@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
@@ -219,16 +218,11 @@ List<NameTypeClassComment> getAllFields(
       final List<dynamic> metadata = rawMetadata is List ? rawMetadata : [];
       final List<String> annotations = [];
       
-      print('COLLECTING FOR ${element.name} (${element.runtimeType})');
       for (final m in metadata) {
         final source = m.toSource() as String;
-        stderr.writeln('  FOUND ANNOTATION: $source');
         if (!source.startsWith('@JsonKey') && !source.startsWith('@jsonKey')) {
           annotations.add(source);
         }
-      }
-      if (metadata.isEmpty) {
-        stderr.writeln('  NO METADATA found for ${element.name}');
       }
 
       // If it's a field, also check its getter
@@ -259,7 +253,6 @@ List<NameTypeClassComment> getAllFields(
 
       return annotations;
     } catch (e) {
-      print('ERROR collecting annotations: $e');
       return [];
     }
   }

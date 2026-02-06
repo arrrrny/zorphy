@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:dartx/dartx.dart';
 import 'package:zorphy/src/common/NameType.dart';
 import 'package:zorphy/src/common/classes.dart';
@@ -56,7 +55,6 @@ String getProperties(
   var classNameTrimmed = className.replaceAll("\$", "");
 
   for (var f in fields) {
-    stderr.writeln('DEBUG FIELD: ${f.name} in $className, jsonKey: ${f.jsonKeyInfo != null}, addAnnotations: ${f.additionalAnnotations}');
     // Add JsonKey annotation if present from source
     if (f.jsonKeyInfo != null) {
       sb.writeln("  ${f.jsonKeyInfo!.toAnnotationString()}");
