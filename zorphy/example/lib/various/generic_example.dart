@@ -1,4 +1,3 @@
-import 'package:json_annotation/json_annotation.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'generic_example.zorphy.dart';

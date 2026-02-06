@@ -617,7 +617,9 @@ Future<void> _handleCreate(ArgResults args) async {
 
   // Generate subtypes in the same file if it's a sealed class
   if (generateSubs && isSealed && explicitSubtypes != null) {
-    print('\n🔄 Generating ${explicitSubtypes.length} subtype(s) in $filePath...');
+    print(
+      '\n🔄 Generating ${explicitSubtypes.length} subtype(s) in $filePath...',
+    );
 
     for (final subtype in explicitSubtypes) {
       final subtypeName = subtype.replaceAll('\$', '');
@@ -679,8 +681,13 @@ Future<void> _handleCreate(ArgResults args) async {
   }
 
   // Generate subtypes in separate files if NOT a sealed class
-  if (generateSubs && !isSealed && explicitSubtypes != null && explicitSubtypes.isNotEmpty) {
-    print('\n🔄 Generating ${explicitSubtypes.length} subtype(s) in separate files...\n');
+  if (generateSubs &&
+      !isSealed &&
+      explicitSubtypes != null &&
+      explicitSubtypes.isNotEmpty) {
+    print(
+      '\n🔄 Generating ${explicitSubtypes.length} subtype(s) in separate files...\n',
+    );
 
     for (final subtype in explicitSubtypes) {
       final subtypeName = subtype.replaceAll(
