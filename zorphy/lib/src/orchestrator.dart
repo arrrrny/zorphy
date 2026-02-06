@@ -110,9 +110,10 @@ class Orchestrator {
     // These need to be inside the class but before the closing }
     for (final block in codeBlocks) {
       if (block == classDeclaration) continue;
-      if (block.startsWith('enum ') ||
-          block.startsWith('class ') ||
-          block.startsWith('extension ')) {
+      final trimmed = block.trim();
+      if (trimmed.startsWith('enum ') ||
+          trimmed.startsWith('class ') ||
+          trimmed.startsWith('extension ')) {
         // Skip - these are added after the class closes
         continue;
       }
@@ -124,9 +125,11 @@ class Orchestrator {
 
     // Add external items (enums, patch classes, extensions) after class closes
     for (final block in codeBlocks) {
-      if (block.startsWith('enum ') ||
-          block.startsWith('class Patch') ||
-          block.startsWith('extension ')) {
+      if (block == classDeclaration) continue; // Skip the main class declaration
+      final trimmed = block.trim();
+      if (trimmed.startsWith('enum ') ||
+          (trimmed.startsWith('class ') && trimmed.contains('Patch')) ||
+          trimmed.startsWith('extension ')) {
         sb.writeln(block);
       }
     }

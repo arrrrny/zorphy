@@ -31,8 +31,8 @@ class PatchGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    // Only generate if there are fields
-    return context.metadata.allFields.isNotEmpty;
+    return context.config.generatePatch && 
+           context.metadata.allFields.isNotEmpty;
   }
 }
 
@@ -62,8 +62,8 @@ class PatchClassGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    // Only generate if there are fields
-    return context.metadata.allFields.isNotEmpty;
+    return context.config.generatePatch && 
+           context.metadata.allFields.isNotEmpty;
   }
 }
 
@@ -79,7 +79,7 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    // Only generate if there are fields
-    return context.metadata.allFields.isNotEmpty;
+    return context.config.generatePatch && 
+           context.metadata.allFields.isNotEmpty;
   }
 }

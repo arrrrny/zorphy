@@ -21,6 +21,9 @@ class GenerationConfig {
   /// Whether to generate compareTo methods
   final bool generateCompareTo;
 
+  /// Whether to generate patch methods and patch classes
+  final bool generatePatch;
+
   /// Whether to hide the public constructor
   final bool hidePublicConstructor;
 
@@ -37,6 +40,7 @@ class GenerationConfig {
     required this.generateCopyWith,
     required this.generateCopyWithFn,
     required this.generateCompareTo,
+    required this.generatePatch,
     required this.hidePublicConstructor,
     required this.factoryMethods,
     required this.ownFields,
@@ -48,6 +52,7 @@ class GenerationConfig {
     required bool explicitToJson,
     required bool generateCopyWithFn,
     required bool generateCompareTo,
+    required bool generatePatch,
     required bool hidePublicConstructor,
     required List<FactoryMethodInfo> factoryMethods,
     required Set<String> ownFields,
@@ -59,6 +64,7 @@ class GenerationConfig {
       generateCopyWith: true, // Always generate copyWith
       generateCopyWithFn: generateCopyWithFn,
       generateCompareTo: generateCompareTo,
+      generatePatch: generatePatch,
       hidePublicConstructor: hidePublicConstructor,
       factoryMethods: factoryMethods,
       ownFields: ownFields,
@@ -74,6 +80,7 @@ class GenerationConfig {
       generateCopyWith: true,
       generateCopyWithFn: false,
       generateCompareTo: true,
+      generatePatch: true,
       hidePublicConstructor: false,
       factoryMethods: [],
       ownFields: {},
@@ -88,6 +95,7 @@ class GenerationConfig {
     this.generateCopyWith = true,
     this.generateCopyWithFn = false,
     this.generateCompareTo = true,
+    this.generatePatch = true,
     this.hidePublicConstructor = false,
     this.factoryMethods = const [],
     this.ownFields = const {},

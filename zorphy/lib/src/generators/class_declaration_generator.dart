@@ -72,6 +72,20 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final implementsStr = _buildImplementsClause(metadata, isAbstract: false);
 
     final sb = StringBuffer();
+    
+    // Don't add @JsonSerializable if:
+    // 1. There are factory methods (abstract parent handles JSON)
+    // 2. Parent has explicitSubTypes (parent handles polymorphic JSON)
+    final parentHasExplicitSubtypes = metadata.interfaces.any((iface) => 
+      iface.interfaceName.startsWith(r'$$') && !iface.isSealed
+    );
+    
+    if (config.generateJson && 
+        config.factoryMethods.isEmpty && 
+        !parentHasExplicitSubtypes) {
+      sb.writeln('@JsonSerializable(explicitToJson: ${config.explicitToJson})');
+    }
+    
     sb.writeln('class $className$genericsStr$extendsStr$implementsStr {');
 
     // Determine if class extends abstract parent
@@ -109,11 +123,13 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
   String _buildGenericsString(ClassMetadata metadata) {
     if (metadata.generics.isEmpty) return '';
-    // Convert GenericParameterMetadata to NameTypeClassComment format
-    final genericsAsNameType = metadata.generics.map((g) {
-      return NameTypeClassComment(g.name, g.bound, null);
-    }).toList();
-    return '<${genericsAsNameType.map((g) => g.toString()).join(', ')}>';
+    final parts = metadata.generics.map((g) {
+      if (g.bound != null && g.bound!.isNotEmpty) {
+        return '${g.name} extends ${g.bound}';
+      }
+      return g.name;
+    }).join(', ');
+    return '<$parts>';
   }
 
   String _buildImplementsClause(ClassMetadata metadata, {required bool isAbstract}) {
@@ -127,26 +143,51 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           .join(', ');
       return clause.isNotEmpty ? ' implements $clause' : '';
     } else {
-      // Concrete class logic - simplified version
-      // This will need to be expanded to handle factory methods and sealed parents
+      // Concrete class - exclude the extended parent from implements
+      final extendedParent = _getExtendedParentName(metadata);
       final clause = interfaces
           .map((i) => _trimInterfaceName(i.interfaceName))
-          .where((name) => name.isNotEmpty)
+          .where((name) => name.isNotEmpty && name != extendedParent)
           .join(', ');
       return clause.isNotEmpty ? ' implements $clause' : '';
     }
   }
 
-  String _buildExtendsClause(ClassMetadata metadata, GenerationConfig config) {
-    // For concrete classes, determine what to extend
-    // This is complex logic from createZorphy that handles:
-    // - Factory methods
-    // - Sealed parents
-    // - Abstract parents
-    // - Multiple interfaces
+  String _getExtendedParentName(ClassMetadata metadata) {
+    // Check what we're extending
+    for (final iface in metadata.interfaces) {
+      final name = iface.interfaceName;
+      if (name.startsWith(r'$$') && !iface.isSealed) {
+        return _trimInterfaceName(name);
+      }
+      if (name.startsWith(r'$') && !name.startsWith(r'$$')) {
+        return _trimInterfaceName(name);
+      }
+    }
+    return '';
+  }
 
-    // For now, return empty string and will be filled in properly
-    // when we integrate the full logic from createZorphy
+  String _buildExtendsClause(ClassMetadata metadata, GenerationConfig config) {
+    // If there are factory methods, extend the abstract parent class
+    if (config.factoryMethods.isNotEmpty) {
+      // Find the abstract parent (the class being defined, e.g., $AssistantMessage)
+      final abstractName = metadata.originalName; // e.g., $AssistantMessage
+      return ' extends $abstractName';
+    }
+    
+    // No factory methods - check if we should extend a parent interface
+    for (final iface in metadata.interfaces) {
+      final name = iface.interfaceName;
+      if (name.startsWith(r'$$') && !iface.isSealed) {
+        // Non-sealed abstract parent - extend it
+        return ' extends ${_trimInterfaceName(name)}';
+      }
+      if (name.startsWith(r'$') && !name.startsWith(r'$$')) {
+        // Single-$ parent - extend it
+        return ' extends ${_trimInterfaceName(name)}';
+      }
+    }
+    
     return '';
   }
 
@@ -157,9 +198,8 @@ class ClassDeclarationGenerator extends UniversalGenerator {
   }
 
   bool _determineExtendsAbstractClass(ClassMetadata metadata, String extendsStr) {
-    // Check if we're extending an abstract parent
-    // This logic will be expanded when integrating with createZorphy
-    return false;
+    // If we have factory methods, we're extending the abstract parent
+    return extendsStr.contains(r'$');
   }
 
   Set<String> _getParentFields(

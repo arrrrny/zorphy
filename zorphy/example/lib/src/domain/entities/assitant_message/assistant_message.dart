@@ -5,7 +5,6 @@ import '../chat_message/chat_message.dart';
 import '../enums/index.dart';
 
 part 'assistant_message.zorphy.dart';
-part 'assistant_message.g.dart';
 
 @Zorphy(generateJson: true)
 abstract class $AssistantMessage implements $$ChatMessage {
