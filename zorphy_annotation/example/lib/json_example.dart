@@ -1,6 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'json_example.zorphy.dart';
+part 'json_example.g.dart';
 
 /// Example demonstrating JSON serialization capabilities.
 ///

@@ -7,6 +7,7 @@ const zorphy = Zorphy(
   explicitToJson: true,
   generateCompareTo: true,
   generateCopyWithFn: false,
+  generatePatch: true,
 );
 
 /// ### Zorphy2 will be created before Zorphy, sometimes the generator needs a related class to be built before another.
@@ -18,6 +19,7 @@ const zorphy2 = Zorphy2(
   explicitToJson: true,
   generateCompareTo: true,
   generateCopyWithFn: false,
+  generatePatch: true,
 );
 
 class Zorphy implements ZorphyX {
@@ -34,6 +36,9 @@ class Zorphy implements ZorphyX {
 
   ///if we want to generate function-based copyWith methods (copyWithFn)
   final bool generateCopyWithFn;
+
+  ///if we want to generate patch methods and patch classes
+  final bool generatePatch;
 
   /// {@template ZorphyX}
   /// ### normal class; prepend class with a single dollar & make abstract
@@ -117,6 +122,7 @@ class Zorphy implements ZorphyX {
     this.generateCompareTo = true,
     this.nonSealed = false,
     this.generateCopyWithFn = false,
+    this.generatePatch = true,
   });
 }
 
@@ -128,6 +134,7 @@ class Zorphy2 implements ZorphyX {
   final bool nonSealed;
   final bool generateCompareTo;
   final bool generateCopyWithFn;
+  final bool generatePatch;
 
   const Zorphy2({
     this.explicitSubTypes = null,
@@ -137,6 +144,7 @@ class Zorphy2 implements ZorphyX {
     this.nonSealed = false,
     this.generateCompareTo = true,
     this.generateCopyWithFn = false,
+    this.generatePatch = true,
   });
 }
 

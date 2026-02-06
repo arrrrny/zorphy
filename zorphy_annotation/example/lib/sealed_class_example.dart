@@ -83,7 +83,7 @@ void main() {
   );
 
   // Polymorphic usage
-  final paymentMethods = <$$PaymentMethod>[creditCard, payPal, bankTransfer];
+  final paymentMethods = <PaymentMethod>[creditCard, payPal, bankTransfer];
 
   print('Processing payments:');
   for (final method in paymentMethods) {
