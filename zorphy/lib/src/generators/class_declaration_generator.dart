@@ -1,6 +1,8 @@
+import '../analysis/field_resolver.dart';
 import '../helpers.dart' as helpers;
 
 import '../models/class_metadata.dart';
+import '../models/interface_metadata.dart';
 import '../models/generation_config.dart';
 import 'base_generator.dart';
 
@@ -116,7 +118,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
     // Get parent fields that need to be passed to super constructor
     final parentFields = hasConcreteParent
-        ? _getParentFieldsForSuper(metadata, metadata.ownFieldNames)
+        ? _getParentFieldsForSuper(metadata, config)
         : <String>{};
 
     // All fields from parent interfaces (for @override detection)
@@ -260,18 +262,29 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
   Set<String> _getParentFieldsForSuper(
     ClassMetadata metadata,
-    Set<String> ownFieldNames,
+    GenerationConfig config,
   ) {
-    // Get parent fields that need to be passed to super constructor
-    // These are fields in allFields that are NOT own fields
-    final parentFields = <String>{};
+    final parentName = _getExtendedParentName(metadata, config);
+    if (parentName.isEmpty) return <String>{};
 
-    for (final field in metadata.allFields) {
-      if (!ownFieldNames.contains(field.name)) {
-        parentFields.add(field.name);
+    // Find the interface that matches the extended parent
+    // Note: interfaceName in metadata.interfaces keeps the $ prefix
+    InterfaceMetadata? parentIface;
+    for (final iface in metadata.interfaces) {
+      if (iface.interfaceName == parentName) {
+        parentIface = iface;
+        break;
       }
     }
 
-    return parentFields;
+    if (parentIface == null) return <String>{};
+
+    // Use FieldResolver to get all fields that belong to the parent class (and its parents)
+    final resolvedParentFields = FieldResolver.resolve(
+      parentIface.element,
+      metadata.allAnnotatedClasses,
+    );
+
+    return resolvedParentFields.map((f) => f.name).toSet();
   }
 }

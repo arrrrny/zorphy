@@ -2,10 +2,8 @@
 /// Generated at: 2026-02-06T20:58:38.399544
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
-import '../circle/circle.dart';
-import '../rectangle/rectangle.dart';
-
 part 'shape.zorphy.dart';
+part 'shape.g.dart';
 
 /// Shape entity
 @Zorphy(
@@ -17,3 +15,9 @@ part 'shape.zorphy.dart';
 abstract class $$Shape {
   String get color;
 }
+
+@Zorphy(generateJson: true, generateCompareTo: true)
+abstract class $Circle implements $$Shape {}
+
+@Zorphy(generateJson: true, generateCompareTo: true)
+abstract class $Rectangle implements $$Shape {}
