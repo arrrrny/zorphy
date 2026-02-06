@@ -4,6 +4,7 @@ import 'chat_message.dart';
 import 'user_message.dart';
 
 part 'chat.zorphy.dart';
+part 'chat.g.dart';
 
 @Zorphy(generateJson: true)
 abstract class $Chat {

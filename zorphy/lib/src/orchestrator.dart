@@ -93,44 +93,59 @@ class Orchestrator {
     ClassMetadata metadata,
     List<String> codeBlocks,
   ) {
-    final sb = StringBuffer();
+    if (codeBlocks.isEmpty) return '';
 
-    // Find class declaration block (first one with "class " in it)
-    final classDeclaration = codeBlocks.firstWhere(
-      (block) => block.trim().startsWith('class ') ||
-                 block.trim().startsWith('sealed class ') ||
-                 block.trim().startsWith('abstract class '),
-      orElse: () => '',
+    final className = metadata.cleanName;
+    final abstractName = metadata.abstractClassName;
+
+    // Find the main class declaration block
+    // It's the one that declares either the clean name (concrete) or abstract name
+    final mainClassBlock = codeBlocks.firstWhere(
+      (block) {
+        final lines = block.split('\n');
+        return lines.any((line) {
+          final trimmed = line.trim();
+          return trimmed.startsWith('class $className') ||
+                 trimmed.startsWith('sealed class $className') ||
+                 trimmed.startsWith('abstract class $className') ||
+                 trimmed.startsWith('class $abstractName') ||
+                 trimmed.startsWith('sealed class $abstractName') ||
+                 trimmed.startsWith('abstract class $abstractName');
+        });
+      },
+      orElse: () => codeBlocks[0],
     );
 
-    // Add class declaration (includes opening { and properties)
-    if (classDeclaration.isNotEmpty) {
-      sb.writeln(classDeclaration);
-    }
+    final sb = StringBuffer();
 
-    // Add other class members (copyWith, factory methods, etc.)
+    // 1. Write the main class block (includes opening { and properties)
+    sb.writeln(mainClassBlock);
+
+    // 2. Add other class members (copyWith, factory methods, etc.)
     // These need to be inside the class but before the closing }
     for (final block in codeBlocks) {
-      if (block == classDeclaration) continue;
+      if (block == mainClassBlock) continue;
+      
       final trimmed = block.trim();
+      // Skip top-level items (enums, other classes, extensions)
       if (trimmed.startsWith('enum ') ||
           trimmed.startsWith('class ') ||
           trimmed.startsWith('extension ')) {
-        // Skip - these are added after the class closes
         continue;
       }
       sb.writeln(block);
     }
 
-    // Close the class
+    // 3. Close the main class
     sb.writeln('}');
 
-    // Add external items (enums, patch classes, extensions) after class closes
+    // 4. Add top-level items (enums, patch classes, extensions) after class closes
     for (final block in codeBlocks) {
-      if (block == classDeclaration) continue; // Skip the main class declaration
+      if (block == mainClassBlock) continue;
+      
       final trimmed = block.trim();
       if (trimmed.startsWith('enum ') ||
-          (trimmed.startsWith('class ') && trimmed.contains('Patch')) ||
+          trimmed.startsWith('class ') ||
           trimmed.startsWith('extension ')) {
         sb.writeln(block);
       }

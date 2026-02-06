@@ -3,7 +3,6 @@ import 'package:build/build.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:zorphy/src/analysis/analysis.dart';
 import 'package:zorphy/src/common/GeneratorForAnnotationX.dart';
-import 'package:zorphy/src/factory_method.dart';
 import 'package:zorphy/src/models/models.dart';
 import 'package:zorphy/src/orchestrator.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
