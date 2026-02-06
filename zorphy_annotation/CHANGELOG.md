@@ -1,5 +1,11 @@
 ## [1.2.1] - 2026-02-05
 
+### Changed
+- Updated to new Zorhpy Api
+- 
+
+## [1.2.1] - 2026-02-05
+
 ### Chore
 - Updated test dependency
 
