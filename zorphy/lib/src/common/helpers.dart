@@ -161,34 +161,64 @@ List<NameTypeClassComment> getAllFields(
 ) {
   var currentClassName = element.name?.replaceAll('\$', '');
 
+  // Helper to get all accessible members (fields and getters) from an element
+  List<NameTypeClassComment> getMembers(
+    InterfaceElement interfaceElem,
+    String sourceClassName,
+  ) {
+    var members = <NameTypeClassComment>[];
+
+    // Add regular fields
+    for (var field in interfaceElem.fields) {
+      if (field.name != "hashCode" && field.name != "runtimeType") {
+        members.add(
+          NameTypeClassComment(
+            field.name ?? "",
+            typeToString(field.type, currentClassName: currentClassName),
+            sourceClassName,
+            comment: field.getter?.documentationComment,
+            jsonKeyInfo: extractJsonKeyInfo(field),
+            isEnum: field.type.element is EnumElement,
+          ),
+        );
+      }
+    }
+
+    // Add getters from accessors (only for ClassElement)
+    if (interfaceElem is ClassElement) {
+      for (var accessor in interfaceElem.accessors) {
+        if (accessor.isGetter &&
+            accessor.name != "hashCode" &&
+            accessor.name != "runtimeType") {
+          // Skip if this is already a field (fields have their own getter)
+          if (!interfaceElem.fields.any((f) => f.name == accessor.name)) {
+            members.add(
+              NameTypeClassComment(
+                accessor.name,
+                typeToString(
+                  accessor.returnType,
+                  currentClassName: currentClassName,
+                ),
+                sourceClassName,
+                comment: accessor.documentationComment,
+                jsonKeyInfo: null, // Getters don't have JsonKey annotations
+                isEnum: accessor.returnType.element is EnumElement,
+              ),
+            );
+          }
+        }
+      }
+    }
+
+    return members;
+  }
+
   var superTypeFields = interfaceTypes
       .where((x) => x.element.name != "Object")
-      .flatMap(
-        (st) => st.element.fields.map(
-          (f) => NameTypeClassComment(
-            f.name ?? "",
-            typeToString(f.type, currentClassName: currentClassName),
-            st.element.name ?? "",
-            comment: f.getter?.documentationComment,
-            jsonKeyInfo: extractJsonKeyInfo(f),
-            isEnum: f.type.element is EnumElement,
-          ),
-        ),
-      )
+      .flatMap((st) => getMembers(st.element, st.element.name ?? ""))
       .toList();
 
-  var classFields = element.fields
-      .map(
-        (f) => NameTypeClassComment(
-          f.name ?? "",
-          typeToString(f.type, currentClassName: currentClassName),
-          element.name ?? "",
-          comment: f.getter?.documentationComment,
-          jsonKeyInfo: extractJsonKeyInfo(f),
-          isEnum: f.type.element is EnumElement,
-        ),
-      )
-      .toList();
+  var classFields = getMembers(element, element.name ?? "");
 
   return (classFields + superTypeFields).distinctBy((x) => x.name).toList();
 }

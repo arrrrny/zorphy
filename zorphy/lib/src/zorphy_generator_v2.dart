@@ -11,7 +11,7 @@ class ZorphyGeneratorV2 extends GeneratorForAnnotationX<Zorphy> {
   static final Map<String, ClassElement> _allAnnotatedClasses = {};
   static Map<String, ClassElement> get allAnnotatedClasses =>
       _allAnnotatedClasses;
-  
+
   static Set<String>? _classesInExplicitSubtypes;
 
   @override
@@ -65,11 +65,13 @@ class ZorphyGeneratorV2 extends GeneratorForAnnotationX<Zorphy> {
     final zorphyChecker = const TypeChecker.fromUrl(
       'package:zorphy_annotation/src/annotations.dart#Zorphy',
     );
-    
+
     for (final cls in _allAnnotatedClasses.values) {
       final clsAnnotation = zorphyChecker.firstAnnotationOf(cls);
       if (clsAnnotation != null) {
-        final explicitSubtypesField = clsAnnotation.getField('explicitSubTypes');
+        final explicitSubtypesField = clsAnnotation.getField(
+          'explicitSubTypes',
+        );
         if (explicitSubtypesField != null && !explicitSubtypesField.isNull) {
           final subtypes = explicitSubtypesField.toListValue();
           if (subtypes != null) {

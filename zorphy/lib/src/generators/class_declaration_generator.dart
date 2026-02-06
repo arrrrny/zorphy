@@ -73,9 +73,14 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
     final sb = StringBuffer();
 
-    // Don't add @JsonSerializable if:
-    // 1. There are factory methods (abstract parent handles JSON)
-    if (config.generateJson && config.factoryMethods.isEmpty) {
+    // Add @JsonSerializable to concrete classes that need JSON serialization
+    // Skip only for abstract classes (starts with $$) that have factory methods
+    // because those abstract classes handle instantiation via factories
+    final hasFactoryMethods = config.factoryMethods.isNotEmpty;
+    final isAbstractClass = metadata.originalName.startsWith(r'$$');
+    final shouldSkipJsonAnnotation = hasFactoryMethods && isAbstractClass;
+
+    if (config.generateJson && !shouldSkipJsonAnnotation) {
       sb.writeln('@JsonSerializable(explicitToJson: ${config.explicitToJson})');
     }
 

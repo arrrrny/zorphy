@@ -16,7 +16,7 @@ List<NameTypeClassComment> getDistinctFields(
       if (allFieldsDistinct.any((x) => x.name == f.name)) {
         continue;
       }
-      
+
       var field = allFields.firstOrNullWhere((x) => x.name == f.name);
       if (field != null) {
         allFieldsDistinct.add(field);
