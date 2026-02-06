@@ -33,7 +33,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final abstractModifier = metadata.nonSealed ? 'abstract ' : '';
 
     // Build implements clause
-    final implementsStr = _buildImplementsClause(metadata, isAbstract: true);
+    final implementsStr = _buildImplementsClause(metadata, config, isAbstract: true);
 
     final genericsStr = _buildGenericsString(metadata);
 
@@ -69,7 +69,8 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
     // Determine extends and implements
     final extendsStr = _buildExtendsClause(metadata, config);
-    final implementsStr = _buildImplementsClause(metadata, isAbstract: false);
+    final implementsStr =
+        _buildImplementsClause(metadata, config, isAbstract: false);
 
     final sb = StringBuffer();
 
@@ -90,7 +91,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final hasExtendsParam = extendsStr.isNotEmpty;
     final extendsAbstractClass = _determineExtendsAbstractClass(
       metadata,
-      extendsStr,
+      config,
     );
 
     // Determine if we're extending a concrete parent
@@ -146,7 +147,8 @@ class ClassDeclarationGenerator extends UniversalGenerator {
   }
 
   String _buildImplementsClause(
-    ClassMetadata metadata, {
+    ClassMetadata metadata,
+    GenerationConfig config, {
     required bool isAbstract,
   }) {
     final interfaces = metadata.interfaces;
@@ -160,51 +162,56 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       return clause.isNotEmpty ? ' implements $clause' : '';
     } else {
       // Concrete class - exclude the extended parent from implements
-      final extendedParent = _getExtendedParentName(metadata);
-      final clause = interfaces
+      final extendedParent = _getExtendedParentName(metadata, config);
+      final clauseParts = interfaces
           .map((i) => _trimInterfaceName(i.interfaceName))
-          .where((name) => name.isNotEmpty && name != extendedParent)
-          .join(', ');
+          .where(
+            (name) => name.isNotEmpty && name != _trimInterfaceName(extendedParent),
+          )
+          .toList();
+
+      // If we have factory methods and we didn't extend the annotated class, we should implement it
+      if (config.factoryMethods.isNotEmpty &&
+          metadata.originalName != extendedParent) {
+        clauseParts.add(metadata.originalName);
+      }
+
+      final clause = clauseParts.join(', ');
       return clause.isNotEmpty ? ' implements $clause' : '';
     }
   }
 
-  String _getExtendedParentName(ClassMetadata metadata) {
-    // Check what we're extending
+  String _getExtendedParentName(
+    ClassMetadata metadata,
+    GenerationConfig config,
+  ) {
+    // 1. Try to find a base class from interfaces (prioritize hierarchy)
     for (final iface in metadata.interfaces) {
       final name = iface.interfaceName;
       if (name.startsWith(r'$$') && !iface.isSealed) {
-        return _trimInterfaceName(name);
+        return name;
       }
       if (name.startsWith(r'$') && !name.startsWith(r'$$')) {
-        return _trimInterfaceName(name);
+        return name;
       }
     }
+
+    // 2. If no parent interface to extend, check factory methods
+    if (config.factoryMethods.isNotEmpty) {
+      return metadata.originalName;
+    }
+
     return '';
   }
 
   String _buildExtendsClause(ClassMetadata metadata, GenerationConfig config) {
-    // If there are factory methods, extend the abstract parent class
-    if (config.factoryMethods.isNotEmpty) {
-      // Find the abstract parent (the class being defined, e.g., $AssistantMessage)
-      final abstractName = metadata.originalName; // e.g., $AssistantMessage
-      return ' extends $abstractName';
-    }
+    final parent = _getExtendedParentName(metadata, config);
+    if (parent.isEmpty) return '';
 
-    // No factory methods - check if we should extend a parent interface
-    for (final iface in metadata.interfaces) {
-      final name = iface.interfaceName;
-      if (name.startsWith(r'$$') && !iface.isSealed) {
-        // Non-sealed abstract parent - extend it
-        return ' extends ${_trimInterfaceName(name)}';
-      }
-      if (name.startsWith(r'$') && !name.startsWith(r'$$')) {
-        // Single-$ parent - extend it (could be abstract or concrete)
-        return ' extends ${_trimInterfaceName(name)}';
-      }
+    if (parent == metadata.originalName) {
+      return ' extends $parent';
     }
-
-    return '';
+    return ' extends ${_trimInterfaceName(parent)}';
   }
 
   /// Check if the class extends a concrete parent (not just an abstract interface)
@@ -240,10 +247,19 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
   bool _determineExtendsAbstractClass(
     ClassMetadata metadata,
-    String extendsStr,
+    GenerationConfig config,
   ) {
-    // If we have factory methods, we're extending the abstract parent
-    return extendsStr.contains(r'$');
+    final parent = _getExtendedParentName(metadata, config);
+    if (parent.isEmpty) return false;
+
+    // $$ classes are always abstract base classes
+    if (parent.startsWith(r'$$')) return true;
+
+    // The annotated class itself ($Current) is always abstract in source
+    if (parent == metadata.originalName) return true;
+
+    // Single $ parents are concrete generated classes
+    return false;
   }
 
   Set<String> _getParentFieldsForSuper(
