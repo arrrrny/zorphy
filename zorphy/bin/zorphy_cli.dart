@@ -128,11 +128,13 @@ ArgParser _createCommandParser() {
     ..addMultiOption(
       'field',
       help: r'Add fields in format: "name:type" or "name:type?" for nullable',
+      splitCommas: false,
     )
     ..addOption('extends', help: r'Interface to extend (e.g., "\$BaseEntity")')
     ..addMultiOption(
       'subtypes',
       help: r'Explicit subtypes for polymorphism (e.g., "\$Dog,\$Cat")',
+      splitCommas: false,
     )
     ..addFlag(
       'dry-run',
@@ -213,6 +215,7 @@ ArgParser _addFieldCommandParser() {
     ..addMultiOption(
       'field',
       help: r'Fields to add in format: "name:type" or "name:type?"',
+      splitCommas: false,
     )
     ..addFlag(
       'dry-run',
@@ -280,9 +283,9 @@ CREATE COMMAND:
     --sealed                Create sealed class (default: false)
     --non-sealed            Create non-sealed class (default: false)
     -f, --fields            Interactive field prompts (default: true)
-    --field                 Add fields directly ("name:type" or "name:type?")
-    --extends               Interface to extend
-    --subtypes              Explicit subtypes
+    --field                 Add one or more fields ("name:type" or "id:int,name:String")
+    --extends               Interface to extend (e.g., BaseEntity)
+    --subtypes              Explicit subtypes (e.g., Dog,Cat)
 
 ENUM COMMAND:
   zorphy_cli enum [options]
@@ -321,14 +324,14 @@ ADD-FIELD COMMAND:
   Options:
     -n, --name              Entity name (required)
     -o, --output            Output base directory (default: lib/src/domain/entities)
-    --field                 Fields to add ("name:type" or "name:type?")
+    --field                 Add one or more fields ("name:type" or "name:type?")
 
 EXAMPLES:
   # Interactive entity creation
   zorphy_cli create -n User
 
-  # Create with fields
-  zorphy_cli create -n User --field name:String --field age:int --field email:String?
+  # Create with multiple fields (comma-separated or multiple flags)
+  zorphy_cli create -n User --field "name:String,age:int" --field email:String?
 
   # Create enum
   zorphy_cli enum -n Status --value active,inactive,pending
@@ -353,8 +356,13 @@ FIELD TYPES:
   Nullable types: Add ? after type (e.g., String?, int?)
   Generic types: List<Type>, Set<Type>, Map<KeyType, ValueType>
   Custom types: Any other class name
-  Zorphy Objects: TypeName (e.g., User, Address). The CLI now automatically detects entities.
+  Zorphy Objects: TypeName (e.g., User, Address). Automatically detected and prefixed.
   Enums: TypeName (will be imported from enums/index.dart)
+
+BULK OPERATION:
+  Multiple fields can be added in a single --field flag using commas:
+  --field "id:String,name:String,data:Map<String, dynamic>"
+  (Commata inside Map or List generics are safely handled)
 
 DIRECTORY STRUCTURE:
   Entities:     lib/src/domain/entities/entity_name/entity_name.dart
@@ -399,20 +407,23 @@ Future<void> _handleCreate(ArgResults args) async {
   final fields = <_FieldInfo>[];
 
   if (providedFields != null && providedFields.isNotEmpty) {
-    for (var fieldDef in providedFields) {
-      final parts = fieldDef.split(':');
-      if (parts.length != 2) {
-        print(
-          'Warning: Invalid field format "$fieldDef". Expected "name:type"',
+    for (var fieldDefGroup in providedFields) {
+      final fieldDefs = _smartSplit(fieldDefGroup);
+      for (var fieldDef in fieldDefs) {
+        final parts = fieldDef.split(':');
+        if (parts.length != 2) {
+          print(
+            'Warning: Invalid field format "$fieldDef". Expected "name:type"',
+          );
+          continue;
+        }
+        final fieldName = parts[0].trim();
+        final fieldType = _normalizeFieldType(
+          parts[1].trim(),
+          baseOutputDir: baseOutputDir,
         );
-        continue;
+        fields.add(_FieldInfo(name: fieldName, type: fieldType));
       }
-      final fieldName = parts[0].trim();
-      final fieldType = _normalizeFieldType(
-        parts[1].trim(),
-        baseOutputDir: baseOutputDir,
-      );
-      fields.add(_FieldInfo(name: fieldName, type: fieldType));
     }
   }
 
@@ -1187,18 +1198,21 @@ Future<void> _handleAddField(ArgResults args) async {
 
   // Parse fields
   final fields = <_FieldInfo>[];
-  for (var fieldDef in providedFields) {
-    final parts = fieldDef.split(':');
-    if (parts.length != 2) {
-      print('Warning: Invalid field format "$fieldDef". Expected "name:type"');
-      continue;
+  for (var fieldDefGroup in providedFields) {
+    final fieldDefs = _smartSplit(fieldDefGroup);
+    for (var fieldDef in fieldDefs) {
+      final parts = fieldDef.split(':');
+      if (parts.length != 2) {
+        print('Warning: Invalid field format "$fieldDef". Expected "name:type"');
+        continue;
+      }
+      final fieldName = parts[0].trim();
+      final fieldType = _normalizeFieldType(
+        parts[1].trim(),
+        baseOutputDir: baseOutputDir,
+      );
+      fields.add(_FieldInfo(name: fieldName, type: fieldType));
     }
-    final fieldName = parts[0].trim();
-    final fieldType = _normalizeFieldType(
-      parts[1].trim(),
-      baseOutputDir: baseOutputDir,
-    );
-    fields.add(_FieldInfo(name: fieldName, type: fieldType));
   }
 
   if (fields.isEmpty) {
@@ -1624,12 +1638,23 @@ String _normalizeGenerics(String generics, {required String baseOutputDir}) {
   final inner = generics.substring(1, generics.length - 1);
 
   // Split by comma, but respect nested generics
+  final parts = _smartSplit(inner);
+
+  // Normalize each part
+  final normalized = parts
+      .map((part) => _normalizeFieldType(part, baseOutputDir: baseOutputDir))
+      .join(', ');
+  return '<$normalized>';
+}
+
+/// Split a string by comma, but respect nested balanced brackets < and >
+List<String> _smartSplit(String input) {
   final parts = <String>[];
   var depth = 0;
   var current = StringBuffer();
 
-  for (var i = 0; i < inner.length; i++) {
-    final char = inner[i];
+  for (var i = 0; i < input.length; i++) {
+    final char = input[i];
     if (char == '<') {
       depth++;
       current.write(char);
@@ -1637,21 +1662,22 @@ String _normalizeGenerics(String generics, {required String baseOutputDir}) {
       depth--;
       current.write(char);
     } else if (char == ',' && depth == 0) {
-      parts.add(current.toString().trim());
+      final part = current.toString().trim();
+      if (part.isNotEmpty) {
+        parts.add(part);
+      }
       current = StringBuffer();
     } else {
       current.write(char);
     }
   }
   if (current.isNotEmpty) {
-    parts.add(current.toString().trim());
+    final part = current.toString().trim();
+    if (part.isNotEmpty) {
+      parts.add(part);
+    }
   }
-
-  // Normalize each part
-  final normalized = parts
-      .map((part) => _normalizeFieldType(part, baseOutputDir: baseOutputDir))
-      .join(', ');
-  return '<$normalized>';
+  return parts;
 }
 
 /// Format class name (PascalCase)
