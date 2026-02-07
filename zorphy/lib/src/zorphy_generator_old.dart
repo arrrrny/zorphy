@@ -11,7 +11,7 @@ import 'package:zorphy/src/createZorphy.dart';
 import 'package:zorphy/src/factory_method.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
+class ZorphyGeneratorOld extends GeneratorForAnnotationX<Zorphy> {
   static final Map<String, ClassElement> _allAnnotatedClasses = {};
   static Map<String, ClassElement> get allAnnotatedClasses =>
       _allAnnotatedClasses;

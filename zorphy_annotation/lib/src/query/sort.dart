@@ -8,14 +8,14 @@ class Sort<TEntity> {
   final bool descending;
 
   const Sort(this.field, {this.descending = false});
-  
+
   const Sort.asc(this.field) : descending = false;
   const Sort.desc(this.field) : descending = true;
 
   Map<String, dynamic> toJson() => {
-    'field': field.name,
-    'descending': descending,
-  };
+        'field': field.name,
+        'descending': descending,
+      };
 }
 
 /// Extension methods for sorting on fields

@@ -15,7 +15,7 @@ class Eq<TEntity, TValue> extends Filter<TEntity> {
   const Eq(this.field, this.value);
 
   @override
-  Map<String, dynamic> toJson() => { field.name: value };
+  Map<String, dynamic> toJson() => {field.name: value};
 }
 
 /// Not equal filter (e.g., field != value)
@@ -25,7 +25,9 @@ class Neq<TEntity, TValue> extends Filter<TEntity> {
   const Neq(this.field, this.value);
 
   @override
-  Map<String, dynamic> toJson() => { field.name: {'neq': value} };
+  Map<String, dynamic> toJson() => {
+        field.name: {'neq': value}
+      };
 }
 
 /// Greater than filter
@@ -35,7 +37,9 @@ class Gt<TEntity, TValue> extends Filter<TEntity> {
   const Gt(this.field, this.value);
 
   @override
-  Map<String, dynamic> toJson() => { field.name: {'gt': value} };
+  Map<String, dynamic> toJson() => {
+        field.name: {'gt': value}
+      };
 }
 
 /// Greater than or equal filter
@@ -45,7 +49,9 @@ class Gte<TEntity, TValue> extends Filter<TEntity> {
   const Gte(this.field, this.value);
 
   @override
-  Map<String, dynamic> toJson() => { field.name: {'gte': value} };
+  Map<String, dynamic> toJson() => {
+        field.name: {'gte': value}
+      };
 }
 
 /// Less than filter
@@ -55,7 +61,9 @@ class Lt<TEntity, TValue> extends Filter<TEntity> {
   const Lt(this.field, this.value);
 
   @override
-  Map<String, dynamic> toJson() => { field.name: {'lt': value} };
+  Map<String, dynamic> toJson() => {
+        field.name: {'lt': value}
+      };
 }
 
 /// Less than or equal filter
@@ -65,7 +73,9 @@ class Lte<TEntity, TValue> extends Filter<TEntity> {
   const Lte(this.field, this.value);
 
   @override
-  Map<String, dynamic> toJson() => { field.name: {'lte': value} };
+  Map<String, dynamic> toJson() => {
+        field.name: {'lte': value}
+      };
 }
 
 /// Contains filter (e.g., for strings or lists)
@@ -75,7 +85,9 @@ class Contains<TEntity, TValue> extends Filter<TEntity> {
   const Contains(this.field, this.value);
 
   @override
-  Map<String, dynamic> toJson() => { field.name: {'contains': value} };
+  Map<String, dynamic> toJson() => {
+        field.name: {'contains': value}
+      };
 }
 
 /// In list filter
@@ -85,7 +97,9 @@ class InList<TEntity, TValue> extends Filter<TEntity> {
   const InList(this.field, this.value);
 
   @override
-  Map<String, dynamic> toJson() => { field.name: {'in': value} };
+  Map<String, dynamic> toJson() => {
+        field.name: {'in': value}
+      };
 }
 
 /// Logical AND combining multiple filters
@@ -95,8 +109,8 @@ class And<TEntity> extends Filter<TEntity> {
 
   @override
   Map<String, dynamic> toJson() => {
-    'and': filters.map((f) => f.toJson()).toList(),
-  };
+        'and': filters.map((f) => f.toJson()).toList(),
+      };
 }
 
 /// Logical OR combining multiple filters
@@ -106,8 +120,8 @@ class Or<TEntity> extends Filter<TEntity> {
 
   @override
   Map<String, dynamic> toJson() => {
-    'or': filters.map((f) => f.toJson()).toList(),
-  };
+        'or': filters.map((f) => f.toJson()).toList(),
+      };
 }
 
 /// Extension methods for easier filter creation
@@ -122,9 +136,9 @@ extension FieldOps<TEntity, TValue> on Field<TEntity, TValue> {
 }
 
 extension StringFieldOps<TEntity> on Field<TEntity, String> {
-   Contains<TEntity, String> contains(String value) => Contains(this, value);
+  Contains<TEntity, String> contains(String value) => Contains(this, value);
 }
 
 extension NullableStringFieldOps<TEntity> on Field<TEntity, String?> {
-   Contains<TEntity, String?> contains(String value) => Contains(this, value);
+  Contains<TEntity, String?> contains(String value) => Contains(this, value);
 }

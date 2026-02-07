@@ -1203,7 +1203,9 @@ Future<void> _handleAddField(ArgResults args) async {
     for (var fieldDef in fieldDefs) {
       final parts = fieldDef.split(':');
       if (parts.length != 2) {
-        print('Warning: Invalid field format "$fieldDef". Expected "name:type"');
+        print(
+          'Warning: Invalid field format "$fieldDef". Expected "name:type"',
+        );
         continue;
       }
       final fieldName = parts[0].trim();

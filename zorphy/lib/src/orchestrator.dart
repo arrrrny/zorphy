@@ -123,10 +123,11 @@ class Orchestrator {
       final trimmed = block.trim();
       // Skip top-level items (enums, other classes, extensions)
       // Check for class declarations more carefully - they can have modifiers
-      final isTopLevelClass = trimmed.startsWith('enum ') ||
+      final isTopLevelClass =
+          trimmed.startsWith('enum ') ||
           trimmed.startsWith('extension ') ||
           _isClassDeclaration(trimmed);
-      
+
       if (isTopLevelClass) {
         continue;
       }
@@ -141,10 +142,11 @@ class Orchestrator {
       if (block == mainClassBlock) continue;
 
       final trimmed = block.trim();
-      final isTopLevelClass = trimmed.startsWith('enum ') ||
+      final isTopLevelClass =
+          trimmed.startsWith('enum ') ||
           trimmed.startsWith('extension ') ||
           _isClassDeclaration(trimmed);
-      
+
       if (isTopLevelClass) {
         sb.writeln(block);
       }

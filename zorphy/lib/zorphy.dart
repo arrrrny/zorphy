@@ -5,5 +5,5 @@
 /// toString, and more.
 library zorphy;
 
-export 'src/ZorphyGenerator.dart';
+export 'src/zorphy_generator.dart';
 export 'package:zorphy_annotation/zorphy_annotation.dart';

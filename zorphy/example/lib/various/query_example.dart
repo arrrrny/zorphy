@@ -15,7 +15,7 @@ abstract class $Product {
 
 void main() {
   // ===== Filter Examples =====
-  
+
   // Simple equality filter
   final filter1 = ProductFields.name.eq('Laptop');
   print('Filter 1: ${filter1.toJson()}');
@@ -49,7 +49,7 @@ void main() {
   // Output: {or: [{price: {lt: 100.0}}, {price: {gt: 10000.0}}]}
 
   // ===== Sort Examples =====
-  
+
   // Ascending sort
   final sort1 = ProductFields.price.asc();
   print('Sort 1: ${sort1.toJson()}');
@@ -66,7 +66,7 @@ void main() {
   // Output: {field: name, descending: false}
 
   // ===== Combined Example: Build a query =====
-  
+
   final complexFilter = And([
     ProductFields.isAvailable.eq(true),
     Or([
@@ -77,13 +77,13 @@ void main() {
       ]),
     ]),
   ]);
-  
+
   final sortByPrice = ProductFields.price.desc();
-  
+
   print('\n=== Complex Query ===');
   print('Filter: ${complexFilter.toJson()}');
   print('Sort: ${sortByPrice.toJson()}');
-  
+
   // This is where a framework would build the actual query:
   // final queryParams = {
   //   'filter': complexFilter.toJson(),

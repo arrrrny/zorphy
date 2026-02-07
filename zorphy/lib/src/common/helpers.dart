@@ -507,7 +507,9 @@ String typeToString(DartType type, {String? currentClassName}) {
       var displayName = type.element?.displayName;
 
       // Fallback to display string if element name is missing (common for InvalidType)
-      if (displayName == null || displayName == 'dynamic' || displayName == 'InvalidType') {
+      if (displayName == null ||
+          displayName == 'dynamic' ||
+          displayName == 'InvalidType') {
         final ds = type.getDisplayString();
         // If it's a parameterized type like List<Attachment>, getDisplayString might return the whole thing
         // We just want the base name if possible.
@@ -518,8 +520,7 @@ String typeToString(DartType type, {String? currentClassName}) {
         }
       }
 
-      if (displayName != 'dynamic' &&
-          displayName != 'InvalidType') {
+      if (displayName != 'dynamic' && displayName != 'InvalidType') {
         // Check if this is an enum - enums don't need $ prefix
         final isEnum = type.element is EnumElement;
         if (isEnum) {
