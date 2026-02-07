@@ -10,7 +10,7 @@ import 'dart:convert';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
-const String _version = '1.3.0';
+const String _version = '1.4.0';
 
 Future<void> main(List<String> args) async {
   final parser = ArgParser()
@@ -145,6 +145,11 @@ ArgParser _createCommandParser() {
       'generate-subs',
       help: 'Automatically generate subtype entities (use with --subtypes)',
       negatable: false,
+    )
+    ..addFlag(
+      'filter',
+      help: 'Enable generation of type-safe field descriptors for filters',
+      defaultsTo: false,
     );
 }
 
@@ -193,6 +198,11 @@ ArgParser _newCommandParser() {
       'dry-run',
       help: 'Preview generated code without writing files',
       negatable: false,
+    )
+    ..addFlag(
+      'filter',
+      help: 'Enable generation of type-safe field descriptors for filters',
+      defaultsTo: false,
     );
 }
 
@@ -246,6 +256,11 @@ ArgParser _fromJsonCommandParser() {
       'dry-run',
       help: 'Preview generated code without writing files',
       negatable: false,
+    )
+    ..addFlag(
+      'filter',
+      help: 'Enable generation of type-safe field descriptors for filters',
+      defaultsTo: false,
     );
 }
 
@@ -286,6 +301,7 @@ CREATE COMMAND:
     --field                 Add one or more fields ("name:type" or "id:int,name:String")
     --extends               Interface to extend (e.g., BaseEntity)
     --subtypes              Explicit subtypes (e.g., Dog,Cat)
+    --filter                Enable type-safe filters (default: false)
 
 ENUM COMMAND:
   zorphy_cli enum [options]
@@ -300,6 +316,7 @@ NEW COMMAND:
     -n, --name              Entity name (required)
     -o, --output            Output base directory (default: lib/src/domain/entities)
     --json                  Enable JSON (default: true)
+    --filter                Enable type-safe filters (default: false)
 
 BUILD COMMAND:
   zorphy_cli build [options]
@@ -395,6 +412,7 @@ Future<void> _handleCreate(ArgResults args) async {
   final extendsInterface = args['extends'] as String?;
   final explicitSubtypes = args['subtypes'] as List<String>?;
   final generateSubs = args['generate-subs'] as bool? ?? false;
+  final generateFilter = args['filter'] as bool? ?? false;
 
   // Get package name
   // String packageName = _getPackageName();
@@ -597,6 +615,7 @@ Future<void> _handleCreate(ArgResults args) async {
   if (useCopyWithFn) annotationOptions.add('generateCopyWithFn: true');
   if (useCompare) annotationOptions.add('generateCompareTo: true');
   if (isNonSealed) annotationOptions.add('nonSealed: true');
+  if (generateFilter) annotationOptions.add('generateFilter: true');
 
   // Add explicitSubTypes if provided
   if (explicitSubtypes != null && explicitSubtypes.isNotEmpty) {
@@ -644,6 +663,7 @@ Future<void> _handleCreate(ArgResults args) async {
         subtypeAnnotationOptions.add('generateCopyWithFn: true');
       }
       if (useCompare) subtypeAnnotationOptions.add('generateCompareTo: true');
+      if (generateFilter) subtypeAnnotationOptions.add('generateFilter: true');
 
       buffer.writeln('/// $subtypeClassName entity (subtype of $className)');
       buffer.writeln('@Zorphy(${subtypeAnnotationOptions.join(', ')})');
@@ -792,6 +812,7 @@ Future<void> _handleCreate(ArgResults args) async {
       if (useCopyWithFn)
         subtypeAnnotationOptions.add('generateCopyWithFn: true');
       if (useCompare) subtypeAnnotationOptions.add('generateCompareTo: true');
+      if (generateFilter) subtypeAnnotationOptions.add('generateFilter: true');
 
       subtypeBuffer.writeln(
         '/// $subtypeClassName entity (subtype of $className)',
@@ -1099,8 +1120,14 @@ Future<void> _handleNew(ArgResults args) async {
   if (useJson) {
     buffer.writeln("part '$entityDirName.g.dart';");
   }
+  final generateFilter = args['filter'] as bool? ?? false;
+
   buffer.writeln();
-  buffer.writeln('@Zorphy(generateJson: $useJson)');
+  if (generateFilter) {
+    buffer.writeln('@Zorphy(generateJson: $useJson, generateFilter: true)');
+  } else {
+    buffer.writeln('@Zorphy(generateJson: $useJson)');
+  }
   buffer.writeln('abstract class \$$className {');
   buffer.writeln('}');
 
@@ -1369,6 +1396,7 @@ Future<void> _handleFromJson(ArgResults args) async {
   final useJson = args['json'] as bool? ?? true;
   final prefixNested = args['prefix-nested'] as bool? ?? true;
   final isDryRun = args['dry-run'] as bool? ?? false;
+  final generateFilter = args['filter'] as bool? ?? false;
 
   // Parse JSON
   final result = _parseJson(
@@ -1386,6 +1414,7 @@ Future<void> _handleFromJson(ArgResults args) async {
       baseOutputDir,
       useJson,
       isDryRun: isDryRun,
+      generateFilter: generateFilter,
     );
   }
 
@@ -1401,6 +1430,7 @@ Future<void> _createEntityFromResult(
   String baseDir,
   bool useJson, {
   bool isDryRun = false,
+  bool generateFilter = false,
 }) async {
   final snakeName = _toSnakeCase(entity.name);
   final entityDir = p.join(baseDir, snakeName);
@@ -1438,7 +1468,13 @@ Future<void> _createEntityFromResult(
     buf.writeln("part '$snakeName.g.dart';");
   }
   buf.writeln();
-  buf.writeln('@Zorphy(generateJson: $useJson, generateCompareTo: true)');
+  if (generateFilter) {
+    buf.writeln(
+      '@Zorphy(generateJson: $useJson, generateCompareTo: true, generateFilter: true)',
+    );
+  } else {
+    buf.writeln('@Zorphy(generateJson: $useJson, generateCompareTo: true)');
+  }
   buf.writeln('abstract class \$${entity.name} {');
   for (final field in entity.fields) {
     buf.writeln('  ${field.fullType} get ${field.name};');
