@@ -217,9 +217,11 @@ cd zorphy
 # Update zorphy_annotation dependency in pubspec.yaml to match version
 echo "📝 Updating zorphy_annotation dependency in zorphy/pubspec.yaml..."
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    sed -i '' "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" pubspec.yaml
+    sed -i '' '/^  zorphy_annotation:/,/path: ..\/zorphy_annotation$/c\
+  zorphy_annotation: ^'$VERSION
+' pubspec.yaml
 else
-    sed -i "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" pubspec.yaml
+    sed -i '/^  zorphy_annotation:/,/path: ..\/zorphy_annotation$/c\  zorphy_annotation: ^'$VERSION pubspec.yaml
 fi
 echo "  ✓ Dependency updated to ^$VERSION"
 
