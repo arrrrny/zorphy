@@ -23,3 +23,6 @@ library zorphy_annotation;
 // Export all annotations
 export 'zorphy.dart';
 export 'src/patch.dart';
+export 'src/query/field.dart';
+export 'src/query/filter.dart';
+export 'src/query/sort.dart';

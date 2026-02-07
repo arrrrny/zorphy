@@ -38,6 +38,9 @@ class Orchestrator {
     // Patch class (conditional, concrete only)
     PatchClassGenerator(),
 
+    // Fields class (concrete only)
+    FieldsClassGenerator(),
+
     // CompareTo extension (conditional, concrete only)
     CompareToExtensionGenerator(),
 
@@ -119,9 +122,12 @@ class Orchestrator {
 
       final trimmed = block.trim();
       // Skip top-level items (enums, other classes, extensions)
-      if (trimmed.startsWith('enum ') ||
-          trimmed.startsWith('class ') ||
-          trimmed.startsWith('extension ')) {
+      // Check for class declarations more carefully - they can have modifiers
+      final isTopLevelClass = trimmed.startsWith('enum ') ||
+          trimmed.startsWith('extension ') ||
+          _isClassDeclaration(trimmed);
+      
+      if (isTopLevelClass) {
         continue;
       }
       sb.writeln(block);
@@ -135,14 +141,24 @@ class Orchestrator {
       if (block == mainClassBlock) continue;
 
       final trimmed = block.trim();
-      if (trimmed.startsWith('enum ') ||
-          trimmed.startsWith('class ') ||
-          trimmed.startsWith('extension ')) {
+      final isTopLevelClass = trimmed.startsWith('enum ') ||
+          trimmed.startsWith('extension ') ||
+          _isClassDeclaration(trimmed);
+      
+      if (isTopLevelClass) {
         sb.writeln(block);
       }
     }
 
     return sb.toString();
+  }
+
+  /// Check if a trimmed string is a class declaration
+  /// Handles: class, abstract class, sealed class, final class, abstract final class, etc.
+  static bool _isClassDeclaration(String trimmed) {
+    // Split by whitespace and look for 'class' keyword
+    final parts = trimmed.split(RegExp(r'\s+'));
+    return parts.contains('class');
   }
 
   /// Temporary bridge to old createZorphy function

@@ -61,6 +61,7 @@ class ZorphyGeneratorV2 extends GeneratorForAnnotationX<Zorphy> {
       generateCompareTo: annotation.read('generateCompareTo').boolValue,
       generatePatch: annotation.peek('generatePatch')?.boolValue ?? true,
       hidePublicConstructor: annotation.read('hidePublicConstructor').boolValue,
+      generateFilter: annotation.read('generateFilter').boolValue,
       factoryMethods: factoryMethods,
       ownFields: ownFields,
     );

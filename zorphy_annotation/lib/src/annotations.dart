@@ -8,6 +8,7 @@ const zorphy = Zorphy(
   generateCompareTo: true,
   generateCopyWithFn: false,
   generatePatch: true,
+  generateFilter: false,
 );
 
 /// ### Zorphy2 will be created before Zorphy, sometimes the generator needs a related class to be built before another.
@@ -20,6 +21,7 @@ const zorphy2 = Zorphy2(
   generateCompareTo: true,
   generateCopyWithFn: false,
   generatePatch: true,
+  generateFilter: false,
 );
 
 class Zorphy implements ZorphyX {
@@ -39,6 +41,9 @@ class Zorphy implements ZorphyX {
 
   ///if we want to generate patch methods and patch classes
   final bool generatePatch;
+
+  /// if we want to generate filter field descriptors
+  final bool generateFilter;
 
   /// {@template ZorphyX}
   /// ### normal class; prepend class with a single dollar & make abstract
@@ -123,6 +128,7 @@ class Zorphy implements ZorphyX {
     this.nonSealed = false,
     this.generateCopyWithFn = false,
     this.generatePatch = true,
+    this.generateFilter = false,
   });
 }
 
@@ -135,6 +141,7 @@ class Zorphy2 implements ZorphyX {
   final bool generateCompareTo;
   final bool generateCopyWithFn;
   final bool generatePatch;
+  final bool generateFilter;
 
   const Zorphy2({
     this.explicitSubTypes = null,
@@ -145,6 +152,7 @@ class Zorphy2 implements ZorphyX {
     this.generateCompareTo = true,
     this.generateCopyWithFn = false,
     this.generatePatch = true,
+    this.generateFilter = false,
   });
 }
 
@@ -153,6 +161,7 @@ abstract class ZorphyX {
 
   bool get generateJson;
   bool get explicitToJson;
+  bool get generateFilter;
 }
 
 Object? Function(Never) getGenericToJsonFn(

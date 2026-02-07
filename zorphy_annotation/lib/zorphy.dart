@@ -5,3 +5,6 @@ export 'src/patch.dart';
 export 'package:quiver/core.dart' show hashObjects;
 export 'package:json_annotation/json_annotation.dart';
 export 'src/patch_base.dart';
+export 'src/query/field.dart';
+export 'src/query/filter.dart';
+export 'src/query/sort.dart';

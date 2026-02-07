@@ -6,3 +6,4 @@
 library zorphy;
 
 export 'src/ZorphyGenerator.dart';
+export 'package:zorphy_annotation/zorphy_annotation.dart';
