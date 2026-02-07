@@ -333,34 +333,17 @@ class ClassAnalyzer {
     String className,
     ClassElement classElement,
   ) {
+    final classNameTrimmed = className.replaceAll(r"$", "");
     return parameters.map((param) {
-      final paramType = param.type.getDisplayString(withNullability: false);
+      // Use the robust typeToString helper which handles nullability and InvalidType/self-references
+      var paramType = common_helpers.typeToString(
+        param.type,
+        currentClassName: classNameTrimmed,
+      );
 
-      // Handle self-referencing types
-      if (paramType.contains('InvalidType') || paramType == 'dynamic') {
-        final classNameTrimmed = className.replaceAll(r'$', '');
-
-        // Check if this is a self-reference to the current class
-        if (param.type.element?.displayName == classElement.displayName ||
-            param.type.element?.displayName == classNameTrimmed) {
-          return FactoryParameterInfo(
-            name: param.name as String,
-            type: classNameTrimmed,
-            isRequired: param.isRequiredNamed || param.isRequiredPositional,
-            isNamed: param.isNamed,
-            hasDefaultValue: param.hasDefaultValue,
-            defaultValue: param.defaultValueCode,
-          );
-        } else {
-          return FactoryParameterInfo(
-            name: param.name as String,
-            type: 'dynamic',
-            isRequired: param.isRequiredNamed || param.isRequiredPositional,
-            isNamed: param.isNamed,
-            hasDefaultValue: param.hasDefaultValue,
-            defaultValue: param.defaultValueCode,
-          );
-        }
+      // CRITICAL FIX: If type is still InvalidType, try to recover from source code directly
+      if (paramType.contains('InvalidType')) {
+        paramType = _recoverTypeFromSource(param as Element, paramType);
       }
 
       return FactoryParameterInfo(
@@ -372,6 +355,162 @@ class ClassAnalyzer {
         defaultValue: param.defaultValueCode as String?,
       );
     }).toList();
+  }
+
+  /// Attempts to recover the original type string from source code
+  /// Used when the analyzer returns InvalidType
+  static String _recoverTypeFromSource(Element element, String currentType) {
+    try {
+      final dynamic dynElem = element;
+      
+      // Try to get source from various places dynamically
+      dynamic sourceObj;
+      try { sourceObj = dynElem.source; } catch(_) {}
+      
+      if (sourceObj == null) {
+        try { sourceObj = (dynElem.library as dynamic)?.source; } catch(_) {}
+      }
+      
+      if (sourceObj == null) {
+         try { sourceObj = (dynElem.enclosingElement as dynamic)?.source; } catch(_) {}
+      }
+
+      String? source;
+      if (sourceObj != null) {
+         try { source = (sourceObj as dynamic).contents.data.toString(); } catch(_) {}
+      }
+
+      // Try various offset properties
+      int? nameOffset;
+      try { nameOffset = dynElem.nameOffset as int?; } catch(_) {}
+      
+      if (nameOffset == null) {
+         try { nameOffset = dynElem.offset as int?; } catch(_) {}
+      }
+
+      if (source == null) {
+        return currentType;
+      }
+      
+      // If nameOffset is missing, try to find the parameter in the source text by searching for method + param
+      if (nameOffset == null || nameOffset == 0) {
+        // Fallback: Text search
+        // We assume the method name is 'create' or derived from enclosing element
+        final methodName = (dynElem.enclosingElement as dynamic)?.name as String?;
+        final paramName = element.name;
+        
+        if (methodName != null && paramName != null) {
+           // Regex to find method declaration followed by parameter
+           // Pattern: methodName ... ( ... paramName
+           // This is rough but likely unique enough in entity files
+           final pattern = RegExp(
+              // Match method name, then opening paren, then anything non-greedy, then paramName
+              // We capture the text BEFORE paramName to find the type
+              '\\b$methodName\\b\\s*\\([\\s\\S]*?([\\w<>,? ]+)\\s+\\b$paramName\\b'
+           );
+           
+           final match = pattern.firstMatch(source);
+           if (match != null) {
+              // The capture group 1 is the stuff immediately before paramName
+              // It might contain previous parameters (comma separated)
+              // We need to take the last part after the last comma
+              var beforeParam = match.group(1)!;
+              if (beforeParam.contains(',')) {
+                 beforeParam = beforeParam.split(',').last;
+              }
+              
+              var candidate = beforeParam.trim();
+              
+              // Clean up keywords/annotations
+              final keywords = ['required', 'final', 'const', 'var', 'covariant', 'late'];
+              for (final kw in keywords) {
+                 if (candidate.startsWith(kw)) {
+                    candidate = candidate.substring(kw.length).trim();
+                 }
+                 candidate = candidate.replaceAll(RegExp(r'\b' + kw + r'\b'), '').trim();
+              }
+              while (candidate.startsWith('@')) {
+                 final idx = candidate.indexOf(' ');
+                 if (idx != -1) candidate = candidate.substring(idx).trim();
+                 else break;
+              }
+              
+              if (candidate.isNotEmpty && !candidate.contains('InvalidType')) {
+                 return candidate;
+              }
+           }
+        }
+        
+        return currentType;
+      }
+      
+      // print('ZORPHY DEBUG: Recovering ${element.name} from offset $nameOffset');
+
+      var i = nameOffset - 1;
+
+      // Skip whitespace backwards from name
+      while (i >= 0 && source.codeUnitAt(i) <= 32) i--;
+
+      if (i < 0) return currentType;
+
+      final typeEnd = i + 1;
+      int depth = 0; // <> depth
+      int parenDepth = 0; // () depth (for annotations)
+
+      // Scan backwards to find start of type
+      int typeStart = 0;
+      
+      while (i >= 0) {
+        final char = source[i];
+
+        if (char == '>') depth++;
+        else if (char == '<') depth--;
+        else if (char == ')') parenDepth++;
+        else if (char == '(') parenDepth--;
+
+        // Stop at delimiters if we are at top level
+        if (depth == 0 && parenDepth == 0) {
+          if (char == ',' || char == '(' || char == '{' || char == ';') {
+            typeStart = i + 1;
+            break;
+          }
+        }
+        i--;
+      }
+
+      var rawString = source.substring(typeStart, typeEnd).trim();
+      print('ZORPHY DEBUG: Extracted raw string: "$rawString"');
+
+      // Basic cleanup of keywords and annotations
+      final keywords = ['required', 'final', 'const', 'var', 'covariant', 'late'];
+      for (final kw in keywords) {
+         if (rawString.startsWith(kw)) {
+            rawString = rawString.substring(kw.length).trim();
+         }
+         final regex = RegExp(r'\b' + kw + r'\b');
+         rawString = rawString.replaceAll(regex, '').trim();
+      }
+
+      // Remove annotations (anything starting with @ up to whitespace or end)
+      while (rawString.startsWith('@')) {
+         final endIdx = rawString.indexOf(' ');
+         if (endIdx != -1) {
+             rawString = rawString.substring(endIdx).trim();
+         } else {
+             break; 
+         }
+      }
+      
+      if (rawString.isNotEmpty && !rawString.contains('InvalidType')) {
+         print('ZORPHY DEBUG: Recovered type: "$rawString"');
+         return rawString;
+      }
+
+      return currentType;
+    } catch (e, st) {
+      print('ZORPHY DEBUG: Error recovering type: $e\n$st');
+      return currentType;
+    }
   }
 
   /// Check if this class is listed in any parent's explicitSubTypes

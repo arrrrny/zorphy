@@ -491,34 +491,69 @@ String typeToString(DartType type, {String? currentClassName}) {
       if (named.isNotEmpty) "{$named}",
     ].join(', ');
     manual = "($parts$trailing)";
-  } else if (type is ParameterizedType) {
-    final arguments = type.typeArguments.isEmpty
-        ? ''
-        : "<${type.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName)).join(', ')}>";
-    final typeName = type.element?.name ?? 'InvalidType';
+  } else if (type is ParameterizedType ||
+      type.toString().contains('InvalidType') ||
+      type.getDisplayString().contains('InvalidType')) {
+    final arguments = type is ParameterizedType && type.typeArguments.isNotEmpty
+        ? "<${type.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName)).join(', ')}>"
+        : '';
+
+    var typeName = type is ParameterizedType ? type.element?.name : null;
+    typeName ??= 'InvalidType';
 
     // Handle self-reference and deps: if type is InvalidType, try to use the name from the element's display string
     // This happens when the file is not yet generated
     if (typeName == 'InvalidType' || typeName == 'dynamic') {
-      final displayName = type.element?.displayName;
-      if (displayName != null && displayName != 'dynamic') {
+      var displayName = type.element?.displayName;
+
+      // Fallback to display string if element name is missing (common for InvalidType)
+      if (displayName == null || displayName == 'dynamic' || displayName == 'InvalidType') {
+        final ds = type.getDisplayString();
+        // If it's a parameterized type like List<Attachment>, getDisplayString might return the whole thing
+        // We just want the base name if possible.
+        if (ds.contains('<')) {
+          displayName = ds.substring(0, ds.indexOf('<'));
+        } else {
+          displayName = ds;
+        }
+      }
+
+      if (displayName != 'dynamic' &&
+          displayName != 'InvalidType') {
         // Check if this is an enum - enums don't need $ prefix
         final isEnum = type.element is EnumElement;
         if (isEnum) {
           manual = "$displayName$arguments";
         } else {
-          // For Zorphy entities, add $ prefix if not already present
-          final prefix = displayName.startsWith('\$') ? '' : '\$';
-          manual = "$prefix$displayName$arguments";
+          // For unresolved types, use the name exactly as it appears in source.
+          // Do not force $ prefix, as it changes the type (e.g. List<Attachment> != List<$Attachment>)
+          manual = "$displayName$arguments";
         }
-      } else if (currentClassName != null) {
-        // Fallback for direct self-references if we know the current class name
-        manual = "\$$currentClassName$arguments";
       } else {
         manual = "$typeName$arguments";
       }
     } else {
-      manual = "$typeName$arguments";
+      // If typeName is standard but arguments might contain InvalidType
+      // check if the string representation has InvalidType
+      if (arguments.contains('InvalidType') ||
+          type.toString().contains('InvalidType')) {
+        final ds = type.getDisplayString();
+        // Extract the full type signature from display string to catch inner types
+        // e.g. List<Attachment> instead of List<InvalidType>
+        if (ds.contains('<')) {
+          // If display string already has nullability marker at the end, strip it
+          // because $nullMarker will be appended later
+          if (ds.endsWith('?')) {
+            manual = ds.substring(0, ds.length - 1);
+          } else {
+            manual = ds;
+          }
+        } else {
+          manual = "$typeName$arguments";
+        }
+      } else {
+        manual = "$typeName$arguments";
+      }
     }
   }
 
