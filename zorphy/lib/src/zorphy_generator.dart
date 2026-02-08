@@ -7,7 +7,7 @@ import 'package:zorphy/src/models/models.dart';
 import 'package:zorphy/src/orchestrator.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-class ZorphyGeneratorV2 extends GeneratorForAnnotationX<Zorphy> {
+class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
   static final Map<String, ClassElement> _allAnnotatedClasses = {};
   static Map<String, ClassElement> get allAnnotatedClasses =>
       _allAnnotatedClasses;
@@ -61,6 +61,7 @@ class ZorphyGeneratorV2 extends GeneratorForAnnotationX<Zorphy> {
       generateCompareTo: annotation.read('generateCompareTo').boolValue,
       generatePatch: annotation.peek('generatePatch')?.boolValue ?? true,
       hidePublicConstructor: annotation.read('hidePublicConstructor').boolValue,
+      generateFilter: annotation.read('generateFilter').boolValue,
       factoryMethods: factoryMethods,
       ownFields: ownFields,
     );

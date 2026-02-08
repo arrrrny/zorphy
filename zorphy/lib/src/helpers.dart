@@ -1017,6 +1017,12 @@ String getPatchClass(
       }
       // Handle single object types (nullable and non-nullable)
       else {
+        // Don't generate patch methods for abstract/sealed types (starting with $$)
+        // as they don't have concrete Patch classes we can instantiate
+        if (fieldType.trim().startsWith(r'$$')) {
+          continue;
+        }
+
         var patchType = innerType + "Patch";
         // with{CapitalizedName}Patch method for direct patch application
         sb.writeln(

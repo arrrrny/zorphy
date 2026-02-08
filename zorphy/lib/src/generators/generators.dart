@@ -7,3 +7,4 @@ export 'equals_tostring_generator.dart';
 export 'patch_generator.dart';
 export 'json_generator.dart';
 export 'extension_generator.dart';
+export 'fields_class_generator.dart';

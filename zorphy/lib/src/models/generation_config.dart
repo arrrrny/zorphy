@@ -27,6 +27,9 @@ class GenerationConfig {
   /// Whether to hide the public constructor
   final bool hidePublicConstructor;
 
+  /// Whether to generate filter field descriptors
+  final bool generateFilter;
+
   /// Factory methods for the class
   final List<FactoryMethodInfo> factoryMethods;
 
@@ -42,6 +45,7 @@ class GenerationConfig {
     required this.generateCompareTo,
     required this.generatePatch,
     required this.hidePublicConstructor,
+    required this.generateFilter,
     required this.factoryMethods,
     required this.ownFields,
   });
@@ -54,6 +58,7 @@ class GenerationConfig {
     required bool generateCompareTo,
     required bool generatePatch,
     required bool hidePublicConstructor,
+    required bool generateFilter,
     required List<FactoryMethodInfo> factoryMethods,
     required Set<String> ownFields,
   }) {
@@ -66,6 +71,7 @@ class GenerationConfig {
       generateCompareTo: generateCompareTo,
       generatePatch: generatePatch,
       hidePublicConstructor: hidePublicConstructor,
+      generateFilter: generateFilter,
       factoryMethods: factoryMethods,
       ownFields: ownFields,
     );
@@ -82,6 +88,7 @@ class GenerationConfig {
       generateCompareTo: true,
       generatePatch: true,
       hidePublicConstructor: false,
+      generateFilter: false,
       factoryMethods: [],
       ownFields: {},
     );
@@ -97,6 +104,7 @@ class GenerationConfig {
     this.generateCompareTo = true,
     this.generatePatch = true,
     this.hidePublicConstructor = false,
+    this.generateFilter = false,
     this.factoryMethods = const [],
     this.ownFields = const {},
   });

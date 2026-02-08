@@ -111,7 +111,7 @@ update_changelog() {
 - $DESCRIPTION
 " CHANGELOG.md
         fi
-        
+
         # Remove [Unreleased] section before publishing
         echo "  🔽 Removing [Unreleased] section before publishing..."
         if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -196,6 +196,9 @@ echo "✅ Successfully published zorphy_annotation version $VERSION!"
 echo ""
 
 cd "$REPO_ROOT"
+
+echo "⏳ Waiting 30 seconds for pub.dev to process zorphy_annotation..."
+sleep 30
 
 # ========================================================================
 # STEP 2: Publish zorphy
