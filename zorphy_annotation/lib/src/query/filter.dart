@@ -207,16 +207,6 @@ class Or<TEntity> extends Filter<TEntity> {
   bool matches(TEntity item) => filters.any((f) => f.matches(item));
 }
 
-/// Extension methods for in-memory filtering of iterables
-extension FilterIterableExt<T> on Iterable<T> {
-  /// Filters the iterable using the given [filter].
-  /// If [filter] is null, returns the original iterable.
-  Iterable<T> filter(Filter<T>? filter) {
-    if (filter == null) return this;
-    return where((item) => filter.matches(item));
-  }
-}
-
 /// Extension methods for easier filter creation
 extension FieldOps<TEntity, TValue> on Field<TEntity, TValue> {
   Eq<TEntity, TValue> eq(TValue value) => Eq(this, value);

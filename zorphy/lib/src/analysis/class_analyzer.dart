@@ -270,8 +270,14 @@ class ClassAnalyzer {
     final classNameTrimmed = className.replaceAll(r'$', '');
     for (var method in classElement.methods) {
       if (method.isStatic && !method.isOperator) {
-        final returnType = method.returnType.getDisplayString();
-        final returnTypeString = method.returnType.toString();
+        var returnType = method.returnType.getDisplayString();
+        var returnTypeString = method.returnType.toString();
+
+        // If type is unresolved, try to recover from source
+        if (returnType == 'dynamic' || returnType.contains('InvalidType')) {
+          returnType = _recoverTypeFromSource(method, returnType);
+          returnTypeString = returnType;
+        }
 
         bool matchesType =
             returnType == className ||
@@ -279,35 +285,7 @@ class ClassAnalyzer {
             returnTypeString == className ||
             returnTypeString == classNameTrimmed;
 
-        // If it's an unresolved type, check the element display name
-        if (!matchesType &&
-            (returnType == 'dynamic' || returnType.contains('InvalidType'))) {
-          final elementDisplayName = method.returnType.element?.displayName;
-          if (elementDisplayName == classElement.displayName ||
-              elementDisplayName == classNameTrimmed ||
-              elementDisplayName == className) {
-            matchesType = true;
-          }
-        }
-
         if (matchesType) {
-          var parameters = _extractParameters(
-            method.formalParameters,
-            className,
-            classElement,
-          );
-          factoryMethods.add(
-            FactoryMethodInfo(
-              name: method.name as String,
-              parameters: parameters,
-              bodyCode: "",
-              className: className,
-            ),
-          );
-        } else if (method.isStatic &&
-            method.name == 'create' &&
-            (returnType.contains('InvalidType') || returnType == 'dynamic')) {
-          // Special fallback for 'create' method if return type is unresolved
           var parameters = _extractParameters(
             method.formalParameters,
             className,
@@ -404,60 +382,34 @@ class ClassAnalyzer {
         return currentType;
       }
 
-      // If nameOffset is missing, try to find the parameter in the source text by searching for method + param
+      // If nameOffset is missing, try to find the element in the source text
       if (nameOffset == null || nameOffset == 0) {
         // Fallback: Text search
-        // We assume the method name is 'create' or derived from enclosing element
-        final methodName =
+        final containerName =
             (dynElem.enclosingElement as dynamic)?.name as String?;
-        final paramName = element.name;
+        final entityName = element.name;
 
-        if (methodName != null && paramName != null) {
-          // Regex to find method declaration followed by parameter
-          // Pattern: methodName ... ( ... paramName
-          // This is rough but likely unique enough in entity files
-          final pattern = RegExp(
-            // Match method name, then opening paren, then anything non-greedy, then paramName
-            // We capture the text BEFORE paramName to find the type
-            '\\b$methodName\\b\\s*\\([\\s\\S]*?([\\w<>,? ]+)\\s+\\b$paramName\\b',
-          );
+        if (containerName != null && entityName != null) {
+          RegExp pattern;
+          if (element is MethodElement) {
+            // Match return type before method name: Type methodName(
+            pattern = RegExp(r'([\w<>,? ]+)\s+\b' + entityName + r'\b\s*\(');
+          } else {
+            // Match parameter type: methodName... ( ... Type paramName
+            pattern = RegExp(
+              '\\b$containerName\\b\\s*\\([\\s\\S]*?([\\w<>,? ]+)\\s+\\b$entityName\\b',
+            );
+          }
 
           final match = pattern.firstMatch(source);
           if (match != null) {
-            // The capture group 1 is the stuff immediately before paramName
-            // It might contain previous parameters (comma separated)
-            // We need to take the last part after the last comma
-            var beforeParam = match.group(1)!;
-            if (beforeParam.contains(',')) {
-              beforeParam = beforeParam.split(',').last;
+            var extracted = match.group(1)!;
+            if (element is! MethodElement && extracted.contains(',')) {
+              extracted = extracted.split(',').last;
             }
 
-            var candidate = beforeParam.trim();
-
-            // Clean up keywords/annotations
-            final keywords = [
-              'required',
-              'final',
-              'const',
-              'var',
-              'covariant',
-              'late',
-            ];
-            for (final kw in keywords) {
-              if (candidate.startsWith(kw)) {
-                candidate = candidate.substring(kw.length).trim();
-              }
-              candidate = candidate
-                  .replaceAll(RegExp(r'\b' + kw + r'\b'), '')
-                  .trim();
-            }
-            while (candidate.startsWith('@')) {
-              final idx = candidate.indexOf(' ');
-              if (idx != -1)
-                candidate = candidate.substring(idx).trim();
-              else
-                break;
-            }
+            var candidate = extracted.trim();
+            candidate = _cleanRecoveredType(candidate);
 
             if (candidate.isNotEmpty && !candidate.contains('InvalidType')) {
               return candidate;
@@ -507,38 +459,10 @@ class ClassAnalyzer {
       }
 
       var rawString = source.substring(typeStart, typeEnd).trim();
-      print('ZORPHY DEBUG: Extracted raw string: "$rawString"');
+      var candidate = _cleanRecoveredType(rawString);
 
-      // Basic cleanup of keywords and annotations
-      final keywords = [
-        'required',
-        'final',
-        'const',
-        'var',
-        'covariant',
-        'late',
-      ];
-      for (final kw in keywords) {
-        if (rawString.startsWith(kw)) {
-          rawString = rawString.substring(kw.length).trim();
-        }
-        final regex = RegExp(r'\b' + kw + r'\b');
-        rawString = rawString.replaceAll(regex, '').trim();
-      }
-
-      // Remove annotations (anything starting with @ up to whitespace or end)
-      while (rawString.startsWith('@')) {
-        final endIdx = rawString.indexOf(' ');
-        if (endIdx != -1) {
-          rawString = rawString.substring(endIdx).trim();
-        } else {
-          break;
-        }
-      }
-
-      if (rawString.isNotEmpty && !rawString.contains('InvalidType')) {
-        print('ZORPHY DEBUG: Recovered type: "$rawString"');
-        return rawString;
+      if (candidate.isNotEmpty && !candidate.contains('InvalidType')) {
+        return candidate;
       }
 
       return currentType;
@@ -546,6 +470,45 @@ class ClassAnalyzer {
       print('ZORPHY DEBUG: Error recovering type: $e\n$st');
       return currentType;
     }
+  }
+
+  static String _cleanRecoveredType(String rawString) {
+    var result = rawString;
+    // Basic cleanup of keywords and annotations
+    final keywords = [
+      'static',
+      'required',
+      'final',
+      'const',
+      'var',
+      'covariant',
+      'late',
+      'external',
+      'abstract',
+    ];
+    for (final kw in keywords) {
+      if (result.startsWith(kw + ' ')) {
+        result = result.substring(kw.length).trim();
+      }
+      result = result.replaceAll(RegExp(r'\b' + kw + r'\b'), '').trim();
+    }
+
+    // Remove annotations (anything starting with @ up to whitespace or end)
+    while (result.startsWith('@')) {
+      final endIdx = result.indexOf(' ');
+      if (endIdx != -1) {
+        result = result.substring(endIdx).trim();
+      } else {
+        // Handle @Annotation(...)
+        if (result.startsWith('@') && result.contains(')')) {
+          final closeIdx = result.indexOf(')');
+          result = result.substring(closeIdx + 1).trim();
+        } else {
+          break;
+        }
+      }
+    }
+    return result;
   }
 
   /// Check if this class is listed in any parent's explicitSubTypes

@@ -133,6 +133,13 @@ void main() {
   final matchAll = products.filter(Filter.always()).toList();
   print('Filter.always(): ${matchAll.length} items');
 
+  print('\n=== In-Memory Sorting ===');
+  final sortedByPrice = products.orderBy(sortByPrice);
+  print('Products ordered by price (desc):');
+  for (final p in sortedByPrice) {
+    print(' - ${p.name}: \$${p.price}');
+  }
+
   // This is where a framework would build the actual query:
   // final queryParams = {
   //   'filter': complexFilter.toJson(),
