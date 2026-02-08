@@ -84,6 +84,62 @@ void main() {
   print('Filter: ${complexFilter.toJson()}');
   print('Sort: ${sortByPrice.toJson()}');
 
+  // ===== In-Memory Filtering Example =====
+
+  final products = [
+    Product(
+      id: 1,
+      name: 'MacBook Pro Premium',
+      price: 2499.0,
+      createdAt: DateTime.now(),
+      isAvailable: true,
+    ),
+    Product(
+      id: 2,
+      name: 'iPhone 15',
+      price: 999.0,
+      createdAt: DateTime.now(),
+      isAvailable: true,
+    ),
+    Product(
+      id: 3,
+      name: 'USB-C Cable',
+      price: 29.0,
+      createdAt: DateTime.now(),
+      isAvailable: true,
+    ),
+    Product(
+      id: 4,
+      name: 'Mac Studio Premium',
+      price: 3999.0,
+      createdAt: DateTime.now(),
+      isAvailable: false,
+    ),
+  ];
+
+  print('\n=== In-Memory Filtering ===');
+  final availablePremium = products.filter(complexFilter).toList();
+  print('Found ${availablePremium.length} available premium products:');
+  for (final p in availablePremium) {
+    print(' - ${p.name} (\$${p.price})');
+  }
+
+  print('\n=== Null & AlwaysMatch Filters ===');
+  // Null filter returns everything
+  final allProducts = products.filter(null).toList();
+  print('Null filter: ${allProducts.length} items');
+
+  // MatchAll filter returns everything
+  final matchAll = products.filter(Filter.always()).toList();
+  print('Filter.always(): ${matchAll.length} items');
+
+  print('\n=== In-Memory Sorting ===');
+  final sortedByPrice = products.orderBy(sortByPrice);
+  print('Products ordered by price (desc):');
+  for (final p in sortedByPrice) {
+    print(' - ${p.name}: \$${p.price}');
+  }
+
   // This is where a framework would build the actual query:
   // final queryParams = {
   //   'filter': complexFilter.toJson(),

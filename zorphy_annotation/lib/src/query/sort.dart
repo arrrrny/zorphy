@@ -16,6 +16,24 @@ class Sort<TEntity> {
         'field': field.name,
         'descending': descending,
       };
+
+  /// Compares two items based on this sort configuration.
+  /// Requires [field.getValue] to be defined.
+  int compare(TEntity a, TEntity b) {
+    var valA = field.getValue!(a);
+    var valB = field.getValue!(b);
+
+    if (valA == valB) return 0;
+    if (valA == null) return descending ? 1 : -1;
+    if (valB == null) return descending ? -1 : 1;
+
+    int result = 0;
+    if (valA is Comparable && valB is Comparable) {
+      result = valA.compareTo(valB);
+    }
+
+    return descending ? -result : result;
+  }
 }
 
 /// Extension methods for sorting on fields

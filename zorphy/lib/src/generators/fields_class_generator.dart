@@ -22,22 +22,33 @@ class FieldsClassGenerator extends UniversalGenerator {
 
     for (final field in metadata.allFields) {
       final fieldName = field.name;
-      // Get the type string. Note that field.type might include nullability derived from analysis
-      // We generally trust it.
       var fieldType = field.type;
+      if (fieldType == null) {
+        fieldType = 'dynamic';
+      } else {
+        fieldType = _cleanType(fieldType);
+      }
 
-      // If type is missing (dynamic), default to dynamic
-      if (fieldType == null) fieldType = 'dynamic';
-
-      // We use the clean class name for the TEntity parameter
+      // Generate a static getter for tear-off
       sb.writeln(
-        '  static const $fieldName = Field<$className, $fieldType>(\'$fieldName\');',
+        '  static $fieldType _\$get$fieldName($className e) => e.$fieldName;',
+      );
+
+      // Use the static getter as a tear-off in the Field constructor
+      sb.writeln(
+        '  static const $fieldName = Field<$className, $fieldType>(\'$fieldName\', _\$get$fieldName);',
       );
     }
 
     sb.writeln('}');
 
     return sb.toString();
+  }
+
+  /// Removes $ and $$ prefixes from Zorphy entity types
+  String _cleanType(String type) {
+    // Strips all $ characters from the type string
+    return type.replaceAll('\$', '');
   }
 
   @override

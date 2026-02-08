@@ -9,3 +9,4 @@ export 'src/patch_base.dart';
 export 'src/query/field.dart';
 export 'src/query/filter.dart';
 export 'src/query/sort.dart';
+export 'src/query/query_iterables.dart';
