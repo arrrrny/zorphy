@@ -1,7 +1,7 @@
 ## [1.4.1] - 2026-02-09
 
 ### Chore
-- Bumped
+- Bumped example versions
 
 ## [1.4.0] - 2026-02-07
 
