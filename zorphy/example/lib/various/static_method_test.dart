@@ -1,6 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'static_method_test.zorphy.dart';
+part 'static_method_test.g.dart';
 
 @Zorphy(generateJson: true)
 abstract class $Category {
