@@ -27,6 +27,7 @@ class NameTypeClassComment {
   final JsonKeyInfo? jsonKeyInfo;
   final List<String> additionalAnnotations;
   final bool isEnum;
+  final List<String> enumValues;
 
   NameTypeClassComment(
     this.name,
@@ -36,6 +37,7 @@ class NameTypeClassComment {
     this.jsonKeyInfo,
     this.additionalAnnotations = const [],
     this.isEnum = false,
+    this.enumValues = const [],
   });
 
   @override

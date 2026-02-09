@@ -9,40 +9,15 @@ class PropertyHelperGenerator extends UniversalGenerator {
     final metadata = context.metadata;
     final sb = StringBuffer();
 
-    // 1. Polymorphic helpers (Pattern 2)
-    // Common for both abstract and concrete classes if they have subtypes
-    if (metadata.explicitSubtypes.isNotEmpty) {
-      sb.writeln('  // Polymorphic helpers');
-      for (final subtype in metadata.explicitSubtypes) {
-        final subtypeName = subtype.interfaceName.replaceAll(r'$', '');
-        sb.writeln('  bool get is$subtypeName => this is $subtypeName;');
-        sb.writeln(
-          '  $subtypeName? get as$subtypeName => this is $subtypeName ? this as $subtypeName : null;',
-        );
-      }
-      sb.writeln('');
-    }
-
-    // 2. Field-specific helpers (Patterns 1, 3, 4)
-    // These are typically for concrete classes where fields have values
-    if (!metadata.isAbstract) {
-      final nullableFields = metadata.allFields.where((f) => f.type?.endsWith('?') ?? false);
-      final collectionFields = metadata.allFields.where((f) => 
-        f.type != null && (
-          f.type!.startsWith('List<') || 
-          f.type!.startsWith('Map<') || 
-          f.type!.startsWith('Set<')
-        )
-      );
-
-      if (nullableFields.isNotEmpty || collectionFields.isNotEmpty) {
+    // 1. Field-specific helpers (hasField, noField, Required, isEnumValue)
+    final fields = metadata.allFields;
+    if (fields.isNotEmpty) {
+      if (!metadata.isAbstract) {
         sb.writeln('  // Property helpers');
       }
 
-      for (final field in metadata.allFields) {
+      for (final field in fields) {
         var type = field.type ?? 'dynamic';
-        
-        // Strip Zorphy prefixes ($ and $$) to get the public type name
         type = type.replaceAll('\$', '');
         
         final fieldName = field.name;
@@ -52,38 +27,50 @@ class PropertyHelperGenerator extends UniversalGenerator {
         final baseName = fieldName.startsWith('_') ? fieldName.substring(1) : fieldName;
         final capitalized = baseName[0].toUpperCase() + baseName.substring(1);
 
-        if (isNullable && !isCollection) {
-           // Pattern 1 & 4 (Only if NOT a collection, collections use Pattern 3 below)
-           sb.writeln('  bool get has$capitalized => $fieldName != null;');
-           sb.writeln('  bool get no$capitalized => $fieldName == null;');
-           
-           final nonNullableType = type.substring(0, type.length - 1);
-           sb.writeln('  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));');
-        } else if (isNullable && isCollection) {
-           // Pattern 4 still useful for collections
-           final nonNullableType = type.substring(0, type.length - 1);
-           sb.writeln('  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));');
-        }
-
-        if (isCollection) {
-          // Pattern 3
-          if (!isNullable) {
-            sb.writeln('  bool get has$capitalized => $fieldName.isNotEmpty;');
-            sb.writeln('  bool get no$capitalized => $fieldName.isEmpty;');
-          } else {
-            // If nullable list/map/set
-            sb.writeln('  bool get has$capitalized => $fieldName?.isNotEmpty ?? false;');
-            sb.writeln('  bool get no$capitalized => $fieldName?.isEmpty ?? true;');
+        if (metadata.isAbstract) {
+          // In abstract classes, we generate abstract getters
+          if (isNullable && !isCollection) {
+            sb.writeln('  bool get has$capitalized;');
+            sb.writeln('  bool get no$capitalized;');
+            final nonNullableType = type.substring(0, type.length - 1);
+            sb.writeln('  $nonNullableType get ${baseName}Required;');
+          } else if (isNullable && isCollection) {
+            final nonNullableType = type.substring(0, type.length - 1);
+            sb.writeln('  $nonNullableType get ${baseName}Required;');
           }
-        }
 
-        if (field.isEnum && field.enumValues.isNotEmpty) {
-          final baseEnumName = type.replaceAll('?', '');
-          for (final value in field.enumValues) {
-            final capitalizedValue = value[0].toUpperCase() + value.substring(1);
-            sb.writeln(
-              '  bool get is$capitalized$capitalizedValue => $fieldName == $baseEnumName.$value;',
-            );
+          if (isCollection) {
+            sb.writeln('  bool get has$capitalized;');
+            sb.writeln('  bool get no$capitalized;');
+          }
+        } else {
+          // In concrete classes, we generate implementations
+          if (isNullable && !isCollection) {
+             sb.writeln('  bool get has$capitalized => $fieldName != null;');
+             sb.writeln('  bool get no$capitalized => $fieldName == null;');
+             final nonNullableType = type.substring(0, type.length - 1);
+             sb.writeln('  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));');
+          } else if (isNullable && isCollection) {
+             final nonNullableType = type.substring(0, type.length - 1);
+             sb.writeln('  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));');
+          }
+
+          if (isCollection) {
+            if (!isNullable) {
+              sb.writeln('  bool get has$capitalized => $fieldName.isNotEmpty;');
+              sb.writeln('  bool get no$capitalized => $fieldName.isEmpty;');
+            } else {
+              sb.writeln('  bool get has$capitalized => $fieldName?.isNotEmpty ?? false;');
+              sb.writeln('  bool get no$capitalized => $fieldName?.isEmpty ?? true;');
+            }
+          }
+
+          if (field.isEnum && field.enumValues.isNotEmpty) {
+            final baseEnumName = type.replaceAll('?', '');
+            for (final value in field.enumValues) {
+              final capitalizedValue = value[0].toUpperCase() + value.substring(1);
+              sb.writeln('  bool get is$capitalized$capitalizedValue => $fieldName == $baseEnumName.$value;');
+            }
           }
         }
       }

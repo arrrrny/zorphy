@@ -321,6 +321,14 @@ List<NameTypeClassComment> getAllFields(
             jsonKeyInfo: extractJsonKeyInfo(dynA as Element),
             additionalAnnotations: _collectAdditionalAnnotations(dynA),
             isEnum: (dynA as dynamic).returnType?.element is EnumElement,
+            enumValues: (dynA as dynamic).returnType?.element is EnumElement
+                ? ((dynA as dynamic).returnType!.element as EnumElement)
+                    .fields
+                    .where((f) => f.isEnumConstant)
+                    .map((f) => f.name ?? "")
+                    .where((name) => name.isNotEmpty)
+                    .toList()
+                : const [],
           );
         });
 
