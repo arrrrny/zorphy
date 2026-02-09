@@ -1,3 +1,8 @@
+## [1.5.0] - 2026-02-09
+
+### Feat
+- Added property helpers extension
+
 ## [1.4.1] - 2026-02-09
 
 ### Chore
