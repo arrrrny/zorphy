@@ -86,7 +86,44 @@ class ClassAnalyzer {
       ),
       classElement: classElement,
       allAnnotatedClasses: allAnnotatedClasses,
+      polymorphicSubtypes: _extractPolymorphicSubtypes(
+        classElement,
+        annotation,
+        allAnnotatedClasses,
+      ),
     );
+  }
+
+  /// Extract all subtypes in the polymorphic hierarchy
+  static List<Interface> _extractPolymorphicSubtypes(
+    ClassElement classElement,
+    ConstantReader annotation,
+    Map<String, ClassElement> allAnnotatedClasses,
+  ) {
+    // 1. If this class has explicit subtypes, those are the ones
+    final ownSubtypes = _extractExplicitSubtypes(annotation, allAnnotatedClasses);
+    if (ownSubtypes.isNotEmpty) return ownSubtypes;
+
+    // 2. Otherwise, check interfaces to see if any of them define a polymorphic hierarchy
+    final zorphyChecker = const TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/annotations.dart#Zorphy',
+    );
+
+    for (final interfaceType in classElement.allSupertypes) {
+      final interfaceElement = interfaceType.element;
+      if (interfaceElement is ClassElement) {
+        final interfaceAnnotation = zorphyChecker.firstAnnotationOf(interfaceElement);
+        if (interfaceAnnotation != null) {
+          final reader = ConstantReader(interfaceAnnotation);
+          final field = reader.peek('explicitSubTypes');
+          if (field != null && !field.isNull) {
+            return _extractExplicitSubtypes(reader, allAnnotatedClasses);
+          }
+        }
+      }
+    }
+
+    return const [];
   }
 
   /// Validate that class uses implements, not extends

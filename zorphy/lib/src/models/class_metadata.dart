@@ -58,6 +58,9 @@ class ClassMetadata {
   /// All annotated classes discovered so far (for polymorphic JSON)
   final Map<String, ClassElement> allAnnotatedClasses;
 
+  /// All subtypes in this hierarchy (for polymorphic property helpers)
+  final List<Interface> polymorphicSubtypes;
+
   const ClassMetadata({
     required this.originalName,
     required this.cleanName,
@@ -76,6 +79,7 @@ class ClassMetadata {
     required this.isInParentExplicitSubtypes,
     required this.classElement,
     required this.allAnnotatedClasses,
+    this.polymorphicSubtypes = const [],
   });
 
   /// Get class name with $ prefix for generated abstract class
