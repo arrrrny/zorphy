@@ -411,54 +411,68 @@ bool _needsPatchHandling(String baseType, List<String> knownClasses) {
 
 /// Replace $-prefixed types with concrete class names for JSON serialization
 /// For example: $TreeNode -> TreeNode, List<$TreeNode> -> List<TreeNode>
+/// Also handles nested generics like Map<String, List<$TreeNode>> -> Map<String, List<TreeNode>>
 String _replaceDollarTypesWithConcrete(String type) {
   // Handle outer nullability
   final isOuterNullable = type.endsWith('?');
   final baseType = isOuterNullable ? type.substring(0, type.length - 1) : type;
 
-  // Handle List<$Type> or List<$Type?>
-  if (baseType.startsWith('List<') && baseType.endsWith('>')) {
-    final innerType = baseType.substring(5, baseType.length - 1);
-    final isInnerNullable = innerType.endsWith('?');
-    final baseInnerType = isInnerNullable
-        ? innerType.substring(0, innerType.length - 1)
-        : innerType;
+  // Recursively process nested generics
+  String _processNestedType(String input) {
+    // First, check if this is a List type
+    if (input.startsWith('List<') && input.endsWith('>')) {
+      final innerType = input.substring(5, input.length - 1);
+      final isInnerNullable = innerType.endsWith('?');
+      final baseInnerType = isInnerNullable
+          ? innerType.substring(0, innerType.length - 1)
+          : innerType;
 
-    if (baseInnerType.startsWith('\$')) {
-      final trimmedType = baseInnerType.replaceAll('\$', '');
-      return 'List<$trimmedType${isInnerNullable ? '?' : ''}>${isOuterNullable ? '?' : ''}';
+      // Recursively process the inner type in case it's also a generic
+      final processedInner = _processNestedType(baseInnerType);
+
+      if (baseInnerType.startsWith('\$')) {
+        final trimmedType = baseInnerType.replaceAll('\$', '');
+        return 'List<$trimmedType${isInnerNullable ? '?' : ''}>';
+      }
+      // Return with processed inner type if it was a generic
+      return 'List<$processedInner${isInnerNullable ? '?' : ''}>';
     }
-    return type;
-  }
 
-  // Handle Map<K, $Type> or Map<K, $Type?>
-  if (baseType.startsWith('Map<') && baseType.endsWith('>')) {
-    final content = baseType.substring(4, baseType.length - 1);
-    final commaIndex = content.lastIndexOf(',');
-    if (commaIndex != -1) {
-      final keyPart = content.substring(0, commaIndex).trim();
-      final valuePart = content.substring(commaIndex + 1).trim();
+    // Check if this is a Map type
+    if (input.startsWith('Map<') && input.endsWith('>')) {
+      final content = input.substring(4, input.length - 1);
+      final commaIndex = content.lastIndexOf(',');
+      if (commaIndex != -1) {
+        final keyPart = content.substring(0, commaIndex).trim();
+        final valuePart = content.substring(commaIndex + 1).trim();
 
-      final isValueNullable = valuePart.endsWith('?');
-      final baseValueType = isValueNullable
-          ? valuePart.substring(0, valuePart.length - 1)
-          : valuePart;
+        final isValueNullable = valuePart.endsWith('?');
+        final baseValueType = isValueNullable
+            ? valuePart.substring(0, valuePart.length - 1)
+            : valuePart;
 
-      if (baseValueType.startsWith('\$')) {
-        final trimmedType = baseValueType.replaceAll('\$', '');
-        return 'Map<$keyPart, $trimmedType${isValueNullable ? '?' : ''}>${isOuterNullable ? '?' : ''}';
+        // Recursively process the value type in case it's also a generic
+        final processedValue = _processNestedType(baseValueType);
+
+        if (baseValueType.startsWith('\$')) {
+          final trimmedType = baseValueType.replaceAll('\$', '');
+          return 'Map<$keyPart, $trimmedType${isValueNullable ? '?' : ''}>';
+        }
+        // Return with processed value type if it was a generic
+        return 'Map<$keyPart, $processedValue${isValueNullable ? '?' : ''}>';
       }
     }
-    return type;
+
+    // Handle direct $Type or $Type?
+    if (input.startsWith('\$')) {
+      return input.replaceAll('\$', '');
+    }
+
+    return input;
   }
 
-  // Handle direct $Type or $Type?
-  if (baseType.startsWith('\$')) {
-    final trimmedType = baseType.replaceAll('\$', '');
-    return '$trimmedType${isOuterNullable ? '?' : ''}';
-  }
-
-  return type;
+  final result = _processNestedType(baseType);
+  return '${result}${isOuterNullable ? '?' : ''}';
 }
 
 String getPropertiesAbstract(
