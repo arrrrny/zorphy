@@ -1,3 +1,8 @@
+## [1.5.1] - 2026-02-11
+
+### Fix
+- fixed issue with nested entity
+
 ## [1.5.0] - 2026-02-09
 
 ### Feat
