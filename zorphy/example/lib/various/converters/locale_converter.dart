@@ -1,4 +1,3 @@
-
 import 'package:zorphy_example/various/locale.dart';
 
 /// Converter for [Locale] type.
@@ -29,7 +28,8 @@ class LocaleConverter {
   /// - `countryCode`: The country code (e.g., 'US'), optional
   ///
   /// Defaults to 'en' if languageCode is missing or invalid.
-  static Locale fromJson(Map<String, dynamic> json) {
+  static Locale? fromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
     final languageCode = json['languageCode'] as String?;
     final countryCode = json['countryCode'] as String?;
     return Locale(languageCode ?? 'en', countryCode ?? '');
@@ -40,7 +40,8 @@ class LocaleConverter {
   /// The JSON map contains:
   /// - `languageCode`: The language code
   /// - `countryCode`: The country code (only if non-empty)
-  static Map<String, dynamic> toJson(Locale locale) {
+  static Map<String, dynamic>? toJson(Locale? locale) {
+    if (locale == null) return null;
     return <String, dynamic>{
       'languageCode': locale.languageCode,
       if (locale.countryCode?.isNotEmpty ?? false)

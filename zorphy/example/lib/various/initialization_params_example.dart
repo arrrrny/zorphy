@@ -1,3 +1,4 @@
+// Touch for re-analysis
 import 'package:zorphy/zorphy.dart';
 
 import 'converters/locale_converter.dart';
@@ -15,6 +16,7 @@ abstract class $InitializationParamsExample {
   $Params? get credentials;
   $Params? get settings;
 
+  @deprecated
   @JsonKey(toJson: LocaleConverter.toJson, fromJson: LocaleConverter.fromJson)
   Locale? get locale;
 }
