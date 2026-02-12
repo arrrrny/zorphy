@@ -101,7 +101,10 @@ class ClassAnalyzer {
     Map<String, ClassElement> allAnnotatedClasses,
   ) {
     // 1. If this class has explicit subtypes, those are the ones
-    final ownSubtypes = _extractExplicitSubtypes(annotation, allAnnotatedClasses);
+    final ownSubtypes = _extractExplicitSubtypes(
+      annotation,
+      allAnnotatedClasses,
+    );
     if (ownSubtypes.isNotEmpty) return ownSubtypes;
 
     // 2. Otherwise, check interfaces to see if any of them define a polymorphic hierarchy
@@ -112,7 +115,9 @@ class ClassAnalyzer {
     for (final interfaceType in classElement.allSupertypes) {
       final interfaceElement = interfaceType.element;
       if (interfaceElement is ClassElement) {
-        final interfaceAnnotation = zorphyChecker.firstAnnotationOf(interfaceElement);
+        final interfaceAnnotation = zorphyChecker.firstAnnotationOf(
+          interfaceElement,
+        );
         if (interfaceAnnotation != null) {
           final reader = ConstantReader(interfaceAnnotation);
           final field = reader.peek('explicitSubTypes');

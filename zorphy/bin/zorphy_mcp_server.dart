@@ -59,16 +59,11 @@ Future<Map<String, dynamic>> _handleRequest(Map<String, dynamic> req) async {
 
   switch (method) {
     case 'initialize':
-      return _success(
-        id,
-        {
-          'protocolVersion': '2024-11-05',
-          'serverInfo': {'name': 'zorphy', 'version': _version},
-          'capabilities': {
-            'tools': {},
-          },
-        },
-      );
+      return _success(id, {
+        'protocolVersion': '2024-11-05',
+        'serverInfo': {'name': 'zorphy', 'version': _version},
+        'capabilities': {'tools': {}},
+      });
 
     case 'notifications/initialized':
       // Just ignore this notification

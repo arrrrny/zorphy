@@ -11,6 +11,7 @@ class TestClass {
 
   TestClass({this.locale});
 
-  factory TestClass.fromJson(Map<String, dynamic> json) => _$TestClassFromJson(json);
+  factory TestClass.fromJson(Map<String, dynamic> json) =>
+      _$TestClassFromJson(json);
   Map<String, dynamic> toJson() => _$TestClassToJson(this);
 }

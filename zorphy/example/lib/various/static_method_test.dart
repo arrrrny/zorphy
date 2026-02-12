@@ -19,15 +19,8 @@ abstract class $Category {
     required String id,
     required String name,
     String? description,
-  }) => Category(
-    id: id,
-    name: name,
-    description: description,
-  );
-  
-  static Category createWithName(String name) => Category(
-    id: 'generated',
-    name: name,
-    description: null,
-  );
+  }) => Category(id: id, name: name, description: description);
+
+  static Category createWithName(String name) =>
+      Category(id: 'generated', name: name, description: null);
 }

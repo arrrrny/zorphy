@@ -12,10 +12,16 @@ class PropertyHelperGenerator extends UniversalGenerator {
     // 1. Polymorphic helpers (isSubtype, asSubtype)
     // ONLY for the class that defines the explicit subtypes (to avoid duplicates and import issues)
     if (metadata.explicitSubtypes.isNotEmpty) {
-      final genericsStr = metadata.generics.isEmpty ? '' : '<${metadata.generics.map((g) => g.name).join(', ')}>';
-      final genericsDefStr = metadata.generics.isEmpty ? '' : '<${metadata.generics.map((g) => g.bound != null ? '${g.name} extends ${g.bound}' : g.name).join(', ')}>';
-      
-      sb.writeln('extension ${metadata.cleanName}PolymorphicE$genericsDefStr on ${metadata.cleanName}$genericsStr {');
+      final genericsStr = metadata.generics.isEmpty
+          ? ''
+          : '<${metadata.generics.map((g) => g.name).join(', ')}>';
+      final genericsDefStr = metadata.generics.isEmpty
+          ? ''
+          : '<${metadata.generics.map((g) => g.bound != null ? '${g.name} extends ${g.bound}' : g.name).join(', ')}>';
+
+      sb.writeln(
+        'extension ${metadata.cleanName}PolymorphicE$genericsDefStr on ${metadata.cleanName}$genericsStr {',
+      );
       for (final subtype in metadata.explicitSubtypes) {
         final subtypeName = subtype.interfaceName.replaceAll(r'$', '');
         if (metadata.cleanName != subtypeName) {
@@ -31,32 +37,49 @@ class PropertyHelperGenerator extends UniversalGenerator {
 
     // 2. Field-specific helpers (hasField, noField, Required, isEnumValue)
     // Wrap these in an extension so they are available on the class without pollulting it or requiring implementation
-    final ownFields = metadata.allFields.where((f) => metadata.ownFieldNames.contains(f.name)).toList();
+    final ownFields = metadata.allFields
+        .where((f) => metadata.ownFieldNames.contains(f.name))
+        .toList();
     if (ownFields.isNotEmpty) {
-      final genericsStr = metadata.generics.isEmpty ? '' : '<${metadata.generics.map((g) => g.name).join(', ')}>';
-      final genericsDefStr = metadata.generics.isEmpty ? '' : '<${metadata.generics.map((g) => g.bound != null ? '${g.name} extends ${g.bound}' : g.name).join(', ')}>';
-      
-      sb.writeln('extension ${metadata.cleanName}PropertyHelpers$genericsDefStr on ${metadata.cleanName}$genericsStr {');
+      final genericsStr = metadata.generics.isEmpty
+          ? ''
+          : '<${metadata.generics.map((g) => g.name).join(', ')}>';
+      final genericsDefStr = metadata.generics.isEmpty
+          ? ''
+          : '<${metadata.generics.map((g) => g.bound != null ? '${g.name} extends ${g.bound}' : g.name).join(', ')}>';
+
+      sb.writeln(
+        'extension ${metadata.cleanName}PropertyHelpers$genericsDefStr on ${metadata.cleanName}$genericsStr {',
+      );
 
       for (final field in ownFields) {
         var type = field.type ?? 'dynamic';
         type = type.replaceAll('\$', '');
-        
+
         final fieldName = field.name;
         final isNullable = type.endsWith('?');
-        final isCollection = type.startsWith('List<') || type.startsWith('Map<') || type.startsWith('Set<');
-        
-        final baseName = fieldName.startsWith('_') ? fieldName.substring(1) : fieldName;
+        final isCollection =
+            type.startsWith('List<') ||
+            type.startsWith('Map<') ||
+            type.startsWith('Set<');
+
+        final baseName = fieldName.startsWith('_')
+            ? fieldName.substring(1)
+            : fieldName;
         final capitalized = baseName[0].toUpperCase() + baseName.substring(1);
 
         if (isNullable && !isCollection) {
-           sb.writeln('  bool get has$capitalized => $fieldName != null;');
-           sb.writeln('  bool get no$capitalized => $fieldName == null;');
-           final nonNullableType = type.substring(0, type.length - 1);
-           sb.writeln('  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));');
+          sb.writeln('  bool get has$capitalized => $fieldName != null;');
+          sb.writeln('  bool get no$capitalized => $fieldName == null;');
+          final nonNullableType = type.substring(0, type.length - 1);
+          sb.writeln(
+            '  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));',
+          );
         } else if (isNullable && isCollection) {
-           final nonNullableType = type.substring(0, type.length - 1);
-           sb.writeln('  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));');
+          final nonNullableType = type.substring(0, type.length - 1);
+          sb.writeln(
+            '  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));',
+          );
         }
 
         if (isCollection) {
@@ -64,16 +87,23 @@ class PropertyHelperGenerator extends UniversalGenerator {
             sb.writeln('  bool get has$capitalized => $fieldName.isNotEmpty;');
             sb.writeln('  bool get no$capitalized => $fieldName.isEmpty;');
           } else {
-            sb.writeln('  bool get has$capitalized => $fieldName?.isNotEmpty ?? false;');
-            sb.writeln('  bool get no$capitalized => $fieldName?.isEmpty ?? true;');
+            sb.writeln(
+              '  bool get has$capitalized => $fieldName?.isNotEmpty ?? false;',
+            );
+            sb.writeln(
+              '  bool get no$capitalized => $fieldName?.isEmpty ?? true;',
+            );
           }
         }
 
         if (field.isEnum && field.enumValues.isNotEmpty) {
           final baseEnumName = type.replaceAll('?', '');
           for (final value in field.enumValues) {
-            final capitalizedValue = value[0].toUpperCase() + value.substring(1);
-            sb.writeln('  bool get is$capitalized$capitalizedValue => $fieldName == $baseEnumName.$value;');
+            final capitalizedValue =
+                value[0].toUpperCase() + value.substring(1);
+            sb.writeln(
+              '  bool get is$capitalized$capitalizedValue => $fieldName == $baseEnumName.$value;',
+            );
           }
         }
       }
@@ -86,7 +116,7 @@ class PropertyHelperGenerator extends UniversalGenerator {
   @override
   bool shouldGenerate(GenerationContext context) {
     // Generate if there are fields or subtypes
-    return context.metadata.allFields.isNotEmpty || 
-           context.metadata.polymorphicSubtypes.isNotEmpty;
+    return context.metadata.allFields.isNotEmpty ||
+        context.metadata.polymorphicSubtypes.isNotEmpty;
   }
 }

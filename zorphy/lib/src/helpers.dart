@@ -518,7 +518,7 @@ String getPropertiesAbstract(
       var cwFieldType = f.type != null
           ? _replaceDollarTypesWithConcrete(f.type!)
           : f.type;
-    sb.writeln("    $cwFieldType? ${f.name},");
+      sb.writeln("    $cwFieldType? ${f.name},");
     }
     sb.writeln("  }) = _\$${className}CopyWith;");
   }
