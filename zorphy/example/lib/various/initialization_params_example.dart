@@ -15,8 +15,6 @@ abstract class $InitializationParamsExample {
   $Params? get params;
   $Params? get credentials;
   $Params? get settings;
-
-  @deprecated
   @JsonKey(toJson: LocaleConverter.toJson, fromJson: LocaleConverter.fromJson)
   Locale? get locale;
 }

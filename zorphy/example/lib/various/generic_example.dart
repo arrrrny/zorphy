@@ -3,9 +3,6 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'generic_example.zorphy.dart';
 part 'generic_example.g.dart';
 
-@Zorphy()
-abstract class $TriggerBuild {}
-
 /// Example demonstrating generic type parameter support.
 ///
 /// This example shows:
