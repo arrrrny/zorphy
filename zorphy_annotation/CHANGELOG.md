@@ -1,3 +1,8 @@
+## [1.5.4] - 2026-02-13
+
+### Change
+- Allow hybrid serialization with json_serializable,for generic field types
+
 ## [1.5.3] - 2026-02-13
 
 ### Fix
