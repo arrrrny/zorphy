@@ -1,3 +1,8 @@
+## [1.5.2] - 2026-02-12
+
+### Fix
+- Updated copyWith generation to use a sentinel parameter pattern, preserving non-nullable fields while allowing explicit nulls for nullable fields.
+
 ## [1.5.1] - 2026-02-11
 
 ### Fix
