@@ -1,3 +1,8 @@
+## [1.5.3] - 2026-02-13
+
+### Fix
+- Fixed JsonKey and other annotations not catching due to Analyzer 10 changes
+
 ## [1.5.2] - 2026-02-12
 
 ### Fix
