@@ -1,3 +1,8 @@
+## [1.5.5] - 2026-02-13
+
+### Fix
+- fixed null type issue on custom toJson
+
 ## [1.5.4] - 2026-02-13
 
 ### Change
