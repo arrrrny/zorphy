@@ -6,7 +6,6 @@ import 'package:test/test.dart';
 void main() {
   group('ClassAnalyzer', () {
     test('placeholder - will test analysis output', () {
-      // TODO: Add integration tests once generators are extracted
       expect(true, isTrue);
     });
   });

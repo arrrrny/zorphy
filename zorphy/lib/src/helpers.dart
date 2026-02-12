@@ -83,6 +83,10 @@ String getProperties(
     }
   }
 
+  if (!isAbstract) {
+    sb.writeln("  static const _copyWithSentinel = Object();");
+  }
+
   if (!isAbstract && !hidePublicConstructor) {
     // Constructor
     sb.writeln("");
@@ -494,6 +498,10 @@ String getPropertiesAbstract(
     sb.writeln("  $fieldType get ${f.name};");
   }
 
+  if (generateCopyWithFn) {
+    sb.writeln("  static const _copyWithSentinel = Object();");
+  }
+
   // Constructor for abstract classes
   if (!isSealedWithSubtypes) {
     // Abstract class - add public constructor (can't use _internal as it's library-private)
@@ -510,7 +518,7 @@ String getPropertiesAbstract(
       var cwFieldType = f.type != null
           ? _replaceDollarTypesWithConcrete(f.type!)
           : f.type;
-      sb.writeln("    $cwFieldType? ${f.name},");
+    sb.writeln("    $cwFieldType? ${f.name},");
     }
     sb.writeln("  }) = _\$${className}CopyWith;");
   }
@@ -532,15 +540,17 @@ String getCopyWith(
   } else {
     sb.writeln("  $classNameTrimmed copyWith({");
     for (var f in fields) {
-      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
-      var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
-      sb.writeln("    $nullableType ${f.name},");
+      sb.writeln("    Object? ${f.name} = _copyWithSentinel,");
     }
     sb.writeln("  }) {");
   }
   sb.writeln("    return $classNameTrimmed(");
   for (var f in fields) {
-    sb.writeln("      ${f.name}: ${f.name} ?? this.${f.name},");
+    var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+    var castSuffix = fieldType == 'dynamic' ? '' : ' as $fieldType';
+    sb.writeln(
+      "      ${f.name}: identical(${f.name}, _copyWithSentinel) ? this.${f.name} : ${f.name}$castSuffix,",
+    );
   }
   sb.writeln("    );");
   sb.writeln("  }");
@@ -553,9 +563,7 @@ String getCopyWith(
   } else {
     sb.writeln("  $classNameTrimmed copyWith$classNameTrimmed({");
     for (var f in fields) {
-      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
-      var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
-      sb.writeln("    $nullableType ${f.name},");
+      sb.writeln("    Object? ${f.name} = _copyWithSentinel,");
     }
     sb.writeln("  }) {");
   }
@@ -620,9 +628,7 @@ String getInterfaceCopyWithMethods(
     sb.writeln("");
     sb.writeln("  $classNameTrimmed copyWith$interfaceNameTrimmed({");
     for (var f in interfaceFields) {
-      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
-      var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
-      sb.writeln("    $nullableType ${f.name},");
+      sb.writeln("    Object? ${f.name} = _copyWithSentinel,");
     }
     sb.writeln("  }) {");
     sb.writeln("    return copyWith(");
