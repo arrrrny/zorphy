@@ -15,6 +15,15 @@ class FieldsClassGenerator extends UniversalGenerator {
 
     if (metadata.allFields.isEmpty) return '';
 
+    final hasGenerics = metadata.generics.isNotEmpty;
+    final genericsArgsStr = hasGenerics
+        ? '<${metadata.generics.map((g) => g.name).join(', ')}>'
+        : '';
+    final genericsDefStr = hasGenerics
+        ? '<${metadata.generics.map((g) => g.bound != null ? '${g.name} extends ${g.bound}' : g.name).join(', ')}>'
+        : '';
+    final classType = '$className$genericsArgsStr';
+
     final sb = StringBuffer();
     sb.writeln('');
     sb.writeln('/// Field descriptors for [$className] query construction');
@@ -29,15 +38,21 @@ class FieldsClassGenerator extends UniversalGenerator {
         fieldType = _cleanType(fieldType);
       }
 
-      // Generate a static getter for tear-off
-      sb.writeln(
-        '  static $fieldType _\$get$fieldName($className e) => e.$fieldName;',
-      );
-
-      // Use the static getter as a tear-off in the Field constructor
-      sb.writeln(
-        '  static const $fieldName = Field<$className, $fieldType>(\'$fieldName\', _\$get$fieldName);',
-      );
+      if (hasGenerics) {
+        sb.writeln(
+          '  static $fieldType _\$get$fieldName$genericsDefStr($classType e) => e.$fieldName;',
+        );
+        sb.writeln(
+          '  static Field<$classType, $fieldType> $fieldName$genericsDefStr() => Field<$classType, $fieldType>(\'$fieldName\', _\$get$fieldName$genericsArgsStr);',
+        );
+      } else {
+        sb.writeln(
+          '  static $fieldType _\$get$fieldName($className e) => e.$fieldName;',
+        );
+        sb.writeln(
+          '  static const $fieldName = Field<$className, $fieldType>(\'$fieldName\', _\$get$fieldName);',
+        );
+      }
     }
 
     sb.writeln('}');
