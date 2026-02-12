@@ -21,7 +21,7 @@ echo "📝 Updating zorphy/pubspec.yaml..."
 cd zorphy
 
 # Replace zorphy_annotation dependency from version to path
-perl -i -0777 -pe 's/^  zorphy_annotation: .*\n/  zorphy_annotation:\n    path: ..\/zorphy_annotation\n/' pubspec.yaml
+perl -i -pe 'if (/^  zorphy_annotation: .+$/) { $_ = "  zorphy_annotation:\n    path: ../zorphy_annotation\n"; }' pubspec.yaml
 
 echo "  ✓ Updated zorphy_annotation to use local path"
 echo ""

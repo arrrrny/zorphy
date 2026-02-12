@@ -64,13 +64,12 @@ class JsonGenerator extends UniversalGenerator {
         sb.writeln(
           '  factory $className.fromJson(Map<String, dynamic> json) {',
         );
-        sb.writeln(
-          '    final instance = _\$$className' + 'FromJson(json);',
-        );
+        sb.writeln('    final instance = _\$$className' + 'FromJson(json);');
         sb.writeln('    return $className(');
         for (var f in metadata.allFields) {
-          final manualField =
-              manualFromJsonFields.where((m) => m.name == f.name);
+          final manualField = manualFromJsonFields.where(
+            (m) => m.name == f.name,
+          );
           if (manualField.isNotEmpty) {
             final info = manualField.first.jsonKeyInfo!;
             final jsonFieldName = info.name ?? f.name;
@@ -284,7 +283,7 @@ class JsonGenerator extends UniversalGenerator {
         final info = f.jsonKeyInfo!;
         final jsonFieldName = info.name ?? f.name;
         sb.writeln(
-          '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name});',
+          '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
         );
       }
       sb.writeln('    return _sanitizeJson(data);');
@@ -372,14 +371,12 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
         );
       } else {
         sb.writeln('  Map<String, dynamic> toJson() {');
-        sb.writeln(
-          '    final data = _\$$className' + 'ToJson(this);',
-        );
+        sb.writeln('    final data = _\$$className' + 'ToJson(this);');
         for (var f in manualToJsonFields) {
           final info = f.jsonKeyInfo!;
           final jsonFieldName = info.name ?? f.name;
           sb.writeln(
-            '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name});',
+            '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
           );
         }
         sb.writeln('    return data;');
@@ -406,7 +403,7 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
           final info = f.jsonKeyInfo!;
           final jsonFieldName = info.name ?? f.name;
           sb.writeln(
-            '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name});',
+            '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
           );
         }
         sb.writeln('    return data;');
@@ -436,7 +433,7 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
       final info = f.jsonKeyInfo!;
       final jsonFieldName = info.name ?? f.name;
       sb.writeln(
-        '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name});',
+        '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
       );
     }
     sb.writeln('    return _sanitizeJson(data);');
