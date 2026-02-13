@@ -12,6 +12,7 @@ abstract class $$Shape {
 // Implementation of the sealed class
 @Zorphy(generateJson: true)
 abstract class $Circle implements $$Shape {
+  @JsonKey(defaultValue: 10.0)
   double get radius;
 
   @override
@@ -20,7 +21,9 @@ abstract class $Circle implements $$Shape {
 
 @Zorphy(generateJson: true)
 abstract class $Rectangle implements $$Shape {
+  @JsonKey(defaultValue: 1.0)
   double get width;
+  @JsonKey(defaultValue: 1.0)
   double get height;
 
   @override
@@ -30,7 +33,14 @@ abstract class $Rectangle implements $$Shape {
 // Self-referencing example
 @Zorphy(generateJson: true)
 abstract class $TreeNode {
+  @JsonKey(defaultValue: "root")
   String get value;
+  
+  @JsonKey(defaultValue: const [])
   List<$TreeNode>? get children;
+  
+  @JsonKey(defaultValue: Duration(seconds: 5))
+  Duration get timeout;
+  
   $TreeNode? get parent;
 }

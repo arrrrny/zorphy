@@ -99,12 +99,13 @@ class JsonKeyInfo {
   });
 
   /// Generates the annotation string representation
-  String toAnnotationString() {
+  String toAnnotationString({bool includeDefaultValue = true}) {
     final params = <String>[];
 
     if (name != null) params.add("name: '$name'");
     if (ignore != null) params.add("ignore: $ignore");
-    if (defaultValue != null) params.add("defaultValue: $defaultValue");
+    if (includeDefaultValue && defaultValue != null)
+      params.add("defaultValue: $defaultValue");
     if (required != null) params.add("required: $required");
     if (includeIfNull != null) params.add("includeIfNull: $includeIfNull");
     if (includeFromJson != null)

@@ -122,18 +122,27 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
     } catch (_) {}
 
     try {
-      final defaultValueObj = reader.read('defaultValue');
-      if (!defaultValueObj.isNull) {
-        if (defaultValueObj.isString) {
-          defaultValue = defaultValueObj.stringValue;
-        } else if (defaultValueObj.isBool) {
-          defaultValue = defaultValueObj.boolValue;
-        } else if (defaultValueObj.isInt) {
-          defaultValue = defaultValueObj.intValue;
-        } else if (defaultValueObj.isDouble) {
-          defaultValue = defaultValueObj.doubleValue;
-        } else {
-          defaultValue = defaultValueObj.objectValue.toString();
+      // First try to extract from source to preserve exact syntax
+      final source = annotation.toSource();
+      defaultValue = _extractDefaultValue(source);
+
+      // Fallback to reader if not found (or if source extraction failed somehow)
+      if (defaultValue == null) {
+        final defaultValueObj = reader.read('defaultValue');
+        if (!defaultValueObj.isNull) {
+          if (defaultValueObj.isString) {
+            // Add quotes for string values to ensure valid Dart code
+            defaultValue = "'${defaultValueObj.stringValue}'";
+          } else if (defaultValueObj.isBool) {
+            defaultValue = defaultValueObj.boolValue.toString();
+          } else if (defaultValueObj.isInt) {
+            defaultValue = defaultValueObj.intValue.toString();
+          } else if (defaultValueObj.isDouble) {
+            defaultValue = defaultValueObj.doubleValue.toString();
+          } else {
+            // Best effort for other types
+            defaultValue = defaultValueObj.objectValue.toString();
+          }
         }
       }
     } catch (_) {}
@@ -233,6 +242,64 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
   }
 
   return null;
+}
+
+String? _extractDefaultValue(String annotationSource) {
+  final match = RegExp(r"defaultValue\s*:\s*").firstMatch(annotationSource);
+  if (match == null) return null;
+
+  final start = match.end;
+  var depth = 0;
+  var inSingleQuote = false;
+  var inDoubleQuote = false;
+  var i = start;
+
+  for (; i < annotationSource.length; i++) {
+    final char = annotationSource[i];
+
+    if (inSingleQuote) {
+      if (char == "'" && annotationSource[i - 1] != '\\') {
+        inSingleQuote = false;
+      }
+      continue;
+    }
+
+    if (inDoubleQuote) {
+      if (char == '"' && annotationSource[i - 1] != '\\') {
+        inDoubleQuote = false;
+      }
+      continue;
+    }
+
+    if (char == "'") {
+      inSingleQuote = true;
+      continue;
+    }
+
+    if (char == '"') {
+      inDoubleQuote = true;
+      continue;
+    }
+
+    if (char == '(' || char == '[' || char == '{') {
+      depth++;
+      continue;
+    }
+
+    if (char == ')' || char == ']' || char == '}') {
+      if (depth == 0) {
+        break;
+      }
+      depth--;
+      continue;
+    }
+
+    if (char == ',' && depth == 0) {
+      break;
+    }
+  }
+
+  return annotationSource.substring(start, i).trim();
 }
 
 String getClassComment(List<Interface> interfaces, String? classComment) {

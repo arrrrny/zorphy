@@ -58,7 +58,9 @@ String getProperties(
   for (var f in fields) {
     // Add JsonKey annotation if present from source
     if (f.jsonKeyInfo != null) {
-      sb.writeln("  ${f.jsonKeyInfo!.toAnnotationString()}");
+      // Exclude defaultValue from generated annotation to avoid issues with non-literal defaults
+      // We handle default values in the constructor
+      sb.writeln("  ${f.jsonKeyInfo!.toAnnotationString(includeDefaultValue: false)}");
     }
 
     // Add additional annotations
@@ -96,6 +98,10 @@ String getProperties(
     var constructorName = isPrivate ? "${classNameTrimmed}._" : "${classNameTrimmed}";
     
     sb.writeln("");
+    
+    // We need to collect initializers for default values
+    var initializers = <String>[];
+    
     if (fields.isEmpty) {
       sb.writeln("  ${constructorPrefix}${constructorName}()");
     } else {
@@ -110,19 +116,68 @@ String getProperties(
         // Check if field is nullable - if it ends with ?, don't add required
         // Use the transformed fieldType to check for nullability
         var isNullable = fieldType != null && fieldType.endsWith('?');
-        var requiredKeyword = isNullable ? "" : "required ";
-        sb.writeln("    ${requiredKeyword}this.${f.name},");
+        
+        var defaultValue = f.jsonKeyInfo?.defaultValue;
+        var hasDefaultValue = defaultValue != null;
+        
+        if (hasDefaultValue) {
+          // If we have a default value, we make the parameter nullable (if not already)
+          // and initialize it with ?? default
+          var paramType = isNullable ? fieldType : "$fieldType?";
+          sb.writeln("    ${paramType} ${f.name},");
+          
+          // Add to initializers list
+          // We can't use this.field = field ?? default in initializer list if we use field name shadowing
+          // But constructor params shadow fields.
+          // In initializer list: "this.field = field ?? default" is valid Dart.
+          
+          var defaultValueString = defaultValue.toString();
+          
+          // Check if we need to add 'const' prefix
+          // Heuristic: if it starts with [ or { or Identifier( and doesn't have const
+          // And isn't a simple literal
+          
+          if (!defaultValueString.startsWith("const ") && 
+              !defaultValueString.startsWith("'") && 
+              !defaultValueString.startsWith('"') &&
+              !RegExp(r'^-?\d').hasMatch(defaultValueString) && // numbers
+              defaultValueString != "true" && 
+              defaultValueString != "false" && 
+              defaultValueString != "null") {
+              
+             // Check for constructor call or collection literal
+             if (defaultValueString.startsWith("[") || 
+                 defaultValueString.startsWith("{") || 
+                 RegExp(r'^[a-zA-Z_$][a-zA-Z0-9_$]*(\.[a-zA-Z_$][a-zA-Z0-9_$]*)?(\s*<[^>]+>)?\s*\(').hasMatch(defaultValueString)) {
+                defaultValueString = "const $defaultValueString";
+             }
+          }
+          
+          initializers.add("this.${f.name} = ${f.name} ?? ${defaultValueString}");
+        } else {
+          var requiredKeyword = isNullable ? "" : "required ";
+          sb.writeln("    ${requiredKeyword}this.${f.name},");
+        }
       }
-      sb.writeln("  })");
+      sb.write("  })");
     }
 
     // Add super call when extending abstract class
     if (hasExtends && extendsAbstractClass) {
       // Extending abstract class - call super()
-      sb.writeln("  : super();");
+      if (initializers.isNotEmpty) {
+        sb.write(" : ${initializers.join(", ")}");
+        sb.writeln(", super();");
+      } else {
+        sb.writeln(" : super();");
+      }
     } else if (hasExtends && !extendsAbstractClass) {
       // Extending concrete class - call super() with parent fields only
-      sb.writeln("  : super(");
+      sb.write(" : ");
+      if (initializers.isNotEmpty) {
+        sb.write("${initializers.join(", ")}, ");
+      }
+      sb.writeln("super(");
       for (var f in fields) {
         if (parentFields.contains(f.name)) {
           sb.writeln("      ${f.name}: ${f.name},");
@@ -130,7 +185,11 @@ String getProperties(
       }
       sb.writeln("    );");
     } else {
-      sb.writeln("  ;");
+      if (initializers.isNotEmpty) {
+        sb.writeln(" : ${initializers.join(", ")};");
+      } else {
+        sb.writeln(";");
+      }
     }
 
     // Named constructor for copyWith
