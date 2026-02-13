@@ -290,6 +290,7 @@ String createZorphy(
         hidePublicConstructor,
         generateCopyWithFn,
         generateJson,
+        hasConstConstructor,
         hasExtendsParam,
         extendsAbstractClass: extendsAbstractClass,
         parentFields: parentFields,

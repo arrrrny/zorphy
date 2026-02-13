@@ -4,7 +4,7 @@ import 'package:zorphy/src/common/NameType.dart';
 
 void main() {
   group('copyWith generation', () {
-    test('uses sentinel parameters and casts to field type', () {
+    test('uses typed params for non-nullable and sentinel for nullable', () {
       final fields = <NameTypeClassComment>[
         NameTypeClassComment('name', 'String', ''),
         NameTypeClassComment('age', 'int', ''),
@@ -13,19 +13,19 @@ void main() {
 
       final code = helpers.getCopyWith(fields, 'User', false);
 
-      expect(code.contains('Object? name = _copyWithSentinel'), isTrue);
-      expect(code.contains('Object? age = _copyWithSentinel'), isTrue);
+      expect(code.contains('String? name'), isTrue);
+      expect(code.contains('int? age'), isTrue);
       expect(code.contains('Object? email = _copyWithSentinel'), isTrue);
 
       expect(
         code.contains(
-          "name: identical(name, _copyWithSentinel) ? this.name : name as String,",
+          "name: name ?? this.name,",
         ),
         isTrue,
       );
       expect(
         code.contains(
-          "age: identical(age, _copyWithSentinel) ? this.age : age as int,",
+          "age: age ?? this.age,",
         ),
         isTrue,
       );

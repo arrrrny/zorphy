@@ -136,6 +136,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         config.hidePublicConstructor,
         config.generateCopyWithFn,
         config.generateJson,
+        metadata.hasConstConstructor,
         hasExtendsParam,
         extendsAbstractClass: extendsAbstractClass,
         parentFields: parentFields,

@@ -504,13 +504,13 @@ void demonstrateChangeTo() {
 
 /// Demonstrates constant constructors
 void demonstrateConstants() {
-  final red = Color(red: 255, green: 0, blue: 0);
-  final blue = Color(red: 0, green: 0, blue: 255);
+  const red = Color(red: 255, green: 0, blue: 0);
+  const blue = Color(red: 0, green: 0, blue: 255);
 
   print('Red color: ${red.red}, ${red.green}, ${blue.blue}');
 
   // Constants are identical
-  final red2 = Color(red: 255, green: 0, blue: 0);
+  const red2 = Color(red: 255, green: 0, blue: 0);
   print('Same red: ${identical(red, red2)}');
 }
 
