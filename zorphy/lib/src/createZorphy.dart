@@ -281,6 +281,19 @@ String createZorphy(
     for (final iface in interfaces) {
       allParentInterfaceFields.addAll(iface.fields.map((f) => f.name));
     }
+    var parentHasConstConstructor = true;
+    if (hasExtendsParam && !extendsAbstractClass) {
+      final extendsMatch = RegExp(r'extends\s+(\S+)').firstMatch(extendsStr);
+      if (extendsMatch != null) {
+        final parentName = extendsMatch.group(1)!;
+        final parentElement = allAnnotatedClasses[parentName] ??
+            allAnnotatedClasses['\$$parentName'];
+        parentHasConstConstructor =
+            parentElement?.constructors.any((e) => e.isConst) ?? false;
+      }
+    }
+    var shouldGenerateConstConstructor =
+        hasConstConstructor && (!hasExtendsParam || parentHasConstConstructor);
 
     sb.writeln(
       getProperties(
@@ -290,7 +303,7 @@ String createZorphy(
         hidePublicConstructor,
         generateCopyWithFn,
         generateJson,
-        hasConstConstructor,
+        shouldGenerateConstConstructor,
         hasExtendsParam,
         extendsAbstractClass: extendsAbstractClass,
         parentFields: parentFields,

@@ -111,6 +111,11 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     // Determine if we're extending a concrete parent
     final parentConcreteClassName = _getConcreteParentName(metadata);
     final hasConcreteParent = parentConcreteClassName != null;
+    final parentHasConst = hasConcreteParent
+        ? _parentHasConstConstructor(metadata, parentConcreteClassName)
+        : true;
+    final shouldGenerateConstConstructor =
+        metadata.hasConstConstructor && (!hasConcreteParent || parentHasConst);
 
     // When extending a concrete parent, we still generate all fields
     // but we need to track which ones belong to the parent for the super call
@@ -136,7 +141,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         config.hidePublicConstructor,
         config.generateCopyWithFn,
         config.generateJson,
-        metadata.hasConstConstructor,
+        shouldGenerateConstConstructor,
         hasExtendsParam,
         extendsAbstractClass: extendsAbstractClass,
         parentFields: parentFields,
@@ -189,6 +194,25 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       final clause = clauseParts.join(', ');
       return clause.isNotEmpty ? ' implements $clause' : '';
     }
+  }
+
+  bool _parentHasConstConstructor(
+    ClassMetadata metadata,
+    String parentConcreteClassName,
+  ) {
+    for (final iface in metadata.interfaces) {
+      final ifaceName = iface.element.name ?? '';
+      final trimmedIfaceName = _trimInterfaceName(iface.interfaceName);
+      if (ifaceName == parentConcreteClassName ||
+          ifaceName == '\$$parentConcreteClassName' ||
+          trimmedIfaceName == parentConcreteClassName) {
+        return iface.element.constructors.any((e) => e.isConst);
+      }
+    }
+    final parentElement =
+        metadata.allAnnotatedClasses[parentConcreteClassName] ??
+            metadata.allAnnotatedClasses['\$$parentConcreteClassName'];
+    return parentElement?.constructors.any((e) => e.isConst) ?? false;
   }
 
   String _getExtendedParentName(

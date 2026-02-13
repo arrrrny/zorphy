@@ -21,6 +21,12 @@ abstract class $User {
   String? get email;
 }
 
+User createGuestUser() => User(
+      name: 'Guest',
+      age: 0,
+      email: null,
+    );
+
 // =============================================================================
 // FEATURE 2: JSON Serialization
 // =============================================================================
@@ -224,9 +230,14 @@ abstract class $Color {
   const $Color();
 }
 
-// =============================================================================
-// FEATURE 13: Complex Nested Structure
-// =============================================================================
+@Zorphy()
+abstract class $StartupOptions {
+  const $StartupOptions();
+
+  Duration? get timeout => Duration(seconds: 5);
+  bool? get forceRefresh => true;
+  String? get locale;
+}
 
 /// Employee in a company
 @Zorphy()
@@ -504,14 +515,21 @@ void demonstrateChangeTo() {
 
 /// Demonstrates constant constructors
 void demonstrateConstants() {
-  const red = Color(red: 255, green: 0, blue: 0);
-  const blue = Color(red: 0, green: 0, blue: 255);
+  final red = Color(red: 255, green: 0, blue: 0);
+  final blue = Color(red: 0, green: 0, blue: 255);
 
   print('Red color: ${red.red}, ${red.green}, ${blue.blue}');
 
   // Constants are identical
-  const red2 = Color(red: 255, green: 0, blue: 0);
+  final red2 = Color(red: 255, green: 0, blue: 0);
   print('Same red: ${identical(red, red2)}');
+}
+
+void demonstrateDefaultValues() {
+  final guest = createGuestUser();
+  print('Guest name: ${guest.name}');
+  print('Guest age: ${guest.age}');
+  print('Guest email: ${guest.email}');
 }
 
 /// Demonstrates complex nested structures
@@ -581,7 +599,10 @@ void main() {
   print('\n12. Constants:');
   demonstrateConstants();
 
-  print('\n13. Complex Nesting:');
+  print('\n13. Default Values:');
+  demonstrateDefaultValues();
+
+  print('\n14. Complex Nesting:');
   demonstrateComplexNesting();
 
   print('\n=== All Examples Complete ===');
