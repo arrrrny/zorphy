@@ -250,6 +250,13 @@ class JsonGenerator extends UniversalGenerator {
       return '';
     }
 
+    // Don't generate toJsonLean in the class body for generic classes that extend
+    // a non-generic parent — the parent already defines toJsonLean() with no params,
+    // and adding params would be an invalid override. The extension handles it instead.
+    if (metadata.generics.isNotEmpty && _hasNonGenericJsonParent(metadata)) {
+      return '';
+    }
+
     final manualToJsonFields = _getManualToJsonFields(metadata);
 
     if (!metadata.isAbstract) {
@@ -319,6 +326,17 @@ class JsonGenerator extends UniversalGenerator {
     sb.writeln('  }');
 
     return sb.toString();
+  }
+
+  /// Whether this generic class extends a non-generic parent that would have
+  /// toJsonLean()/toJson() with no generic params (causing override conflicts).
+  bool _hasNonGenericJsonParent(ClassMetadata metadata) {
+    for (final iface in metadata.interfaces) {
+      if (iface.typeParams.isEmpty) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Fields excluded from json_serializable but having manual fromJson converters
