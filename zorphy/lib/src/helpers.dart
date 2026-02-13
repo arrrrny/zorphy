@@ -85,55 +85,21 @@ String getProperties(
   }
 
   if (!isAbstract) {
+    // Constructor Generation
     var constructorPrefix = hasConstConstructor ? "const " : "";
-
-    // Public Constructor
-    if (!hidePublicConstructor) {
-      sb.writeln("");
-      if (fields.isEmpty) {
-        sb.writeln("  ${constructorPrefix}${classNameTrimmed}()");
-      } else {
-        sb.writeln("  ${constructorPrefix}${classNameTrimmed}({");
-        for (var f in fields) {
-          // Determine the field type (same logic as above for field declarations)
-          var fieldType = f.type;
-          if (fieldType != null) {
-            fieldType = _replaceDollarTypesWithConcrete(fieldType);
-          }
-
-          // Check if field is nullable - if it ends with ?, don't add required
-          // Use the transformed fieldType to check for nullability
-          var isNullable = fieldType != null && fieldType.endsWith('?');
-          var requiredKeyword = isNullable ? "" : "required ";
-          sb.writeln("    ${requiredKeyword}this.${f.name},");
-        }
-        sb.writeln("  })");
-      }
-
-      // Add super call when extending abstract class
-      if (hasExtends && extendsAbstractClass) {
-        // Extending abstract class - call super()
-        sb.writeln("  : super();");
-      } else if (hasExtends && !extendsAbstractClass) {
-        // Extending concrete class - call super() with parent fields only
-        sb.writeln("  : super(");
-        for (var f in fields) {
-          if (parentFields.contains(f.name)) {
-            sb.writeln("      ${f.name}: ${f.name},");
-          }
-        }
-        sb.writeln("    );");
-      } else {
-        sb.writeln("  ;");
-      }
-    }
-
-    // Private Constructor
+    
+    // Determine which constructor to generate based on hidePublicConstructor
+    // if hidePublicConstructor is true -> Generate ONLY private constructor ._()
+    // if hidePublicConstructor is false -> Generate ONLY public constructor ()
+    
+    var isPrivate = hidePublicConstructor;
+    var constructorName = isPrivate ? "${classNameTrimmed}._" : "${classNameTrimmed}";
+    
     sb.writeln("");
     if (fields.isEmpty) {
-      sb.writeln("  ${constructorPrefix}${classNameTrimmed}._()");
+      sb.writeln("  ${constructorPrefix}${constructorName}()");
     } else {
-      sb.writeln("  ${constructorPrefix}${classNameTrimmed}._({");
+      sb.writeln("  ${constructorPrefix}${constructorName}({");
       for (var f in fields) {
         // Determine the field type (same logic as above for field declarations)
         var fieldType = f.type;
