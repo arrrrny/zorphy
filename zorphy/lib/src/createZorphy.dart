@@ -39,7 +39,8 @@ String createZorphy(
   var isAbstractWithSubtypes =
       elementName.startsWith("\$\$") && typesExplicit.isNotEmpty;
   if (generateJson && !isSealedClass && !isAbstractWithSubtypes) {
-    sb.writeln("@JsonSerializable(explicitToJson: $explicitToJson)");
+    var constructorParam = hidePublicConstructor ? ", constructor: '_'" : "";
+    sb.writeln("@JsonSerializable(explicitToJson: $explicitToJson$constructorParam)");
   }
 
   var className = elementName.replaceAll("\$", "");
@@ -330,7 +331,13 @@ String createZorphy(
 
   // Add patchWith method for non-abstract classes
   if (!isAbstract) {
-    sb.writeln(getPatchWithMethod(allFieldsDistinct, className));
+    sb.writeln(
+      getPatchWithMethod(
+        allFieldsDistinct,
+        className,
+        hidePublicConstructor: hidePublicConstructor,
+      ),
+    );
     sb.writeln(
       getInterfaceCopyWithMethods(interfaces, allFieldsDistinct, className),
     );
@@ -345,7 +352,12 @@ String createZorphy(
       );
     }
     sb.writeln(
-      getInterfacePatchWithMethods(interfaces, allFieldsDistinct, className),
+      getInterfacePatchWithMethods(
+        interfaces,
+        allFieldsDistinct,
+        className,
+        hidePublicConstructor: hidePublicConstructor,
+      ),
     );
   }
 

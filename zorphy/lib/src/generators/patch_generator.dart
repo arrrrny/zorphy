@@ -14,7 +14,13 @@ class PatchGenerator extends ConcreteClassGenerator {
     final className = metadata.cleanName;
 
     // Generate patchWith method
-    sb.writeln(helpers.getPatchWithMethod(metadata.allFields, className));
+    sb.writeln(
+      helpers.getPatchWithMethod(
+        metadata.allFields,
+        className,
+        hidePublicConstructor: context.config.hidePublicConstructor,
+      ),
+    );
 
     // Generate interface-specific patchWith methods
     sb.writeln(
@@ -22,6 +28,7 @@ class PatchGenerator extends ConcreteClassGenerator {
         metadata.interfaces,
         metadata.allFields,
         className,
+        hidePublicConstructor: context.config.hidePublicConstructor,
       ),
     );
 

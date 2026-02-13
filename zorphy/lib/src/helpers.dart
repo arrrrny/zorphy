@@ -84,14 +84,56 @@ String getProperties(
     }
   }
 
-  if (!isAbstract && !hidePublicConstructor) {
-    // Constructor
-    sb.writeln("");
+  if (!isAbstract) {
     var constructorPrefix = hasConstConstructor ? "const " : "";
+
+    // Public Constructor
+    if (!hidePublicConstructor) {
+      sb.writeln("");
+      if (fields.isEmpty) {
+        sb.writeln("  ${constructorPrefix}${classNameTrimmed}()");
+      } else {
+        sb.writeln("  ${constructorPrefix}${classNameTrimmed}({");
+        for (var f in fields) {
+          // Determine the field type (same logic as above for field declarations)
+          var fieldType = f.type;
+          if (fieldType != null) {
+            fieldType = _replaceDollarTypesWithConcrete(fieldType);
+          }
+
+          // Check if field is nullable - if it ends with ?, don't add required
+          // Use the transformed fieldType to check for nullability
+          var isNullable = fieldType != null && fieldType.endsWith('?');
+          var requiredKeyword = isNullable ? "" : "required ";
+          sb.writeln("    ${requiredKeyword}this.${f.name},");
+        }
+        sb.writeln("  })");
+      }
+
+      // Add super call when extending abstract class
+      if (hasExtends && extendsAbstractClass) {
+        // Extending abstract class - call super()
+        sb.writeln("  : super();");
+      } else if (hasExtends && !extendsAbstractClass) {
+        // Extending concrete class - call super() with parent fields only
+        sb.writeln("  : super(");
+        for (var f in fields) {
+          if (parentFields.contains(f.name)) {
+            sb.writeln("      ${f.name}: ${f.name},");
+          }
+        }
+        sb.writeln("    );");
+      } else {
+        sb.writeln("  ;");
+      }
+    }
+
+    // Private Constructor
+    sb.writeln("");
     if (fields.isEmpty) {
-      sb.writeln("  ${constructorPrefix}${classNameTrimmed}()");
+      sb.writeln("  ${constructorPrefix}${classNameTrimmed}._()");
     } else {
-      sb.writeln("  ${constructorPrefix}${classNameTrimmed}({");
+      sb.writeln("  ${constructorPrefix}${classNameTrimmed}._({");
       for (var f in fields) {
         // Determine the field type (same logic as above for field declarations)
         var fieldType = f.type;
@@ -523,8 +565,9 @@ String getPropertiesAbstract(
 String getCopyWith(
   List<NameTypeClassComment> fields,
   String className,
-  bool generateCopyWithFn,
-) {
+  bool generateCopyWithFn, {
+  bool hidePublicConstructor = false,
+}) {
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
 
@@ -541,7 +584,9 @@ String getCopyWith(
     }
     sb.writeln("  }) {");
   }
-  sb.writeln("    return $classNameTrimmed(");
+  
+  var constructorSuffix = hidePublicConstructor ? "._" : "";
+  sb.writeln("    return $classNameTrimmed$constructorSuffix(");
   for (var f in fields) {
     sb.writeln("      ${f.name}: ${f.name} ?? this.${f.name},");
   }
@@ -1096,7 +1141,11 @@ const PRIMITIVE_TYPES = [
   'dynamic',
 ];
 
-String getPatchWithMethod(List<NameTypeClassComment> fields, String className) {
+String getPatchWithMethod(
+  List<NameTypeClassComment> fields,
+  String className, {
+  bool hidePublicConstructor = false,
+}) {
   if (fields.isEmpty) return '';
 
   var classNameTrimmed = className.replaceAll("\$", "");
@@ -1111,7 +1160,9 @@ String getPatchWithMethod(List<NameTypeClassComment> fields, String className) {
     "    final _patcher = patchInput ?? $classNameTrimmed" + "Patch();",
   );
   sb.writeln("    final _patchMap = _patcher.toPatch();");
-  sb.writeln("    return $classNameTrimmed(");
+  
+  var constructorSuffix = hidePublicConstructor ? "._" : "";
+  sb.writeln("    return $classNameTrimmed$constructorSuffix(");
 
   for (var i = 0; i < fields.length; i++) {
     var f = fields[i];
@@ -1130,8 +1181,9 @@ String getPatchWithMethod(List<NameTypeClassComment> fields, String className) {
 String getInterfacePatchWithMethods(
   List<Interface> interfaces,
   List<NameTypeClassComment> classFields,
-  String className,
-) {
+  String className, {
+  bool hidePublicConstructor = false,
+}) {
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
   var classFieldNames = classFields.map((f) => f.name).toSet();
@@ -1160,7 +1212,9 @@ String getInterfacePatchWithMethods(
       "    final _patcher = patchInput ?? $interfaceNameTrimmed" + "Patch();",
     );
     sb.writeln("    final _patchMap = _patcher.toPatch();");
-    sb.writeln("    return $classNameTrimmed(");
+    
+    var constructorSuffix = hidePublicConstructor ? "._" : "";
+    sb.writeln("    return $classNameTrimmed$constructorSuffix(");
 
     for (var f in classFields) {
       if (interfaceFieldNames.contains(f.name)) {

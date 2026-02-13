@@ -94,8 +94,9 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       final genericParams = metadata.generics.isNotEmpty
           ? ', genericArgumentFactories: true'
           : '';
+      final constructorParam = config.hidePublicConstructor ? ", constructor: '_'" : "";
       sb.writeln(
-        '@JsonSerializable(explicitToJson: ${config.explicitToJson}$genericParams)',
+        '@JsonSerializable(explicitToJson: ${config.explicitToJson}$genericParams$constructorParam)',
       );
     }
 
