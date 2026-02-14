@@ -1,0 +1,39 @@
+name: Dart CI
+
+on:
+  push:
+    branches: [ master, main, development ]
+  pull_request:
+    branches: [ master, main, development ]
+
+jobs:
+  analyze_and_test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies (zorphy_annotation)
+        run: dart pub get
+        working-directory: zorphy_annotation
+
+      - name: Analyze (zorphy_annotation)
+        run: dart analyze
+        working-directory: zorphy_annotation
+
+      - name: Install dependencies (zorphy)
+        run: dart pub get
+        working-directory: zorphy
+
+      - name: Analyze (zorphy)
+        run: dart analyze
+        working-directory: zorphy
+
+      - name: Run tests (zorphy)
+        run: dart test
+        working-directory: zorphy
