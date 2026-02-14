@@ -1,32 +1,50 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.5.7] - 2026-02-14
+
+### Fix
+- Modified skip logic in `getProperties()` to not skip fields that exist in both parentFields and ownFields (overridden fields)
+- Prevents duplicate `@override` annotation when source already has it
+- Constructor generation `isParentField` check now excludes fields in ownFields so overridden fields use `this.field` syntax
+- Added `_getCovariantFields()` helper to detect fields where class type differs from interface type
+- `getInterfaceCopyWithMethods()` now uses class field types (not interface types) for parameters and adds covariant where needed
+- `getInterfaceCopyWithFnMethods()` now uses class field types for parameters
+
 ## [1.5.6] - 2026-02-14
 
 ### Chore
-- Updated docs, created docusarous website, create public constructors by default and only create private on public hidden
+- Updated docs and created docusaurus website
+- Create public constructors by default and only create private when hidden
 
 ## [1.5.5] - 2026-02-13
 
 ### Fix
-- fixed null type issue on custom toJson
+- Fixed null type issue on custom toJson
 
 ## [1.5.4] - 2026-02-13
 
 ### Change
-- Allow hybrid serialization with json_serializable,for generic field types
+- Allow hybrid serialization with json_serializable for generic field types
 
 ## [1.5.3] - 2026-02-13
 
 ### Fix
-- Fixed JsonKey and other annotations not catching due to Analyzer 10 changes
-- 
+- Fixed JsonKey and other annotations not being caught due to Analyzer 10 changes
+
 ## [1.5.2] - 2026-02-12
 
 ### Fix
-- Updated copyWith generation to use a sentinel parameter pattern, preserving non-nullable fields while allowing explicit nulls for nullable fields.
+- Updated copyWith generation to use a sentinel parameter pattern, preserving non-nullable fields while allowing explicit nulls for nullable fields
 
 ## [1.5.1] - 2026-02-11
 
 ### Fix
-- fixed issue with nested entity
+- Fixed issue with nested entity
 
 ## [1.5.0] - 2026-02-09
 
@@ -41,40 +59,32 @@
 ## [1.4.0] - 2026-02-07
 
 ### Feat
-- Added
+- Added [feature description needed]
 
 ## [1.3.4] - 2026-02-07
 
 ### Fix
-- Referencing
+- Referencing issues
 
 ## [1.3.3] - 2026-02-07
 
 ### Fix
-- Upgraded
+- Upgraded dependencies
 
 ## [1.3.2] - 2026-02-06
 
 ### Fix
-- Analyzer
+- Analyzer compatibility improvements
 
 ## [1.3.1] - 2026-02-06
 
 ### Fix
-- Improved
+- Improved type handling
 
 ## [1.3.0] - 2026-02-06
 
-### Features
-- Added `--dry-run` flag to CLI commands (`create`, `new`, `enum`, `add-field`, `from-json`) to preview generated code without writing files.
-- Added support for generating `explicitSubTypes` annotation without extending an interface.
-
 ### Changed
-- Renamed `--subtype` flag to `--subtypes` in `create` command.
-- Updated `zorphy_annotation` dependency to 1.3.0.
-
-### Fix
-- Fixed handling of special characters (like `<` and `>`) in CLI `List` and `Map` type arguments.
+- Updated to new Zorphy API
 
 ## [1.2.1] - 2026-02-05
 
@@ -84,7 +94,7 @@
 ## [1.2.0] - 2026-02-05
 
 ### Chore
-- Downgraded analyzer version to match latest flutter sdk
+- Downgraded analyzer version to match latest Flutter SDK
 
 ## [1.1.1] - 2026-02-05
 
@@ -94,95 +104,64 @@
 ## [1.1.0] - 2026-02-05
 
 ### Change
-- Fixed an edge case where a class extends a sealed class and implements another class was causing parameters not passed in super constructor
-
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+- Fixed edge case where a class extends a sealed class and implements another class causing parameters not passed in super constructor
 
 ## [1.0.0] - 2026-02-04
 
 ### Added
+- Initial release of zorphy_annotation package
+- Core `@Zorphy()` annotation with full configuration support
+- `generateJson` option for JSON serialization
+- `generateCompareTo` option for diff generation
+- `generateCopyWithFn` option for function-based copyWith
+- `explicitSubTypes` option for sealed class hierarchies
+- Support for generic type parameters
+- Support for nested object patching
+- Support for self-referencing types
+- Support for multiple inheritance via interfaces
+- Support for enum fields
+- Support for constant constructors
+- Full TypeScript-style type safety
 
-- Initial release of zorphy code generator
-- Complete code generation for immutable data classes
-- CLI tool for entity and enum generation
-- JSON serialization support via json_serializable integration
-- Comprehensive test suite with examples
-- Support for all zorphy_annotation features
-
-### Code Generation
-
-- Immutable concrete class generation from abstract definitions
-- Automatic constructor with required/optional parameters
+### Features
+- Immutable data class generation
+- Automatic constructor generation
 - Smart copyWith methods
-- Function-based copyWith (copyWithFn) option
-- Patch class generation with fluent API
-- Nested patch support
-- Equality operator (==) generation
-- HashCode generation
+- Advanced patching system with fluent API
+- JSON serialization with lean JSON option
+- Sealed classes with polymorphic serialization
+- Multiple inheritance support
+- Generic class support
+- Enum integration
+- Self-referencing type support
+- Comparison and diff generation
+- Equality and hashCode generation
 - ToString generation
-- CompareTo method for diff generation
-
-### Advanced Features
-
-- Sealed class generation with explicit subtypes
-- Polymorphic JSON serialization with type discriminators
-- Multiple inheritance via interface implementation
-- Generic type parameter support
-- Self-referencing type support (tree structures)
-- Enum field support with automatic serialization
-- DateTime serialization (ISO 8601)
-- Lean JSON option (excludes metadata)
-- Constant constructor support
-
-### CLI
-
-- `zorphy create` command for entity generation
-- `zorphy enum` command for enum generation
-- Interactive field prompts
-- Support for all annotation options via CLI
-- Smart type detection and validation
-
-### Integration
-
-- Full build_runner integration
-- json_serializable integration for JSON support
-- Part file generation (.zorphy.dart)
-- Efficient incremental builds
-
-### Examples
-
-- Comprehensive example suite
-- Real-world usage patterns
-- State management examples
-- API response handling
-- Nested configuration
-- Comparison and patching
+- Type-safe field enums
 
 ### Documentation
-
-- Complete README with feature reference
+- Comprehensive README with examples
 - Quick start guide
-- CLI documentation
-- Real-world examples
-- Troubleshooting guide
+- Feature reference
+- Real-world usage examples
 
-### Bug Fixes
-
-- Fixed multiple inheritance super constructor calls
-- Fixed self-referencing type resolution
-- Fixed generic type parameter handling
-- Added json_annotation to dev dependencies
-
-### Performance
-
-- Optimized build performance
-- Efficient incremental compilation
-- Minimal generated code overhead
-
-[Unreleased]: https://github.com/arrrrny/zorphy/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/arrrrny/zorphy/compare/v1.5.6...HEAD
+[1.5.6]: https://github.com/arrrrny/zorphy/compare/v1.5.5...v1.5.6
+[1.5.5]: https://github.com/arrrrny/zorphy/compare/v1.5.4...v1.5.5
+[1.5.4]: https://github.com/arrrrny/zorphy/compare/v1.5.3...v1.5.4
+[1.5.3]: https://github.com/arrrrny/zorphy/compare/v1.5.2...v1.5.3
+[1.5.2]: https://github.com/arrrrny/zorphy/compare/v1.5.1...v1.5.2
+[1.5.1]: https://github.com/arrrrny/zorphy/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/arrrrny/zorphy/compare/v1.4.1...v1.5.0
+[1.4.1]: https://github.com/arrrrny/zorphy/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/arrrrny/zorphy/compare/v1.3.4...v1.4.0
+[1.3.4]: https://github.com/arrrrny/zorphy/compare/v1.3.3...v1.3.4
+[1.3.3]: https://github.com/arrrrny/zorphy/compare/v1.3.2...v1.3.3
+[1.3.2]: https://github.com/arrrrny/zorphy/compare/v1.3.1...v1.3.2
+[1.3.1]: https://github.com/arrrrny/zorphy/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/arrrrny/zorphy/compare/v1.2.1...v1.3.0
+[1.2.1]: https://github.com/arrrrny/zorphy/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/arrrrny/zorphy/compare/v1.1.1...v1.2.0
+[1.1.1]: https://github.com/arrrrny/zorphy/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/arrrrny/zorphy/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/arrrrny/zorphy/releases/tag/v1.0.0

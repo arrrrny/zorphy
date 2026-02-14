@@ -56,16 +56,74 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 1
 fi
 
-# Get current date
+    # Get current date
 DATE=$(date +%Y-%m-%d)
 
 echo "🚀 Publishing zorphy monorepo version $VERSION..."
 echo "📍 Working directory: $REPO_ROOT"
 echo ""
 echo "📦 Publishing order:"
-echo "   1. zorphy_annotation (tag: annotation-v$VERSION)"
-echo "   2. zorphy (tag: v$VERSION)"
+echo "   1. zorphy_annotation (tag: annotation-vX.Y.Z)"
+echo "   2. zorphy (tag: vX.Y.Z)"
 echo ""
+
+# Function to update comparison links at bottom of CHANGELOG
+update_changelog_links() {
+    local package_dir="$1"
+    local version="$2"
+    local prev_version=""
+
+    echo "  📝 Updating comparison links..."
+    cd "$package_dir"
+
+    # Extract previous version from [Unreleased] link
+    if grep -q "^\[Unreleased\]:" CHANGELOG.md; then
+        prev_version=$(grep "^\[Unreleased\]:" CHANGELOG.md | sed -E 's/.*\/compare\/v?([0-9]+\.[0-9]+\.[0-9]+)\.\.\..*/\1/')
+    fi
+
+    # If no previous version found, default to 1.0.0
+    if [ -z "$prev_version" ]; then
+        prev_version="1.0.0"
+    fi
+
+    # Get the package name prefix (annotation-v or v)
+    if [[ "$package_dir" == *"annotation"* ]]; then
+        prefix="annotation-v"
+    else
+        prefix="v"
+    fi
+
+    # Update or add [Unreleased] link
+    if grep -q "^\[Unreleased\]:" CHANGELOG.md; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s|^\[Unreleased\]:.*|[Unreleased]: https://github.com/arrrrny/zorphy/compare/${prefix}${version}...HEAD|" CHANGELOG.md
+        else
+            sed -i "s|^\[Unreleased\]:.*|[Unreleased]: https://github.com/arrrrny/zorphy/compare/${prefix}${version}...HEAD|" CHANGELOG.md
+        fi
+    else
+        # Add [Unreleased] link at end
+        echo "" >> CHANGELOG.md
+        echo "[Unreleased]: https://github.com/arrrrny/zorphy/compare/${prefix}${version}...HEAD" >> CHANGELOG.md
+    fi
+
+    # Add new version link
+    if ! grep -q "^\[${version}\]:" CHANGELOG.md; then
+        if grep -q "^\[${prev_version}\]:" CHANGELOG.md; then
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "/^\[${prev_version}\]:/a\\
+[${version}]: https://github.com/arrrrny/zorphy/compare/${prefix}${prev_version}...${prefix}${version}
+" CHANGELOG.md
+            else
+                sed -i "/^\[${prev_version}\]:/a\\
+[${version}]: https://github.com/arrrrny/zorphy/compare/${prefix}${prev_version}...${prefix}${version}
+" CHANGELOG.md
+            fi
+        fi
+    fi
+
+    echo "  ✓ Comparison links updated"
+    cd "$REPO_ROOT" > /dev/null
+}
 
 # Function to update CHANGELOG
 update_changelog() {
@@ -121,6 +179,9 @@ update_changelog() {
             perl -i -0pe 's/^## \[Unreleased\]\n\n//' CHANGELOG.md
         fi
     fi
+
+    # Update comparison links
+    update_changelog_links "$package_dir" "$VERSION"
 
     echo "  ✓ CHANGELOG.md updated"
     cd "$REPO_ROOT" > /dev/null

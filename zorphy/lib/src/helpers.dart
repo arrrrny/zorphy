@@ -58,12 +58,16 @@ String getProperties(
   var classNameTrimmed = className.replaceAll("\$", "");
 
   for (var f in fields) {
-    // Check if we should skip generating this field (inherited from concrete parent)
-    // We do this check first to avoid generating annotations for skipped fields
-    if (!isAbstract &&
+    // Check if field is inherited from concrete parent but NOT overridden in child
+    var isInheritedOnly =
+        !isAbstract &&
         hasExtends &&
         !extendsAbstractClass &&
-        parentFields.contains(f.name)) {
+        parentFields.contains(f.name) &&
+        !ownFields.contains(f.name);
+
+    // Skip purely inherited fields (not overridden)
+    if (isInheritedOnly) {
       continue;
     }
 
@@ -91,14 +95,18 @@ String getProperties(
     if (isAbstract) {
       sb.writeln("  ${fieldType} get ${f.name};");
     } else {
-      // Check if we should skip generating this field (inherited from concrete parent)
+      // Skip purely inherited fields (not overridden) - already handled above
       if (hasExtends &&
           !extendsAbstractClass &&
-          parentFields.contains(f.name)) {
+          parentFields.contains(f.name) &&
+          !ownFields.contains(f.name)) {
         continue;
       }
       // Add @override if field exists in any parent interface
-      if (hasExtends && allInheritedFields.contains(f.name)) {
+      // (skip if already present from source annotations)
+      if (hasExtends &&
+          allInheritedFields.contains(f.name) &&
+          !f.additionalAnnotations.contains('@override')) {
         sb.writeln("  @override");
       }
       sb.writeln("  final ${fieldType} ${f.name};");
@@ -138,11 +146,12 @@ String getProperties(
         // Use the transformed fieldType to check for nullability
         var isNullable = fieldType != null && fieldType.endsWith('?');
 
-        // Check if field is inherited from a concrete parent
+        // Check if field is inherited from a concrete parent (and NOT overridden)
         var isParentField =
             hasExtends &&
             !extendsAbstractClass &&
-            parentFields.contains(f.name);
+            parentFields.contains(f.name) &&
+            !ownFields.contains(f.name);
 
         var defaultValue = f.jsonKeyInfo?.defaultValue;
         var hasDefaultValue = defaultValue != null;
@@ -638,9 +647,13 @@ String getCopyWith(
   String className,
   bool generateCopyWithFn, {
   bool hidePublicConstructor = false,
+  List<Interface> interfaces = const [],
 }) {
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
+
+  // Build a set of field names that are overridden with a narrower type
+  var covariantFields = _getCovariantFields(fields, interfaces);
 
   // Regular copyWith method (standard convention)
   if (fields.isEmpty) {
@@ -650,7 +663,8 @@ String getCopyWith(
     for (var f in fields) {
       var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
       var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
-      sb.writeln("    $nullableType ${f.name},");
+      var covariant = covariantFields.contains(f.name) ? 'covariant ' : '';
+      sb.writeln("    $covariant$nullableType ${f.name},");
     }
     sb.writeln("  }) {");
   }
@@ -713,6 +727,33 @@ String getCopyWith(
   return sb.toString();
 }
 
+/// Detects fields that have been overridden with a narrower type in a child class.
+/// Returns a set of field names that need the `covariant` keyword.
+Set<String> _getCovariantFields(
+  List<NameTypeClassComment> classFields,
+  List<Interface> interfaces,
+) {
+  var covariantFields = <String>{};
+  for (var f in classFields) {
+    var classType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+    for (var iface in interfaces) {
+      var ifaceField = iface.fields.cast<NameType?>().firstWhere(
+        (x) => x?.name == f.name,
+        orElse: () => null,
+      );
+      if (ifaceField != null) {
+        var ifaceType = _replaceDollarTypesWithConcrete(
+          ifaceField.type ?? 'dynamic',
+        );
+        if (classType != ifaceType) {
+          covariantFields.add(f.name);
+        }
+      }
+    }
+  }
+  return covariantFields;
+}
+
 /// Generates copyWith methods scoped to implemented interfaces.
 String getInterfaceCopyWithMethods(
   List<Interface> interfaces,
@@ -722,6 +763,9 @@ String getInterfaceCopyWithMethods(
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
   var classFieldNames = classFields.map((f) => f.name).toSet();
+
+  // Detect fields overridden with narrower types
+  var covariantFields = _getCovariantFields(classFields, interfaces);
 
   for (var i in interfaces) {
     var interfaceName = i.interfaceName;
@@ -739,9 +783,17 @@ String getInterfaceCopyWithMethods(
     sb.writeln("");
     sb.writeln("  $classNameTrimmed copyWith$interfaceNameTrimmed({");
     for (var f in interfaceFields) {
-      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+      // Use the class field's type if it overrides the interface field's type
+      var classField = classFields.firstWhere(
+        (cf) => cf.name == f.name,
+        orElse: () => NameTypeClassComment(f.name, f.type, ''),
+      );
+      var fieldType = _replaceDollarTypesWithConcrete(
+        classField.type ?? f.type ?? 'dynamic',
+      );
       var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
-      sb.writeln("    $nullableType ${f.name},");
+      var covariant = covariantFields.contains(f.name) ? 'covariant ' : '';
+      sb.writeln("    $covariant$nullableType ${f.name},");
     }
     sb.writeln("  }) {");
     sb.writeln("    return copyWith(");
@@ -780,7 +832,14 @@ String getInterfaceCopyWithFnMethods(
     sb.writeln("");
     sb.writeln("  $classNameTrimmed copyWith${interfaceNameTrimmed}Fn({");
     for (var f in interfaceFields) {
-      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+      // Use the class field's type if it overrides the interface field's type
+      var classField = classFields.firstWhere(
+        (cf) => cf.name == f.name,
+        orElse: () => NameTypeClassComment(f.name, f.type, ''),
+      );
+      var fieldType = _replaceDollarTypesWithConcrete(
+        classField.type ?? f.type ?? 'dynamic',
+      );
       var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
       sb.writeln("    $nullableType Function()? ${f.name},");
     }
