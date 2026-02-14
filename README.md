@@ -6,6 +6,8 @@
 
 Visit the official documentation at **[arrrrny.github.io/zorphy](https://arrrrny.github.io/zorphy/)** for detailed guides, examples, and API references.
 
+You can also find the package on **[pub.dev](https://pub.dev/packages/zorphy)**.
+
 ## ✨ Features
 
 - 📋 **Immutable Data Classes** - Clean, immutable class definitions with minimal boilerplate

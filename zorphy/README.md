@@ -12,6 +12,7 @@
 ## 📚 Documentation & Resources
 
 - **[Official Documentation](https://arrrrny.github.io/zorphy/)** - Comprehensive guides and examples
+- **[pub.dev](https://pub.dev/packages/zorphy)** - Package on the Dart package repository
 - **[GitHub](https://github.com/arrrrny/zorphy)** - Source code and issue tracker
 - **[Examples](./example)** - Complete working examples in the repository
 - **[Zuraffa](https://pub.dev/packages/zuraffa)** - Clean Architecture framework for Flutter
