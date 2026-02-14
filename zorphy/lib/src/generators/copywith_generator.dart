@@ -31,6 +31,7 @@ class CopyWithGenerator extends UniversalGenerator {
         copyWithClassName,
         config.generateCopyWithFn,
         hidePublicConstructor: config.hidePublicConstructor,
+        interfaces: metadata.allValueTInterfaces,
       ),
     );
 

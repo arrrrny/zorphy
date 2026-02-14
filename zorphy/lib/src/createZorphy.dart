@@ -323,7 +323,12 @@ String createZorphy(
         ? (elementName.startsWith("\$\$") ? className : "\$$className")
         : className;
     sb.writeln(
-      getCopyWith(allFieldsDistinct, copyWithClassName, generateCopyWithFn),
+      getCopyWith(
+        allFieldsDistinct,
+        copyWithClassName,
+        generateCopyWithFn,
+        interfaces: allValueTInterfaces,
+      ),
     );
   }
 
