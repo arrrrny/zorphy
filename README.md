@@ -2,6 +2,10 @@
 
 **Zorphy** is a powerful code generation package for Dart/Flutter that provides clean, immutable class definitions with advanced features including copyWith methods, JSON serialization, equality, toString, inheritance support, and sophisticated patch mechanisms.
 
+## 📖 Documentation
+
+Visit the official documentation at **[arrrrny.github.io/zorphy](https://arrrrny.github.io/zorphy/)** for detailed guides, examples, and API references.
+
 ## ✨ Features
 
 - 📋 **Immutable Data Classes** - Clean, immutable class definitions with minimal boilerplate
