@@ -14,6 +14,8 @@ const sidebars = {
       type: 'category',
       label: 'Examples',
       items: [
+        'examples/comprehensive',
+        'examples/domain-gallery',
         'examples/basic',
         'examples/json',
         'examples/enums',

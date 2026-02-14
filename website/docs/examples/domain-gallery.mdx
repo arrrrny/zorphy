@@ -1,0 +1,108 @@
+---
+title: Domain Gallery
+---
+
+This gallery showcases real-world domain entities from the `example/lib/src/domain/entities` directory, demonstrating how Zorphy handles complex relationships and domain logic.
+
+## Chat System
+
+A complex polymorphic hierarchy for a messaging system.
+
+### Chat Message (Base)
+```dart
+@Zorphy(
+  generateJson: true,
+  explicitSubTypes: [$UserMessage, $AssistantMessage],
+  nonSealed: true,
+)
+abstract class $$ChatMessage {
+  String? get id;
+  String get text;
+  ChatMessageRole get role;
+  DateTime get createdAt;
+  List<$$Attachment>? get attachments;
+}
+```
+
+### User Message
+```dart
+@Zorphy(generateJson: true)
+abstract class $UserMessage implements $$ChatMessage {
+  @override ChatMessageRole get role => ChatMessageRole.user;
+}
+```
+
+### Assistant Message
+```dart
+@Zorphy(generateJson: true)
+abstract class $AssistantMessage implements $$ChatMessage {
+  @override ChatMessageRole get role => ChatMessageRole.assistant;
+
+  // Custom factory for easier creation
+  static AssistantMessage create({required String text}) => AssistantMessage(
+    text: text,
+    role: ChatMessageRole.assistant,
+    createdAt: DateTime.now(),
+  );
+}
+```
+
+## Attachment Hierarchy
+
+Demonstrating nested polymorphism.
+
+```dart
+@Zorphy(
+  generateJson: true,
+  explicitSubTypes: [$FileAttachment, $LinkAttachment],
+  nonSealed: true,
+)
+abstract class $$Attachment {
+  String get name;
+  String get mimeType;
+}
+
+@Zorphy(generateJson: true)
+abstract class $FileAttachment implements $$Attachment {
+  int get size;
+  String get path;
+}
+
+@Zorphy(generateJson: true)
+abstract class $LinkAttachment implements $$Attachment {
+  String get url;
+}
+```
+
+## User & Address
+
+Nesting and comparison support.
+
+```dart
+@Zorphy(generateJson: true, generateCompareTo: true)
+abstract class $UserWithAddress {
+  String get name;
+  $Address get address;
+  String? get phone;
+}
+
+@Zorphy(generateJson: true)
+abstract class $Address {
+  String get street;
+  String get city;
+}
+```
+
+## Account & Enums
+
+Using domain-specific enumerations.
+
+```dart
+@Zorphy(generateJson: true)
+abstract class $Account {
+  String get id;
+  String get email;
+  UserStatus get status;
+  DateTime get lastLogin;
+}
+```

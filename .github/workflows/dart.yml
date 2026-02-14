@@ -37,3 +37,7 @@ jobs:
       - name: Run tests (zorphy)
         run: dart test
         working-directory: zorphy
+
+      - name: Analyze (example)
+        run: dart analyze
+        working-directory: zorphy/example
