@@ -1,0 +1,15 @@
+---
+title: Compare Helpers
+---
+
+`compare_test.dart` enables field-by-field diffing using generated compare helpers.
+
+```dart
+@Zorphy(generateCompareTo: true)
+abstract class $Person {
+  String get name;
+  int get age;
+}
+```
+
+The generator adds a `compareToPerson` extension that returns a map of changed fields.

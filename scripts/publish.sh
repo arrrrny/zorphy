@@ -197,8 +197,8 @@ echo ""
 
 cd "$REPO_ROOT"
 
-echo "⏳ Waiting 30 seconds for pub.dev to process zorphy_annotation..."
-sleep 30
+echo "⏳ Waiting 90 seconds for pub.dev to process zorphy_annotation..."
+sleep 90
 
 # ========================================================================
 # STEP 2: Publish zorphy
@@ -216,7 +216,7 @@ cd zorphy
 
 # Update zorphy_annotation dependency in pubspec.yaml to match version
 echo "📝 Updating zorphy_annotation dependency in zorphy/pubspec.yaml..."
-perl -i -0777 -pe "s/^  zorphy_annotation:\n    path: \.\.\/zorphy_annotation$/  zorphy_annotation: ^$VERSION/m" pubspec.yaml
+perl -i -0777 -pe "s/^  zorphy_annotation:\n    path: \.\.\/zorphy_annotation$/  zorphy_annotation: ^$VERSION/m; s/^  zorphy_annotation: .*/  zorphy_annotation: ^$VERSION/m" pubspec.yaml
 echo "  ✓ Dependency updated to ^$VERSION"
 
 # Commit changes

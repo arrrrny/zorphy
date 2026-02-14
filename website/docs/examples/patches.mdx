@@ -1,0 +1,32 @@
+---
+title: Patch Updates
+---
+
+Patch helpers generate small, composable updates. This references `basic_example.dart`, `nested_example.dart`, and `no_patch_example.dart`.
+
+## Patch a single entity
+
+```dart
+final patch = UserPatch.create()
+  ..withAge(32)
+  ..withEmail('alice@example.com');
+
+final patched = user.patchWithUser(patchInput: patch);
+```
+
+## Nested patching
+
+```dart
+final personPatch = PersonPatch.create()
+  ..withAddressPatch(AddressPatch.create()..withCity('Los Angeles'));
+```
+
+## Turn off patch generation
+
+```dart
+@Zorphy(generatePatch: false, generateJson: true)
+abstract class $NoPatchUser {
+  String get name;
+  int get age;
+}
+```

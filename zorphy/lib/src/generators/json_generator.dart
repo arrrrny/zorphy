@@ -1,3 +1,4 @@
+import '../common/NameType.dart';
 import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
 import 'base_generator.dart';
@@ -6,9 +7,11 @@ import 'base_generator.dart';
 /// This is complex and handles both toJson/fromJson and polymorphic JSON
 /// Wraps the logic from createZorphy lines 346-488
 class JsonGenerator extends UniversalGenerator {
+  /// Creates a generator for JSON serialization members.
   JsonGenerator();
 
   @override
+  /// Generates fromJson/toJson-related members for the class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final config = context.config;
@@ -40,6 +43,7 @@ class JsonGenerator extends UniversalGenerator {
   }
 
   @override
+  /// Returns true when JSON generation is enabled.
   bool shouldGenerate(GenerationContext context) {
     return context.config.generateJson;
   }
@@ -51,12 +55,37 @@ class JsonGenerator extends UniversalGenerator {
 
     if (metadata.explicitSubtypes.isEmpty && metadata.generics.isEmpty) {
       // Simple case - no generics, no explicit subtypes
+      final manualFromJsonFields = _getManualFromJsonFields(metadata);
       sb.writeln('');
       sb.writeln('  /// Creates a [$className] instance from JSON');
-      sb.writeln(
-        '  factory $className.fromJson(Map<String, dynamic> json) => _\$$className' +
-            'FromJson(json);',
-      );
+      if (manualFromJsonFields.isEmpty) {
+        sb.writeln(
+          '  factory $className.fromJson(Map<String, dynamic> json) => _\$$className' +
+              'FromJson(json);',
+        );
+      } else {
+        sb.writeln(
+          '  factory $className.fromJson(Map<String, dynamic> json) {',
+        );
+        sb.writeln('    final instance = _\$$className' + 'FromJson(json);');
+        sb.writeln('    return $className(');
+        for (var f in metadata.allFields) {
+          final manualField = manualFromJsonFields.where(
+            (m) => m.name == f.name,
+          );
+          if (manualField.isNotEmpty) {
+            final info = manualField.first.jsonKeyInfo!;
+            final jsonFieldName = info.name ?? f.name;
+            sb.writeln(
+              '      ${f.name}: json[\'$jsonFieldName\'] != null ? ${info.fromJson}(json[\'$jsonFieldName\'] as Map<String, dynamic>) as ${f.type} : null,',
+            );
+          } else {
+            sb.writeln('      ${f.name}: instance.${f.name},');
+          }
+        }
+        sb.writeln('    );');
+        sb.writeln('  }');
+      }
     } else if (metadata.explicitSubtypes.isNotEmpty) {
       // Abstract class with explicit subtypes - polymorphic JSON
       sb.writeln(_generatePolymorphicFromJson(metadata, config));
@@ -178,12 +207,39 @@ class JsonGenerator extends UniversalGenerator {
         .map((g) => 'fromJson${g.name}')
         .join(', ');
 
+    // Check for fields excluded from json_serializable that have manual converters
+    final manualFromJsonFields = _getManualFromJsonFields(metadata);
+
     sb.writeln('');
     sb.writeln('  /// Creates a [$className] instance from JSON');
-    sb.writeln(
-      '  factory $className.fromJson(Map<String, dynamic> json, $fromJsonParams) => _\$$className' +
-          'FromJson(json, $fromJsonArgs);',
-    );
+    if (manualFromJsonFields.isEmpty) {
+      sb.writeln(
+        '  factory $className.fromJson(Map<String, dynamic> json, $fromJsonParams) => _\$$className' +
+            'FromJson(json, $fromJsonArgs);',
+      );
+    } else {
+      sb.writeln(
+        '  factory $className.fromJson(Map<String, dynamic> json, $fromJsonParams) {',
+      );
+      sb.writeln(
+        '    final instance = _\$$className' + 'FromJson(json, $fromJsonArgs);',
+      );
+      sb.writeln('    return $className(');
+      for (var f in metadata.allFields) {
+        final manualField = manualFromJsonFields.where((m) => m.name == f.name);
+        if (manualField.isNotEmpty) {
+          final info = manualField.first.jsonKeyInfo!;
+          final jsonFieldName = info.name ?? f.name;
+          sb.writeln(
+            '      ${f.name}: json[\'$jsonFieldName\'] != null ? ${info.fromJson}(json[\'$jsonFieldName\'] as Map<String, dynamic>) as ${f.type} : null,',
+          );
+        } else {
+          sb.writeln('      ${f.name}: instance.${f.name},');
+        }
+      }
+      sb.writeln('    );');
+      sb.writeln('  }');
+    }
 
     return sb.toString();
   }
@@ -196,6 +252,15 @@ class JsonGenerator extends UniversalGenerator {
     if (metadata.isAbstract && metadata.explicitSubtypes.isNotEmpty) {
       return '';
     }
+
+    // Don't generate toJsonLean in the class body for generic classes that extend
+    // a non-generic parent — the parent already defines toJsonLean() with no params,
+    // and adding params would be an invalid override. The extension handles it instead.
+    if (metadata.generics.isNotEmpty && _hasNonGenericJsonParent(metadata)) {
+      return '';
+    }
+
+    final manualToJsonFields = _getManualToJsonFields(metadata);
 
     if (!metadata.isAbstract) {
       sb.writeln('');
@@ -221,6 +286,14 @@ class JsonGenerator extends UniversalGenerator {
         sb.writeln(
           '    final Map<String, dynamic> data = _\$$className' +
               'ToJson(this, $toJsonArgs);',
+        );
+      }
+      // Add manual toJson fields
+      for (var f in manualToJsonFields) {
+        final info = f.jsonKeyInfo!;
+        final jsonFieldName = info.name ?? f.name;
+        sb.writeln(
+          '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
         );
       }
       sb.writeln('    return _sanitizeJson(data);');
@@ -258,17 +331,43 @@ class JsonGenerator extends UniversalGenerator {
     return sb.toString();
   }
 
-  // String _buildGenericsString(ClassMetadata metadata) {
-  //   if (metadata.generics.isEmpty) return '';
-  //   return '<${metadata.generics.map((g) => g.toString()).join(', ')}>';
-  // }
+  /// Whether this generic class extends a non-generic parent that would have
+  /// toJsonLean()/toJson() with no generic params (causing override conflicts).
+  bool _hasNonGenericJsonParent(ClassMetadata metadata) {
+    for (final iface in metadata.interfaces) {
+      if (iface.typeParams.isEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Fields excluded from json_serializable but having manual fromJson converters
+  List<NameTypeClassComment> _getManualFromJsonFields(ClassMetadata metadata) {
+    return metadata.allFields.where((f) {
+      final info = f.jsonKeyInfo;
+      if (info == null) return false;
+      return info.includeFromJson == false && info.fromJson != null;
+    }).toList();
+  }
+
+  /// Fields excluded from json_serializable but having manual toJson converters
+  List<NameTypeClassComment> _getManualToJsonFields(ClassMetadata metadata) {
+    return metadata.allFields.where((f) {
+      final info = f.jsonKeyInfo;
+      if (info == null) return false;
+      return info.includeToJson == false && info.toJson != null;
+    }).toList();
+  }
 }
 
 /// Generates JSON extension for concrete classes
 class JsonExtensionGenerator extends ConcreteClassGenerator {
+  /// Creates a generator for JSON extension helpers.
   JsonExtensionGenerator();
 
   @override
+  /// Generates JSON helper extensions for the class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final config = context.config;
@@ -281,15 +380,31 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
     final genericsStr = _buildGenericsString(metadata);
     final sb = StringBuffer();
 
+    final manualToJsonFields = _getManualToJsonFields(metadata);
+
     sb.writeln('');
     sb.writeln(
       'extension ${className}Serialization$genericsStr on $className$genericsStr {',
     );
 
     if (metadata.generics.isEmpty) {
-      sb.writeln(
-        '  Map<String, dynamic> toJson() => _\$$className' + 'ToJson(this);',
-      );
+      if (manualToJsonFields.isEmpty) {
+        sb.writeln(
+          '  Map<String, dynamic> toJson() => _\$$className' + 'ToJson(this);',
+        );
+      } else {
+        sb.writeln('  Map<String, dynamic> toJson() {');
+        sb.writeln('    final data = _\$$className' + 'ToJson(this);');
+        for (var f in manualToJsonFields) {
+          final info = f.jsonKeyInfo!;
+          final jsonFieldName = info.name ?? f.name;
+          sb.writeln(
+            '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
+          );
+        }
+        sb.writeln('    return data;');
+        sb.writeln('  }');
+      }
     } else {
       final toJsonParams = metadata.generics
           .map((g) => 'Object? Function(${g.name} value) toJson${g.name}')
@@ -297,10 +412,26 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
       final toJsonArgs = metadata.generics
           .map((g) => 'toJson${g.name}')
           .join(', ');
-      sb.writeln(
-        '  Map<String, dynamic> toJson($toJsonParams) => _\$$className' +
-            'ToJson(this, $toJsonArgs);',
-      );
+      if (manualToJsonFields.isEmpty) {
+        sb.writeln(
+          '  Map<String, dynamic> toJson($toJsonParams) => _\$$className' +
+              'ToJson(this, $toJsonArgs);',
+        );
+      } else {
+        sb.writeln('  Map<String, dynamic> toJson($toJsonParams) {');
+        sb.writeln(
+          '    final data = _\$$className' + 'ToJson(this, $toJsonArgs);',
+        );
+        for (var f in manualToJsonFields) {
+          final info = f.jsonKeyInfo!;
+          final jsonFieldName = info.name ?? f.name;
+          sb.writeln(
+            '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
+          );
+        }
+        sb.writeln('    return data;');
+        sb.writeln('  }');
+      }
     }
     if (metadata.generics.isEmpty) {
       sb.writeln('  Map<String, dynamic> toJsonLean() {');
@@ -318,6 +449,14 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
       sb.writeln(
         '    final Map<String, dynamic> data = _\$$className' +
             'ToJson(this, $toJsonArgs);',
+      );
+    }
+    // Add manual toJson fields
+    for (var f in manualToJsonFields) {
+      final info = f.jsonKeyInfo!;
+      final jsonFieldName = info.name ?? f.name;
+      sb.writeln(
+        '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
       );
     }
     sb.writeln('    return _sanitizeJson(data);');
@@ -350,5 +489,13 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
   String _buildGenericsString(ClassMetadata metadata) {
     if (metadata.generics.isEmpty) return '';
     return '<${metadata.generics.map((g) => g.toString()).join(', ')}>';
+  }
+
+  List<NameTypeClassComment> _getManualToJsonFields(ClassMetadata metadata) {
+    return metadata.allFields.where((f) {
+      final info = f.jsonKeyInfo;
+      if (info == null) return false;
+      return info.includeToJson == false && info.toJson != null;
+    }).toList();
   }
 }

@@ -9,9 +9,14 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
 
-const String _version = '1.1.1';
+const String _version = '1.5.0';
 
-void main() {
+void main(List<String> args) {
+  if (args.contains('--version')) {
+    stdout.writeln('Zorphy MCP Server v$_version');
+    return;
+  }
+
   stderr.writeln('Zorphy MCP Server v$_version starting...');
 
   stdin.transform(utf8.decoder).transform(const LineSplitter()).listen((
@@ -19,18 +24,30 @@ void main() {
   ) async {
     if (line.trim().isEmpty) return;
 
+    dynamic id;
     try {
       final request = jsonDecode(line);
+      if (request is! Map<String, dynamic>) return;
+
+      id = request['id'];
       final response = await _handleRequest(request);
-      stdout.writeln(jsonEncode(response));
+
+      // Only send response if it was a request (had an id)
+      if (id != null) {
+        stdout.writeln(jsonEncode(response));
+      }
     } catch (e, stack) {
       stderr.writeln('Error: $e\n$stack');
-      stdout.writeln(
-        jsonEncode({
-          'jsonrpc': '2.0',
-          'error': {'code': -32603, 'message': 'Internal error: $e'},
-        }),
-      );
+      // Only attempt to send error if we had an id to respond to
+      if (id != null) {
+        stdout.writeln(
+          jsonEncode({
+            'jsonrpc': '2.0',
+            'id': id,
+            'error': {'code': -32603, 'message': 'Internal error: $e'},
+          }),
+        );
+      }
     }
   });
 }
@@ -47,6 +64,10 @@ Future<Map<String, dynamic>> _handleRequest(Map<String, dynamic> req) async {
         'serverInfo': {'name': 'zorphy', 'version': _version},
         'capabilities': {'tools': {}},
       });
+
+    case 'notifications/initialized':
+      // Just ignore this notification
+      return {};
 
     case 'tools/list':
       return _success(id, {'tools': _getTools()});

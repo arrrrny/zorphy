@@ -1,0 +1,35 @@
+---
+title: Nullability and Hashing
+---
+
+`nullable_test.dart` and `hash_code_test.dart` demonstrate how Zorphy treats nullable fields and large field counts.
+
+## Nullable fields
+
+```dart
+@Zorphy(generateJson: true)
+abstract class $ErrorLog {
+  String? get id;
+  String get message;
+  String? get userId;
+  Map<String, dynamic>? get deviceInfo;
+  DateTime get timestamp;
+}
+```
+
+Nullability is preserved in generated constructors, copyWith, and JSON.
+
+## Large hashCode
+
+```dart
+@Zorphy(generateJson: true)
+abstract class $LargeClass {
+  String get f1;
+  String get f2;
+  String get f3;
+  String get f4;
+  String get f5;
+}
+```
+
+For large models, Zorphy splits hash calculations for stability and performance.

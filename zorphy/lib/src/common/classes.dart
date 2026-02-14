@@ -14,6 +14,7 @@ class Interface {
   /// If true the interface has hidePublicConstructor: true
   final bool hidePublicConstructor;
 
+  /// Creates an interface descriptor from generic names and bounds.
   Interface(
     this.interfaceName,
     List<String?> genericExtends,
@@ -31,6 +32,7 @@ class Interface {
          (i) => NameType(genericName[i] ?? "", genericExtends[i] ?? ""),
        ) {}
 
+  /// Creates an interface descriptor from prebuilt generics.
   Interface.fromGenerics(
     this.interfaceName,
     this.typeParams,
@@ -40,6 +42,7 @@ class Interface {
     this.hidePublicConstructor = false,
   ]);
 
+  /// Returns a compact string representation of the interface.
   toString() =>
       "${this.interfaceName.toString()}|${this.typeParams.toString()}|${this.fields.toString()}";
 }
@@ -47,6 +50,7 @@ class Interface {
 class InterfaceWithComment extends Interface {
   final String? comment;
 
+  /// Creates an interface descriptor with an optional comment.
   InterfaceWithComment(
     String type,
     List<String?> typeArgsTypes,
@@ -65,6 +69,7 @@ class InterfaceWithComment extends Interface {
          hidePublicConstructor,
        );
 
+  /// Returns a compact string representation of the interface.
   toString() =>
       "${this.interfaceName.toString()}|${this.typeParams.toString()}|${this.fields.toString()}";
 }
@@ -76,6 +81,7 @@ class ClassDef {
   final List<GenericsNameType> generics;
   final List<String> baseTypes;
 
+  /// Creates a class definition descriptor.
   ClassDef(
     this.isAbstract,
     this.name,
@@ -89,8 +95,10 @@ class GenericsNameType {
   final String name;
   final String? type;
 
+  /// Creates a generic parameter descriptor.
   GenericsNameType(this.name, this.type);
 
+  /// Returns a compact string representation of the generic.
   toString() => "${this.name}:${this.type}";
 }
 
@@ -102,6 +110,7 @@ class MethodDetails<TMeta1> {
   final List<GenericsNameType> generics;
   final String returnType;
 
+  /// Creates a method signature descriptor.
   MethodDetails(
     this.methodComment,
     this.methodName,

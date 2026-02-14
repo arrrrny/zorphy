@@ -10,17 +10,22 @@ import 'package:zorphy/src/helpers.dart';
 import 'package:zorphy/src/createZorphy.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
+/// Generates Zorphy2 code from annotated classes.
 class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
   static final Map<String, ClassElement> _allAnnotatedClasses = {};
+
+  /// Returns all annotated classes discovered during generation.
   static Map<String, ClassElement> get allAnnotatedClasses =>
       _allAnnotatedClasses;
 
   @override
+  /// Returns the annotation type checker for Zorphy2.
   TypeChecker get typeChecker => const TypeChecker.fromUrl(
     'package:zorphy_annotation/src/annotations.dart#Zorphy2',
   );
 
   @override
+  /// Generates code for a single annotated element.
   dynamic generateForAnnotatedElement(
     Element element,
     ConstantReader annotation,
@@ -187,6 +192,7 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
     return sb.toString();
   }
 
+  /// Collects all fields declared on this element and its Zorphy subtypes.
   List<NameTypeClassComment> getAllFieldsIncludingSubtypes(
     ClassElement element,
   ) {
@@ -218,6 +224,7 @@ class Zorphy2Generator extends GeneratorForAnnotationX<Zorphy2> {
   }
 }
 
+/// Creates the build_runner builder for Zorphy2 generation.
 Builder zorphy2Builder(BuilderOptions options) => //
 PartBuilder(
   [Zorphy2Generator()],

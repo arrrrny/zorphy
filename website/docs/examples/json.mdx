@@ -1,0 +1,32 @@
+---
+title: JSON Serialization
+---
+
+Based on `json_example.dart`, this shows full JSON and lean JSON.
+
+```dart
+@Zorphy(generateJson: true)
+abstract class $Product {
+  String get id;
+  String get name;
+  double get price;
+  DateTime get createdAt;
+}
+```
+
+## Full vs lean JSON
+
+```dart
+final product = Product(
+  id: 'prod-001',
+  name: 'Wireless Mouse',
+  price: 29.99,
+  createdAt: DateTime(2024, 1, 15),
+);
+
+final fullJson = product.toJson();
+final leanJson = product.toJsonLean();
+final restored = Product.fromJson(fullJson);
+```
+
+Lean JSON strips the `_className_` metadata and is useful for API payloads that do not need Zorphy type info.

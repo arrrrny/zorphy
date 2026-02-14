@@ -4,9 +4,11 @@ import 'base_generator.dart';
 /// Generates equals, hashCode, and toString methods
 /// Wraps the existing getEqualsAndHashCode and getToString functions
 class EqualsToStringGenerator extends ConcreteClassGenerator {
+  /// Creates a generator for equality and toString members.
   EqualsToStringGenerator();
 
   @override
+  /// Generates equals, hashCode, and toString for the class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final sb = StringBuffer();

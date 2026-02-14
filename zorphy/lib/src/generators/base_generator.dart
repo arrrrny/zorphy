@@ -6,6 +6,7 @@ class GenerationContext {
   final ClassMetadata metadata;
   final GenerationConfig config;
 
+  /// Creates a generation context for a single class.
   const GenerationContext({required this.metadata, required this.config});
 }
 
@@ -23,6 +24,7 @@ abstract class CodeGenerator {
 /// Base class for generators that only run for concrete classes
 abstract class ConcreteClassGenerator implements CodeGenerator {
   @override
+  /// Returns true when the target class is concrete.
   bool shouldGenerate(GenerationContext context) =>
       !context.metadata.isAbstract;
 }
@@ -30,11 +32,13 @@ abstract class ConcreteClassGenerator implements CodeGenerator {
 /// Base class for generators that only run for abstract classes
 abstract class AbstractClassGenerator implements CodeGenerator {
   @override
+  /// Returns true when the target class is abstract.
   bool shouldGenerate(GenerationContext context) => context.metadata.isAbstract;
 }
 
 /// Base class for generators that run for both abstract and concrete
 abstract class UniversalGenerator implements CodeGenerator {
   @override
+  /// Always returns true for universal generators.
   bool shouldGenerate(GenerationContext context) => true;
 }

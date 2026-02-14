@@ -588,10 +588,9 @@ packages:
   zorphy_annotation:
     dependency: "direct main"
     description:
-      name: zorphy_annotation
-      sha256: "66e2e91ac8b1692695adb3660691d3cf0c69ee3b8e36d53e2882e3e7ab8ab8cb"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.4.0"
+      path: "../zorphy_annotation"
+      relative: true
+    source: path
+    version: "1.5.5"
 sdks:
   dart: ">=3.9.0 <4.0.0"

@@ -58,6 +58,10 @@ class ClassMetadata {
   /// All annotated classes discovered so far (for polymorphic JSON)
   final Map<String, ClassElement> allAnnotatedClasses;
 
+  /// All subtypes in this hierarchy (for polymorphic property helpers)
+  final List<Interface> polymorphicSubtypes;
+
+  /// Creates a complete metadata record for a Zorphy class.
   const ClassMetadata({
     required this.originalName,
     required this.cleanName,
@@ -76,22 +80,27 @@ class ClassMetadata {
     required this.isInParentExplicitSubtypes,
     required this.classElement,
     required this.allAnnotatedClasses,
+    this.polymorphicSubtypes = const [],
   });
 
   /// Get class name with $ prefix for generated abstract class
   /// If original starts with $$, keep it; otherwise use $
+  /// Returns the generated abstract class name with $ prefix.
   String get abstractClassName =>
       originalName.startsWith(r'$$') ? originalName : r'$' + cleanName;
 
   /// Whether JSON serialization should be generated
   /// For sealed classes or abstract classes with explicitSubtypes, only fromJson is generated
+  /// Returns true when a fromJson factory should be generated.
   bool get shouldGenerateJsonFactory =>
       explicitSubtypes.isNotEmpty || (isAbstract && !isSealed);
 
   /// Whether this is a concrete class that can be instantiated
+  /// Returns true when the class can be instantiated.
   bool get isConcrete => !isAbstract;
 
   @override
+  /// Returns a readable summary of this metadata.
   String toString() =>
       'ClassMetadata($originalName, abstract=$isAbstract, sealed=$isSealed)';
 }
@@ -101,11 +110,14 @@ class GenericParameterMetadata {
   final String name;
   final String? bound;
 
+  /// Creates a generic type parameter descriptor.
   const GenericParameterMetadata({required this.name, this.bound});
 
   @override
+  /// Returns a readable representation of the generic parameter.
   String toString() => bound != null ? '$name extends $bound' : name;
 
   // Alias for compatibility with code expecting 'type'
+  /// Returns the bound as a type alias for compatibility.
   String? get type => bound;
 }

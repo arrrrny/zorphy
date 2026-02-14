@@ -1,0 +1,30 @@
+---
+title: Enums
+---
+
+From `enum_example.dart`, Zorphy keeps enums as first-class fields.
+
+```dart
+enum Status { active, inactive, pending, suspended }
+
+@Zorphy(generateJson: true)
+abstract class $Task {
+  String get id;
+  String get title;
+  Status get status;
+}
+```
+
+## Why it matters
+
+- Enums serialize cleanly with JSON.
+- Pattern matching stays expressive.
+- Generated helpers still work the same.
+
+```dart
+final task = Task(
+  id: 'task-001',
+  title: 'Complete docs',
+  status: Status.active,
+);
+```

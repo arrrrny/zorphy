@@ -2,7 +2,7 @@
 /// Generated at: 2026-02-06T20:16:38.165707
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
-import '../enums/index.dart';
+import '../../../../comprehensive/comprehensive_example.dart';
 
 part 'account.zorphy.dart';
 part 'account.g.dart';

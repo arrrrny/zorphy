@@ -1,3 +1,38 @@
+## [1.5.6] - 2026-02-14
+
+### Chore
+- Updated docs, created docusarous website, create public constructors by default and only create private on public hidden
+
+## [1.5.5] - 2026-02-13
+
+### Fix
+- fixed null type issue on custom toJson
+
+## [1.5.4] - 2026-02-13
+
+### Change
+- Allow hybrid serialization with json_serializable,for generic field types
+
+## [1.5.3] - 2026-02-13
+
+### Fix
+- Fixed JsonKey and other annotations not catching due to Analyzer 10 changes
+- 
+## [1.5.2] - 2026-02-12
+
+### Fix
+- Updated copyWith generation to use a sentinel parameter pattern, preserving non-nullable fields while allowing explicit nulls for nullable fields.
+
+## [1.5.1] - 2026-02-11
+
+### Fix
+- fixed issue with nested entity
+
+## [1.5.0] - 2026-02-09
+
+### Feat
+- Added property helpers extension
+
 ## [1.4.1] - 2026-02-09
 
 ### Chore

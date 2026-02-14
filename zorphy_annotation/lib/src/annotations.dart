@@ -119,6 +119,7 @@ class Zorphy implements ZorphyX {
   /// `class $A<T> {`
   /// `class $B<T, T1> implements $A {`
   /// `class $C<T, T1> implements $A {`
+  /// Creates a Zorphy annotation with configurable generation options.
   const Zorphy({
     this.explicitSubTypes = null,
     this.generateJson = false,
@@ -128,7 +129,7 @@ class Zorphy implements ZorphyX {
     this.nonSealed = false,
     this.generateCopyWithFn = false,
     this.generatePatch = true,
-    this.generateFilter = false,
+    this.generateFilter = true,
   });
 }
 
@@ -143,6 +144,7 @@ class Zorphy2 implements ZorphyX {
   final bool generatePatch;
   final bool generateFilter;
 
+  /// Creates a Zorphy2 annotation with configurable generation options.
   const Zorphy2({
     this.explicitSubTypes = null,
     this.generateJson = false,
@@ -152,18 +154,25 @@ class Zorphy2 implements ZorphyX {
     this.generateCompareTo = true,
     this.generateCopyWithFn = false,
     this.generatePatch = true,
-    this.generateFilter = false,
+    this.generateFilter = true,
   });
 }
 
 abstract class ZorphyX {
+  /// Returns explicitly declared subtypes for polymorphic generation.
   List<Type>? get explicitSubTypes;
 
+  /// Returns whether JSON serialization code should be generated.
   bool get generateJson;
+
+  /// Returns whether to use explicitToJson in json_serializable.
   bool get explicitToJson;
+
+  /// Returns whether filter descriptors should be generated.
   bool get generateFilter;
 }
 
+/// Resolves a generic toJson function for the provided [type].
 Object? Function(Never) getGenericToJsonFn(
   Map<Type, Object? Function(Never)> fns,
   Type type,
@@ -176,6 +185,7 @@ Object? Function(Never) getGenericToJsonFn(
   return type1_fn;
 }
 
+/// Resolves the matching fromJson function for the provided generic type ids.
 dynamic getFromJsonToGenericFn(
   Map<List<String>, dynamic Function(Map<String, dynamic>)> fns,
   Map<String, dynamic> json,

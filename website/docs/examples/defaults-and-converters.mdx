@@ -1,0 +1,36 @@
+---
+title: Defaults and Converters
+---
+
+This page reflects `complex_example.dart`, `initialization_params_example.dart`, and `test_json_key.dart`.
+
+## Default values with JsonKey
+
+```dart
+@Zorphy(generateJson: true)
+abstract class $TreeNode {
+  @JsonKey(defaultValue: "root")
+  String get value;
+
+  @JsonKey(defaultValue: const [])
+  List<$TreeNode>? get children;
+
+  @JsonKey(defaultValue: Duration(seconds: 5))
+  Duration get timeout;
+}
+```
+
+## Custom JSON converters
+
+```dart
+@Zorphy(generateJson: true, generateFilter: true)
+abstract class $InitializationParamsExample {
+  Duration get timeout => Duration(seconds: 5);
+  bool get forceRefresh => true;
+
+  @JsonKey(toJson: LocaleConverter.toJson, fromJson: LocaleConverter.fromJson)
+  Locale? get locale;
+}
+```
+
+The same converter pattern works with plain `json_annotation` classes as well.

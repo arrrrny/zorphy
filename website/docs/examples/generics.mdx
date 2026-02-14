@@ -1,0 +1,43 @@
+---
+title: Generics
+---
+
+From `generic_example.dart`, Zorphy supports generic entities and generic JSON factories.
+
+## Generic entities
+
+```dart
+@Zorphy(generateJson: true)
+abstract class $Result<T> {
+  bool get success;
+  T? get data;
+  String? get errorMessage;
+}
+```
+
+## Generic converters
+
+```dart
+class GenericConverter<T> implements JsonConverter<T?, Object?> {
+  const GenericConverter();
+  @override
+  T? fromJson(Object? json) => json as T?;
+  @override
+  Object? toJson(T? object) => object;
+}
+
+@Zorphy(generateJson: true)
+abstract class $ResultWithConverter<T> {
+  bool get success;
+  @JsonKey(name: 'data_field')
+  @GenericConverter()
+  T? get data;
+}
+```
+
+## Usage
+
+```dart
+final result = Result<String>(success: true, data: 'ok');
+final json = result.toJson((value) => value);
+```

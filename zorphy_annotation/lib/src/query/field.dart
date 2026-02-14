@@ -10,5 +10,6 @@ class Field<TEntity, TValue> {
   /// Optional, but required for in-memory filtering/sorting.
   final TValue Function(TEntity)? getValue;
 
+  /// Creates a field descriptor with optional value extractor.
   const Field(this.name, [this.getValue]);
 }

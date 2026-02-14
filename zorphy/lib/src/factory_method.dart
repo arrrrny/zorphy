@@ -4,6 +4,7 @@ class FactoryMethodInfo {
   final String bodyCode;
   final String className;
 
+  /// Creates a factory method descriptor.
   FactoryMethodInfo({
     required this.name,
     required this.parameters,
@@ -20,6 +21,7 @@ class FactoryParameterInfo {
   final bool hasDefaultValue;
   final String? defaultValue;
 
+  /// Creates a factory parameter descriptor.
   FactoryParameterInfo({
     required this.name,
     required this.type,

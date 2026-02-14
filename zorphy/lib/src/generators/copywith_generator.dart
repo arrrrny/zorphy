@@ -4,9 +4,11 @@ import 'base_generator.dart';
 /// Generates copyWith methods
 /// Wraps the existing getCopyWith function
 class CopyWithGenerator extends UniversalGenerator {
+  /// Creates a generator for copyWith helpers.
   CopyWithGenerator();
 
   @override
+  /// Generates copyWith members for the current class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final config = context.config;
@@ -28,6 +30,7 @@ class CopyWithGenerator extends UniversalGenerator {
         metadata.allFields,
         copyWithClassName,
         config.generateCopyWithFn,
+        hidePublicConstructor: config.hidePublicConstructor,
       ),
     );
 
@@ -56,6 +59,7 @@ class CopyWithGenerator extends UniversalGenerator {
   }
 
   @override
+  /// Returns true when copyWith generation is enabled for the context.
   bool shouldGenerate(GenerationContext context) {
     // CopyWith is always generated for concrete classes
     // For abstract classes, only if generateCopyWithFn is true

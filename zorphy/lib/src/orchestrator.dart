@@ -20,6 +20,9 @@ class Orchestrator {
     // Factory methods (conditional)
     FactoryMethodGenerator(),
 
+    // Semantic property helpers (always runs if fields/subtypes exist)
+    PropertyHelperGenerator(),
+
     // Patch methods (conditional, concrete only)
     PatchGenerator(),
 

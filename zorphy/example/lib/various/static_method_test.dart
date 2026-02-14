@@ -1,6 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'static_method_test.zorphy.dart';
+part 'static_method_test.g.dart';
 
 @Zorphy(generateJson: true)
 abstract class $Category {
@@ -18,15 +19,8 @@ abstract class $Category {
     required String id,
     required String name,
     String? description,
-  }) => Category(
-    id: id,
-    name: name,
-    description: description,
-  );
-  
-  static Category createWithName(String name) => Category(
-    id: 'generated',
-    name: name,
-    description: null,
-  );
+  }) => Category(id: id, name: name, description: description);
+
+  static Category createWithName(String name) =>
+      Category(id: 'generated', name: name, description: null);
 }

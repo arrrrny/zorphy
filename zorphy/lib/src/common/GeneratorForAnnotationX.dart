@@ -4,12 +4,16 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
 import 'package:source_gen/source_gen.dart';
 
+/// Base generator that processes elements annotated with [T].
 abstract class GeneratorForAnnotationX<T> extends Generator {
+  /// Creates a generator for a specific annotation type.
   const GeneratorForAnnotationX();
 
+  /// Returns the type checker for the annotation.
   TypeChecker get typeChecker;
 
   @override
+  /// Generates code for all annotated elements in a library.
   FutureOr<String> generate(LibraryReader library, BuildStep buildStep) async {
     final values = Set<String>();
 
@@ -29,6 +33,7 @@ abstract class GeneratorForAnnotationX<T> extends Generator {
     return values.join('\n\n');
   }
 
+  /// Generates code for a single annotated element.
   dynamic generateForAnnotatedElement(
     Element element,
     ConstantReader annotation,

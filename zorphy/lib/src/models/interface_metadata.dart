@@ -14,6 +14,7 @@ class InterfaceMetadata extends InterfaceWithComment {
   // Store type arguments separately for easier access
   final List<DartType> _typeArguments;
 
+  /// Creates interface metadata with attached analyzer element.
   InterfaceMetadata(
     String type,
     List<String?> typeArgsTypes,
@@ -36,9 +37,11 @@ class InterfaceMetadata extends InterfaceWithComment {
        );
 
   // Getter for type arguments
+  /// Returns the resolved type arguments for the interface.
   List<DartType> get typeArguments => _typeArguments;
 
   // Factory to convert from InterfaceWithComment
+  /// Builds metadata from an InterfaceWithComment and analyzer element.
   factory InterfaceMetadata.fromInterfaceWithComment(
     InterfaceWithComment iwc,
     ClassElement element, {
@@ -57,6 +60,7 @@ class InterfaceMetadata extends InterfaceWithComment {
     );
   }
 
+  /// Returns a compact string representation of this metadata.
   toString() =>
       "${this.interfaceName.toString()}|${this.typeParams.toString()}|${this.fields.toString()}|element=${element.name}";
 }

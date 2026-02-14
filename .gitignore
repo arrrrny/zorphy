@@ -30,6 +30,7 @@
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+**/node_modules/
 .flutter-plugins
 .flutter-plugins-dependencies
 .packages

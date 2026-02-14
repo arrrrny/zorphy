@@ -3,6 +3,7 @@ import 'package:zorphy/src/common/NameType.dart';
 import 'package:zorphy/src/common/classes.dart';
 import 'package:zorphy/src/factory_method.dart';
 
+/// Deduplicates fields, prioritizing interface definitions first.
 List<NameTypeClassComment> getDistinctFields(
   List<NameTypeClassComment> allFields,
   List<Interface> interfaces,
@@ -38,6 +39,7 @@ List<NameTypeClassComment> getDistinctFields(
   return allFieldsDistinct;
 }
 
+/// Generates fields and constructor code for a class.
 String getProperties(
   List<NameTypeClassComment> fields,
   String className,
@@ -45,6 +47,7 @@ String getProperties(
   bool hidePublicConstructor,
   bool generateCopyWithFn,
   bool generateJson,
+  bool hasConstConstructor,
   bool hasExtends, {
   bool extendsAbstractClass = false,
   Set<String> parentFields = const {},
@@ -55,9 +58,22 @@ String getProperties(
   var classNameTrimmed = className.replaceAll("\$", "");
 
   for (var f in fields) {
+    // Check if we should skip generating this field (inherited from concrete parent)
+    // We do this check first to avoid generating annotations for skipped fields
+    if (!isAbstract &&
+        hasExtends &&
+        !extendsAbstractClass &&
+        parentFields.contains(f.name)) {
+      continue;
+    }
+
     // Add JsonKey annotation if present from source
     if (f.jsonKeyInfo != null) {
-      sb.writeln("  ${f.jsonKeyInfo!.toAnnotationString()}");
+      // Exclude defaultValue from generated annotation to avoid issues with non-literal defaults
+      // We handle default values in the constructor
+      sb.writeln(
+        "  ${f.jsonKeyInfo!.toAnnotationString(includeDefaultValue: false)}",
+      );
     }
 
     // Add additional annotations
@@ -75,6 +91,12 @@ String getProperties(
     if (isAbstract) {
       sb.writeln("  ${fieldType} get ${f.name};");
     } else {
+      // Check if we should skip generating this field (inherited from concrete parent)
+      if (hasExtends &&
+          !extendsAbstractClass &&
+          parentFields.contains(f.name)) {
+        continue;
+      }
       // Add @override if field exists in any parent interface
       if (hasExtends && allInheritedFields.contains(f.name)) {
         sb.writeln("  @override");
@@ -83,13 +105,28 @@ String getProperties(
     }
   }
 
-  if (!isAbstract && !hidePublicConstructor) {
-    // Constructor
+  if (!isAbstract) {
+    // Constructor Generation
+    var constructorPrefix = hasConstConstructor ? "const " : "";
+
+    // Determine which constructor to generate based on hidePublicConstructor
+    // if hidePublicConstructor is true -> Generate ONLY private constructor ._()
+    // if hidePublicConstructor is false -> Generate ONLY public constructor ()
+
+    var isPrivate = hidePublicConstructor;
+    var constructorName = isPrivate
+        ? "${classNameTrimmed}._"
+        : "${classNameTrimmed}";
+
     sb.writeln("");
+
+    // We need to collect initializers for default values
+    var initializers = <String>[];
+
     if (fields.isEmpty) {
-      sb.writeln("  ${classNameTrimmed}()");
+      sb.writeln("  ${constructorPrefix}${constructorName}()");
     } else {
-      sb.writeln("  ${classNameTrimmed}({");
+      sb.writeln("  ${constructorPrefix}${constructorName}({");
       for (var f in fields) {
         // Determine the field type (same logic as above for field declarations)
         var fieldType = f.type;
@@ -100,19 +137,90 @@ String getProperties(
         // Check if field is nullable - if it ends with ?, don't add required
         // Use the transformed fieldType to check for nullability
         var isNullable = fieldType != null && fieldType.endsWith('?');
-        var requiredKeyword = isNullable ? "" : "required ";
-        sb.writeln("    ${requiredKeyword}this.${f.name},");
+
+        // Check if field is inherited from a concrete parent
+        var isParentField =
+            hasExtends &&
+            !extendsAbstractClass &&
+            parentFields.contains(f.name);
+
+        var defaultValue = f.jsonKeyInfo?.defaultValue;
+        var hasDefaultValue = defaultValue != null;
+
+        if (isParentField) {
+          // Inherited field: generate normal parameter (nullable to allow inheriting defaults)
+          // If the field is inherited, we assume the parent handles the default value if we pass null.
+          // If parent requires non-null, we must provide it.
+          var paramType = (isNullable || hasDefaultValue)
+              ? (fieldType!.endsWith('?') ? fieldType : "$fieldType?")
+              : fieldType;
+          var requiredKeyword = (isNullable || hasDefaultValue)
+              ? ""
+              : "required ";
+          sb.writeln("    ${requiredKeyword}${paramType} ${f.name},");
+
+          // Do NOT add to initializers for parent fields
+        } else if (hasDefaultValue) {
+          // If we have a default value, we make the parameter nullable (if not already)
+          // and initialize it with ?? default
+          var paramType = isNullable ? fieldType : "$fieldType?";
+          sb.writeln("    ${paramType} ${f.name},");
+
+          // Add to initializers list
+          // We can't use this.field = field ?? default in initializer list if we use field name shadowing
+          // But constructor params shadow fields.
+          // In initializer list: "this.field = field ?? default" is valid Dart.
+
+          var defaultValueString = defaultValue.toString();
+
+          // Check if we need to add 'const' prefix
+          // Heuristic: if it starts with [ or { or Identifier( and doesn't have const
+          // And isn't a simple literal
+
+          if (!defaultValueString.startsWith("const ") &&
+              !defaultValueString.startsWith("'") &&
+              !defaultValueString.startsWith('"') &&
+              !RegExp(r'^-?\d').hasMatch(defaultValueString) && // numbers
+              defaultValueString != "true" &&
+              defaultValueString != "false" &&
+              defaultValueString != "null") {
+            // Check for constructor call or collection literal
+            if (defaultValueString.startsWith("[") ||
+                defaultValueString.startsWith("{") ||
+                RegExp(
+                  r'^[a-zA-Z_$][a-zA-Z0-9_$]*(\.[a-zA-Z_$][a-zA-Z0-9_$]*)?(\s*<[^>]+>)?\s*\(',
+                ).hasMatch(defaultValueString)) {
+              defaultValueString = "const $defaultValueString";
+            }
+          }
+
+          initializers.add(
+            "this.${f.name} = ${f.name} ?? ${defaultValueString}",
+          );
+        } else {
+          var requiredKeyword = isNullable ? "" : "required ";
+          sb.writeln("    ${requiredKeyword}this.${f.name},");
+        }
       }
-      sb.writeln("  })");
+      sb.write("  })");
     }
 
     // Add super call when extending abstract class
     if (hasExtends && extendsAbstractClass) {
       // Extending abstract class - call super()
-      sb.writeln("  : super();");
+      if (initializers.isNotEmpty) {
+        sb.write(" : ${initializers.join(", ")}");
+        sb.writeln(", super();");
+      } else {
+        sb.writeln(" : super();");
+      }
     } else if (hasExtends && !extendsAbstractClass) {
       // Extending concrete class - call super() with parent fields only
-      sb.writeln("  : super(");
+      sb.write(" : ");
+      if (initializers.isNotEmpty) {
+        sb.write("${initializers.join(", ")}, ");
+      }
+      sb.writeln("super(");
       for (var f in fields) {
         if (parentFields.contains(f.name)) {
           sb.writeln("      ${f.name}: ${f.name},");
@@ -120,7 +228,11 @@ String getProperties(
       }
       sb.writeln("    );");
     } else {
-      sb.writeln("  ;");
+      if (initializers.isNotEmpty) {
+        sb.writeln(" : ${initializers.join(", ")};");
+      } else {
+        sb.writeln(";");
+      }
     }
 
     // Named constructor for copyWith
@@ -155,6 +267,7 @@ String getProperties(
   return sb.toString();
 }
 
+/// Generates a factory constructor implementation for a class.
 String generateFactoryMethod(
   FactoryMethodInfo factory,
   String classNameTrimmed,
@@ -411,56 +524,71 @@ bool _needsPatchHandling(String baseType, List<String> knownClasses) {
 
 /// Replace $-prefixed types with concrete class names for JSON serialization
 /// For example: $TreeNode -> TreeNode, List<$TreeNode> -> List<TreeNode>
+/// Also handles nested generics like Map<String, List<$TreeNode>> -> Map<String, List<TreeNode>>
 String _replaceDollarTypesWithConcrete(String type) {
   // Handle outer nullability
   final isOuterNullable = type.endsWith('?');
   final baseType = isOuterNullable ? type.substring(0, type.length - 1) : type;
 
-  // Handle List<$Type> or List<$Type?>
-  if (baseType.startsWith('List<') && baseType.endsWith('>')) {
-    final innerType = baseType.substring(5, baseType.length - 1);
-    final isInnerNullable = innerType.endsWith('?');
-    final baseInnerType = isInnerNullable
-        ? innerType.substring(0, innerType.length - 1)
-        : innerType;
+  // Recursively process nested generics
+  String _processNestedType(String input) {
+    // First, check if this is a List type
+    if (input.startsWith('List<') && input.endsWith('>')) {
+      final innerType = input.substring(5, input.length - 1);
+      final isInnerNullable = innerType.endsWith('?');
+      final baseInnerType = isInnerNullable
+          ? innerType.substring(0, innerType.length - 1)
+          : innerType;
 
-    if (baseInnerType.startsWith('\$')) {
-      final trimmedType = baseInnerType.replaceAll('\$', '');
-      return 'List<$trimmedType${isInnerNullable ? '?' : ''}>${isOuterNullable ? '?' : ''}';
+      // Recursively process the inner type in case it's also a generic
+      final processedInner = _processNestedType(baseInnerType);
+
+      if (baseInnerType.startsWith('\$')) {
+        final trimmedType = baseInnerType.replaceAll('\$', '');
+        return 'List<$trimmedType${isInnerNullable ? '?' : ''}>';
+      }
+      // Return with processed inner type if it was a generic
+      return 'List<$processedInner${isInnerNullable ? '?' : ''}>';
     }
-    return type;
-  }
 
-  // Handle Map<K, $Type> or Map<K, $Type?>
-  if (baseType.startsWith('Map<') && baseType.endsWith('>')) {
-    final content = baseType.substring(4, baseType.length - 1);
-    final commaIndex = content.lastIndexOf(',');
-    if (commaIndex != -1) {
-      final keyPart = content.substring(0, commaIndex).trim();
-      final valuePart = content.substring(commaIndex + 1).trim();
+    // Check if this is a Map type
+    if (input.startsWith('Map<') && input.endsWith('>')) {
+      final content = input.substring(4, input.length - 1);
+      final commaIndex = content.lastIndexOf(',');
+      if (commaIndex != -1) {
+        final keyPart = content.substring(0, commaIndex).trim();
+        final valuePart = content.substring(commaIndex + 1).trim();
 
-      final isValueNullable = valuePart.endsWith('?');
-      final baseValueType = isValueNullable
-          ? valuePart.substring(0, valuePart.length - 1)
-          : valuePart;
+        final isValueNullable = valuePart.endsWith('?');
+        final baseValueType = isValueNullable
+            ? valuePart.substring(0, valuePart.length - 1)
+            : valuePart;
 
-      if (baseValueType.startsWith('\$')) {
-        final trimmedType = baseValueType.replaceAll('\$', '');
-        return 'Map<$keyPart, $trimmedType${isValueNullable ? '?' : ''}>${isOuterNullable ? '?' : ''}';
+        // Recursively process the value type in case it's also a generic
+        final processedValue = _processNestedType(baseValueType);
+
+        if (baseValueType.startsWith('\$')) {
+          final trimmedType = baseValueType.replaceAll('\$', '');
+          return 'Map<$keyPart, $trimmedType${isValueNullable ? '?' : ''}>';
+        }
+        // Return with processed value type if it was a generic
+        return 'Map<$keyPart, $processedValue${isValueNullable ? '?' : ''}>';
       }
     }
-    return type;
+
+    // Handle direct $Type or $Type?
+    if (input.startsWith('\$')) {
+      return input.replaceAll('\$', '');
+    }
+
+    return input;
   }
 
-  // Handle direct $Type or $Type?
-  if (baseType.startsWith('\$')) {
-    final trimmedType = baseType.replaceAll('\$', '');
-    return '$trimmedType${isOuterNullable ? '?' : ''}';
-  }
-
-  return type;
+  final result = _processNestedType(baseType);
+  return '${result}${isOuterNullable ? '?' : ''}';
 }
 
+/// Generates abstract property declarations and optional copyWith factory.
 String getPropertiesAbstract(
   List<NameTypeClassComment> fields,
   String className,
@@ -504,11 +632,13 @@ String getPropertiesAbstract(
   return sb.toString();
 }
 
+/// Generates copyWith methods for a concrete class.
 String getCopyWith(
   List<NameTypeClassComment> fields,
   String className,
-  bool generateCopyWithFn,
-) {
+  bool generateCopyWithFn, {
+  bool hidePublicConstructor = false,
+}) {
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
 
@@ -524,7 +654,9 @@ String getCopyWith(
     }
     sb.writeln("  }) {");
   }
-  sb.writeln("    return $classNameTrimmed(");
+
+  var constructorSuffix = hidePublicConstructor ? "._" : "";
+  sb.writeln("    return $classNameTrimmed$constructorSuffix(");
   for (var f in fields) {
     sb.writeln("      ${f.name}: ${f.name} ?? this.${f.name},");
   }
@@ -581,6 +713,7 @@ String getCopyWith(
   return sb.toString();
 }
 
+/// Generates copyWith methods scoped to implemented interfaces.
 String getInterfaceCopyWithMethods(
   List<Interface> interfaces,
   List<NameTypeClassComment> classFields,
@@ -621,6 +754,7 @@ String getInterfaceCopyWithMethods(
   return sb.toString();
 }
 
+/// Generates function-based copyWith methods for interfaces.
 String getInterfaceCopyWithFnMethods(
   List<Interface> interfaces,
   List<NameTypeClassComment> classFields,
@@ -665,6 +799,7 @@ String getInterfaceCopyWithFnMethods(
   return sb.toString();
 }
 
+/// Generates == operator and hashCode overrides.
 String getEqualsAndHashCode(
   List<NameTypeClassComment> fields,
   String className,
@@ -737,6 +872,7 @@ String getEqualsAndHashCode(
   return sb.toString();
 }
 
+/// Generates a toString override for the class.
 String getToString(List<NameTypeClassComment> fields, String className) {
   var sb = StringBuffer();
 
@@ -763,6 +899,7 @@ String getToString(List<NameTypeClassComment> fields, String className) {
   return sb.toString();
 }
 
+/// Generates an enum of field names for patch support.
 String getEnumPropertyList(
   List<NameTypeClassComment> fields,
   String className,
@@ -785,6 +922,7 @@ String getEnumPropertyList(
   return sb.toString();
 }
 
+/// Generates a Patch class for partial updates.
 String getPatchClass(
   List<NameTypeClassComment> fields,
   String className,
@@ -1057,6 +1195,7 @@ String getPatchClass(
   return sb.toString();
 }
 
+/// Strips all $ prefixes from a Dart type string.
 String getDataTypeWithoutDollars(String type) {
   return type.replaceAll('\$', '');
 }
@@ -1077,7 +1216,12 @@ const PRIMITIVE_TYPES = [
   'dynamic',
 ];
 
-String getPatchWithMethod(List<NameTypeClassComment> fields, String className) {
+/// Generates a patchWith method for a class.
+String getPatchWithMethod(
+  List<NameTypeClassComment> fields,
+  String className, {
+  bool hidePublicConstructor = false,
+}) {
   if (fields.isEmpty) return '';
 
   var classNameTrimmed = className.replaceAll("\$", "");
@@ -1092,7 +1236,9 @@ String getPatchWithMethod(List<NameTypeClassComment> fields, String className) {
     "    final _patcher = patchInput ?? $classNameTrimmed" + "Patch();",
   );
   sb.writeln("    final _patchMap = _patcher.toPatch();");
-  sb.writeln("    return $classNameTrimmed(");
+
+  var constructorSuffix = hidePublicConstructor ? "._" : "";
+  sb.writeln("    return $classNameTrimmed$constructorSuffix(");
 
   for (var i = 0; i < fields.length; i++) {
     var f = fields[i];
@@ -1108,11 +1254,13 @@ String getPatchWithMethod(List<NameTypeClassComment> fields, String className) {
   return sb.toString();
 }
 
+/// Generates patchWith methods for implemented interfaces.
 String getInterfacePatchWithMethods(
   List<Interface> interfaces,
   List<NameTypeClassComment> classFields,
-  String className,
-) {
+  String className, {
+  bool hidePublicConstructor = false,
+}) {
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
   var classFieldNames = classFields.map((f) => f.name).toSet();
@@ -1141,7 +1289,9 @@ String getInterfacePatchWithMethods(
       "    final _patcher = patchInput ?? $interfaceNameTrimmed" + "Patch();",
     );
     sb.writeln("    final _patchMap = _patcher.toPatch();");
-    sb.writeln("    return $classNameTrimmed(");
+
+    var constructorSuffix = hidePublicConstructor ? "._" : "";
+    sb.writeln("    return $classNameTrimmed$constructorSuffix(");
 
     for (var f in classFields) {
       if (interfaceFieldNames.contains(f.name)) {
@@ -1160,6 +1310,7 @@ String getInterfacePatchWithMethods(
   return sb.toString();
 }
 
+/// Generates a compareTo extension for diffing fields.
 String getCompareToExtension(
   String classNameTrimmed,
   List<NameTypeClassComment> allFields,
