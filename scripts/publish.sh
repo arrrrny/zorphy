@@ -203,6 +203,21 @@ update_pubspec() {
     cd "$REPO_ROOT" > /dev/null
 }
 
+update_readme() {
+    echo "📝 Updating README.md dependencies..."
+    cd "$REPO_ROOT"
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" README.md
+        sed -i '' "s/zorphy: .*/zorphy: ^$VERSION/" README.md
+    else
+        sed -i "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" README.md
+        sed -i "s/zorphy: .*/zorphy: ^$VERSION/" README.md
+    fi
+
+    echo "  ✓ README.md dependencies updated to ^$VERSION"
+}
+
 # ========================================================================
 # STEP 1: Publish zorphy_annotation
 # ========================================================================
@@ -333,6 +348,48 @@ echo "✅ Successfully published zorphy version $VERSION!"
 echo ""
 
 cd "$REPO_ROOT"
+
+# ========================================================================
+# STEP 3: Update README.md
+# ========================================================================
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📝 Step 3/3: Updating README.md"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+update_readme
+
+# Commit README changes
+echo "🔨 Committing README.md changes..."
+git add README.md
+git commit -m "chore: update README.md dependencies to v$VERSION"
+echo "  ✓ Changes committed"
+
+# Create PR (if gh CLI available)
+if command -v gh &> /dev/null; then
+    echo "🔄 Creating pull request to master..."
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+    if gh pr list --head "$CURRENT_BRANCH" --json number | grep -q "\"number\""; then
+        echo "  ⚠️  PR already exists for branch $CURRENT_BRANCH"
+    else
+        gh pr create --base master --head "$CURRENT_BRANCH" \
+            --title "chore: update README.md dependencies to v$VERSION" \
+            --body "Update README.md dependencies
+
+**Version:** $VERSION
+**Date:** $DATE
+
+**Changes:**
+- Update zorphy_annotation to ^$VERSION
+- Update zorphy to ^$VERSION
+- Build runner version remains unchanged
+
+Please review and merge this PR to master."
+        echo "  ✓ PR created"
+    fi
+fi
 
 # ========================================================================
 # SUMMARY
