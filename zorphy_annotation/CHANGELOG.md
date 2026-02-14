@@ -1,3 +1,8 @@
+## [1.5.6] - 2026-02-14
+
+### Chore
+- Updated docs, created docusarous website, create public constructors by default and only create private on public hidden
+
 ## [1.5.5] - 2026-02-13
 
 ### Fix
