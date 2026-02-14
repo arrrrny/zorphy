@@ -11,10 +11,11 @@
 
 ## 📚 Documentation & Resources
 
-- **[Website](https://zuraffa.com)** - Official documentation and landing page
+- **[Official Documentation](https://arrrrny.github.io/zorphy/)** - Comprehensive guides and examples
+- **[pub.dev](https://pub.dev/packages/zorphy)** - Package on the Dart package repository
+- **[GitHub](https://github.com/arrrrny/zorphy)** - Source code and issue tracker
+- **[Examples](./example)** - Complete working examples in the repository
 - **[Zuraffa](https://pub.dev/packages/zuraffa)** - Clean Architecture framework for Flutter
-- **[GitHub](https://github.com/arrrrny/zorphy)** - Source code and examples
-- **[Examples](./example)** - Complete working examples
 - 📦 **JSON Serialization** - Full `toJson`/`fromJson` support with polymorphic type handling
 - ⚖️ **Equality** - Auto-generated `==` operator and `hashCode`
 - 📝 **toString** - Meaningful string representations for debugging
@@ -34,10 +35,10 @@ Add the dependencies to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zorphy_annotation: ^1.3.0
+  zorphy_annotation: ^1.5.6
 
 dev_dependencies:
-  zorphy: ^1.3.0
+  zorphy: ^1.5.6
   build_runner: ^2.4.0
 ```
 
