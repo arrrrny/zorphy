@@ -59,4 +59,7 @@ app.*.map.json
 /android/app/release
 
 **/build
+# Ignore all hidden files/folders
 .**
+# But allow .github directory for workflows
+!.github/
