@@ -18,9 +18,17 @@ cd "$REPO_ROOT"
 VERSION="$1"
 PROMOTE_MODE=false
 
+VERSION_EXISTS=false
+if grep -q "^## \[$VERSION\]" zorphy_annotation/CHANGELOG.md || \
+   grep -q "^## \[$VERSION\]" zorphy/CHANGELOG.md; then
+    VERSION_EXISTS=true
+fi
+
 # Check if we should promote [Unreleased]
 if [ $# -eq 1 ]; then
-    if grep -q "^## \[Unreleased\]" zorphy_annotation/CHANGELOG.md || \
+    if [ "$VERSION_EXISTS" = true ]; then
+        echo "✓ Version $VERSION already exists in CHANGELOG, proceeding with publish..."
+    elif grep -q "^## \[Unreleased\]" zorphy_annotation/CHANGELOG.md || \
        grep -q "^## \[Unreleased\]" zorphy/CHANGELOG.md; then
         echo "✨ Detected [Unreleased] section. Promoting to version $VERSION..."
         PROMOTE_MODE=true
@@ -74,7 +82,6 @@ update_changelog_links() {
     local prev_version=""
 
     echo "  📝 Updating comparison links..."
-    cd "$package_dir"
 
     # Extract previous version from [Unreleased] link
     if grep -q "^\[Unreleased\]:" CHANGELOG.md; then
@@ -133,6 +140,13 @@ update_changelog() {
     echo "📝 Updating $package_name CHANGELOG..."
     cd "$package_dir"
 
+    # Check if version already exists in CHANGELOG
+    if grep -q "^## \[$VERSION\]" CHANGELOG.md; then
+        echo "  ✓ Version $VERSION already exists in CHANGELOG, skipping..."
+        cd "$REPO_ROOT" > /dev/null
+        return
+    fi
+
     # Check if [Unreleased] section exists
     if ! grep -q "^## \[Unreleased\]" CHANGELOG.md; then
         echo "  ⚠️  No [Unreleased] section found, adding it..."
@@ -173,7 +187,6 @@ update_changelog() {
         # Remove [Unreleased] section before publishing
         echo "  🔽 Removing [Unreleased] section before publishing..."
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            # Match from [Unreleased] to the next ## header, delete [Unreleased] and blank lines
             perl -i -0pe 's/^## \[Unreleased\]\n\n//' CHANGELOG.md
         else
             perl -i -0pe 's/^## \[Unreleased\]\n\n//' CHANGELOG.md
