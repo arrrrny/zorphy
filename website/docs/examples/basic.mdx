@@ -1,0 +1,31 @@
+---
+title: Basic Entity
+---
+
+This mirrors `basic_example.dart` and focuses on the essentials: fields, constructors, copyWith, equality, and patching.
+
+```dart
+@zorphy
+abstract class $User {
+  String get name;
+  int get age;
+  String? get email;
+}
+```
+
+## Highlights
+
+- Instantiate with named parameters.
+- `copyWith` produces a modified copy without mutating.
+- Equality is structural, not identity-based.
+- Patch objects allow partial updates.
+
+```dart
+final user = User(name: 'Alice', age: 30);
+final updated = user.copyWith(age: 31);
+
+final patch = UserPatch.create()
+  ..withAge(32)
+  ..withEmail('alice@example.com');
+final patched = user.patchWithUser(patchInput: patch);
+```

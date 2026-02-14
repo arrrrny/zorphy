@@ -1,0 +1,44 @@
+---
+sidebar_position: 2
+title: Features
+---
+
+Zorphy keeps the source declarations tiny and pushes the heavy lifting into generated code.
+
+## Core generation
+
+- Immutable concrete classes generated from `$`-prefixed abstract definitions.
+- `copyWith` helpers for partial updates.
+- Structural equality, `hashCode`, and `toString`.
+- Optional `compareTo` helpers for diffing two instances.
+- Optional patch APIs for controlled updates.
+
+## JSON serialization
+
+- `toJson` and `fromJson` for every generated class.
+- Lean JSON output for clean payloads when you want to remove metadata.
+- Manual converters via `@JsonKey(toJson: ..., fromJson: ...)`.
+- Polymorphic JSON for sealed and explicit subtype hierarchies.
+
+## Polymorphism
+
+- Sealed bases with `$$`.
+- `explicitSubTypes` for safe JSON dispatch.
+- `nonSealed` for open hierarchies used in domain entities.
+
+## Generics
+
+- Generic entities with `genericArgumentFactories`.
+- Custom converters for generic fields.
+
+## Query helpers
+
+- Field descriptors for filters and sorting.
+- Built-in filter operators: `eq`, `gt`, `lt`, `contains`, `and`, `or`.
+- In-memory query helpers for quick iteration.
+
+## Quality of life
+
+- Default values via `@JsonKey(defaultValue: ...)`.
+- Hidden constructors with factory methods.
+- Nullability annotations that align with generated code.

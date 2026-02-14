@@ -2,12 +2,15 @@ class NameType {
   final String name;
   final String? type;
 
+  /// Creates a simple name/type pair.
   NameType(this.name, this.type);
 
   @override
+  /// Returns a readable representation of the pair.
   String toString() => "$name: $type";
 
   @override
+  /// Compares two NameType instances by value.
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is NameType &&
@@ -16,6 +19,7 @@ class NameType {
           type == other.type;
 
   @override
+  /// Returns a hash code derived from name and type.
   int get hashCode => name.hashCode ^ (type.hashCode);
 }
 
@@ -29,6 +33,7 @@ class NameTypeClassComment {
   final bool isEnum;
   final List<String> enumValues;
 
+  /// Creates a name/type pair with optional class and annotation metadata.
   NameTypeClassComment(
     this.name,
     this.type,
@@ -41,9 +46,11 @@ class NameTypeClassComment {
   });
 
   @override
+  /// Returns a readable representation with class context.
   String toString() => "$name: $type ($className)";
 
   @override
+  /// Compares two NameTypeClassComment instances by value.
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is NameTypeClassComment &&
@@ -53,6 +60,7 @@ class NameTypeClassComment {
           className == other.className;
 
   @override
+  /// Returns a hash code derived from name, type, and className.
   int get hashCode => name.hashCode ^ type.hashCode ^ className.hashCode;
 }
 
@@ -63,6 +71,7 @@ class NameTypeClassCommentData<TMeta1> {
   final String? comment;
   final TMeta1? meta1;
 
+  /// Creates a name/type pair with custom metadata.
   NameTypeClassCommentData(
     this.name,
     this.type,
@@ -85,6 +94,7 @@ class JsonKeyInfo {
   final String? fromJson;
   final String? converter;
 
+  /// Creates a JsonKeyInfo record with optional parameters.
   const JsonKeyInfo({
     this.name,
     this.ignore,
@@ -99,6 +109,7 @@ class JsonKeyInfo {
   });
 
   /// Generates the annotation string representation
+  /// Builds the Dart annotation string for this JsonKey configuration.
   String toAnnotationString({bool includeDefaultValue = true}) {
     final params = <String>[];
 
@@ -119,8 +130,10 @@ class JsonKeyInfo {
     return "@JsonKey(${params.join(", ")})";
   }
 
+  /// Returns true when at least one annotation parameter is set.
   bool get hasAnnotations => params.isNotEmpty;
 
+  /// Lists which JsonKey parameters are present.
   List<String> get params {
     final result = <String>[];
     if (name != null) result.add("name");

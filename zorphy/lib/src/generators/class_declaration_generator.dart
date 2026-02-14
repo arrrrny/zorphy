@@ -9,9 +9,11 @@ import 'base_generator.dart';
 /// Generates class declaration, properties, and constructor
 /// This wraps the existing getProperties and getPropertiesAbstract functions
 class ClassDeclarationGenerator extends UniversalGenerator {
+  /// Creates a generator for class declarations and constructors.
   ClassDeclarationGenerator();
 
   @override
+  /// Generates a class declaration for the current context.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final config = context.config;
@@ -94,7 +96,9 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       final genericParams = metadata.generics.isNotEmpty
           ? ', genericArgumentFactories: true'
           : '';
-      final constructorParam = config.hidePublicConstructor ? ", constructor: '_'" : "";
+      final constructorParam = config.hidePublicConstructor
+          ? ", constructor: '_'"
+          : "";
       sb.writeln(
         '@JsonSerializable(explicitToJson: ${config.explicitToJson}$genericParams$constructorParam)',
       );
@@ -212,7 +216,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     }
     final parentElement =
         metadata.allAnnotatedClasses[parentConcreteClassName] ??
-            metadata.allAnnotatedClasses['\$$parentConcreteClassName'];
+        metadata.allAnnotatedClasses['\$$parentConcreteClassName'];
     return parentElement?.constructors.any((e) => e.isConst) ?? false;
   }
 

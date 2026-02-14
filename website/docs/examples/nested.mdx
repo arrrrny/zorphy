@@ -1,0 +1,35 @@
+---
+title: Nested Objects
+---
+
+From `nested_example.dart`, Zorphy handles nested entities, self-references, and nested patching.
+
+```dart
+@zorphy
+abstract class $Person {
+  String get name;
+  int get age;
+  $Address get address;
+}
+```
+
+## Nested patching
+
+```dart
+final personPatch = PersonPatch.create()
+  ..withAddressPatch(AddressPatch.create()..withCity('Los Angeles'));
+
+final updated = person.patchWithPerson(patchInput: personPatch);
+```
+
+## Self-referencing trees
+
+```dart
+@Zorphy(generateJson: true)
+abstract class $CategoryNode {
+  String get id;
+  String get name;
+  List<$CategoryNode>? get children;
+  $CategoryNode? get parent;
+}
+```

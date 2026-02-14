@@ -2,9 +2,11 @@ import 'base_generator.dart';
 
 /// Generates semantic property helpers (hasField, isSubtype, etc.)
 class PropertyHelperGenerator extends UniversalGenerator {
+  /// Creates a generator for property helper extensions.
   PropertyHelperGenerator();
 
   @override
+  /// Generates property helper extensions for the class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final sb = StringBuffer();
@@ -114,6 +116,7 @@ class PropertyHelperGenerator extends UniversalGenerator {
   }
 
   @override
+  /// Returns true when there are fields or subtypes to support.
   bool shouldGenerate(GenerationContext context) {
     // Generate if there are fields or subtypes
     return context.metadata.allFields.isNotEmpty ||

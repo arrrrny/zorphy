@@ -6,6 +6,7 @@ class AnnotationParser {
   /// Parse annotation and return options map
   /// For now, this is a simple placeholder - the actual options
   /// are read directly in the generators where needed
+  /// Returns typed options extracted from the annotation.
   static AnnotationOptions parse(ConstantReader annotation) {
     return AnnotationOptions(
       generateJson: annotation.read('generateJson').boolValue,
@@ -27,6 +28,7 @@ class AnnotationOptions {
   final bool hidePublicConstructor;
   final bool nonSealed;
 
+  /// Creates a typed options object from annotation values.
   const AnnotationOptions({
     required this.generateJson,
     required this.explicitToJson,

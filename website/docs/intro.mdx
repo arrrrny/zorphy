@@ -1,0 +1,32 @@
+---
+sidebar_position: 1
+title: Getting Started
+---
+
+Zorphy turns small, readable Dart definitions into fully featured, immutable data classes. You describe the fields and intent. Zorphy generates constructors, copyWith, equality, JSON, patch helpers, filters, and more.
+
+## Install
+
+Add the annotation package and generator to your pubspec, then run build_runner. The examples in this repo use the same setup.
+
+## A minimal entity
+
+```dart
+@zorphy
+abstract class $User {
+  String get name;
+  int get age;
+  String? get email;
+}
+```
+
+You get:
+
+- A concrete `User` class with a constructor.
+- `copyWith`, `==`, `hashCode`, `toString`.
+- Patch helpers like `UserPatch`.
+
+## What to explore next
+
+- Feature tour: see what the generator can produce.
+- Examples: each page mirrors a repo example with short, practical notes.

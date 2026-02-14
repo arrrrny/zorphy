@@ -35,12 +35,12 @@ abstract class $Rectangle implements $$Shape {
 abstract class $TreeNode {
   @JsonKey(defaultValue: "root")
   String get value;
-  
+
   @JsonKey(defaultValue: const [])
   List<$TreeNode>? get children;
-  
+
   @JsonKey(defaultValue: Duration(seconds: 5))
   Duration get timeout;
-  
+
   $TreeNode? get parent;
 }

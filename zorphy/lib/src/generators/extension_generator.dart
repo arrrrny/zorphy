@@ -4,9 +4,11 @@ import 'base_generator.dart';
 /// Generates compareTo extension method
 /// Wraps the existing getCompareToExtension function
 class CompareToExtensionGenerator extends ConcreteClassGenerator {
+  /// Creates a generator for compareTo extensions.
   CompareToExtensionGenerator();
 
   @override
+  /// Generates a compareTo extension for the class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final className = metadata.cleanName;
@@ -19,6 +21,7 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
   }
 
   @override
+  /// Returns true when compareTo generation is enabled.
   bool shouldGenerate(GenerationContext context) {
     return context.config.generateCompareTo;
   }
@@ -27,9 +30,11 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
 /// Generates changeTo extension methods for explicit subtypes
 /// Wraps the existing getChangeToExtension function
 class ChangeToExtensionGenerator extends UniversalGenerator {
+  /// Creates a generator for changeTo extensions.
   ChangeToExtensionGenerator();
 
   @override
+  /// Generates changeTo extensions for explicit subtypes.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
 
@@ -50,6 +55,7 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
   }
 
   @override
+  /// Returns true when explicit subtypes are defined.
   bool shouldGenerate(GenerationContext context) {
     return context.metadata.explicitSubtypes.isNotEmpty;
   }

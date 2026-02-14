@@ -21,11 +21,7 @@ abstract class $User {
   String? get email;
 }
 
-User createGuestUser() => User(
-      name: 'Guest',
-      age: 0,
-      email: null,
-    );
+User createGuestUser() => User(name: 'Guest', age: 0, email: null);
 
 // =============================================================================
 // FEATURE 2: JSON Serialization

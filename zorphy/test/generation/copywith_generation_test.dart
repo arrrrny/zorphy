@@ -17,24 +17,9 @@ void main() {
       expect(code.contains('int? age'), isTrue);
       expect(code.contains('String? email'), isTrue);
 
-      expect(
-        code.contains(
-          "name: name ?? this.name,",
-        ),
-        isTrue,
-      );
-      expect(
-        code.contains(
-          "age: age ?? this.age,",
-        ),
-        isTrue,
-      );
-      expect(
-        code.contains(
-          "email: email ?? this.email,",
-        ),
-        isTrue,
-      );
+      expect(code.contains("name: name ?? this.name,"), isTrue);
+      expect(code.contains("age: age ?? this.age,"), isTrue);
+      expect(code.contains("email: email ?? this.email,"), isTrue);
     });
   });
 }

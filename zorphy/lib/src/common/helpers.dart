@@ -7,6 +7,7 @@ import 'package:source_gen/source_gen.dart';
 import 'NameType.dart';
 import 'classes.dart';
 
+/// Finds an annotation by name on a list of metadata entries.
 ElementAnnotation? findAnnotation(
   List<ElementAnnotation> annotations,
   String name,
@@ -57,6 +58,7 @@ List<ElementAnnotation> _extractAnnotations(dynamic rawMetadata) {
   return [];
 }
 
+/// Extracts JsonKey configuration from a field or accessor.
 JsonKeyInfo? extractJsonKeyInfo(Element element) {
   try {
     final dynamic dynElem = element;
@@ -302,6 +304,7 @@ String? _extractDefaultValue(String annotationSource) {
   return annotationSource.substring(start, i).trim();
 }
 
+/// Builds a merged doc comment string for a class and its interfaces.
 String getClassComment(List<Interface> interfaces, String? classComment) {
   var a = interfaces
       .where((e) => e is InterfaceWithComment && e.comment != classComment)
@@ -318,6 +321,7 @@ String getClassComment(List<Interface> interfaces, String? classComment) {
   return a.join("\n").trim() + "\n";
 }
 
+/// Collects fields from interfaces and a concrete class element.
 List<NameTypeClassComment> getAllFields(
   List<InterfaceType> interfaceTypes,
   ClassElement element,
@@ -436,6 +440,7 @@ List<NameTypeClassComment> getAllFields(
       .toList();
 }
 
+/// Converts a Dart type to a normalized string representation.
 String typeToString(DartType type, {String? currentClassName}) {
   final nullMarker = type.nullabilitySuffix == NullabilitySuffix.question
       ? '?'

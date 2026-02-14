@@ -2,9 +2,11 @@ import 'base_generator.dart';
 
 /// Generates the static Fields class containing Field descriptors for the entity
 class FieldsClassGenerator extends UniversalGenerator {
+  /// Creates a generator for field descriptor classes.
   FieldsClassGenerator();
 
   @override
+  /// Generates a Fields helper class for query construction.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final className = metadata.cleanName;
@@ -67,6 +69,7 @@ class FieldsClassGenerator extends UniversalGenerator {
   }
 
   @override
+  /// Returns true when filter descriptors should be generated.
   bool shouldGenerate(GenerationContext context) {
     return context.config.generateFilter &&
         context.metadata.allFields.isNotEmpty;

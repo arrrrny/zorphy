@@ -1,0 +1,40 @@
+---
+title: Factories and Constructors
+---
+
+This page uses `factory_test.dart` and the domain entity factory in `assistant_message.dart`.
+
+## Hide the public constructor
+
+```dart
+@Zorphy(generateJson: true, hidePublicConstructor: true)
+abstract class $TestWithFactory {
+  String get id;
+
+  static TestWithFactory create({required String id}) =>
+      TestWithFactory._(id: id);
+}
+```
+
+This keeps instantiation controlled while still letting generated code construct instances.
+
+## Static factory helpers
+
+```dart
+@Zorphy(generateJson: true)
+abstract class $AssistantMessage implements $$ChatMessage {
+  @override
+  ChatMessageRole get role => ChatMessageRole.assistant;
+
+  static AssistantMessage create({
+    required String text,
+    DateTime? createdAt,
+    List<Attachment>? attachments,
+  }) => AssistantMessage(
+    text: text,
+    attachments: attachments ?? [],
+    role: ChatMessageRole.assistant,
+    createdAt: createdAt ?? DateTime.now(),
+  );
+}
+```

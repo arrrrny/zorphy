@@ -1,0 +1,52 @@
+---
+title: Filters and Queries
+---
+
+This combines `query_example.dart`, `filter_non_generic_example.dart`, and `filter_generic_example.dart`.
+
+## Enable filters
+
+```dart
+@Zorphy(generateJson: true, generateFilter: true)
+abstract class $Product {
+  int get id;
+  String get name;
+  double get price;
+  DateTime get createdAt;
+  bool get isAvailable;
+}
+```
+
+## Build filters
+
+```dart
+final filter = And([
+  ProductFields.isAvailable.eq(true),
+  ProductFields.price.lt(1000.0),
+  ProductFields.name.contains('Pro'),
+]);
+```
+
+## Sort helpers
+
+```dart
+final sortByPrice = ProductFields.price.desc();
+```
+
+## In-memory evaluation
+
+```dart
+final results = products.filter(filter).orderBy(sortByPrice);
+```
+
+## Generic filter fields
+
+```dart
+@Zorphy(generateFilter: true)
+abstract class $CreateParams<T, P> {
+  T get data;
+  P? get params;
+}
+
+final dataField = CreateParamsFields.data<String, Params>();
+```

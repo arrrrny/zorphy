@@ -6,5 +6,6 @@ part 'factory_test.g.dart';
 abstract class $TestWithFactory {
   String get id;
 
- static TestWithFactory create({required String id}) =>  TestWithFactory._(id: id);
+  static TestWithFactory create({required String id}) =>
+      TestWithFactory._(id: id);
 }

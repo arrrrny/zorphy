@@ -7,9 +7,11 @@ import 'base_generator.dart';
 /// This is complex and handles both toJson/fromJson and polymorphic JSON
 /// Wraps the logic from createZorphy lines 346-488
 class JsonGenerator extends UniversalGenerator {
+  /// Creates a generator for JSON serialization members.
   JsonGenerator();
 
   @override
+  /// Generates fromJson/toJson-related members for the class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final config = context.config;
@@ -41,6 +43,7 @@ class JsonGenerator extends UniversalGenerator {
   }
 
   @override
+  /// Returns true when JSON generation is enabled.
   bool shouldGenerate(GenerationContext context) {
     return context.config.generateJson;
   }
@@ -360,9 +363,11 @@ class JsonGenerator extends UniversalGenerator {
 
 /// Generates JSON extension for concrete classes
 class JsonExtensionGenerator extends ConcreteClassGenerator {
+  /// Creates a generator for JSON extension helpers.
   JsonExtensionGenerator();
 
   @override
+  /// Generates JSON helper extensions for the class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final config = context.config;

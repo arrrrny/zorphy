@@ -4,8 +4,10 @@
 class JsonToEntity {
   final bool prefixNested;
 
+  /// Creates a converter that can prefix nested entity names.
   JsonToEntity({this.prefixNested = true});
 
+  /// Parses JSON into an entity definition tree.
   EntityResult parse(
     Map<String, dynamic> json,
     String name, {
@@ -93,6 +95,7 @@ class EntityResult {
   final List<Field> fields;
   final List<EntityResult> nested;
 
+  /// Creates a parsed entity result with fields and nested entities.
   EntityResult(this.name, this.fields, this.nested);
 }
 
@@ -101,7 +104,9 @@ class Field {
   final String type;
   final bool nullable;
 
+  /// Creates a field descriptor with type and nullability.
   Field(this.name, this.type, this.nullable);
 
+  /// Returns the type string with nullability applied.
   String get fullType => nullable && !type.endsWith('?') ? '$type?' : type;
 }

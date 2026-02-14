@@ -1,0 +1,61 @@
+---
+title: Polymorphism
+---
+
+Zorphy supports sealed and open hierarchies with explicit subtype lists. This page combines `sealed_class_example.dart` and the domain entities like `$$Attachment` and `$$ChatMessage`.
+
+## Sealed hierarchy
+
+```dart
+@Zorphy(
+  generateJson: true,
+  explicitSubTypes: [$CreditCard, $PayPal, $BankTransfer],
+)
+abstract class $$PaymentMethod {
+  String get displayName;
+  String get processPayment;
+}
+```
+
+Concrete types implement the sealed base:
+
+```dart
+@Zorphy(generateJson: true)
+abstract class $CreditCard implements $$PaymentMethod {
+  String get cardNumber;
+}
+```
+
+## Open hierarchy with explicit subtypes
+
+The domain entities use `nonSealed: true` to keep the base open while still enabling polymorphic JSON.
+
+```dart
+@Zorphy(
+  generateJson: true,
+  explicitSubTypes: [$FileAttachment, $LinkAttachment],
+  nonSealed: true,
+)
+abstract class $$Attachment {
+  String get name;
+  String get mimeType;
+}
+```
+
+```dart
+@Zorphy(
+  generateJson: true,
+  explicitSubTypes: [$UserMessage, $AssistantMessage],
+  nonSealed: true,
+)
+abstract class $$ChatMessage {
+  String get text;
+  ChatMessageRole get role;
+}
+```
+
+## Why this matters
+
+- Safe polymorphic JSON dispatch.
+- Strong typing when switching on subtype.
+- Clear separation between base contracts and concrete classes.

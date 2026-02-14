@@ -7,19 +7,24 @@ import 'package:zorphy/src/models/models.dart';
 import 'package:zorphy/src/orchestrator.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
+/// Generates Zorphy code from @Zorphy annotated classes.
 class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
   static final Map<String, ClassElement> _allAnnotatedClasses = {};
+
+  /// Returns all annotated classes discovered during generation.
   static Map<String, ClassElement> get allAnnotatedClasses =>
       _allAnnotatedClasses;
 
   static Set<String>? _classesInExplicitSubtypes;
 
   @override
+  /// Returns the annotation type checker for Zorphy.
   TypeChecker get typeChecker => const TypeChecker.fromUrl(
     'package:zorphy_annotation/src/annotations.dart#Zorphy',
   );
 
   @override
+  /// Generates code for a single annotated element.
   dynamic generateForAnnotatedElement(
     Element element,
     ConstantReader annotation,

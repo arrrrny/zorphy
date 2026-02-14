@@ -4,9 +4,11 @@ import 'base_generator.dart';
 /// Generates factory method constructors
 /// Wraps the existing generateFactoryMethod function
 class FactoryMethodGenerator extends ConcreteClassGenerator {
+  /// Creates a generator for factory constructors.
   FactoryMethodGenerator();
 
   @override
+  /// Generates factory constructors for the current class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final sb = StringBuffer();
@@ -35,6 +37,7 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
   }
 
   @override
+  /// Returns true when non-recursive factory methods exist.
   bool shouldGenerate(GenerationContext context) {
     final metadata = context.metadata;
     final className = metadata.cleanName;

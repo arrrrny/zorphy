@@ -4,6 +4,7 @@ import 'package:zorphy/src/common/classes.dart';
 import 'package:zorphy/src/factory_method.dart';
 import 'package:zorphy/src/helpers.dart';
 
+/// Generates the code block for a single Zorphy-annotated class.
 String createZorphy(
   bool isAbstract,
   List<NameTypeClassComment> allFieldsDistinct,
@@ -40,7 +41,9 @@ String createZorphy(
       elementName.startsWith("\$\$") && typesExplicit.isNotEmpty;
   if (generateJson && !isSealedClass && !isAbstractWithSubtypes) {
     var constructorParam = hidePublicConstructor ? ", constructor: '_'" : "";
-    sb.writeln("@JsonSerializable(explicitToJson: $explicitToJson$constructorParam)");
+    sb.writeln(
+      "@JsonSerializable(explicitToJson: $explicitToJson$constructorParam)",
+    );
   }
 
   var className = elementName.replaceAll("\$", "");
@@ -287,7 +290,8 @@ String createZorphy(
       final extendsMatch = RegExp(r'extends\s+(\S+)').firstMatch(extendsStr);
       if (extendsMatch != null) {
         final parentName = extendsMatch.group(1)!;
-        final parentElement = allAnnotatedClasses[parentName] ??
+        final parentElement =
+            allAnnotatedClasses[parentName] ??
             allAnnotatedClasses['\$$parentName'];
         parentHasConstConstructor =
             parentElement?.constructors.any((e) => e.isConst) ?? false;

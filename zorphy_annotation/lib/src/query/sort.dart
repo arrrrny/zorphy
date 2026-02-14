@@ -7,11 +7,16 @@ class Sort<TEntity> {
   final Field<TEntity, Object?> field;
   final bool descending;
 
+  /// Creates a sort configuration for [field].
   const Sort(this.field, {this.descending = false});
 
+  /// Creates an ascending sort for [field].
   const Sort.asc(this.field) : descending = false;
+
+  /// Creates a descending sort for [field].
   const Sort.desc(this.field) : descending = true;
 
+  /// Serializes this sort configuration to JSON.
   Map<String, dynamic> toJson() => {
         'field': field.name,
         'descending': descending,
@@ -38,6 +43,9 @@ class Sort<TEntity> {
 
 /// Extension methods for sorting on fields
 extension FieldSortOps<TEntity, TValue> on Field<TEntity, TValue> {
+  /// Builds an ascending sort for this field.
   Sort<TEntity> asc() => Sort(this, descending: false);
+
+  /// Builds a descending sort for this field.
   Sort<TEntity> desc() => Sort(this, descending: true);
 }

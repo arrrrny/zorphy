@@ -36,6 +36,7 @@ class GenerationConfig {
   /// Field names defined directly on this class (not inherited)
   final Set<String> ownFields;
 
+  /// Creates a generation configuration with explicit options.
   const GenerationConfig({
     required this.outputExtension,
     required this.generateJson,
@@ -51,6 +52,7 @@ class GenerationConfig {
   });
 
   /// Create config for standard zorphy builder
+  /// Creates config for the standard Zorphy builder.
   factory GenerationConfig.zorphy({
     required bool generateJson,
     required bool explicitToJson,
@@ -78,6 +80,7 @@ class GenerationConfig {
   }
 
   /// Create config for zorphy2 builder (first pass for circular dependencies)
+  /// Creates config for the Zorphy2 builder.
   factory GenerationConfig.zorphy2() {
     return const GenerationConfig(
       outputExtension: '.zorphy2.dart',
@@ -88,13 +91,14 @@ class GenerationConfig {
       generateCompareTo: true,
       generatePatch: true,
       hidePublicConstructor: false,
-      generateFilter: false,
+      generateFilter: true,
       factoryMethods: [],
       ownFields: {},
     );
   }
 
   /// Create config for testing with custom values
+  /// Creates config for testing with override values.
   const GenerationConfig.test({
     this.outputExtension = '.zorphy.dart',
     this.generateJson = true,
@@ -104,7 +108,7 @@ class GenerationConfig {
     this.generateCompareTo = true,
     this.generatePatch = true,
     this.hidePublicConstructor = false,
-    this.generateFilter = false,
+    this.generateFilter = true,
     this.factoryMethods = const [],
     this.ownFields = const {},
   });
