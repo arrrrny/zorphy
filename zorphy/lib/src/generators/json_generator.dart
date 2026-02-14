@@ -108,10 +108,12 @@ class JsonGenerator extends UniversalGenerator {
     sb.writeln('  /// Creates a [$className] instance from JSON');
     sb.writeln('  factory $className.fromJson(Map<String, dynamic> json) {');
 
-    // For concrete classes in parent's explicitSubTypes, check if _className_ is null first
-    // This handles parsing the class itself when there's no discriminator
+    // For concrete classes, check if _className_ is null or matches self first
+    // This handles: (1) classes in parent's explicitSubTypes, and
+    // (2) concrete classes that define their own explicitSubTypes (nonSealed base classes)
     final hasSelfCase =
-        !metadata.isAbstract && metadata.isInParentExplicitSubtypes;
+        !metadata.isAbstract &&
+        (metadata.isInParentExplicitSubtypes || metadata.nonSealed);
     final totalCases = metadata.explicitSubtypes.length + (hasSelfCase ? 1 : 0);
     var caseIndex = 0;
 
@@ -158,7 +160,7 @@ class JsonGenerator extends UniversalGenerator {
     );
     sb.writeln('  }');
 
-    // For non-sealed abstract classes, also generate toJson
+    // For nonSealed classes with explicitSubTypes, generate toJson dispatcher
     if (metadata.nonSealed) {
       sb.writeln('');
       sb.writeln('  Map<String, dynamic> toJson() {');
@@ -179,9 +181,19 @@ class JsonGenerator extends UniversalGenerator {
       }
 
       sb.writeln('    }');
-      sb.writeln(
-        '    throw UnsupportedError("Unknown subtype: \$runtimeType");',
-      );
+
+      if (metadata.isAbstract) {
+        sb.writeln(
+          '    throw UnsupportedError("Unknown subtype: \$runtimeType");',
+        );
+      } else {
+        // Concrete base class — serialize itself with discriminator
+        sb.writeln(
+          '    final json = _\$${className}ToJson(this);',
+        );
+        sb.writeln("    json['_className_'] = '$className';");
+        sb.writeln('    return json;');
+      }
       sb.writeln('  }');
     }
 
