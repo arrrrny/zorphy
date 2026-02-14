@@ -3,7 +3,7 @@ const { themes: prismThemes } = require('prism-react-renderer');
 const config = {
   title: 'Zorphy',
   tagline: 'Modern Dart code generation made approachable',
-  url: 'https://zuraffa.com',
+  url: 'https://arrrrny.github.io/zorphy/',
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'throw',
