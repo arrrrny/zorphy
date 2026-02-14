@@ -37,3 +37,15 @@ jobs:
       - name: Run tests (zorphy)
         run: dart test
         working-directory: zorphy
+
+      - name: Install dependencies (example)
+        run: dart pub get
+        working-directory: zorphy/example
+
+      - name: Run build_runner (example)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: zorphy/example
+
+      - name: Analyze (example)
+        run: dart analyze
+        working-directory: zorphy/example
