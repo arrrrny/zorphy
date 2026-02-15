@@ -1,3 +1,8 @@
+## [1.6.2] - 2026-02-15
+
+### Fix
+- works with analyzer 10.0.0 that dont require meta 1.18
+
 ## [1.6.1] - 2026-02-15
 
 ### Change
@@ -155,7 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Feature reference
 - Real-world usage examples
 
-[Unreleased]: https://github.com/arrrrny/zorphy/compare/annotation-v1.6.1...HEAD
+[Unreleased]: https://github.com/arrrrny/zorphy/compare/annotation-v1.6.2...HEAD
 [1.5.6]: https://github.com/arrrrny/zorphy/compare/v1.5.5...v1.5.6
 [1.6.1]: https://github.com/arrrrny/zorphy/compare/annotation-v1.5.6...annotation-v1.6.1
 [1.5.5]: https://github.com/arrrrny/zorphy/compare/v1.5.4...v1.5.5
