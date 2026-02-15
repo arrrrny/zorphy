@@ -188,9 +188,7 @@ class JsonGenerator extends UniversalGenerator {
         );
       } else {
         // Concrete base class — serialize itself with discriminator
-        sb.writeln(
-          '    final json = _\$${className}ToJson(this);',
-        );
+        sb.writeln('    final json = _\$${className}ToJson(this);');
         sb.writeln("    json['_className_'] = '$className';");
         sb.writeln('    return json;');
       }
