@@ -1,3 +1,8 @@
+## [1.6.3] - 2026-02-15
+
+### 
+- 
+
 ## [1.6.2] - 2026-02-15
 
 ### Fix
@@ -165,10 +170,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Feature reference
 - Real-world usage examples
 
-[Unreleased]: https://github.com/arrrrny/zorphy/compare/v1.6.2...HEAD
+[Unreleased]: https://github.com/arrrrny/zorphy/compare/v1.6.3...HEAD
 [1.5.6]: https://github.com/arrrrny/zorphy/compare/v1.5.5...v1.5.6
 [1.6.1]: https://github.com/arrrrny/zorphy/compare/v1.5.6...v1.6.1
 [1.6.2]: https://github.com/arrrrny/zorphy/compare/v1.6.1...v1.6.2
+[1.6.3]: https://github.com/arrrrny/zorphy/compare/v1.6.2...v1.6.3
 [1.5.5]: https://github.com/arrrrny/zorphy/compare/v1.5.4...v1.5.5
 [1.5.4]: https://github.com/arrrrny/zorphy/compare/v1.5.3...v1.5.4
 [1.5.3]: https://github.com/arrrrny/zorphy/compare/v1.5.2...v1.5.3
