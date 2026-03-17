@@ -403,7 +403,7 @@ String createZorphy(
         var prefix = i == 0 ? "if" : "} else if";
         if (c.typeParams.isNotEmpty) {
           sb.writeln(
-            "    $prefix (json['_className_'] == \"$interfaceName\") {",
+            "    $prefix (json['__typename'] == \"$interfaceName\") {",
           );
           sb.writeln("      var fn_fromJson = getFromJsonToGenericFn(");
           sb.writeln("        ${interfaceName}_Generics_Sing().fns,");
@@ -413,15 +413,15 @@ String createZorphy(
           sb.writeln("      return fn_fromJson(json);");
         } else {
           sb.writeln(
-            "    $prefix (json['_className_'] == \"$interfaceName\") {",
+            "    $prefix (json['__typename'] == \"$interfaceName\") {",
           );
           sb.writeln("      return $interfaceName.fromJson(json);");
         }
       }
       sb.writeln("    }");
       sb.writeln(
-        "    throw UnsupportedError(\"The _className_ '" +
-            r"${json['_className_']}" +
+        "    throw UnsupportedError(\"The __typename '" +
+            r"${json['__typename']}" +
             "' is not supported by the ${classNameTrimmed}.fromJson constructor.\");",
       );
       sb.writeln("  }");
@@ -452,7 +452,7 @@ String createZorphy(
       sb.writeln(
         "  factory ${classNameTrimmed}.fromJson(Map<String, dynamic> json) {",
       );
-      sb.writeln("    if (json['_className_'] == null) {");
+      sb.writeln("    if (json['__typename'] == null) {");
       sb.writeln("      return _\$${classNameTrimmed}FromJson(json);");
       sb.writeln("    }");
       var classesForJson = <Interface>[
@@ -472,7 +472,7 @@ String createZorphy(
         var prefix = i == 0 ? "if" : "} else if";
         if (c.typeParams.isNotEmpty) {
           sb.writeln(
-            "    $prefix (json['_className_'] == \"$interfaceName\") {",
+            "    $prefix (json['__typename'] == \"$interfaceName\") {",
           );
           sb.writeln("      var fn_fromJson = getFromJsonToGenericFn(");
           sb.writeln("        ${interfaceName}_Generics_Sing().fns,");
@@ -482,7 +482,7 @@ String createZorphy(
           sb.writeln("      return fn_fromJson(json);");
         } else {
           sb.writeln(
-            "    $prefix (json['_className_'] == \"$interfaceName\") {",
+            "    $prefix (json['__typename'] == \"$interfaceName\") {",
           );
           sb.writeln(
             "      return ${isCurrentClass ? "_\$" : ""}$interfaceName${isCurrentClass ? "FromJson" : ".fromJson"}(json);",
@@ -491,8 +491,8 @@ String createZorphy(
       }
       sb.writeln("    }");
       sb.writeln(
-        "    throw UnsupportedError(\"The _className_ '" +
-            r"${json['_className_']}" +
+        "    throw UnsupportedError(\"The __typename '" +
+            r"${json['__typename']}" +
             "' is not supported by the ${classNameTrimmed}.fromJson constructor.\");",
       );
       sb.writeln("  }");
@@ -510,7 +510,7 @@ String createZorphy(
       sb.writeln("");
       sb.writeln("  dynamic _sanitizeJson(dynamic json) {");
       sb.writeln("    if (json is Map<String, dynamic>) {");
-      sb.writeln("      json.remove('_className_');");
+      sb.writeln("      json.remove('__typename');");
       sb.writeln("      return json..forEach((key, value) {");
       sb.writeln("        json[key] = _sanitizeJson(value);");
       sb.writeln("      });");
@@ -559,7 +559,7 @@ String createZorphy(
     sb.writeln("");
     sb.writeln("  dynamic _sanitizeJson(dynamic json) {");
     sb.writeln("    if (json is Map<String, dynamic>) {");
-    sb.writeln("      json.remove('_className_');");
+    sb.writeln("      json.remove('__typename');");
     sb.writeln("      return json..forEach((key, value) {");
     sb.writeln("        json[key] = _sanitizeJson(value);");
     sb.writeln("      });");

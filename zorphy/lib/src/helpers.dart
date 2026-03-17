@@ -1047,7 +1047,7 @@ String getPatchClass(
   sb.writeln("  }");
   sb.writeln();
 
-  // Add toJson method with _className_
+  // Add toJson method with __typename
   sb.writeln("  Map<String, dynamic> toJson() {");
   sb.writeln("    final json = <String, dynamic>{};");
   sb.writeln("    _patch.forEach((key, value) {");

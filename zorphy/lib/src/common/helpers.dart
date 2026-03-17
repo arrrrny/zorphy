@@ -394,34 +394,30 @@ List<NameTypeClassComment> getAllFields(
       );
     });
 
-    // Get getters using dynamic to bypass analyzer version differences
-    final dynamic dynamicElem = elem;
-    final List<dynamic> gettersList = (dynamicElem.getters as List? ?? []);
-
-    var getters = gettersList
-        .where((a) => (a as dynamic).isSynthetic == false)
-        .map((a) {
-          final dynamic dynA = a;
-          return NameTypeClassComment(
-            dynA.name ?? "",
-            typeToString(
-              (dynA as dynamic).returnType,
-              currentClassName: currentClassName,
-            ),
-            elem.name ?? "",
-            comment: (dynA as dynamic).documentationComment,
-            jsonKeyInfo: extractJsonKeyInfo(dynA as Element),
-            additionalAnnotations: _collectAdditionalAnnotations(dynA),
-            isEnum: (dynA as dynamic).returnType?.element is EnumElement,
-            enumValues: (dynA as dynamic).returnType?.element is EnumElement
-                ? ((dynA as dynamic).returnType!.element as EnumElement).fields
-                      .where((f) => f.isEnumConstant)
-                      .map((f) => f.name ?? "")
-                      .where((name) => name.isNotEmpty)
-                      .toList()
-                : const [],
-          );
-        });
+    var getters = elem.getters.where((a) => a.isOriginDeclaration == true).map((
+      a,
+    ) {
+      final dynamic dynA = a;
+      return NameTypeClassComment(
+        dynA.name ?? "",
+        typeToString(
+          (dynA as dynamic).returnType,
+          currentClassName: currentClassName,
+        ),
+        elem.name ?? "",
+        comment: (dynA as dynamic).documentationComment,
+        jsonKeyInfo: extractJsonKeyInfo(dynA as Element),
+        additionalAnnotations: _collectAdditionalAnnotations(dynA),
+        isEnum: (dynA as dynamic).returnType?.element is EnumElement,
+        enumValues: (dynA as dynamic).returnType?.element is EnumElement
+            ? ((dynA as dynamic).returnType!.element as EnumElement).fields
+                  .where((f) => f.isEnumConstant)
+                  .map((f) => f.name ?? "")
+                  .where((name) => name.isNotEmpty)
+                  .toList()
+            : const [],
+      );
+    });
 
     return [...getters, ...fields];
   }

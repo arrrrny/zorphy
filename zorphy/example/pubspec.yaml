@@ -14,4 +14,5 @@ dev_dependencies:
   zorphy:
     path: ../
   build_runner: ^2.11.0
-  json_serializable: ^6.12.0
+  json_serializable:
+    path: ../../../json_serializable.dart/json_serializable
