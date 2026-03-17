@@ -29,4 +29,4 @@ final leanJson = product.toJsonLean();
 final restored = Product.fromJson(fullJson);
 ```
 
-Lean JSON strips the `_className_` metadata and is useful for API payloads that do not need Zorphy type info.
+Lean JSON strips the `__typename` metadata and is useful for API payloads that do not need Zorphy type info.

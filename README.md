@@ -634,7 +634,7 @@ abstract class $Cat implements $$Animal {
 // Serialization includes type discriminator
 final dog = Dog(breed: 'Labrador');
 final json = dog.toJson();
-// {"_className_": "Dog", "breed": "Labrador"}
+// {"__typename": "Dog", "breed": "Labrador"}
 
 // Deserialization automatically handles type
 final animal = Animal.fromJson(json);

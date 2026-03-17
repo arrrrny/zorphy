@@ -9,7 +9,7 @@ Zorphy provides **full support** for nested Zorphy objects (like `$CreditCard`, 
 - ✅ Polymorphic objects with proper type discrimination
 - ✅ Deep nesting at any level
 
-All nested objects are automatically serialized with `_className_` discriminator for proper deserialization!
+All nested objects are automatically serialized with `__typename` discriminator for proper deserialization!
 
 ## Examples
 
@@ -39,7 +39,7 @@ final user = User(
   ),
 );
 
-// JSON includes _className_ for nested object
+// JSON includes __typename for nested object
 final json = user.toJson();
 // {
 //   "id": "1",
@@ -47,9 +47,9 @@ final json = user.toJson();
 //     "street": "123 Main St",
 //     "city": "New York",
 //     "country": "USA",
-//     "_className_": "Address"  // ← Type discriminator
+//     "__typename": "Address"  // ← Type discriminator
 //   },
-//   "_className_": "User"
+//   "__typename": "User"
 // }
 
 // Deserialization works automatically
@@ -81,7 +81,7 @@ final order = Order(
   ],
 );
 
-// Each item in list gets _className_
+// Each item in list gets __typename
 final json = order.toJson();
 // {
 //   "orderId": "order1",
@@ -90,16 +90,16 @@ final json = order.toJson();
 //       "productId": "1",
 //       "name": "Laptop",
 //       "price": 999.99,
-//       "_className_": "OrderItem"  // ← Each item has type
+//       "__typename": "OrderItem"  // ← Each item has type
 //     },
 //     {
 //       "productId": "2",
 //       "name": "Mouse",
 //       "price": 29.99,
-//       "_className_": "OrderItem"
+//       "__typename": "OrderItem"
 //     }
 //   ],
-//   "_className_": "Order"
+//   "__typename": "Order"
 // }
 
 // Deserializes correctly
@@ -133,7 +133,7 @@ final catalog = ProductCatalog(
   },
 );
 
-// Each map value gets _className_
+// Each map value gets __typename
 final json = catalog.toJson();
 // {
 //   "catalogId": "cat1",
@@ -142,16 +142,16 @@ final json = catalog.toJson();
 //       "id": "1",
 //       "name": "Laptop",
 //       "price": 999.99,
-//       "_className_": "Product"  // ← Each value has type
+//       "__typename": "Product"  // ← Each value has type
 //     },
 //     "prod2": {
 //       "id": "2",
 //       "name": "Mouse",
 //       "price": 29.99,
-//       "_className_": "Product"
+//       "__typename": "Product"
 //     }
 //   },
-//   "_className_": "ProductCatalog"
+//   "__typename": "ProductCatalog"
 // }
 
 // Deserializes correctly
@@ -208,17 +208,17 @@ final json = transaction.toJson();
 //   "paymentMethod": {
 //     "cardNumber": "4111111111111111",
 //     "expiryDate": "12/25",
-//     "_className_": "CreditCard"  // ← Type is preserved
+//     "__typename": "CreditCard"  // ← Type is preserved
 //   },
 //   "history": [
-//     {"cardNumber": "4111111111111111", "expiryDate": "12/25", "_className_": "CreditCard"},
-//     {"email": "user@example.com", "_className_": "PayPal"}
+//     {"cardNumber": "4111111111111111", "expiryDate": "12/25", "__typename": "CreditCard"},
+//     {"email": "user@example.com", "__typename": "PayPal"}
 //   ],
 //   "availableMethods": {
-//     "credit_card": {"cardNumber": "...", "expiryDate": "12/25", "_className_": "CreditCard"},
-//     "paypal": {"email": "user@example.com", "_className_": "PayPal"}
+//     "credit_card": {"cardNumber": "...", "expiryDate": "12/25", "__typename": "CreditCard"},
+//     "paypal": {"email": "user@example.com", "__typename": "PayPal"}
 //   },
-//   "_className_": "Transaction"
+//   "__typename": "Transaction"
 // }
 
 // Deserializes with correct types
@@ -289,18 +289,18 @@ final company = Company(
   employeeDirectory: {},
 );
 
-// Every nested object has _className_
+// Every nested object has __typename
 final json = company.toJson();
-// json['address']['_className_'] == 'CompanyAddress'
-// json['address']['location']['_className_'] == 'GeoLocation'
-// json['departments'][0]['_className_'] == 'Department'
-// json['departments'][0]['manager']['_className_'] == 'Employee'
-// json['departments'][0]['manager']['contactInfo']['_className_'] == 'ContactInfo'
+// json['address']['__typename'] == 'CompanyAddress'
+// json['address']['location']['__typename'] == 'GeoLocation'
+// json['departments'][0]['__typename'] == 'Department'
+// json['departments'][0]['manager']['__typename'] == 'Employee'
+// json['departments'][0]['manager']['contactInfo']['__typename'] == 'ContactInfo'
 ```
 
-## Type Discriminator (`_className_`)
+## Type Discriminator (`__typename`)
 
-Every Zorphy object in JSON includes an `_className_` field that:
+Every Zorphy object in JSON includes an `__typename` field that:
 
 1. **Identifies the concrete type** during deserialization
 2. **Enables polymorphism** - base types can deserialize to correct subtypes
@@ -309,11 +309,11 @@ Every Zorphy object in JSON includes an `_className_` field that:
 
 ### Removing Type Discriminator
 
-Use `toJsonLean()` to get JSON without `_className_`:
+Use `toJsonLean()` to get JSON without `__typename`:
 
 ```dart
-final json = user.toJson();        // Includes _className_
-final lean = user.toJsonLean();    // Removes _className_
+final json = user.toJson();        // Includes __typename
+final lean = user.toJsonLean();    // Removes __typename
 ```
 
 ## CLI Usage
@@ -351,7 +351,7 @@ mcp.call_tool("create_entity", {
 ## Key Features
 
 ✅ **Automatic serialization** - No manual code needed  
-✅ **Type preservation** - `_className_` ensures correct deserialization  
+✅ **Type preservation** - `__typename` ensures correct deserialization  
 ✅ **Polymorphism support** - Base types deserialize to concrete subtypes  
 ✅ **Deep nesting** - Works at any level  
 ✅ **Null safety** - Nullable nested objects supported  
@@ -361,7 +361,7 @@ mcp.call_tool("create_entity", {
 ## Performance Notes
 
 - Nested objects are serialized recursively
-- Each object adds one field (`_className_`) to JSON
+- Each object adds one field (`__typename`) to JSON
 - No reflection used - all compile-time generated
 - Minimal runtime overhead
 
@@ -372,6 +372,6 @@ Zorphy provides **complete, automatic support** for nested Zorphy objects in any
 - Lists
 - Maps  
 - Any depth of nesting
-- With full type preservation through `_className_` discriminator
+- With full type preservation through `__typename` discriminator
 
 Just define your entities with nested Zorphy types, and everything works automatically! 🎉

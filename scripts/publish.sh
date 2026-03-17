@@ -305,7 +305,7 @@ cd zorphy
 
 # Update zorphy_annotation dependency in pubspec.yaml to match version
 echo "📝 Updating zorphy_annotation dependency in zorphy/pubspec.yaml..."
-perl -i -0777 -pe "s/^  zorphy_annotation:\n    path: \.\.\/zorphy_annotation$/  zorphy_annotation: ^$VERSION/m; s/^  zorphy_annotation: .*/  zorphy_annotation: ^$VERSION/m" pubspec.yaml
+perl -i -0777 -pe "s/^  zorphy_annotation:\s*\n\s*path:\s*\.\.\/zorphy_annotation\n/  zorphy_annotation: ^$VERSION\n/g; s/^  zorphy_annotation:\s*\S+\n/  zorphy_annotation: ^$VERSION\n/g" pubspec.yaml
 echo "  ✓ Dependency updated to ^$VERSION"
 
 # Commit changes
