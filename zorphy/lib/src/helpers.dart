@@ -102,6 +102,12 @@ String getProperties(
           !ownFields.contains(f.name)) {
         continue;
       }
+
+      // If it's a getter-only override in the child class, we don't need a field
+      if (f.isGetterOnly && ownFields.contains(f.name)) {
+        continue;
+      }
+
       // Add @override if field exists in any parent interface
       // (skip if already present from source annotations)
       if (hasExtends &&
@@ -136,6 +142,11 @@ String getProperties(
     } else {
       sb.writeln("  ${constructorPrefix}${constructorName}({");
       for (var f in fields) {
+        // Skip fields that are overridden as getters in the class
+        if (!isAbstract && f.isGetterOnly && ownFields.contains(f.name)) {
+          continue;
+        }
+
         // Determine the field type (same logic as above for field declarations)
         var fieldType = f.type;
         if (fieldType != null) {
@@ -648,6 +659,7 @@ String getCopyWith(
   bool generateCopyWithFn, {
   bool hidePublicConstructor = false,
   List<Interface> interfaces = const [],
+  Set<String> ownFields = const {},
 }) {
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
@@ -661,6 +673,11 @@ String getCopyWith(
   } else {
     sb.writeln("  $classNameTrimmed copyWith({");
     for (var f in fields) {
+      // Skip fields that are overridden as getters in the class
+      if (f.isGetterOnly && ownFields.contains(f.name)) {
+        continue;
+      }
+
       var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
       var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
       var covariant = covariantFields.contains(f.name) ? 'covariant ' : '';
@@ -672,6 +689,10 @@ String getCopyWith(
   var constructorSuffix = hidePublicConstructor ? "._" : "";
   sb.writeln("    return $classNameTrimmed$constructorSuffix(");
   for (var f in fields) {
+    // Skip fields that are overridden as getters in the class
+    if (f.isGetterOnly && ownFields.contains(f.name)) {
+      continue;
+    }
     sb.writeln("      ${f.name}: ${f.name} ?? this.${f.name},");
   }
   sb.writeln("    );");
@@ -685,6 +706,11 @@ String getCopyWith(
   } else {
     sb.writeln("  $classNameTrimmed copyWith$classNameTrimmed({");
     for (var f in fields) {
+      // Skip fields that are overridden as getters in the class
+      if (f.isGetterOnly && ownFields.contains(f.name)) {
+        continue;
+      }
+
       var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
       var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
       sb.writeln("    $nullableType ${f.name},");
@@ -693,7 +719,10 @@ String getCopyWith(
   }
   sb.writeln("    return copyWith(");
   if (fields.isNotEmpty) {
-    var params = fields.map((f) => "${f.name}: ${f.name}").join(", ");
+    var params = fields
+        .where((f) => !(f.isGetterOnly && ownFields.contains(f.name)))
+        .map((f) => "${f.name}: ${f.name}")
+        .join(", ");
     sb.writeln("      $params,");
   }
   sb.writeln("    );");

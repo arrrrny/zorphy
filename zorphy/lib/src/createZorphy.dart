@@ -328,6 +328,7 @@ String createZorphy(
         copyWithClassName,
         generateCopyWithFn,
         interfaces: allValueTInterfaces,
+        ownFields: ownFields,
       ),
     );
   }

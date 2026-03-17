@@ -275,10 +275,16 @@ class ClassAnalyzer {
 
   /// Extract field names defined directly on this class
   static Set<String> _extractOwnFieldNames(ClassElement classElement) {
-    return classElement.fields
+    final fields = classElement.fields
         .where((f) => f.name != "hashCode" && f.name != "runtimeType")
-        .map((f) => f.name ?? "")
-        .toSet();
+        .map((f) => f.name);
+
+    final getters = classElement.getters
+        .where((a) => a.isOriginDeclaration == true)
+        .where((a) => a.name != "hashCode" && a.name != "runtimeType")
+        .map((a) => a.name);
+
+    return {...fields.whereType<String>(), ...getters.whereType<String>()};
   }
 
   /// Extract factory methods from class

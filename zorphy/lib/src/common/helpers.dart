@@ -81,13 +81,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
 
     // Also check if we are a getter and the field/variable has it
     if (annotation == null && element is PropertyAccessorElement) {
-      dynamic variable;
-      try {
-        variable = dynElem.variable2;
-      } catch (_) {}
-      try {
-        variable ??= dynElem.variable;
-      } catch (_) {}
+      final variable = element.variable;
       if (variable != null) {
         final varAnnotations = _extractAnnotations(variable.metadata);
 
@@ -356,13 +350,7 @@ List<NameTypeClassComment> getAllFields(
 
       // If it's a getter, also check its variable
       if (element is PropertyAccessorElement) {
-        dynamic variable;
-        try {
-          variable = (element as dynamic).variable2;
-        } catch (_) {}
-        try {
-          variable ??= (element as dynamic).variable;
-        } catch (_) {}
+        final variable = element.variable;
         if (variable != null) {
           final varAnnotations = _extractAnnotations(variable.metadata);
           for (final m in varAnnotations) {
@@ -391,26 +379,28 @@ List<NameTypeClassComment> getAllFields(
         jsonKeyInfo: extractJsonKeyInfo(f),
         additionalAnnotations: _collectAdditionalAnnotations(f),
         isEnum: f.type.element is EnumElement,
+        isGetterOnly:
+            f.isOriginGetterSetter && f.getter != null && f.setter == null,
       );
     });
 
     var getters = elem.getters.where((a) => a.isOriginDeclaration == true).map((
       a,
     ) {
-      final dynamic dynA = a;
       return NameTypeClassComment(
-        dynA.name ?? "",
+        a.name ?? "",
         typeToString(
-          (dynA as dynamic).returnType,
+          a.returnType,
           currentClassName: currentClassName,
         ),
         elem.name ?? "",
-        comment: (dynA as dynamic).documentationComment,
-        jsonKeyInfo: extractJsonKeyInfo(dynA as Element),
-        additionalAnnotations: _collectAdditionalAnnotations(dynA),
-        isEnum: (dynA as dynamic).returnType?.element is EnumElement,
-        enumValues: (dynA as dynamic).returnType?.element is EnumElement
-            ? ((dynA as dynamic).returnType!.element as EnumElement).fields
+        comment: a.documentationComment,
+        jsonKeyInfo: extractJsonKeyInfo(a),
+        additionalAnnotations: _collectAdditionalAnnotations(a),
+        isEnum: a.returnType.element is EnumElement,
+        isGetterOnly: (a.variable) == null,
+        enumValues: a.returnType.element is EnumElement
+            ? (a.returnType.element as EnumElement).fields
                   .where((f) => f.isEnumConstant)
                   .map((f) => f.name ?? "")
                   .where((name) => name.isNotEmpty)

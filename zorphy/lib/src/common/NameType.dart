@@ -32,6 +32,7 @@ class NameTypeClassComment {
   final List<String> additionalAnnotations;
   final bool isEnum;
   final List<String> enumValues;
+  final bool isGetterOnly;
 
   /// Creates a name/type pair with optional class and annotation metadata.
   NameTypeClassComment(
@@ -43,6 +44,7 @@ class NameTypeClassComment {
     this.additionalAnnotations = const [],
     this.isEnum = false,
     this.enumValues = const [],
+    this.isGetterOnly = false,
   });
 
   @override
@@ -57,11 +59,16 @@ class NameTypeClassComment {
           runtimeType == other.runtimeType &&
           name == other.name &&
           type == other.type &&
-          className == other.className;
+          className == other.className &&
+          isGetterOnly == other.isGetterOnly;
 
   @override
   /// Returns a hash code derived from name, type, and className.
-  int get hashCode => name.hashCode ^ type.hashCode ^ className.hashCode;
+  int get hashCode =>
+      name.hashCode ^
+      type.hashCode ^
+      className.hashCode ^
+      isGetterOnly.hashCode;
 }
 
 class NameTypeClassCommentData<TMeta1> {
