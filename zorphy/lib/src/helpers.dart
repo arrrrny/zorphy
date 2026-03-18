@@ -422,37 +422,51 @@ String getChangeToExtension({
       }
     }
 
-    // Generate parameters for the target type - only include fields that aren't in source
+    // Generate parameters for the target type
     var sourceFieldNames = sourceFields.map((f) => f.name).toSet();
-    var targetOnlyFields = targetFieldsDistinct
-        .where((f) => !sourceFieldNames.contains(f.name))
-        .toList();
+    var sourceFieldMap = {for (var f in sourceFields) f.name: f};
 
-    // Build parameter list
+    // Parameters for the changeTo method
     var params = <String>[];
-    for (var field in targetOnlyFields) {
-      var fieldTypeRaw = field.type ?? '';
-      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
-      var fieldName = field.name;
-      var isNullable = fieldType.endsWith('?');
 
-      if (isNullable) {
-        params.add('$fieldType $fieldName');
-      } else {
-        params.add('required $fieldType $fieldName');
-      }
-    }
-
-    // Also include fields that exist in both but might want to override (nullable)
     for (var field in targetFieldsDistinct) {
+      var fieldName = field.name;
       var fieldTypeRaw = field.type ?? '';
       var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
-      var fieldName = field.name;
-      var isNullable = fieldType.endsWith('?');
+      var isTargetNullable = fieldType.endsWith('?');
 
-      if (sourceFieldNames.contains(fieldName) && isNullable) {
-        // Add optional parameter for fields that exist in both
-        params.add('$fieldType $fieldName');
+      var existsInSource = sourceFieldMap.containsKey(fieldName);
+
+      if (existsInSource) {
+        var sourceField = sourceFieldMap[fieldName]!;
+        var sourceFieldTypeRaw = sourceField.type ?? '';
+        var sourceFieldType =
+            _replaceDollarTypesWithConcrete(sourceFieldTypeRaw);
+        var isSourceNullable = sourceFieldType.endsWith('?');
+
+        // If it was nullable in source but is NOT nullable in target, it must be required
+        if (isSourceNullable && !isTargetNullable) {
+          params.add('required $fieldType $fieldName');
+        } else {
+          // If it's optional if it exists in source and the target can accept current value
+          // or if user wants to override it.
+          // We always allow override if it's nullable in target
+          if (isTargetNullable) {
+            params.add('$fieldType $fieldName');
+          } else {
+            // Non-nullable in target, and non-nullable in source.
+            // Still allow override? Yes, but it's optional because we have a source value.
+            // We make it nullable in the parameter list to allow the "if (fieldName != null)" check in the patcher
+            params.add('$fieldType? $fieldName');
+          }
+        }
+      } else {
+        // Field only in target
+        if (isTargetNullable) {
+          params.add('$fieldType $fieldName');
+        } else {
+          params.add('required $fieldType $fieldName');
+        }
       }
     }
 
@@ -462,34 +476,17 @@ String getChangeToExtension({
     sb.writeln('  $targetClassName changeTo$targetClassName($paramClause) {');
     sb.writeln('    final _patcher = ${targetClassName}Patch();');
 
-    // Set required fields
-    for (var field in targetOnlyFields) {
-      var fieldName = field.name;
-      var fieldTypeRaw = field.type ?? '';
-      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
-      var isNullable = fieldType.endsWith('?');
-      var fieldNameCap = fieldName[0].toUpperCase() + fieldName.substring(1);
-
-      if (!isNullable) {
-        sb.writeln('    _patcher.with$fieldNameCap($fieldName);');
-      } else if (params.contains('$fieldType $fieldName')) {
-        sb.writeln('    if ($fieldName != null) {');
-        sb.writeln('      _patcher.with$fieldNameCap($fieldName);');
-        sb.writeln('    }');
-      }
-    }
-
-    // Set optional override fields
+    // Set fields in the patcher
     for (var field in targetFieldsDistinct) {
+      var fieldName = field.name;
       var fieldTypeRaw = field.type ?? '';
       var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
-      var fieldName = field.name;
-      var isNullable = fieldType.endsWith('?');
       var fieldNameCap = fieldName[0].toUpperCase() + fieldName.substring(1);
 
-      if (sourceFieldNames.contains(fieldName) &&
-          isNullable &&
-          params.contains('$fieldType $fieldName')) {
+      if (params.contains('required $fieldType $fieldName')) {
+        sb.writeln('    _patcher.with$fieldNameCap($fieldName);');
+      } else if (params.contains('$fieldType $fieldName') ||
+          params.contains('$fieldType? $fieldName')) {
         sb.writeln('    if ($fieldName != null) {');
         sb.writeln('      _patcher.with$fieldNameCap($fieldName);');
         sb.writeln('    }');
@@ -519,29 +516,27 @@ String getChangeToExtension({
           '          ? (_patchMap[$fieldEnum] is Function)\n'
           '                ? _patchMap[$fieldEnum]($fieldName)\n'
           '                : _patchMap[$fieldEnum]\n'
-          '          : $fieldName',
+          '          : (this as dynamic).$fieldName',
         );
-      } else if (isNullable && params.contains('$fieldType $fieldName')) {
-        // Optional parameter that might be in patch
-        constructorParams.add(
-          '      $fieldName: _patchMap.containsKey($fieldEnum)\n'
-          '          ? (_patchMap[$fieldEnum] is Function)\n'
-          '                ? _patchMap[$fieldEnum]($fieldName)\n'
-          '                : _patchMap[$fieldEnum]\n'
-          '          : $fieldName',
-        );
-      } else if (!sourceFieldNames.contains(fieldName)) {
-        // Field only in target (required)
+      } else if (params.contains('required $fieldType $fieldName')) {
+        // Field only in target or required because of nullability change
         constructorParams.add('      $fieldName: _patchMap[$fieldEnum]');
-      } else {
-        // Field in both - use patch or current value
+      } else if (params.contains('$fieldType $fieldName') ||
+          params.contains('$fieldType? $fieldName')) {
+        // Optional parameter that might be in patch
+        var existsInSource = sourceFieldMap.containsKey(fieldName);
+        var sourceValue =
+            existsInSource ? '(this as dynamic).$fieldName' : 'null';
         constructorParams.add(
           '      $fieldName: _patchMap.containsKey($fieldEnum)\n'
           '          ? (_patchMap[$fieldEnum] is Function)\n'
           '                ? _patchMap[$fieldEnum]($fieldName)\n'
           '                : _patchMap[$fieldEnum]\n'
-          '          : $fieldName',
+          '          : $sourceValue',
         );
+      } else {
+        // Field in both - use current value (no override possible in changeTo)
+        constructorParams.add('      $fieldName: (this as dynamic).$fieldName');
       }
     }
 
