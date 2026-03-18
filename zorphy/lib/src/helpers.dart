@@ -104,7 +104,19 @@ String getProperties(
       }
 
       // If it's a getter-only override in the child class, we don't need a field
-      if (f.isGetterOnly && ownFields.contains(f.name)) {
+      // UNLESS it has a default value (in which case it becomes a backed field)
+      if (f.isGetterOnly &&
+          ownFields.contains(f.name) &&
+          f.jsonKeyInfo?.defaultValue == null) {
+        continue;
+      }
+
+      // CRITICAL FIX: Also skip if it is a getter-only override even if not in ownFields
+      // (if it was resolved as a getter-only from the main class element)
+      // UNLESS it has a default value
+      if (f.isGetterOnly &&
+          !isAbstract &&
+          f.jsonKeyInfo?.defaultValue == null) {
         continue;
       }
 
@@ -142,8 +154,11 @@ String getProperties(
     } else {
       sb.writeln("  ${constructorPrefix}${constructorName}({");
       for (var f in fields) {
-        // Skip fields that are overridden as getters in the class
-        if (!isAbstract && f.isGetterOnly && ownFields.contains(f.name)) {
+        var defaultValue = f.jsonKeyInfo?.defaultValue;
+        var hasDefaultValue = defaultValue != null;
+
+        // Skip fields that are overridden as getters in the class, UNLESS they have a default value
+        if (!isAbstract && f.isGetterOnly && !hasDefaultValue) {
           continue;
         }
 
@@ -163,9 +178,6 @@ String getProperties(
             !extendsAbstractClass &&
             parentFields.contains(f.name) &&
             !ownFields.contains(f.name);
-
-        var defaultValue = f.jsonKeyInfo?.defaultValue;
-        var hasDefaultValue = defaultValue != null;
 
         if (isParentField) {
           // Inherited field: generate normal parameter (nullable to allow inheriting defaults)
@@ -263,6 +275,16 @@ String getProperties(
       } else {
         sb.writeln("  ${classNameTrimmed}.copyWith({");
         for (var f in fields) {
+          // Skip getter-only fields in copyWith UNLESS they have a default value
+          // Actually, if it's a getter-only with a default value, should it be in copyWith?
+          // If it's a fixed value getter, copyWith doesn't make sense for it.
+          // But if it's a field-backed getter with a default value, it should be.
+          if (!isAbstract &&
+              f.isGetterOnly &&
+              f.jsonKeyInfo?.defaultValue == null) {
+            continue;
+          }
+
           var fieldType = f.type != null
               ? _replaceDollarTypesWithConcrete(f.type!)
               : f.type;
@@ -274,9 +296,18 @@ String getProperties(
         }
         sb.writeln("  }) : ");
       }
-      for (var i = 0; i < fields.length; i++) {
-        var f = fields[i];
-        var comma = i == fields.length - 1 ? ";" : ",";
+      var copyWithFields = fields
+          .where(
+            (f) =>
+                !(!isAbstract &&
+                    f.isGetterOnly &&
+                    f.jsonKeyInfo?.defaultValue == null),
+          )
+          .toList();
+      for (var i = 0; i < copyWithFields.length; i++) {
+        var f = copyWithFields[i];
+        var comma = i == copyWithFields.length - 1 ? ";" : ",";
+
         sb.writeln(
           "    ${f.name} = ${f.name} ?? (() { throw ArgumentError(\"${f.name} is required\"); })()$comma",
         );
@@ -674,7 +705,7 @@ String getCopyWith(
     sb.writeln("  $classNameTrimmed copyWith({");
     for (var f in fields) {
       // Skip fields that are overridden as getters in the class
-      if (f.isGetterOnly && ownFields.contains(f.name)) {
+      if (f.isGetterOnly) {
         continue;
       }
 
@@ -690,7 +721,7 @@ String getCopyWith(
   sb.writeln("    return $classNameTrimmed$constructorSuffix(");
   for (var f in fields) {
     // Skip fields that are overridden as getters in the class
-    if (f.isGetterOnly && ownFields.contains(f.name)) {
+    if (f.isGetterOnly) {
       continue;
     }
     sb.writeln("      ${f.name}: ${f.name} ?? this.${f.name},");
@@ -707,7 +738,7 @@ String getCopyWith(
     sb.writeln("  $classNameTrimmed copyWith$classNameTrimmed({");
     for (var f in fields) {
       // Skip fields that are overridden as getters in the class
-      if (f.isGetterOnly && ownFields.contains(f.name)) {
+      if (f.isGetterOnly) {
         continue;
       }
 
@@ -720,7 +751,7 @@ String getCopyWith(
   sb.writeln("    return copyWith(");
   if (fields.isNotEmpty) {
     var params = fields
-        .where((f) => !(f.isGetterOnly && ownFields.contains(f.name)))
+        .where((f) => !f.isGetterOnly)
         .map((f) => "${f.name}: ${f.name}")
         .join(", ");
     sb.writeln("      $params,");
@@ -736,6 +767,10 @@ String getCopyWith(
     } else {
       sb.writeln("  $classNameTrimmed copyWithFn({");
       for (var f in fields) {
+        // Skip fields that are overridden as getters in the class
+        if (f.isGetterOnly) {
+          continue;
+        }
         var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
         // Function parameter and return type match the field type exactly
         // Only the function itself is nullable
@@ -745,6 +780,10 @@ String getCopyWith(
     }
     sb.writeln("    return $classNameTrimmed(");
     for (var f in fields) {
+      // Skip fields that are overridden as getters in the class
+      if (f.isGetterOnly) {
+        continue;
+      }
       sb.writeln(
         "      ${f.name}: ${f.name} != null ? ${f.name}(this.${f.name}) : this.${f.name},",
       );
@@ -1158,20 +1197,31 @@ String getPatchClass(
     var innerType = fieldTypeWithoutDollars.replaceAll("?", "");
 
     // Check if this is a Zorphy type (starts with $ and not a generic)
-    bool isKnownClassType(String type) {
+    bool isKnownClassType(String type, bool isEnum) {
+      if (isEnum) return false;
+      if (type.contains('Function'))
+        return false; // Function types are not Zorphy types
       if (type.startsWith("\$")) return true;
-      return knownClasses.any((k) => type == k);
+      if (knownClasses.any((k) => type == k)) return true;
+
+      // Only treat it as Zorphy type if it's NOT a primitive AND it's NOT a generic
+      // AND it's NOT an enum (usually enums don't have $ prefix)
+      // Since we don't have full type info for cross-file types, we use the $ prefix
+      // as the primary indicator for Zorphy entities.
+      return false;
     }
 
     var isZorphyType =
-        isKnownClassType(innerType) ||
+        isKnownClassType(innerType, field.isEnum) ||
         (innerType.startsWith("List<") &&
             isKnownClassType(
               innerType.replaceAll(RegExp(r'^List<(.+)>$'), r'$1'),
+              false, // Lists are not enums themselves
             )) ||
         (innerType.startsWith("Map<") &&
             isKnownClassType(
               innerType.replaceAll(RegExp(r'^Map<(.+, .+)>$'), r'$2'),
+              false, // Maps are not enums themselves
             ));
 
     if (isZorphyType && !isGenericType) {
@@ -1185,7 +1235,7 @@ String getPatchClass(
           );
           var elementTypeIsZorphy =
               elementType.startsWith("\$") ||
-              knownClasses.contains(elementTypeWithoutDollars);
+              isKnownClassType(elementTypeWithoutDollars, false);
           // Don't generate updateAt for abstract classes ($$) as they don't have Patch classes
           // Check the original field type to see if it had $$
           var isAbstractType = fieldType.contains("\$\$");
@@ -1218,7 +1268,7 @@ String getPatchClass(
           var valueTypeWithoutDollars = getDataTypeWithoutDollars(valueType);
           var valueTypeIsZorphy =
               valueType.startsWith("\$") ||
-              knownClasses.contains(valueTypeWithoutDollars);
+              isKnownClassType(valueTypeWithoutDollars, false);
           if (valueTypeIsZorphy) {
             var valuePatchType = valueTypeWithoutDollars + "Patch";
             sb.writeln(
@@ -1289,19 +1339,29 @@ String getDataTypeWithoutDollars(String type) {
 }
 
 const PRIMITIVE_TYPES = [
-  'String',
-  'int',
-  'double',
-  'num',
+  'BigInt',
   'bool',
   'DateTime',
-  'List',
-  'Set',
-  'Map',
-  'BigInt',
+  'double',
   'Duration',
-  'Uri',
   'dynamic',
+  'Enum',
+  'Function',
+  'int',
+  'Iterable',
+  'List',
+  'Map',
+  'Never',
+  'Null',
+  'num',
+  'Object',
+  'Record',
+  'Runes',
+  'Set',
+  'String',
+  'Symbol',
+  'Uri',
+  'void',
 ];
 
 /// Generates a patchWith method for a class.

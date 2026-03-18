@@ -81,13 +81,21 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
 
     // Also check if we are a getter and the field/variable has it
     if (annotation == null && element is PropertyAccessorElement) {
-      final variable = element.variable;
+      final dynamic dynAccessor = element;
+      Element? variable;
+      try {
+        variable = dynAccessor.variable2 ?? dynAccessor.variable;
+      } catch (_) {
+        try {
+          variable = dynAccessor.variable;
+        } catch (_) {}
+      }
       if (variable != null) {
         final varAnnotations = _extractAnnotations(variable.metadata);
 
         annotation = varAnnotations.isNotEmpty
             ? findAnnotation(varAnnotations, 'JsonKey') ??
-                  findAnnotation(varAnnotations, 'jsonKey')
+                findAnnotation(varAnnotations, 'jsonKey')
             : null;
       }
     }
@@ -318,7 +326,7 @@ String getClassComment(List<Interface> interfaces, String? classComment) {
 /// Collects fields from interfaces and a concrete class element.
 List<NameTypeClassComment> getAllFields(
   List<InterfaceType> interfaceTypes,
-  ClassElement element,
+  InterfaceElement element,
 ) {
   var currentClassName = element.name?.replaceAll('\$', '') ?? '';
 
@@ -350,7 +358,15 @@ List<NameTypeClassComment> getAllFields(
 
       // If it's a getter, also check its variable
       if (element is PropertyAccessorElement) {
-        final variable = element.variable;
+        final dynamic dynAccessor = element;
+        Element? variable;
+        try {
+          variable = dynAccessor.variable2 ?? dynAccessor.variable;
+        } catch (_) {
+          try {
+            variable = dynAccessor.variable;
+          } catch (_) {}
+        }
         if (variable != null) {
           final varAnnotations = _extractAnnotations(variable.metadata);
           for (final m in varAnnotations) {
@@ -387,6 +403,18 @@ List<NameTypeClassComment> getAllFields(
     var getters = elem.getters.where((a) => a.isOriginDeclaration == true).map((
       a,
     ) {
+      var isGetterOnly = false;
+      try {
+        isGetterOnly = ((a as dynamic).variable2 ?? (a as dynamic).variable) == null;
+      } catch (_) {
+        try {
+          isGetterOnly = (a as dynamic).variable == null;
+        } catch (_) {
+          // If we can't access variable at all, assume it's a getter-only for safety
+          isGetterOnly = true;
+        }
+      }
+
       return NameTypeClassComment(
         a.name ?? "",
         typeToString(
@@ -398,7 +426,7 @@ List<NameTypeClassComment> getAllFields(
         jsonKeyInfo: extractJsonKeyInfo(a),
         additionalAnnotations: _collectAdditionalAnnotations(a),
         isEnum: a.returnType.element is EnumElement,
-        isGetterOnly: (a.variable) == null,
+        isGetterOnly: isGetterOnly,
         enumValues: a.returnType.element is EnumElement
             ? (a.returnType.element as EnumElement).fields
                   .where((f) => f.isEnumConstant)
