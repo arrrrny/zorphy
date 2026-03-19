@@ -680,13 +680,22 @@ String getPropertiesAbstract(
 
 /// Generates copyWith methods for a concrete class.
 String getCopyWith(
-  List<NameTypeClassComment> fields,
+  List<NameTypeClassComment> fieldsInput,
   String className,
   bool generateCopyWithFn, {
   bool hidePublicConstructor = false,
   List<Interface> interfaces = const [],
   Set<String> ownFields = const {},
 }) {
+  // Deduplicate fields by name, keeping the first occurrence (which is usually the most specific)
+  final fields = <NameTypeClassComment>[];
+  final seenNames = <String>{};
+  for (var f in fieldsInput) {
+    if (seenNames.add(f.name)) {
+      fields.add(f);
+    }
+  }
+
   var sb = StringBuffer();
   var classNameTrimmed = className.replaceAll("\$", "");
 
@@ -982,7 +991,7 @@ String getEqualsAndHashCode(
         sb.write(" ^ Object.hash(");
         for (var i = 0; i < chunkFields.length; i++) {
           var f = chunkFields[i];
-          var comma = i == chunkFields.length - 1 ? ")" : ",";
+          var comma = i == chunkFields.length - 1 ? (chunkFields.length == 1 ? ", 0)" : ")") : ",";
           sb.write("this.${f.name}$comma");
         }
       }
