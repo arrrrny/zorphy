@@ -62,9 +62,7 @@ class EntityTemplateGenerator {
   static void _writePartDirectives(StringBuffer buffer, EntityConfig config) {
     buffer.writeln("part '${config.snakeName}.zorphy.dart';");
 
-    final hasSubtypes = config.explicitSubtypes.isNotEmpty;
-    if (config.generateJson &&
-        (!config.isSealed && !config.isNonSealed || hasSubtypes)) {
+    if (config.generateJson && !config.isSealed && !config.isNonSealed) {
       buffer.writeln("part '${config.snakeName}.g.dart';");
     }
     buffer.writeln();
@@ -87,7 +85,7 @@ class EntityTemplateGenerator {
     buffer.writeln('/// ${config.className} entity');
     buffer.writeln('@Zorphy(${annotationOptions.join(', ')})');
 
-    final abstractClassName = config.isSealed
+    final abstractClassName = config.isSealed || config.isNonSealed
         ? '\$\$${config.className}'
         : '\$${config.className}';
 
@@ -127,7 +125,7 @@ class EntityTemplateGenerator {
     );
     buffer.writeln('@Zorphy(${annotationOptions.join(', ')})');
 
-    final parentRef = parentIsSealed
+    final parentRef = parentIsSealed || config.isNonSealed
         ? '\$\$$parentClassName'
         : '\$$parentClassName';
     buffer.writeln(
@@ -183,7 +181,7 @@ class EntityTemplateGenerator {
     buffer.writeln('/// $subtypeName entity (subtype of $parentClassName)');
     buffer.writeln('@Zorphy(${annotationOptions.join(', ')})');
 
-    final parentRef = parentIsSealed
+    final parentRef = parentIsSealed || parentConfig.isNonSealed
         ? '\$\$$parentClassName'
         : '\$$parentClassName';
     buffer.writeln('abstract class \$$subtypeName implements $parentRef {');

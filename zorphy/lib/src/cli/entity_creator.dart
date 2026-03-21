@@ -60,6 +60,11 @@ class EntityCreator {
       if (!config.dryRun) {
         await Directory(entityDir).create(recursive: true);
         await File(filePath).writeAsString(content);
+
+        if (normalizedConfig.generateSubtypes &&
+            normalizedConfig.explicitSubtypes.isNotEmpty) {
+          await generateSubtypeFiles(normalizedConfig, {});
+        }
       }
 
       return EntityResult(

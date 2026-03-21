@@ -62,8 +62,9 @@ void main() {
       expect(code, contains('String? id')); 
       expect(code, contains('required String type'));
       
-      // Verify the generated code: it should use the value from 'this' if not patched
-      expect(code, contains(r': (this as dynamic).id'));
+      // Verify the generated code: it should apply the patch to JSON before calling fromJson
+      expect(code, contains(r'final _json = this.toJson()..addAll(_patcher.toJson());'));
+      expect(code, contains(r'return TypedListing.fromJson(_json);'));
     });
 
     test('makes field optional in changeTo if it is nullable in target', () {
@@ -89,6 +90,33 @@ void main() {
       
       expect(code, contains('String? name'));
       expect(code, isNot(contains('required String? name')));
+    });
+
+    test('changeTo applies patch to JSON before calling fromJson', () {
+      final sourceFields = <NameTypeClassComment>[
+        NameTypeClassComment('id', 'String', 'Listing'),
+      ];
+      
+      final targetFields = <NameType>[
+        NameType('id', 'String'),
+        NameType('barcode', 'String'),
+      ];
+      
+      final explicitSubTypes = [
+        Interface('BarcodeListing', [], [], targetFields, true)
+      ];
+      
+      final code = helpers.getChangeToExtension(
+        sourceFields: sourceFields,
+        sourceClassName: 'Listing',
+        explicitSubTypes: explicitSubTypes,
+        knownClasses: [],
+      );
+      
+      // We want to see the patch being applied to JSON before fromJson
+      expect(code, contains(r'final _json = this.toJson()..addAll(_patcher.toJson());'));
+      expect(code, contains(r'return BarcodeListing.fromJson(_json);'));
+      expect(code, isNot(contains(r'..patchWithBarcodeListing')));
     });
   });
 }

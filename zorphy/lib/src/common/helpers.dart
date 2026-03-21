@@ -111,6 +111,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
     bool? includeIfNull;
     bool? includeFromJson;
     bool? includeToJson;
+    bool? disallowNullValue;
     String? toJson;
     String? fromJson;
     String? converter;
@@ -175,6 +176,12 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
     } catch (_) {}
 
     try {
+      final disallowNullValueValue = reader.read('disallowNullValue');
+      if (!disallowNullValueValue.isNull)
+        disallowNullValue = disallowNullValueValue.boolValue;
+    } catch (_) {}
+
+    try {
       final source = annotation.toSource();
 
       final match = RegExp(r'toJson\s*:\s*([^,)]+)').firstMatch(source);
@@ -225,6 +232,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
         includeIfNull != null ||
         includeFromJson != null ||
         includeToJson != null ||
+        disallowNullValue != null ||
         toJson != null ||
         fromJson != null ||
         converter != null) {
@@ -236,6 +244,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
         includeIfNull: includeIfNull,
         includeFromJson: includeFromJson,
         includeToJson: includeToJson,
+        disallowNullValue: disallowNullValue,
         toJson: toJson,
         fromJson: fromJson,
         converter: converter,

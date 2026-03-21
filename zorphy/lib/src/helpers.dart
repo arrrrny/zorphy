@@ -73,10 +73,10 @@ String getProperties(
 
     // Add JsonKey annotation if present from source
     if (f.jsonKeyInfo != null) {
-      // Exclude defaultValue from generated annotation to avoid issues with non-literal defaults
-      // We handle default values in the constructor
+      // We include defaultValue in the annotation so json_serializable can handle it.
+      // We also handle it in the constructor as a fallback for manual instantiation.
       sb.writeln(
-        "  ${f.jsonKeyInfo!.toAnnotationString(includeDefaultValue: false)}",
+        "  ${f.jsonKeyInfo!.toAnnotationString(includeDefaultValue: true)}",
       );
     }
 
@@ -440,8 +440,9 @@ String getChangeToExtension({
       if (existsInSource) {
         var sourceField = sourceFieldMap[fieldName]!;
         var sourceFieldTypeRaw = sourceField.type ?? '';
-        var sourceFieldType =
-            _replaceDollarTypesWithConcrete(sourceFieldTypeRaw);
+        var sourceFieldType = _replaceDollarTypesWithConcrete(
+          sourceFieldTypeRaw,
+        );
         var isSourceNullable = sourceFieldType.endsWith('?');
 
         // If it was nullable in source but is NOT nullable in target, it must be required
@@ -493,67 +494,10 @@ String getChangeToExtension({
       }
     }
 
-    sb.writeln('    final _patchMap = _patcher.toPatch();');
-
-    // Generate constructor call
-    sb.write('    return $targetClassName(');
-
-    var constructorParams = <String>[];
-    for (var field in targetFieldsDistinct) {
-      var fieldName = field.name;
-      var fieldTypeRaw = field.type ?? '';
-      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
-      var fieldEnum = "${targetClassName}\$.$fieldName";
-      var isNullable = fieldType.endsWith('?');
-
-      // Check if field has special handling (needs patch handling)
-      var baseType = fieldType.replaceAll('?', '');
-      var needsPatchHandling = _needsPatchHandling(baseType, knownClasses);
-
-      if (needsPatchHandling) {
-        constructorParams.add(
-          '      $fieldName: _patchMap.containsKey($fieldEnum)\n'
-          '          ? (_patchMap[$fieldEnum] is Function)\n'
-          '                ? _patchMap[$fieldEnum]($fieldName)\n'
-          '                : _patchMap[$fieldEnum]\n'
-          '          : (this as dynamic).$fieldName',
-        );
-      } else if (params.contains('required $fieldType $fieldName')) {
-        // Field only in target or required because of nullability change
-        constructorParams.add('      $fieldName: _patchMap[$fieldEnum]');
-      } else if (params.contains('$fieldType $fieldName') ||
-          params.contains('$fieldType? $fieldName')) {
-        // Optional parameter that might be in patch
-        var existsInSource = sourceFieldMap.containsKey(fieldName);
-        var sourceValue =
-            existsInSource ? '(this as dynamic).$fieldName' : 'null';
-        constructorParams.add(
-          '      $fieldName: _patchMap.containsKey($fieldEnum)\n'
-          '          ? (_patchMap[$fieldEnum] is Function)\n'
-          '                ? _patchMap[$fieldEnum]($fieldName)\n'
-          '                : _patchMap[$fieldEnum]\n'
-          '          : $sourceValue',
-        );
-      } else {
-        // Field in both - use current value (no override possible in changeTo)
-        constructorParams.add('      $fieldName: (this as dynamic).$fieldName');
-      }
-    }
-
-    if (constructorParams.isNotEmpty) {
-      sb.writeln();
-      for (var i = 0; i < constructorParams.length; i++) {
-        var isLast = i == constructorParams.length - 1;
-        sb.write(constructorParams[i]);
-        if (!isLast) {
-          sb.writeln(',');
-        } else {
-          sb.writeln();
-        }
-      }
-    }
-
-    sb.writeln('    );');
+    sb.writeln('    final _json = this.toJson()..addAll(_patcher.toJson());');
+    sb.writeln(
+      '    return $targetClassName.fromJson(_json);',
+    );
     sb.writeln('  }');
     sb.writeln();
   }
@@ -847,9 +791,14 @@ String getInterfaceCopyWithMethods(
     var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
     if (interfaceNameTrimmed == classNameTrimmed) continue;
 
-    var interfaceFields = i.fields
-        .where((f) => classFieldNames.contains(f.name))
-        .toList();
+    var seenFields = <String>{};
+    var interfaceFields = i.fields.where((f) {
+      if (classFieldNames.contains(f.name) && !seenFields.contains(f.name)) {
+        seenFields.add(f.name);
+        return true;
+      }
+      return false;
+    }).toList();
     if (interfaceFields.isEmpty) continue;
 
     sb.writeln("");
@@ -896,9 +845,15 @@ String getInterfaceCopyWithFnMethods(
     var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
     if (interfaceNameTrimmed == classNameTrimmed) continue;
 
-    var interfaceFields = i.fields
-        .where((f) => allFieldsDistinct.any((af) => af.name == f.name))
-        .toList();
+    var seenFields = <String>{};
+    var interfaceFields = i.fields.where((f) {
+      if (allFieldsDistinct.any((af) => af.name == f.name) &&
+          !seenFields.contains(f.name)) {
+        seenFields.add(f.name);
+        return true;
+      }
+      return false;
+    }).toList();
     if (interfaceFields.isEmpty) continue;
 
     sb.writeln("");
@@ -991,7 +946,9 @@ String getEqualsAndHashCode(
         sb.write(" ^ Object.hash(");
         for (var i = 0; i < chunkFields.length; i++) {
           var f = chunkFields[i];
-          var comma = i == chunkFields.length - 1 ? (chunkFields.length == 1 ? ", 0)" : ")") : ",";
+          var comma = i == chunkFields.length - 1
+              ? (chunkFields.length == 1 ? ", 0)" : ")")
+              : ",";
           sb.write("this.${f.name}$comma");
         }
       }
@@ -1252,7 +1209,7 @@ String getPatchClass(
             sb.writeln("      var updatedList = List.from(list);");
             sb.writeln("      if (index >= 0 && index < updatedList.length) {");
             sb.writeln(
-              "        updatedList[index] = patch(updatedList[index] as $elementPatchType);",
+              "        updatedList[index] = patch($elementPatchType()).applyTo(updatedList[index] as ${elementTypeWithoutDollars.replaceAll("?", "")});",
             );
             sb.writeln("      }");
             sb.writeln("      return updatedList;");
@@ -1284,7 +1241,7 @@ String getPatchClass(
             sb.writeln("      var updatedMap = Map.from(map);");
             sb.writeln("      if (updatedMap.containsKey(key)) {");
             sb.writeln(
-              "        updatedMap[key] = patch(updatedMap[key] as $valuePatchType);",
+              "        updatedMap[key] = patch($valuePatchType()).applyTo(updatedMap[key] as ${valueTypeWithoutDollars.replaceAll("?", "")});",
             );
             sb.writeln("      }");
             sb.writeln("      return updatedMap;");
@@ -1320,10 +1277,9 @@ String getPatchClass(
         );
         sb.writeln("    _patch[$enumName.$name] = (dynamic current) {");
         sb.writeln("      var currentPatch = $patchType();");
-        sb.writeln("      if (current != null) {");
-        sb.writeln("        currentPatch = current as $patchType;");
-        sb.writeln("      }");
-        sb.writeln("      return patch(currentPatch);");
+        sb.writeln(
+          "      return patch(currentPatch).applyTo(current as ${innerType.replaceAll("?", "")});",
+        );
         sb.writeln("    };");
         sb.writeln("    return this;");
         sb.writeln("  }");
@@ -1396,7 +1352,7 @@ String getPatchWithMethod(
     var f = fields[i];
     var comma = i == fields.length - 1 ? "" : ",";
     sb.writeln(
-      "      ${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name}$comma",
+      "      ${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name}$comma",
     );
   }
 
@@ -1425,9 +1381,14 @@ String getInterfacePatchWithMethods(
     var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
     if (interfaceNameTrimmed == classNameTrimmed) continue;
 
-    var interfaceFields = i.fields
-        .where((f) => classFieldNames.contains(f.name))
-        .toList();
+    var seenFields = <String>{};
+    var interfaceFields = i.fields.where((f) {
+      if (classFieldNames.contains(f.name) && !seenFields.contains(f.name)) {
+        seenFields.add(f.name);
+        return true;
+      }
+      return false;
+    }).toList();
     if (interfaceFields.isEmpty) continue;
 
     var enumName = '${interfaceNameTrimmed}\$';
@@ -1448,7 +1409,7 @@ String getInterfacePatchWithMethods(
     for (var f in classFields) {
       if (interfaceFieldNames.contains(f.name)) {
         sb.writeln(
-          "      ${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name},",
+          "      ${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name},",
         );
       } else {
         sb.writeln("      ${f.name}: this.${f.name},");
