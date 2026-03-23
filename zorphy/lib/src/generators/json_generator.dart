@@ -30,6 +30,12 @@ class JsonGenerator extends UniversalGenerator {
     if (shouldGenerateJson || shouldGeneratePolymorphicJson) {
       // Generate fromJson factory constructor
       sb.writeln(_generateFromJson(metadata, config));
+      if (!metadata.nonSealed) {
+        sb.writeln(_generateToJsonLean(metadata, config));
+      }
+    }
+
+    if (metadata.nonSealed && !metadata.isAbstract) {
       sb.writeln(_generateToJsonLean(metadata, config));
     }
 
@@ -164,23 +170,21 @@ class JsonGenerator extends UniversalGenerator {
     if (metadata.nonSealed) {
       sb.writeln('');
       sb.writeln('  Map<String, dynamic> toJson() {');
-      sb.writeln(
-        '    if (this is ${metadata.explicitSubtypes[0].interfaceName.replaceAll(r'$', '')}) {',
-      );
-      sb.writeln(
-        '      return (this as ${metadata.explicitSubtypes[0].interfaceName.replaceAll(r'$', '')}).toJson();',
-      );
-
-      for (var i = 1; i < metadata.explicitSubtypes.length; i++) {
+      for (var i = 0; i < metadata.explicitSubtypes.length; i++) {
         final subtype = metadata.explicitSubtypes[i].interfaceName.replaceAll(
           r'$',
           '',
         );
-        sb.writeln('    } else if (this is $subtype) {');
-        sb.writeln('      return (this as $subtype).toJson();');
+        final keyword = i == 0 ? 'if' : '} else if';
+        sb.writeln('    $keyword (this is $subtype) {');
+        sb.writeln('      final json = (this as $subtype).toJsonLean();');
+        sb.writeln('      json[\'__typename\'] = "$subtype";');
+        sb.writeln('      return json;');
       }
 
-      sb.writeln('    }');
+      if (metadata.explicitSubtypes.isNotEmpty) {
+        sb.writeln('    }');
+      }
 
       if (metadata.isAbstract) {
         sb.writeln(
@@ -188,7 +192,7 @@ class JsonGenerator extends UniversalGenerator {
         );
       } else {
         // Concrete base class — serialize itself with discriminator
-        sb.writeln('    final json = _\$${className}ToJson(this);');
+        sb.writeln('    final json = toJsonLean();');
         sb.writeln("    json['__typename'] = '$className';");
         sb.writeln('    return json;');
       }
@@ -259,7 +263,10 @@ class JsonGenerator extends UniversalGenerator {
     final className = metadata.cleanName;
 
     // Don't generate toJsonLean for sealed classes or abstract classes with subtypes
-    if (metadata.isAbstract && metadata.explicitSubtypes.isNotEmpty) {
+    // UNLESS it's a nonSealed class (where we need toJsonLean for polymorphic toJson)
+    if (metadata.isAbstract &&
+        metadata.explicitSubtypes.isNotEmpty &&
+        !metadata.nonSealed) {
       return '';
     }
 
@@ -272,32 +279,39 @@ class JsonGenerator extends UniversalGenerator {
 
     final manualToJsonFields = _getManualToJsonFields(metadata);
 
-    if (!metadata.isAbstract) {
-      sb.writeln('');
-      if (metadata.generics.isEmpty) {
-        sb.writeln('  Map<String, dynamic> toJsonLean() {');
+    sb.writeln('');
+    if (metadata.generics.isEmpty) {
+      sb.writeln('  Map<String, dynamic> toJsonLean() {');
+      if (metadata.isAbstract) {
+        sb.writeln('    final Map<String, dynamic> data = {};');
+      } else {
         sb.writeln(
           '    final Map<String, dynamic> data = _\$$className' +
               'ToJson(this);',
         );
+      }
+    } else {
+      final toJsonParams = metadata.generics
+          .map(
+            (g) => 'Object? Function(T value) toJson${g.name}'.replaceAll(
+              'T',
+              g.name,
+            ),
+          )
+          .join(', ');
+      final toJsonArgs = metadata.generics
+          .map((g) => 'toJson${g.name}')
+          .join(', ');
+      sb.writeln('  Map<String, dynamic> toJsonLean($toJsonParams) {');
+      if (metadata.isAbstract) {
+        sb.writeln('    final Map<String, dynamic> data = {};');
       } else {
-        final toJsonParams = metadata.generics
-            .map(
-              (g) => 'Object? Function(T value) toJson${g.name}'.replaceAll(
-                'T',
-                g.name,
-              ),
-            )
-            .join(', ');
-        final toJsonArgs = metadata.generics
-            .map((g) => 'toJson${g.name}')
-            .join(', ');
-        sb.writeln('  Map<String, dynamic> toJsonLean($toJsonParams) {');
         sb.writeln(
           '    final Map<String, dynamic> data = _\$$className' +
               'ToJson(this, $toJsonArgs);',
         );
       }
+    }
       // Add manual toJson fields
       for (var f in manualToJsonFields) {
         final info = f.jsonKeyInfo!;
@@ -306,21 +320,20 @@ class JsonGenerator extends UniversalGenerator {
           '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
         );
       }
-      sb.writeln('    return _sanitizeJson(data);');
-      sb.writeln('  }');
-      sb.writeln('');
-      sb.writeln('  dynamic _sanitizeJson(dynamic json) {');
-      sb.writeln('    if (json is Map<String, dynamic>) {');
-      sb.writeln('      json.remove(\'__typename\');');
-      sb.writeln('      return json..forEach((key, value) {');
-      sb.writeln('        json[key] = _sanitizeJson(value);');
-      sb.writeln('      });');
-      sb.writeln('    } else if (json is List) {');
-      sb.writeln('      return json.map((e) => _sanitizeJson(e)).toList();');
-      sb.writeln('    }');
-      sb.writeln('    return json;');
-      sb.writeln('  }');
-    }
+    sb.writeln('    return _sanitizeJson(data);');
+    sb.writeln('  }');
+    sb.writeln('');
+    sb.writeln('  dynamic _sanitizeJson(dynamic json) {');
+    sb.writeln('    if (json is Map<String, dynamic>) {');
+    sb.writeln('      json.remove(\'__typename\');');
+    sb.writeln('      return json..forEach((key, value) {');
+    sb.writeln('        json[key] = _sanitizeJson(value);');
+    sb.writeln('      });');
+    sb.writeln('    } else if (json is List) {');
+    sb.writeln('      return json.map((e) => _sanitizeJson(e)).toList();');
+    sb.writeln('    }');
+    sb.writeln('    return json;');
+    sb.writeln('  }');
 
     return sb.toString();
   }
