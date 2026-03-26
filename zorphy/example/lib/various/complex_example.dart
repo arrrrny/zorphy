@@ -12,7 +12,6 @@ abstract class $$Shape {
 // Implementation of the sealed class
 @Zorphy(generateJson: true)
 abstract class $Circle implements $$Shape {
-  @JsonKey(defaultValue: 10.0)
   double get radius;
 
   @override
@@ -39,7 +38,6 @@ abstract class $TreeNode {
   @JsonKey(defaultValue: const [])
   List<$TreeNode>? get children;
 
-  @JsonKey(defaultValue: Duration(seconds: 5))
   Duration get timeout;
 
   $TreeNode? get parent;

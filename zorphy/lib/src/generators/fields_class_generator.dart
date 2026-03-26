@@ -62,9 +62,33 @@ class FieldsClassGenerator extends UniversalGenerator {
     return sb.toString();
   }
 
-  /// Removes $ and $$ prefixes from Zorphy entity types
+  /// Removes $ and $$ prefixes from Zorphy entity types while preserving library prefixes
   String _cleanType(String type) {
-    // Strips all $ characters from the type string
+    if (type.contains('<')) {
+      // For generics, use a more robust approach (or just delegate if we had the helper)
+      // Since this is a simple generator, let's just use the same logic as _replaceDollarTypesWithConcrete
+      // but without the full recursive implementation for now, or just use a regex
+      // Actually, replaceAll('$', '') is mostly fine UNLESS prefix has $.
+      // Let's at least preserve prefix dots.
+      if (!type.contains('.')) return type.replaceAll('\$', '');
+      
+      return type.split('.').map((part) {
+        if (part.contains('<')) {
+          final base = part.substring(0, part.indexOf('<'));
+          final rest = part.substring(part.indexOf('<'));
+          return base.replaceAll('\$', '') + rest.replaceAll('\$', '');
+        }
+        return part.replaceAll('\$', '');
+      }).join('.');
+    }
+    
+    if (type.contains('.')) {
+      final lastDot = type.lastIndexOf('.');
+      final prefix = type.substring(0, lastDot + 1);
+      final name = type.substring(lastDot + 1);
+      return prefix + name.replaceAll('\$', '');
+    }
+    
     return type.replaceAll('\$', '');
   }
 

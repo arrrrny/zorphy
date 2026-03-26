@@ -17,7 +17,7 @@ class FieldResolver {
     // 1. Add fields from current class FIRST (highest priority)
     fields.addAll(
       helpers
-          .getAllFields([], classElement)
+          .getAllFields([], classElement, library: classElement.library)
           .where((x) => x.name != "hashCode" && x.name != "runtimeType"),
     );
     processedTypes.add(classElement.name ?? "");
@@ -35,7 +35,7 @@ class FieldResolver {
       // helpers.getAllFields([], elem) does exactly this
       fields.addAll(
         helpers
-            .getAllFields([], element)
+            .getAllFields([], element, library: classElement.library)
             .where((x) => x.name != "hashCode" && x.name != "runtimeType"),
       );
     }

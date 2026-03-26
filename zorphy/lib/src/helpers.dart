@@ -522,56 +522,58 @@ String _replaceDollarTypesWithConcrete(String type) {
 
   // Recursively process nested generics
   String _processNestedType(String input) {
-    // First, check if this is a List type
-    if (input.startsWith('List<') && input.endsWith('>')) {
-      final innerType = input.substring(5, input.length - 1);
-      final isInnerNullable = innerType.endsWith('?');
-      final baseInnerType = isInnerNullable
-          ? innerType.substring(0, innerType.length - 1)
-          : innerType;
+    // 1. If it's a generic type like List<...>, Map<...>, or Prefixed.Type<...>
+    // First find the last top-level generic bracket pair
+    final firstBracket = input.indexOf('<');
+    final lastBracket = input.lastIndexOf('>');
 
-      // Recursively process the inner type in case it's also a generic
-      final processedInner = _processNestedType(baseInnerType);
+    if (firstBracket != -1 && lastBracket > firstBracket) {
+      final baseType = input.substring(0, firstBracket);
+      final innerContent = input.substring(firstBracket + 1, lastBracket);
 
-      if (baseInnerType.startsWith('\$')) {
-        final trimmedType = baseInnerType.replaceAll('\$', '');
-        return 'List<$trimmedType${isInnerNullable ? '?' : ''}>';
-      }
-      // Return with processed inner type if it was a generic
-      return 'List<$processedInner${isInnerNullable ? '?' : ''}>';
-    }
+      // Split inner content by commas, but only at top level (not inside nested brackets)
+      final arguments = <String>[];
+      var bracketDepth = 0;
+      var currentArgument = StringBuffer();
 
-    // Check if this is a Map type
-    if (input.startsWith('Map<') && input.endsWith('>')) {
-      final content = input.substring(4, input.length - 1);
-      final commaIndex = content.lastIndexOf(',');
-      if (commaIndex != -1) {
-        final keyPart = content.substring(0, commaIndex).trim();
-        final valuePart = content.substring(commaIndex + 1).trim();
-
-        final isValueNullable = valuePart.endsWith('?');
-        final baseValueType = isValueNullable
-            ? valuePart.substring(0, valuePart.length - 1)
-            : valuePart;
-
-        // Recursively process the value type in case it's also a generic
-        final processedValue = _processNestedType(baseValueType);
-
-        if (baseValueType.startsWith('\$')) {
-          final trimmedType = baseValueType.replaceAll('\$', '');
-          return 'Map<$keyPart, $trimmedType${isValueNullable ? '?' : ''}>';
+      for (var i = 0; i < innerContent.length; i++) {
+        final char = innerContent[i];
+        if (char == '<') {
+          bracketDepth++;
+          currentArgument.write(char);
+        } else if (char == '>') {
+          bracketDepth--;
+          currentArgument.write(char);
+        } else if (char == ',' && bracketDepth == 0) {
+          arguments.add(currentArgument.toString().trim());
+          currentArgument.clear();
+        } else {
+          currentArgument.write(char);
         }
-        // Return with processed value type if it was a generic
-        return 'Map<$keyPart, $processedValue${isValueNullable ? '?' : ''}>';
       }
+      arguments.add(currentArgument.toString().trim());
+
+      final processedArgs = arguments.map((arg) => _processNestedType(arg)).join(', ');
+      
+      // Remove $ only from the base type name if it has a prefix
+      final cleanedBase = baseType.contains('.') 
+          ? baseType.substring(0, baseType.lastIndexOf('.') + 1) + 
+            baseType.substring(baseType.lastIndexOf('.') + 1).replaceAll('\$', '')
+          : baseType.replaceAll('\$', '');
+          
+      return '$cleanedBase<$processedArgs>';
     }
 
-    // Handle direct $Type or $Type?
-    if (input.startsWith('\$')) {
-      return input.replaceAll('\$', '');
-    }
+    // 2. Simple types (potentially with prefix and nullability)
+    final isNullable = input.endsWith('?');
+    final base = isNullable ? input.substring(0, input.length - 1) : input;
 
-    return input;
+    final cleanedBase = base.contains('.')
+        ? base.substring(0, base.lastIndexOf('.') + 1) +
+          base.substring(base.lastIndexOf('.') + 1).replaceAll('\$', '')
+        : base.replaceAll('\$', '');
+
+    return '$cleanedBase${isNullable ? '?' : ''}';
   }
 
   final result = _processNestedType(baseType);
