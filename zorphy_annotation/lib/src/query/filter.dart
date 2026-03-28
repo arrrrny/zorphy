@@ -304,6 +304,24 @@ class Nested<TEntity, TValue> extends Filter<TEntity> {
   }
 }
 
+/// Logical NOT negating a filter
+class Not<TEntity> extends Filter<TEntity> {
+  final Filter<TEntity> filter;
+
+  /// Creates a filter that matches when [filter] does not match.
+  const Not(this.filter);
+
+  @override
+
+  /// Serializes the logical NOT predicate to JSON.
+  Map<String, dynamic> toJson() => {'not': filter.toJson()};
+
+  @override
+
+  /// Returns true when the inner filter does not match the [item].
+  bool matches(TEntity item) => !filter.matches(item);
+}
+
 /// Extension methods for easier filter creation
 extension FieldOps<TEntity, TValue> on Field<TEntity, TValue> {
   /// Builds an equality filter for this field.
@@ -332,11 +350,35 @@ extension FieldOps<TEntity, TValue> on Field<TEntity, TValue> {
       Nested<TEntity, TValue>(this, filter);
 }
 
+/// List-contains-element filter (e.g., List<T>.contains(value))
+class Has<TEntity, TElement> extends Filter<TEntity> {
+  final Field<TEntity, List<TElement>> field;
+  final TElement value;
+
+  /// Creates a filter that matches when [field] (a list) contains [value].
+  const Has(this.field, this.value);
+
+  @override
+
+  /// Serializes the has predicate to JSON.
+  Map<String, dynamic> toJson() => {
+        field.name: {'has': value}
+      };
+
+  @override
+
+  /// Returns true when the list field contains [value].
+  bool matches(TEntity item) => field.getValue!(item).contains(value);
+}
+
 extension CollectionFieldOps<TEntity, TElement>
     on Field<TEntity, List<TElement>> {
   /// Builds a nested filter for a collection field.
   Nested<TEntity, List<TElement>> filter(Filter<dynamic> filter) =>
       Nested<TEntity, List<TElement>>(this, filter);
+
+  /// Builds a has filter that matches when the list contains [value].
+  Has<TEntity, TElement> has(TElement value) => Has(this, value);
 }
 
 extension StringFieldOps<TEntity> on Field<TEntity, String> {
@@ -347,4 +389,9 @@ extension StringFieldOps<TEntity> on Field<TEntity, String> {
 extension NullableStringFieldOps<TEntity> on Field<TEntity, String?> {
   /// Builds a contains filter for nullable string fields.
   Contains<TEntity, String?> contains(String value) => Contains(this, value);
+}
+
+extension FilterOps<TEntity> on Filter<TEntity> {
+  /// Negates this filter.
+  Not<TEntity> not() => Not(this);
 }
