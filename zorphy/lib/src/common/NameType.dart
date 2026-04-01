@@ -32,6 +32,7 @@ class NameTypeClassComment {
   final List<String> additionalAnnotations;
   final bool isEnum;
   final List<String> enumValues;
+  final bool isGetterOnly;
 
   /// Creates a name/type pair with optional class and annotation metadata.
   NameTypeClassComment(
@@ -43,6 +44,7 @@ class NameTypeClassComment {
     this.additionalAnnotations = const [],
     this.isEnum = false,
     this.enumValues = const [],
+    this.isGetterOnly = false,
   });
 
   @override
@@ -57,11 +59,16 @@ class NameTypeClassComment {
           runtimeType == other.runtimeType &&
           name == other.name &&
           type == other.type &&
-          className == other.className;
+          className == other.className &&
+          isGetterOnly == other.isGetterOnly;
 
   @override
   /// Returns a hash code derived from name, type, and className.
-  int get hashCode => name.hashCode ^ type.hashCode ^ className.hashCode;
+  int get hashCode =>
+      name.hashCode ^
+      type.hashCode ^
+      className.hashCode ^
+      isGetterOnly.hashCode;
 }
 
 class NameTypeClassCommentData<TMeta1> {
@@ -90,6 +97,7 @@ class JsonKeyInfo {
   final bool? includeIfNull;
   final bool? includeFromJson;
   final bool? includeToJson;
+  final bool? disallowNullValue;
   final String? toJson;
   final String? fromJson;
   final String? converter;
@@ -103,6 +111,7 @@ class JsonKeyInfo {
     this.includeIfNull,
     this.includeFromJson,
     this.includeToJson,
+    this.disallowNullValue,
     this.toJson,
     this.fromJson,
     this.converter,
@@ -122,6 +131,8 @@ class JsonKeyInfo {
     if (includeFromJson != null)
       params.add("includeFromJson: $includeFromJson");
     if (includeToJson != null) params.add("includeToJson: $includeToJson");
+    if (disallowNullValue != null)
+      params.add("disallowNullValue: $disallowNullValue");
     if (toJson != null) params.add("toJson: $toJson");
     if (fromJson != null) params.add("fromJson: $fromJson");
     if (converter != null) params.add("converter: $converter");
@@ -143,6 +154,7 @@ class JsonKeyInfo {
     if (includeIfNull != null) result.add("includeIfNull");
     if (includeFromJson != null) result.add("includeFromJson");
     if (includeToJson != null) result.add("includeToJson");
+    if (disallowNullValue != null) result.add("disallowNullValue");
     if (toJson != null) result.add("toJson");
     if (fromJson != null) result.add("fromJson");
     if (converter != null) result.add("converter");

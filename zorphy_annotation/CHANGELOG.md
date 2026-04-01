@@ -1,9 +1,39 @@
+## [1.6.5] - 2026-04-01
+
+### Change
+- Analyzer 12 compabilities
+
+## [1.6.4] - 2026-02-15
+
+### Fix
+- Have to upgrade Analyzer package due to bug in 10.0.0
+
+## [1.6.3] - 2026-02-15
+
+### Fix
+- downgraded annotation dependency to meta 1.17
+
+## [1.6.2] - 2026-02-15
+
+### Fix
+- works with analyzer 10.0.0 that dont require meta 1.18
+
+## [1.6.1] - 2026-02-15
+
+### Change
+- Refactored CLI code to be more robust and consumable
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.5.8] - 2026-02-14
+
+### Fix
+- Nonsealed classes with explicit subtypes can have their own fromJson
 
 ## [1.5.7] - 2026-02-14
 
@@ -145,8 +175,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Feature reference
 - Real-world usage examples
 
-[Unreleased]: https://github.com/arrrrny/zorphy/compare/v1.5.6...HEAD
+[Unreleased]: https://github.com/arrrrny/zorphy/compare/annotation-v1.6.5...HEAD
 [1.5.6]: https://github.com/arrrrny/zorphy/compare/v1.5.5...v1.5.6
+[1.6.1]: https://github.com/arrrrny/zorphy/compare/annotation-v1.5.6...annotation-v1.6.1
 [1.5.5]: https://github.com/arrrrny/zorphy/compare/v1.5.4...v1.5.5
 [1.5.4]: https://github.com/arrrrny/zorphy/compare/v1.5.3...v1.5.4
 [1.5.3]: https://github.com/arrrrny/zorphy/compare/v1.5.2...v1.5.3

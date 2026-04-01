@@ -53,7 +53,8 @@ class ZorphyGenerator extends GeneratorForAnnotationX<Zorphy> {
     final factoryMethods = metadata.factoryMethods;
 
     // Get own fields (defined directly on this class, not inherited)
-    var ownFields = classElement.fields
+    var ownFields = classElement.children
+        .whereType<FieldElement>()
         .where((f) => f.name != "hashCode" && f.name != "runtimeType")
         .map((f) => f.name ?? "")
         .toSet();

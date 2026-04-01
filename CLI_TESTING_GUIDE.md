@@ -435,14 +435,14 @@ You've successfully tested nested Zorphy objects if:
 - [ ] No import errors in generated files
 - [ ] `zorphy list` shows all entities
 - [ ] Can instantiate objects in Dart code
-- [ ] JSON serialization includes `_className_` for nested objects
+- [ ] JSON serialization includes `__typename` for nested objects
 
 ## Next Steps
 
 After successful testing:
 
 1. **Use in your project:** Start creating entities with nested objects
-2. **Test JSON serialization:** Verify `_className_` is added for all nested objects
+2. **Test JSON serialization:** Verify `__typename` is added for all nested objects
 3. **Test polymorphism:** Create sealed hierarchies and test exhaustiveness
 4. **Test patching:** Use the patch system to update nested objects
 

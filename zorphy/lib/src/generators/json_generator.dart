@@ -30,10 +30,16 @@ class JsonGenerator extends UniversalGenerator {
     if (shouldGenerateJson || shouldGeneratePolymorphicJson) {
       // Generate fromJson factory constructor
       sb.writeln(_generateFromJson(metadata, config));
+      if (!metadata.nonSealed) {
+        sb.writeln(_generateToJsonLean(metadata, config));
+      }
+    }
+
+    if (metadata.nonSealed && !metadata.isAbstract) {
       sb.writeln(_generateToJsonLean(metadata, config));
     }
 
-    // For concrete classes in a parent's explicitSubTypes, also generate toJson with _className_
+    // For concrete classes in a parent's explicitSubTypes, also generate toJson with __typename
     // This is needed even if the class has its own explicitSubTypes (polymorphic)
     if (!metadata.isAbstract && metadata.isInParentExplicitSubtypes) {
       sb.writeln(_generateToJsonWithDiscriminator(metadata));
@@ -108,16 +114,18 @@ class JsonGenerator extends UniversalGenerator {
     sb.writeln('  /// Creates a [$className] instance from JSON');
     sb.writeln('  factory $className.fromJson(Map<String, dynamic> json) {');
 
-    // For concrete classes in parent's explicitSubTypes, check if _className_ is null first
-    // This handles parsing the class itself when there's no discriminator
+    // For concrete classes, check if __typename is null or matches self first
+    // This handles: (1) classes in parent's explicitSubTypes, and
+    // (2) concrete classes that define their own explicitSubTypes (nonSealed base classes)
     final hasSelfCase =
-        !metadata.isAbstract && metadata.isInParentExplicitSubtypes;
+        !metadata.isAbstract &&
+        (metadata.isInParentExplicitSubtypes || metadata.nonSealed);
     final totalCases = metadata.explicitSubtypes.length + (hasSelfCase ? 1 : 0);
     var caseIndex = 0;
 
     if (hasSelfCase) {
       sb.writeln(
-        '    if (json[\'_className_\'] == null || json[\'_className_\'] == "$className") {',
+        '    if (json[\'__typename\'] == null || json[\'__typename\'] == "$className") {',
       );
       sb.writeln('      return _\$${className}FromJson(json);');
       caseIndex++;
@@ -133,7 +141,7 @@ class JsonGenerator extends UniversalGenerator {
       final prefix = caseIndex == 0 ? 'if' : '} else if';
 
       if (subtype.typeParams.isNotEmpty) {
-        sb.writeln('    $prefix (json[\'_className_\'] == "$interfaceName") {');
+        sb.writeln('    $prefix (json[\'__typename\'] == "$interfaceName") {');
         sb.writeln('      var fn_fromJson = getFromJsonToGenericFn(');
         sb.writeln('        ${interfaceName}_Generics_Sing().fns,');
         sb.writeln('        json,');
@@ -141,7 +149,7 @@ class JsonGenerator extends UniversalGenerator {
         sb.writeln('      );');
         sb.writeln('      return fn_fromJson(json);');
       } else {
-        sb.writeln('    $prefix (json[\'_className_\'] == "$interfaceName") {');
+        sb.writeln('    $prefix (json[\'__typename\'] == "$interfaceName") {');
         sb.writeln('      return $interfaceName.fromJson(json);');
       }
 
@@ -152,36 +160,42 @@ class JsonGenerator extends UniversalGenerator {
     }
 
     sb.writeln(
-      '    throw UnsupportedError("The _className_ \' + '
-              r"${json['_className_']}" +
+      '    throw UnsupportedError("The __typename \' + '
+              r"${json['__typename']}" +
           '\' is not supported by the $className.fromJson constructor.");',
     );
     sb.writeln('  }');
 
-    // For non-sealed abstract classes, also generate toJson
+    // For nonSealed classes with explicitSubTypes, generate toJson dispatcher
     if (metadata.nonSealed) {
       sb.writeln('');
       sb.writeln('  Map<String, dynamic> toJson() {');
-      sb.writeln(
-        '    if (this is ${metadata.explicitSubtypes[0].interfaceName.replaceAll(r'$', '')}) {',
-      );
-      sb.writeln(
-        '      return (this as ${metadata.explicitSubtypes[0].interfaceName.replaceAll(r'$', '')}).toJson();',
-      );
-
-      for (var i = 1; i < metadata.explicitSubtypes.length; i++) {
+      for (var i = 0; i < metadata.explicitSubtypes.length; i++) {
         final subtype = metadata.explicitSubtypes[i].interfaceName.replaceAll(
           r'$',
           '',
         );
-        sb.writeln('    } else if (this is $subtype) {');
-        sb.writeln('      return (this as $subtype).toJson();');
+        final keyword = i == 0 ? 'if' : '} else if';
+        sb.writeln('    $keyword (this is $subtype) {');
+        sb.writeln('      final json = (this as $subtype).toJsonLean();');
+        sb.writeln('      json[\'__typename\'] = "$subtype";');
+        sb.writeln('      return json;');
       }
 
-      sb.writeln('    }');
-      sb.writeln(
-        '    throw UnsupportedError("Unknown subtype: \$runtimeType");',
-      );
+      if (metadata.explicitSubtypes.isNotEmpty) {
+        sb.writeln('    }');
+      }
+
+      if (metadata.isAbstract) {
+        sb.writeln(
+          '    throw UnsupportedError("Unknown subtype: \$runtimeType");',
+        );
+      } else {
+        // Concrete base class — serialize itself with discriminator
+        sb.writeln('    final json = toJsonLean();');
+        sb.writeln("    json['__typename'] = '$className';");
+        sb.writeln('    return json;');
+      }
       sb.writeln('  }');
     }
 
@@ -249,7 +263,10 @@ class JsonGenerator extends UniversalGenerator {
     final className = metadata.cleanName;
 
     // Don't generate toJsonLean for sealed classes or abstract classes with subtypes
-    if (metadata.isAbstract && metadata.explicitSubtypes.isNotEmpty) {
+    // UNLESS it's a nonSealed class (where we need toJsonLean for polymorphic toJson)
+    if (metadata.isAbstract &&
+        metadata.explicitSubtypes.isNotEmpty &&
+        !metadata.nonSealed) {
       return '';
     }
 
@@ -262,32 +279,39 @@ class JsonGenerator extends UniversalGenerator {
 
     final manualToJsonFields = _getManualToJsonFields(metadata);
 
-    if (!metadata.isAbstract) {
-      sb.writeln('');
-      if (metadata.generics.isEmpty) {
-        sb.writeln('  Map<String, dynamic> toJsonLean() {');
+    sb.writeln('');
+    if (metadata.generics.isEmpty) {
+      sb.writeln('  Map<String, dynamic> toJsonLean() {');
+      if (metadata.isAbstract) {
+        sb.writeln('    final Map<String, dynamic> data = {};');
+      } else {
         sb.writeln(
           '    final Map<String, dynamic> data = _\$$className' +
               'ToJson(this);',
         );
+      }
+    } else {
+      final toJsonParams = metadata.generics
+          .map(
+            (g) => 'Object? Function(T value) toJson${g.name}'.replaceAll(
+              'T',
+              g.name,
+            ),
+          )
+          .join(', ');
+      final toJsonArgs = metadata.generics
+          .map((g) => 'toJson${g.name}')
+          .join(', ');
+      sb.writeln('  Map<String, dynamic> toJsonLean($toJsonParams) {');
+      if (metadata.isAbstract) {
+        sb.writeln('    final Map<String, dynamic> data = {};');
       } else {
-        final toJsonParams = metadata.generics
-            .map(
-              (g) => 'Object? Function(T value) toJson${g.name}'.replaceAll(
-                'T',
-                g.name,
-              ),
-            )
-            .join(', ');
-        final toJsonArgs = metadata.generics
-            .map((g) => 'toJson${g.name}')
-            .join(', ');
-        sb.writeln('  Map<String, dynamic> toJsonLean($toJsonParams) {');
         sb.writeln(
           '    final Map<String, dynamic> data = _\$$className' +
               'ToJson(this, $toJsonArgs);',
         );
       }
+    }
       // Add manual toJson fields
       for (var f in manualToJsonFields) {
         final info = f.jsonKeyInfo!;
@@ -296,35 +320,34 @@ class JsonGenerator extends UniversalGenerator {
           '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
         );
       }
-      sb.writeln('    return _sanitizeJson(data);');
-      sb.writeln('  }');
-      sb.writeln('');
-      sb.writeln('  dynamic _sanitizeJson(dynamic json) {');
-      sb.writeln('    if (json is Map<String, dynamic>) {');
-      sb.writeln('      json.remove(\'_className_\');');
-      sb.writeln('      return json..forEach((key, value) {');
-      sb.writeln('        json[key] = _sanitizeJson(value);');
-      sb.writeln('      });');
-      sb.writeln('    } else if (json is List) {');
-      sb.writeln('      return json.map((e) => _sanitizeJson(e)).toList();');
-      sb.writeln('    }');
-      sb.writeln('    return json;');
-      sb.writeln('  }');
-    }
+    sb.writeln('    return _sanitizeJson(data);');
+    sb.writeln('  }');
+    sb.writeln('');
+    sb.writeln('  dynamic _sanitizeJson(dynamic json) {');
+    sb.writeln('    if (json is Map<String, dynamic>) {');
+    sb.writeln('      json.remove(\'__typename\');');
+    sb.writeln('      return json..forEach((key, value) {');
+    sb.writeln('        json[key] = _sanitizeJson(value);');
+    sb.writeln('      });');
+    sb.writeln('    } else if (json is List) {');
+    sb.writeln('      return json.map((e) => _sanitizeJson(e)).toList();');
+    sb.writeln('    }');
+    sb.writeln('    return json;');
+    sb.writeln('  }');
 
     return sb.toString();
   }
 
-  /// Generate toJson method with _className_ discriminator for classes in parent's explicitSubTypes
+  /// Generate toJson method with __typename discriminator for classes in parent's explicitSubTypes
   String _generateToJsonWithDiscriminator(ClassMetadata metadata) {
     final sb = StringBuffer();
     final className = metadata.cleanName;
 
-    // Generate toJson method with _className_ discriminator
+    // Generate toJson method with __typename discriminator
     sb.writeln('');
     sb.writeln('  Map<String, dynamic> toJson() {');
     sb.writeln('    final json = _\$$className' + 'ToJson(this);');
-    sb.writeln('    json[\'_className_\'] = \'$className\';');
+    sb.writeln('    json[\'__typename\'] = \'$className\';');
     sb.writeln('    return json;');
     sb.writeln('  }');
 
@@ -464,7 +487,7 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
     sb.writeln('');
     sb.writeln('  dynamic _sanitizeJson(dynamic json) {');
     sb.writeln('    if (json is Map<String, dynamic>) {');
-    sb.writeln('      json.remove(\'_className_\');');
+    sb.writeln('      json.remove(\'__typename\');');
     sb.writeln('      return json..forEach((key, value) {');
     sb.writeln('        json[key] = _sanitizeJson(value);');
     sb.writeln('      });');

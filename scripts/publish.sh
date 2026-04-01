@@ -18,9 +18,17 @@ cd "$REPO_ROOT"
 VERSION="$1"
 PROMOTE_MODE=false
 
+VERSION_EXISTS=false
+if grep -q "^## \[$VERSION\]" zorphy_annotation/CHANGELOG.md || \
+   grep -q "^## \[$VERSION\]" zorphy/CHANGELOG.md; then
+    VERSION_EXISTS=true
+fi
+
 # Check if we should promote [Unreleased]
 if [ $# -eq 1 ]; then
-    if grep -q "^## \[Unreleased\]" zorphy_annotation/CHANGELOG.md || \
+    if [ "$VERSION_EXISTS" = true ]; then
+        echo "✓ Version $VERSION already exists in CHANGELOG, proceeding with publish..."
+    elif grep -q "^## \[Unreleased\]" zorphy_annotation/CHANGELOG.md || \
        grep -q "^## \[Unreleased\]" zorphy/CHANGELOG.md; then
         echo "✨ Detected [Unreleased] section. Promoting to version $VERSION..."
         PROMOTE_MODE=true
@@ -74,7 +82,6 @@ update_changelog_links() {
     local prev_version=""
 
     echo "  📝 Updating comparison links..."
-    cd "$package_dir"
 
     # Extract previous version from [Unreleased] link
     if grep -q "^\[Unreleased\]:" CHANGELOG.md; then
@@ -133,6 +140,13 @@ update_changelog() {
     echo "📝 Updating $package_name CHANGELOG..."
     cd "$package_dir"
 
+    # Check if version already exists in CHANGELOG
+    if grep -q "^## \[$VERSION\]" CHANGELOG.md; then
+        echo "  ✓ Version $VERSION already exists in CHANGELOG, skipping..."
+        cd "$REPO_ROOT" > /dev/null
+        return
+    fi
+
     # Check if [Unreleased] section exists
     if ! grep -q "^## \[Unreleased\]" CHANGELOG.md; then
         echo "  ⚠️  No [Unreleased] section found, adding it..."
@@ -173,7 +187,6 @@ update_changelog() {
         # Remove [Unreleased] section before publishing
         echo "  🔽 Removing [Unreleased] section before publishing..."
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            # Match from [Unreleased] to the next ## header, delete [Unreleased] and blank lines
             perl -i -0pe 's/^## \[Unreleased\]\n\n//' CHANGELOG.md
         else
             perl -i -0pe 's/^## \[Unreleased\]\n\n//' CHANGELOG.md
@@ -201,6 +214,21 @@ update_pubspec() {
 
     echo "  ✓ Version updated to $VERSION"
     cd "$REPO_ROOT" > /dev/null
+}
+
+update_readme() {
+    echo "📝 Updating README.md dependencies..."
+    cd "$REPO_ROOT"
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" README.md
+        sed -i '' "s/zorphy: .*/zorphy: ^$VERSION/" README.md
+    else
+        sed -i "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" README.md
+        sed -i "s/zorphy: .*/zorphy: ^$VERSION/" README.md
+    fi
+
+    echo "  ✓ README.md dependencies updated to ^$VERSION"
 }
 
 # ========================================================================
@@ -277,7 +305,7 @@ cd zorphy
 
 # Update zorphy_annotation dependency in pubspec.yaml to match version
 echo "📝 Updating zorphy_annotation dependency in zorphy/pubspec.yaml..."
-perl -i -0777 -pe "s/^  zorphy_annotation:\n    path: \.\.\/zorphy_annotation$/  zorphy_annotation: ^$VERSION/m; s/^  zorphy_annotation: .*/  zorphy_annotation: ^$VERSION/m" pubspec.yaml
+perl -i -0777 -pe "s/^  zorphy_annotation:\s*\n\s*path:\s*\.\.\/zorphy_annotation\n/  zorphy_annotation: ^$VERSION\n/g; s/^  zorphy_annotation:\s*\S+\n/  zorphy_annotation: ^$VERSION\n/g" pubspec.yaml
 echo "  ✓ Dependency updated to ^$VERSION"
 
 # Commit changes
@@ -333,6 +361,48 @@ echo "✅ Successfully published zorphy version $VERSION!"
 echo ""
 
 cd "$REPO_ROOT"
+
+# ========================================================================
+# STEP 3: Update README.md
+# ========================================================================
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📝 Step 3/3: Updating README.md"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+update_readme
+
+# Commit README changes
+echo "🔨 Committing README.md changes..."
+git add README.md
+git commit -m "chore: update README.md dependencies to v$VERSION"
+echo "  ✓ Changes committed"
+
+# Create PR (if gh CLI available)
+if command -v gh &> /dev/null; then
+    echo "🔄 Creating pull request to master..."
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+    if gh pr list --head "$CURRENT_BRANCH" --json number | grep -q "\"number\""; then
+        echo "  ⚠️  PR already exists for branch $CURRENT_BRANCH"
+    else
+        gh pr create --base master --head "$CURRENT_BRANCH" \
+            --title "chore: update README.md dependencies to v$VERSION" \
+            --body "Update README.md dependencies
+
+**Version:** $VERSION
+**Date:** $DATE
+
+**Changes:**
+- Update zorphy_annotation to ^$VERSION
+- Update zorphy to ^$VERSION
+- Build runner version remains unchanged
+
+Please review and merge this PR to master."
+        echo "  ✓ PR created"
+    fi
+fi
 
 # ========================================================================
 # SUMMARY

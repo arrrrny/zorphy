@@ -11,7 +11,7 @@ Zorphy **fully supports** nested Zorphy objects in:
 - ✅ Polymorphic: `$$PaymentMethod` with concrete `$CreditCard`, `$PayPal`
 - ✅ Deep nesting at any level
 
-All nested objects automatically get `_className_` in JSON for proper deserialization!
+All nested objects automatically get `__typename` in JSON for proper deserialization!
 
 ## 🖥️ CLI Usage
 
@@ -452,7 +452,7 @@ mcp.call_tool("build_entities", {})
 2. **Use `$$` prefix** for sealed/polymorphic base types: `$$PaymentMethod`, `$$OrderStatus`
 3. **Add `?`** for nullable: `$Address?`, `List<$Item?>`
 4. **Works everywhere** - single fields, lists, maps, any nesting level
-5. **Automatic JSON** - all nested objects get `_className_` discriminator
+5. **Automatic JSON** - all nested objects get `__typename` discriminator
 
 ## 📊 Generated JSON Example
 
@@ -472,17 +472,17 @@ final json = order.toJson();
 //     "id": "user1",
 //     "name": "Alice",
 //     "address": null,
-//     "_className_": "User"  // ← Type preserved!
+//     "__typename": "User"  // ← Type preserved!
 //   },
 //   "items": [
 //     {
 //       "productId": "prod1",
 //       "name": "Laptop",
 //       "price": 999.99,
-//       "_className_": "OrderItem"  // ← Each item has type!
+//       "__typename": "OrderItem"  // ← Each item has type!
 //     }
 //   ],
-//   "_className_": "Order"
+//   "__typename": "Order"
 // }
 ```
 
@@ -493,6 +493,6 @@ final json = order.toJson();
 - **Prefixes:** `$` for concrete, `$$` for sealed/polymorphic
 - **Collections:** `List<$Type>`, `Map<Key, $Type>`
 - **Nullable:** Add `?` after type
-- **Automatic:** `_className_` added to JSON for all nested objects
+- **Automatic:** `__typename` added to JSON for all nested objects
 
 🎉 **That's it! Nested Zorphy objects work seamlessly in CLI and MCP!**

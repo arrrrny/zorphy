@@ -66,14 +66,24 @@ class InterfaceCollector {
       return InterfaceMetadata(
         interfaceName, // Don't strip $ prefix - interfaces should keep the $
         e.typeArguments
-            .map((t) => helpers.typeToString(t, currentClassName: className))
+            .map(
+              (t) => helpers.typeToString(
+                t,
+                currentClassName: className,
+                library: classElement.library,
+              ),
+            )
             .toList(),
         e.element.typeParameters.map((x) => x.name ?? "").toList(),
         e.element.fields
             .map(
               (f) => NameType(
                 f.name ?? "",
-                helpers.typeToString(f.type, currentClassName: className),
+                helpers.typeToString(
+                  f.type,
+                  currentClassName: className,
+                  library: classElement.library,
+                ),
               ),
             )
             .toList(),

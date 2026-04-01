@@ -1,5 +1,4 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/type.dart';
 import '../common/NameType.dart';
 import '../common/helpers.dart' as helpers;
 
@@ -15,34 +14,33 @@ class FieldResolver {
     var fields = <NameTypeClassComment>[];
     var processedTypes = <String>{};
 
-    // Recursively add fields from class and its supertypes
-    void addFields(ClassElement elem) {
-      var elemName = elem.name ?? "";
-      if (processedTypes.contains(elemName)) return;
-      processedTypes.add(elemName);
+    // 1. Add fields from current class FIRST (highest priority)
+    fields.addAll(
+      helpers
+          .getAllFields([], classElement, library: classElement.library)
+          .where((x) => x.name != "hashCode" && x.name != "runtimeType"),
+    );
+    processedTypes.add(classElement.name ?? "");
 
-      // Add fields from all supertypes
+    // 2. Add fields from all supertypes in proximity order
+    for (var supertype in classElement.allSupertypes) {
+      final element = supertype.element;
+      var supertypeName = element.name ?? "";
+      if (supertypeName == "Object" || processedTypes.contains(supertypeName)) {
+        continue;
+      }
+      processedTypes.add(supertypeName);
+
+      // Collect only OWN fields from the supertype to avoid redundant collection
+      // helpers.getAllFields([], elem) does exactly this
       fields.addAll(
         helpers
-            .getAllFields(
-              elem.allSupertypes.whereType<InterfaceType>().toList(),
-              elem,
-            )
+            .getAllFields([], element, library: classElement.library)
             .where((x) => x.name != "hashCode" && x.name != "runtimeType"),
       );
-
-      // Recursively add fields from annotated supertypes
-      for (var supertype in elem.allSupertypes) {
-        var supertypeName = supertype.element.name ?? "";
-        if (allAnnotatedClasses.containsKey(supertypeName)) {
-          addFields(allAnnotatedClasses[supertypeName]!);
-        }
-      }
     }
 
-    addFields(classElement);
-
-    // Deduplicate by field name (keep first occurrence)
+    // Deduplicate by field name (keep first occurrence = nearest child)
     final seen = <String>{};
     final distinct = <NameTypeClassComment>[];
     for (final field in fields) {

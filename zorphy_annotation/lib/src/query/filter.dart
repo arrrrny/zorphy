@@ -252,7 +252,7 @@ class And<TEntity> extends Filter<TEntity> {
   bool matches(TEntity item) => filters.every((f) => f.matches(item));
 }
 
-/// Logical OR combining multiple filters
+  /// Logical OR combining multiple filters
 class Or<TEntity> extends Filter<TEntity> {
   final List<Filter<TEntity>> filters;
 
@@ -270,6 +270,56 @@ class Or<TEntity> extends Filter<TEntity> {
 
   /// Returns true when any filter matches the [item].
   bool matches(TEntity item) => filters.any((f) => f.matches(item));
+}
+
+/// Nested object or collection filter
+class Nested<TEntity, TValue> extends Filter<TEntity> {
+  final Field<TEntity, TValue> field;
+  final Filter<dynamic> filter;
+
+  /// Creates a filter that matches when [field] matches [filter].
+  /// If [TValue] is an [Iterable], matches if any element in the collection matches the [filter].
+  /// If [TValue] is a single object, matches if the object matches the [filter].
+  const Nested(this.field, this.filter);
+
+  @override
+
+  /// Serializes the nested filter to JSON.
+  Map<String, dynamic> toJson() => {
+        field.name: filter.toJson(),
+      };
+
+  @override
+
+  /// Returns true when the nested value (or any value in its collection) matches [filter].
+  bool matches(TEntity item) {
+    final value = field.getValue!(item);
+    if (value == null) return false;
+
+    if (value is Iterable) {
+      return value.any((element) => filter.matches(element));
+    } else {
+      return filter.matches(value);
+    }
+  }
+}
+
+/// Logical NOT negating a filter
+class Not<TEntity> extends Filter<TEntity> {
+  final Filter<TEntity> filter;
+
+  /// Creates a filter that matches when [filter] does not match.
+  const Not(this.filter);
+
+  @override
+
+  /// Serializes the logical NOT predicate to JSON.
+  Map<String, dynamic> toJson() => {'not': filter.toJson()};
+
+  @override
+
+  /// Returns true when the inner filter does not match the [item].
+  bool matches(TEntity item) => !filter.matches(item);
 }
 
 /// Extension methods for easier filter creation
@@ -294,6 +344,41 @@ extension FieldOps<TEntity, TValue> on Field<TEntity, TValue> {
 
   /// Builds an inclusion filter for this field.
   InList<TEntity, TValue> isIn(List<TValue> values) => InList(this, values);
+
+  /// Builds a nested filter for this field.
+  Nested<TEntity, TValue> filter(Filter<dynamic> filter) =>
+      Nested<TEntity, TValue>(this, filter);
+}
+
+/// List-contains-element filter (e.g., List<T>.contains(value))
+class Has<TEntity, TElement> extends Filter<TEntity> {
+  final Field<TEntity, List<TElement>> field;
+  final TElement value;
+
+  /// Creates a filter that matches when [field] (a list) contains [value].
+  const Has(this.field, this.value);
+
+  @override
+
+  /// Serializes the has predicate to JSON.
+  Map<String, dynamic> toJson() => {
+        field.name: {'has': value}
+      };
+
+  @override
+
+  /// Returns true when the list field contains [value].
+  bool matches(TEntity item) => field.getValue!(item).contains(value);
+}
+
+extension CollectionFieldOps<TEntity, TElement>
+    on Field<TEntity, List<TElement>> {
+  /// Builds a nested filter for a collection field.
+  Nested<TEntity, List<TElement>> filter(Filter<dynamic> filter) =>
+      Nested<TEntity, List<TElement>>(this, filter);
+
+  /// Builds a has filter that matches when the list contains [value].
+  Has<TEntity, TElement> has(TElement value) => Has(this, value);
 }
 
 extension StringFieldOps<TEntity> on Field<TEntity, String> {
@@ -304,4 +389,9 @@ extension StringFieldOps<TEntity> on Field<TEntity, String> {
 extension NullableStringFieldOps<TEntity> on Field<TEntity, String?> {
   /// Builds a contains filter for nullable string fields.
   Contains<TEntity, String?> contains(String value) => Contains(this, value);
+}
+
+extension FilterOps<TEntity> on Filter<TEntity> {
+  /// Negates this filter.
+  Not<TEntity> not() => Not(this);
 }

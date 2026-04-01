@@ -81,19 +81,21 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
 
     // Also check if we are a getter and the field/variable has it
     if (annotation == null && element is PropertyAccessorElement) {
-      dynamic variable;
+      final dynamic dynAccessor = element;
+      Element? variable;
       try {
-        variable = dynElem.variable2;
-      } catch (_) {}
-      try {
-        variable ??= dynElem.variable;
-      } catch (_) {}
+        variable = dynAccessor.variable;
+      } catch (_) {
+        try {
+          variable = dynAccessor.variable;
+        } catch (_) {}
+      }
       if (variable != null) {
         final varAnnotations = _extractAnnotations(variable.metadata);
 
         annotation = varAnnotations.isNotEmpty
             ? findAnnotation(varAnnotations, 'JsonKey') ??
-                  findAnnotation(varAnnotations, 'jsonKey')
+                findAnnotation(varAnnotations, 'jsonKey')
             : null;
       }
     }
@@ -109,6 +111,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
     bool? includeIfNull;
     bool? includeFromJson;
     bool? includeToJson;
+    bool? disallowNullValue;
     String? toJson;
     String? fromJson;
     String? converter;
@@ -173,6 +176,12 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
     } catch (_) {}
 
     try {
+      final disallowNullValueValue = reader.read('disallowNullValue');
+      if (!disallowNullValueValue.isNull)
+        disallowNullValue = disallowNullValueValue.boolValue;
+    } catch (_) {}
+
+    try {
       final source = annotation.toSource();
 
       final match = RegExp(r'toJson\s*:\s*([^,)]+)').firstMatch(source);
@@ -223,6 +232,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
         includeIfNull != null ||
         includeFromJson != null ||
         includeToJson != null ||
+        disallowNullValue != null ||
         toJson != null ||
         fromJson != null ||
         converter != null) {
@@ -234,6 +244,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
         includeIfNull: includeIfNull,
         includeFromJson: includeFromJson,
         includeToJson: includeToJson,
+        disallowNullValue: disallowNullValue,
         toJson: toJson,
         fromJson: fromJson,
         converter: converter,
@@ -324,8 +335,10 @@ String getClassComment(List<Interface> interfaces, String? classComment) {
 /// Collects fields from interfaces and a concrete class element.
 List<NameTypeClassComment> getAllFields(
   List<InterfaceType> interfaceTypes,
-  ClassElement element,
-) {
+  InterfaceElement element, {
+  LibraryElement? library,
+}) {
+  library ??= element.library;
   var currentClassName = element.name?.replaceAll('\$', '') ?? '';
 
   List<String> _collectAdditionalAnnotations(Element element) {
@@ -356,13 +369,15 @@ List<NameTypeClassComment> getAllFields(
 
       // If it's a getter, also check its variable
       if (element is PropertyAccessorElement) {
-        dynamic variable;
+        final dynamic dynAccessor = element;
+        Element? variable;
         try {
-          variable = (element as dynamic).variable2;
-        } catch (_) {}
-        try {
-          variable ??= (element as dynamic).variable;
-        } catch (_) {}
+          variable = dynAccessor.variable;
+        } catch (_) {
+          try {
+            variable = dynAccessor.variable;
+          } catch (_) {}
+        }
         if (variable != null) {
           final varAnnotations = _extractAnnotations(variable.metadata);
           for (final m in varAnnotations) {
@@ -382,46 +397,56 @@ List<NameTypeClassComment> getAllFields(
   }
 
   List<NameTypeClassComment> collectFromElement(InterfaceElement elem) {
-    var fields = elem.fields.map((f) {
+    var fields = elem.children.whereType<FieldElement>().map((f) {
       return NameTypeClassComment(
         f.name ?? "",
-        typeToString(f.type, currentClassName: currentClassName),
+        typeToString(f.type,
+            currentClassName: currentClassName, library: library),
         elem.name ?? "",
         comment: f.getter?.documentationComment,
         jsonKeyInfo: extractJsonKeyInfo(f),
         additionalAnnotations: _collectAdditionalAnnotations(f),
         isEnum: f.type.element is EnumElement,
+        isGetterOnly:
+            f.isOriginGetterSetter && f.getter != null && f.setter == null,
       );
     });
 
-    // Get getters using dynamic to bypass analyzer version differences
-    final dynamic dynamicElem = elem;
-    final List<dynamic> gettersList = (dynamicElem.getters as List? ?? []);
-
-    var getters = gettersList
-        .where((a) => (a as dynamic).isSynthetic == false)
+    var getters = elem.children
+        .whereType<PropertyAccessorElement>()
+        .where((a) => a is GetterElement && a.isOriginDeclaration)
         .map((a) {
-          final dynamic dynA = a;
-          return NameTypeClassComment(
-            dynA.name ?? "",
-            typeToString(
-              (dynA as dynamic).returnType,
-              currentClassName: currentClassName,
-            ),
-            elem.name ?? "",
-            comment: (dynA as dynamic).documentationComment,
-            jsonKeyInfo: extractJsonKeyInfo(dynA as Element),
-            additionalAnnotations: _collectAdditionalAnnotations(dynA),
-            isEnum: (dynA as dynamic).returnType?.element is EnumElement,
-            enumValues: (dynA as dynamic).returnType?.element is EnumElement
-                ? ((dynA as dynamic).returnType!.element as EnumElement).fields
-                      .where((f) => f.isEnumConstant)
-                      .map((f) => f.name ?? "")
-                      .where((name) => name.isNotEmpty)
-                      .toList()
-                : const [],
-          );
-        });
+      bool isGetterOnly;
+      try {
+        isGetterOnly = a is GetterElement && (a as dynamic).variable == null;
+      } catch (_) {
+        // Fallback for different analyzer versions or unexpected states
+        isGetterOnly = true;
+      }
+
+      return NameTypeClassComment(
+        a.name ?? "",
+        typeToString(
+          a.returnType,
+          currentClassName: currentClassName,
+          library: library,
+        ),
+        elem.name ?? "",
+        comment: a.documentationComment,
+        jsonKeyInfo: extractJsonKeyInfo(a),
+        additionalAnnotations: _collectAdditionalAnnotations(a),
+        isEnum: a.returnType.element is EnumElement,
+        isGetterOnly: isGetterOnly,
+        enumValues: a.returnType.element is EnumElement
+            ? (a.returnType.element as EnumElement).children
+                  .whereType<FieldElement>()
+                  .where((f) => f.isEnumConstant)
+                  .map((f) => f.name ?? "")
+                  .where((name) => name.isNotEmpty)
+                  .toList()
+            : const [],
+      );
+    });
 
     return [...getters, ...fields];
   }
@@ -441,27 +466,34 @@ List<NameTypeClassComment> getAllFields(
 }
 
 /// Converts a Dart type to a normalized string representation.
-String typeToString(DartType type, {String? currentClassName}) {
-  final nullMarker = type.nullabilitySuffix == NullabilitySuffix.question
-      ? '?'
-      : type.nullabilitySuffix == NullabilitySuffix.star
-      ? '*'
-      : '';
+String typeToString(
+  DartType type, {
+  String? currentClassName,
+  LibraryElement? library,
+}) {
+  final nullMarker =
+      type.nullabilitySuffix == NullabilitySuffix.question
+          ? '?'
+          : type.nullabilitySuffix == NullabilitySuffix.star
+          ? '*'
+          : '';
 
   final alias = type.alias;
   String? manual;
   if (alias != null) {
-    final args = alias.typeArguments.isEmpty
-        ? ''
-        : "<${alias.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName)).join(', ')}>";
+    final args =
+        alias.typeArguments.isEmpty
+            ? ''
+            : "<${alias.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName, library: library)).join(', ')}>";
     manual = "${alias.element.name}$args";
   } else if (type is FunctionType) {
-    final generics = type.typeParameters.isNotEmpty
-        ? "<${type.typeParameters.map((param) {
-            final bound = param.bound;
-            return "${param.name}${bound == null ? "" : " = ${typeToString(bound)}"}";
-          }).join(', ')}>"
-        : '';
+    final generics =
+        type.typeParameters.isNotEmpty
+            ? "<${type.typeParameters.map((param) {
+                final bound = param.bound;
+                return "${param.name}${bound == null ? "" : " = ${typeToString(bound, currentClassName: currentClassName, library: library)}"}";
+              }).join(', ')}>"
+            : '';
 
     // Reserved keywords that cannot be used as identifiers
     const reservedKeywords = {
@@ -542,8 +574,12 @@ String typeToString(DartType type, {String? currentClassName}) {
         .map((param) {
           final paramName = sanitizeParameterName(param.name);
           return paramName.isEmpty
-              ? typeToString(param.type, currentClassName: currentClassName)
-              : "${typeToString(param.type, currentClassName: currentClassName)} $paramName";
+              ? typeToString(
+                param.type,
+                currentClassName: currentClassName,
+                library: library,
+              )
+              : "${typeToString(param.type, currentClassName: currentClassName, library: library)} $paramName";
         })
         .join(', ');
     final named = type.formalParameters
@@ -552,8 +588,8 @@ String typeToString(DartType type, {String? currentClassName}) {
           final paramName = sanitizeParameterName(param.name);
           final prefix = param.isRequiredNamed ? 'required ' : '';
           return paramName.isEmpty
-              ? "${prefix}${typeToString(param.type, currentClassName: currentClassName)}"
-              : "${prefix}${typeToString(param.type, currentClassName: currentClassName)} $paramName";
+              ? "${prefix}${typeToString(param.type, currentClassName: currentClassName, library: library)}"
+              : "${prefix}${typeToString(param.type, currentClassName: currentClassName, library: library)} $paramName";
         })
         .join(', ');
     final optional = type.formalParameters
@@ -561,8 +597,12 @@ String typeToString(DartType type, {String? currentClassName}) {
         .map((param) {
           final paramName = sanitizeParameterName(param.name);
           return paramName.isEmpty
-              ? typeToString(param.type, currentClassName: currentClassName)
-              : "${typeToString(param.type, currentClassName: currentClassName)} $paramName";
+              ? typeToString(
+                param.type,
+                currentClassName: currentClassName,
+                library: library,
+              )
+              : "${typeToString(param.type, currentClassName: currentClassName, library: library)} $paramName";
         })
         .join(', ');
     final parts = [
@@ -571,15 +611,21 @@ String typeToString(DartType type, {String? currentClassName}) {
       if (optional.isNotEmpty) "[$optional]",
     ].join(', ');
     manual =
-        "${typeToString(type.returnType, currentClassName: currentClassName)} Function$generics($parts)";
+        "${typeToString(type.returnType, currentClassName: currentClassName, library: library)} Function$generics($parts)";
   } else if (type is RecordType) {
     final positional = type.positionalFields
-        .map((e) => typeToString(e.type, currentClassName: currentClassName))
+        .map(
+          (e) => typeToString(
+            e.type,
+            currentClassName: currentClassName,
+            library: library,
+          ),
+        )
         .join(', ');
     final named = type.namedFields
         .map(
           (e) =>
-              "${typeToString(e.type, currentClassName: currentClassName)} ${e.name}",
+              "${typeToString(e.type, currentClassName: currentClassName, library: library)} ${e.name}",
         )
         .join(', ');
     final trailing =
@@ -594,12 +640,43 @@ String typeToString(DartType type, {String? currentClassName}) {
   } else if (type is ParameterizedType ||
       type.toString().contains('InvalidType') ||
       type.getDisplayString().contains('InvalidType')) {
-    final arguments = type is ParameterizedType && type.typeArguments.isNotEmpty
-        ? "<${type.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName)).join(', ')}>"
-        : '';
+    final arguments =
+        type is ParameterizedType && type.typeArguments.isNotEmpty
+            ? "<${type.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName, library: library)).join(', ')}>"
+            : '';
 
     var typeName = type is ParameterizedType ? type.element?.name : null;
     typeName ??= 'InvalidType';
+
+    final ds = type.getDisplayString();
+
+    // Handle library prefixes for resolved types
+    if (library != null &&
+        type.element?.library != null &&
+        type.element?.library != library &&
+        typeName != 'InvalidType' &&
+        typeName != 'dynamic') {
+      final imports = library.firstFragment.libraryImports;
+      final typeLibrary = type.element?.library;
+      final typeLibraryUri = typeLibrary?.firstFragment.source.uri;
+
+      for (final import in imports) {
+        final importedLibrary = import.importedLibrary;
+        final importedLibraryUri = importedLibrary?.firstFragment.source.uri;
+
+        // Compare by element first, then by URI string if elements don't match
+        if (importedLibrary == typeLibrary ||
+            (typeLibraryUri != null &&
+                importedLibraryUri != null &&
+                typeLibraryUri.toString() == importedLibraryUri.toString())) {
+          final prefix = import.prefix?.name;
+          if (prefix != null) {
+            typeName = "$prefix.$typeName";
+          }
+          break;
+        }
+      }
+    }
 
     // Handle self-reference and deps: if type is InvalidType, try to use the name from the element's display string
     // This happens when the file is not yet generated
@@ -610,7 +687,6 @@ String typeToString(DartType type, {String? currentClassName}) {
       if (displayName == null ||
           displayName == 'dynamic' ||
           displayName == 'InvalidType') {
-        final ds = type.getDisplayString();
         // If it's a parameterized type like List<Attachment>, getDisplayString might return the whole thing
         // We just want the base name if possible.
         if (ds.contains('<')) {
@@ -638,7 +714,6 @@ String typeToString(DartType type, {String? currentClassName}) {
       // check if the string representation has InvalidType
       if (arguments.contains('InvalidType') ||
           type.toString().contains('InvalidType')) {
-        final ds = type.getDisplayString();
         // Extract the full type signature from display string to catch inner types
         // e.g. List<Attachment> instead of List<InvalidType>
         if (ds.contains('<')) {
@@ -654,6 +729,20 @@ String typeToString(DartType type, {String? currentClassName}) {
         }
       } else {
         manual = "$typeName$arguments";
+      }
+    }
+
+    // CRITICAL: Ensure we don't accidentally strip a prefix that was already present in the display string
+    // if we end up with something like "Document" when display string was "dws.Document"
+    if (!manual.contains('.') && ds.contains('.')) {
+      final lastDot = ds.lastIndexOf('.');
+      final dsPrefix = ds.substring(0, lastDot);
+      // Ensure we're not just getting a generic prefix (like "List")
+      if (dsPrefix.isNotEmpty &&
+          !dsPrefix.contains('<') &&
+          !dsPrefix.contains('(') &&
+          !manual.startsWith(dsPrefix + '.')) {
+        manual = "$dsPrefix.$manual";
       }
     }
   }
