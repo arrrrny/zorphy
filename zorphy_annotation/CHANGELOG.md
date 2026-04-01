@@ -1,3 +1,8 @@
+## [1.6.5] - 2026-04-01
+
+### Change
+- Analyzer 12 compabilities
+
 ## [1.6.4] - 2026-02-15
 
 ### Fix
@@ -170,7 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Feature reference
 - Real-world usage examples
 
-[Unreleased]: https://github.com/arrrrny/zorphy/compare/annotation-v1.6.4...HEAD
+[Unreleased]: https://github.com/arrrrny/zorphy/compare/annotation-v1.6.5...HEAD
 [1.5.6]: https://github.com/arrrrny/zorphy/compare/v1.5.5...v1.5.6
 [1.6.1]: https://github.com/arrrrny/zorphy/compare/annotation-v1.5.6...annotation-v1.6.1
 [1.5.5]: https://github.com/arrrrny/zorphy/compare/v1.5.4...v1.5.5
