@@ -252,7 +252,7 @@ class And<TEntity> extends Filter<TEntity> {
   bool matches(TEntity item) => filters.every((f) => f.matches(item));
 }
 
-  /// Logical OR combining multiple filters
+/// Logical OR combining multiple filters
 class Or<TEntity> extends Filter<TEntity> {
   final List<Filter<TEntity>> filters;
 

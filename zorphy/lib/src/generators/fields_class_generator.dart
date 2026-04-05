@@ -71,24 +71,27 @@ class FieldsClassGenerator extends UniversalGenerator {
       // Actually, replaceAll('$', '') is mostly fine UNLESS prefix has $.
       // Let's at least preserve prefix dots.
       if (!type.contains('.')) return type.replaceAll('\$', '');
-      
-      return type.split('.').map((part) {
-        if (part.contains('<')) {
-          final base = part.substring(0, part.indexOf('<'));
-          final rest = part.substring(part.indexOf('<'));
-          return base.replaceAll('\$', '') + rest.replaceAll('\$', '');
-        }
-        return part.replaceAll('\$', '');
-      }).join('.');
+
+      return type
+          .split('.')
+          .map((part) {
+            if (part.contains('<')) {
+              final base = part.substring(0, part.indexOf('<'));
+              final rest = part.substring(part.indexOf('<'));
+              return base.replaceAll('\$', '') + rest.replaceAll('\$', '');
+            }
+            return part.replaceAll('\$', '');
+          })
+          .join('.');
     }
-    
+
     if (type.contains('.')) {
       final lastDot = type.lastIndexOf('.');
       final prefix = type.substring(0, lastDot + 1);
       final name = type.substring(lastDot + 1);
       return prefix + name.replaceAll('\$', '');
     }
-    
+
     return type.replaceAll('\$', '');
   }
 

@@ -7,8 +7,8 @@ void main() {
     test('includes getter-only field in constructor if it has a defaultValue', () {
       final fields = <NameTypeClassComment>[
         NameTypeClassComment(
-          'timeout', 
-          'Duration', 
+          'timeout',
+          'Duration',
           'MyClass',
           isGetterOnly: true,
           jsonKeyInfo: const JsonKeyInfo(defaultValue: 'Duration(seconds: 5)'),
@@ -16,12 +16,12 @@ void main() {
       ];
 
       final code = helpers.getProperties(
-        fields, 
-        'MyClass', 
+        fields,
+        'MyClass',
         false, // isAbstract
         false, // hidePublicConstructor
-        true,  // generateCopyWithFn
-        true,  // generateJson
+        true, // generateCopyWithFn
+        true, // generateJson
         false, // hasConstConstructor
         false, // hasExtends
         ownFields: {'timeout'},
@@ -37,9 +37,12 @@ void main() {
       // var paramType = isNullable ? fieldType : "$fieldType?";
       // sb.writeln("    ${paramType} ${f.name},");
       // AND initializers.add("this.${f.name} = ${f.name} ?? ${defaultValueString}");
-      
+
       expect(code.contains('Duration? timeout'), isTrue);
-      expect(code.contains('this.timeout = timeout ?? const Duration(seconds: 5)'), isTrue);
+      expect(
+        code.contains('this.timeout = timeout ?? const Duration(seconds: 5)'),
+        isTrue,
+      );
     });
   });
 }

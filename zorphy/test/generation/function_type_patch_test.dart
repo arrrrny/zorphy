@@ -13,11 +13,7 @@ void main() {
       ),
     ];
 
-    final patchClass = helpers.getPatchClass(
-      fields,
-      'ValidationRule',
-      [],
-    );
+    final patchClass = helpers.getPatchClass(fields, 'ValidationRule', []);
 
     print('Generated Patch Class:');
     print(patchClass);

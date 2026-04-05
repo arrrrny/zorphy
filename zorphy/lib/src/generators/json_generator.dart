@@ -312,14 +312,14 @@ class JsonGenerator extends UniversalGenerator {
         );
       }
     }
-      // Add manual toJson fields
-      for (var f in manualToJsonFields) {
-        final info = f.jsonKeyInfo!;
-        final jsonFieldName = info.name ?? f.name;
-        sb.writeln(
-          '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
-        );
-      }
+    // Add manual toJson fields
+    for (var f in manualToJsonFields) {
+      final info = f.jsonKeyInfo!;
+      final jsonFieldName = info.name ?? f.name;
+      sb.writeln(
+        '    if (${f.name} != null) data[\'$jsonFieldName\'] = ${info.toJson}(${f.name}!);',
+      );
+    }
     sb.writeln('    return _sanitizeJson(data);');
     sb.writeln('  }');
     sb.writeln('');

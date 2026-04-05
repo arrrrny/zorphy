@@ -423,7 +423,6 @@ String getChangeToExtension({
     }
 
     // Generate parameters for the target type
-    var sourceFieldNames = sourceFields.map((f) => f.name).toSet();
     var sourceFieldMap = {for (var f in sourceFields) f.name: f};
 
     // Parameters for the changeTo method
@@ -494,11 +493,11 @@ String getChangeToExtension({
       }
     }
 
-    sb.writeln('    final _json = Map<String, dynamic>.from((this as dynamic).toJson());');
-    sb.writeln('    _json.addAll(_patcher.toJson());');
     sb.writeln(
-      '    return $targetClassName.fromJson(_json);',
+      '    final _json = Map<String, dynamic>.from((this as dynamic).toJson());',
     );
+    sb.writeln('    _json.addAll(_patcher.toJson());');
+    sb.writeln('    return $targetClassName.fromJson(_json);');
     sb.writeln('  }');
     sb.writeln();
   }
@@ -506,11 +505,6 @@ String getChangeToExtension({
   sb.writeln('}');
 
   return sb.toString();
-}
-
-/// Check if a type needs patch handling (is a known Zorphy class)
-bool _needsPatchHandling(String baseType, List<String> knownClasses) {
-  return knownClasses.contains(baseType);
 }
 
 /// Replace $-prefixed types with concrete class names for JSON serialization
@@ -554,14 +548,18 @@ String _replaceDollarTypesWithConcrete(String type) {
       }
       arguments.add(currentArgument.toString().trim());
 
-      final processedArgs = arguments.map((arg) => _processNestedType(arg)).join(', ');
-      
+      final processedArgs = arguments
+          .map((arg) => _processNestedType(arg))
+          .join(', ');
+
       // Remove $ only from the base type name if it has a prefix
-      final cleanedBase = baseType.contains('.') 
-          ? baseType.substring(0, baseType.lastIndexOf('.') + 1) + 
-            baseType.substring(baseType.lastIndexOf('.') + 1).replaceAll('\$', '')
+      final cleanedBase = baseType.contains('.')
+          ? baseType.substring(0, baseType.lastIndexOf('.') + 1) +
+                baseType
+                    .substring(baseType.lastIndexOf('.') + 1)
+                    .replaceAll('\$', '')
           : baseType.replaceAll('\$', '');
-          
+
       return '$cleanedBase<$processedArgs>';
     }
 
@@ -571,7 +569,7 @@ String _replaceDollarTypesWithConcrete(String type) {
 
     final cleanedBase = base.contains('.')
         ? base.substring(0, base.lastIndexOf('.') + 1) +
-          base.substring(base.lastIndexOf('.') + 1).replaceAll('\$', '')
+              base.substring(base.lastIndexOf('.') + 1).replaceAll('\$', '')
         : base.replaceAll('\$', '');
 
     return '$cleanedBase${isNullable ? '?' : ''}';
@@ -1121,7 +1119,9 @@ String getPatchClass(
             sb.writeln(
               "  ${classNameTrimmed}Patch update${capitalizedName}At(int index, $elementPatchType Function($elementPatchType) patch) {",
             );
-            sb.writeln("    patchMap[$enumName.$name] = (List<dynamic> list) {");
+            sb.writeln(
+              "    patchMap[$enumName.$name] = (List<dynamic> list) {",
+            );
             sb.writeln("      var updatedList = List.from(list);");
             sb.writeln("      if (index >= 0 && index < updatedList.length) {");
             sb.writeln(

@@ -8,34 +8,38 @@ void main() {
       final fields = <NameTypeClassComment>[
         NameTypeClassComment('id', 'String', 'BarcodeUrlTemplate'),
         NameTypeClassComment(
-          'type', 
-          'UrlPageType', 
+          'type',
+          'UrlPageType',
           'BarcodeUrlTemplate',
           isGetterOnly: true,
         ),
-        NameTypeClassComment('endpoints', 'List<UrlEndpoint>?', 'BarcodeUrlTemplate'),
+        NameTypeClassComment(
+          'endpoints',
+          'List<UrlEndpoint>?',
+          'BarcodeUrlTemplate',
+        ),
       ];
 
       final code = helpers.getProperties(
-        fields, 
-        'BarcodeUrlTemplate', 
+        fields,
+        'BarcodeUrlTemplate',
         false, // isAbstract
         false, // hidePublicConstructor
-        true,  // generateCopyWithFn
-        true,  // generateJson
+        true, // generateCopyWithFn
+        true, // generateJson
         false, // hasConstConstructor
-        true,  // hasExtends
+        true, // hasExtends
         ownFields: {'id', 'type', 'endpoints'},
       );
 
       // Should contain id and endpoints
       expect(code.contains('required this.id'), isTrue);
       expect(code.contains('this.endpoints'), isTrue);
-      
+
       // Should NOT contain type in constructor parameters
       expect(code.contains('this.type'), isFalse);
       expect(code.contains('required this.type'), isFalse);
-      
+
       // Should NOT contain type field declaration (since it is getterOnly)
       expect(code.contains('final UrlPageType type;'), isFalse);
     });

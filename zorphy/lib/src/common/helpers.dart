@@ -95,7 +95,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
 
         annotation = varAnnotations.isNotEmpty
             ? findAnnotation(varAnnotations, 'JsonKey') ??
-                findAnnotation(varAnnotations, 'jsonKey')
+                  findAnnotation(varAnnotations, 'jsonKey')
             : null;
       }
     }
@@ -400,8 +400,11 @@ List<NameTypeClassComment> getAllFields(
     var fields = elem.children.whereType<FieldElement>().map((f) {
       return NameTypeClassComment(
         f.name ?? "",
-        typeToString(f.type,
-            currentClassName: currentClassName, library: library),
+        typeToString(
+          f.type,
+          currentClassName: currentClassName,
+          library: library,
+        ),
         elem.name ?? "",
         comment: f.getter?.documentationComment,
         jsonKeyInfo: extractJsonKeyInfo(f),
@@ -416,37 +419,38 @@ List<NameTypeClassComment> getAllFields(
         .whereType<PropertyAccessorElement>()
         .where((a) => a is GetterElement && a.isOriginDeclaration)
         .map((a) {
-      bool isGetterOnly;
-      try {
-        isGetterOnly = a is GetterElement && (a as dynamic).variable == null;
-      } catch (_) {
-        // Fallback for different analyzer versions or unexpected states
-        isGetterOnly = true;
-      }
+          bool isGetterOnly;
+          try {
+            isGetterOnly =
+                a is GetterElement && (a as dynamic).variable == null;
+          } catch (_) {
+            // Fallback for different analyzer versions or unexpected states
+            isGetterOnly = true;
+          }
 
-      return NameTypeClassComment(
-        a.name ?? "",
-        typeToString(
-          a.returnType,
-          currentClassName: currentClassName,
-          library: library,
-        ),
-        elem.name ?? "",
-        comment: a.documentationComment,
-        jsonKeyInfo: extractJsonKeyInfo(a),
-        additionalAnnotations: _collectAdditionalAnnotations(a),
-        isEnum: a.returnType.element is EnumElement,
-        isGetterOnly: isGetterOnly,
-        enumValues: a.returnType.element is EnumElement
-            ? (a.returnType.element as EnumElement).children
-                  .whereType<FieldElement>()
-                  .where((f) => f.isEnumConstant)
-                  .map((f) => f.name ?? "")
-                  .where((name) => name.isNotEmpty)
-                  .toList()
-            : const [],
-      );
-    });
+          return NameTypeClassComment(
+            a.name ?? "",
+            typeToString(
+              a.returnType,
+              currentClassName: currentClassName,
+              library: library,
+            ),
+            elem.name ?? "",
+            comment: a.documentationComment,
+            jsonKeyInfo: extractJsonKeyInfo(a),
+            additionalAnnotations: _collectAdditionalAnnotations(a),
+            isEnum: a.returnType.element is EnumElement,
+            isGetterOnly: isGetterOnly,
+            enumValues: a.returnType.element is EnumElement
+                ? (a.returnType.element as EnumElement).children
+                      .whereType<FieldElement>()
+                      .where((f) => f.isEnumConstant)
+                      .map((f) => f.name ?? "")
+                      .where((name) => name.isNotEmpty)
+                      .toList()
+                : const [],
+          );
+        });
 
     return [...getters, ...fields];
   }
@@ -471,29 +475,26 @@ String typeToString(
   String? currentClassName,
   LibraryElement? library,
 }) {
-  final nullMarker =
-      type.nullabilitySuffix == NullabilitySuffix.question
-          ? '?'
-          : type.nullabilitySuffix == NullabilitySuffix.star
-          ? '*'
-          : '';
+  final nullMarker = type.nullabilitySuffix == NullabilitySuffix.question
+      ? '?'
+      : type.nullabilitySuffix == NullabilitySuffix.star
+      ? '*'
+      : '';
 
   final alias = type.alias;
   String? manual;
   if (alias != null) {
-    final args =
-        alias.typeArguments.isEmpty
-            ? ''
-            : "<${alias.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName, library: library)).join(', ')}>";
+    final args = alias.typeArguments.isEmpty
+        ? ''
+        : "<${alias.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName, library: library)).join(', ')}>";
     manual = "${alias.element.name}$args";
   } else if (type is FunctionType) {
-    final generics =
-        type.typeParameters.isNotEmpty
-            ? "<${type.typeParameters.map((param) {
-                final bound = param.bound;
-                return "${param.name}${bound == null ? "" : " = ${typeToString(bound, currentClassName: currentClassName, library: library)}"}";
-              }).join(', ')}>"
-            : '';
+    final generics = type.typeParameters.isNotEmpty
+        ? "<${type.typeParameters.map((param) {
+            final bound = param.bound;
+            return "${param.name}${bound == null ? "" : " = ${typeToString(bound, currentClassName: currentClassName, library: library)}"}";
+          }).join(', ')}>"
+        : '';
 
     // Reserved keywords that cannot be used as identifiers
     const reservedKeywords = {
@@ -575,10 +576,10 @@ String typeToString(
           final paramName = sanitizeParameterName(param.name);
           return paramName.isEmpty
               ? typeToString(
-                param.type,
-                currentClassName: currentClassName,
-                library: library,
-              )
+                  param.type,
+                  currentClassName: currentClassName,
+                  library: library,
+                )
               : "${typeToString(param.type, currentClassName: currentClassName, library: library)} $paramName";
         })
         .join(', ');
@@ -598,10 +599,10 @@ String typeToString(
           final paramName = sanitizeParameterName(param.name);
           return paramName.isEmpty
               ? typeToString(
-                param.type,
-                currentClassName: currentClassName,
-                library: library,
-              )
+                  param.type,
+                  currentClassName: currentClassName,
+                  library: library,
+                )
               : "${typeToString(param.type, currentClassName: currentClassName, library: library)} $paramName";
         })
         .join(', ');
@@ -640,10 +641,9 @@ String typeToString(
   } else if (type is ParameterizedType ||
       type.toString().contains('InvalidType') ||
       type.getDisplayString().contains('InvalidType')) {
-    final arguments =
-        type is ParameterizedType && type.typeArguments.isNotEmpty
-            ? "<${type.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName, library: library)).join(', ')}>"
-            : '';
+    final arguments = type is ParameterizedType && type.typeArguments.isNotEmpty
+        ? "<${type.typeArguments.map((t) => typeToString(t, currentClassName: currentClassName, library: library)).join(', ')}>"
+        : '';
 
     var typeName = type is ParameterizedType ? type.element?.name : null;
     typeName ??= 'InvalidType';
