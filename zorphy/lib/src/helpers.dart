@@ -1031,99 +1031,12 @@ String getPatchClass(
 
   // Add Patch<T> implementation
   sb.writeln(
-    "class ${classNameTrimmed}Patch implements Patch<$classNameTrimmed> {",
+    "class ${classNameTrimmed}Patch extends PatchBase<$classNameTrimmed, $enumName> {",
   );
-  sb.writeln("  final Map<$enumName, dynamic> _patch = {};");
-  sb.writeln();
-
-  // Static factory methods
-  sb.writeln(
-    "  static ${classNameTrimmed}Patch create([Map<String, dynamic>? diff]) {",
-  );
-  sb.writeln("    final patch = ${classNameTrimmed}Patch();");
-  sb.writeln("    if (diff != null) {");
-  sb.writeln("      diff.forEach((key, value) {");
-  sb.writeln("        try {");
-  sb.writeln(
-    "          final enumValue = $enumName.values.firstWhere((e) => e.name == key);",
-  );
-  sb.writeln("          if (value is Function) {");
-  sb.writeln("            patch._patch[enumValue] = value();");
-  sb.writeln("          } else {");
-  sb.writeln("            patch._patch[enumValue] = value;");
-  sb.writeln("          }");
-  sb.writeln("        } catch (_) {}");
-  sb.writeln("      });");
-  sb.writeln("    }");
-  sb.writeln("    return patch;");
-  sb.writeln("  }");
-  sb.writeln();
-
-  // Generate fromPatch
-  sb.writeln(
-    "  static ${classNameTrimmed}Patch fromPatch(Map<${classNameTrimmed}\$, dynamic> patch) {",
-  );
-  sb.writeln("    final _patch = ${classNameTrimmed}Patch();");
-  sb.writeln("    _patch._patch.addAll(patch);");
-  sb.writeln("    return _patch;");
-  sb.writeln("  }");
-  sb.writeln();
-
-  // Convert to map method
-  sb.writeln("  Map<$enumName, dynamic> toPatch() => Map.from(_patch);");
   sb.writeln();
 
   sb.writeln("  $classNameTrimmed applyTo($classNameTrimmed entity) {");
   sb.writeln("    return entity.patchWith$classNameTrimmed(patchInput: this);");
-  sb.writeln("  }");
-  sb.writeln();
-
-  // Add toJson method with __typename
-  sb.writeln("  Map<String, dynamic> toJson() {");
-  sb.writeln("    final json = <String, dynamic>{};");
-  sb.writeln("    _patch.forEach((key, value) {");
-  sb.writeln("      if (value != null) {");
-  sb.writeln("        if (value is Function) {");
-  sb.writeln("          final result = value();");
-  sb.writeln("          json[key.name] = _convertToJson(result);");
-  sb.writeln("        } else {");
-  sb.writeln("          json[key.name] = _convertToJson(value);");
-  sb.writeln("        }");
-  sb.writeln("      }");
-  sb.writeln("    });");
-  sb.writeln("    return json;");
-  sb.writeln("  }");
-  sb.writeln();
-
-  // Add convertToJson method
-  sb.writeln("  dynamic _convertToJson(dynamic value) {");
-  sb.writeln("    if (value == null) return null;");
-  sb.writeln("    if (value is DateTime) return value.toIso8601String();");
-  sb.writeln("    if (value is Enum) return value.toString().split('.').last;");
-  sb.writeln(
-    "    if (value is List) return value.map((e) => _convertToJson(e)).toList();",
-  );
-  sb.writeln(
-    "    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));",
-  );
-  sb.writeln(
-    "    if (value is num || value is bool || value is String) return value;",
-  );
-  sb.writeln("    try {");
-  sb.writeln(
-    "        if (value?.toJsonLean != null) return value.toJsonLean();",
-  );
-  sb.writeln("      } catch (_) {}");
-  sb.writeln("    if (value?.toJson != null) return value.toJson();");
-  sb.writeln("    return value.toString();");
-  sb.writeln("  }");
-  sb.writeln();
-
-  // Add fromJson factory
-  sb.writeln(
-    "  static ${classNameTrimmed}Patch fromJson(Map<String, dynamic> json) {",
-  );
-  sb.writeln("    return create(json);");
   sb.writeln("  }");
   sb.writeln();
 
@@ -1149,7 +1062,7 @@ String getPatchClass(
     sb.writeln(
       "  ${classNameTrimmed}Patch with$capitalizedName($parameterType value) {",
     );
-    sb.writeln("    _patch[$enumName.$name] = value;");
+    sb.writeln("    patchMap[$enumName.$name] = value;");
     sb.writeln("    return this;");
     sb.writeln("  }");
     sb.writeln();
@@ -1207,7 +1120,7 @@ String getPatchClass(
             sb.writeln(
               "  ${classNameTrimmed}Patch update${capitalizedName}At(int index, $elementPatchType Function($elementPatchType) patch) {",
             );
-            sb.writeln("    _patch[$enumName.$name] = (List<dynamic> list) {");
+            sb.writeln("    patchMap[$enumName.$name] = (List<dynamic> list) {");
             sb.writeln("      var updatedList = List.from(list);");
             sb.writeln("      if (index >= 0 && index < updatedList.length) {");
             sb.writeln(
@@ -1238,7 +1151,7 @@ String getPatchClass(
               "  ${classNameTrimmed}Patch update${capitalizedName}Value($keyType key, $valuePatchType Function($valuePatchType) patch) {",
             );
             sb.writeln(
-              "    _patch[$enumName.$name] = (Map<dynamic, dynamic> map) {",
+              "    patchMap[$enumName.$name] = (Map<dynamic, dynamic> map) {",
             );
             sb.writeln("      var updatedMap = Map.from(map);");
             sb.writeln("      if (updatedMap.containsKey(key)) {");
@@ -1267,7 +1180,7 @@ String getPatchClass(
         sb.writeln(
           "  ${classNameTrimmed}Patch with${capitalizedName}Patch($patchType patch) {",
         );
-        sb.writeln("    _patch[$enumName.$name] = patch;");
+        sb.writeln("    patchMap[$enumName.$name] = patch;");
         sb.writeln("    return this;");
         sb.writeln("  }");
         sb.writeln();
@@ -1277,7 +1190,7 @@ String getPatchClass(
         sb.writeln(
           "  ${classNameTrimmed}Patch with${capitalizedName}PatchFunc($funcParamType patch) {",
         );
-        sb.writeln("    _patch[$enumName.$name] = (dynamic current) {");
+        sb.writeln("    patchMap[$enumName.$name] = (dynamic current) {");
         sb.writeln("      var currentPatch = $patchType();");
         sb.writeln(
           "      return patch(currentPatch).applyTo(current as ${innerType.replaceAll("?", "")});",
@@ -1345,7 +1258,7 @@ String getPatchWithMethod(
   sb.writeln(
     "    final _patcher = patchInput ?? $classNameTrimmed" + "Patch();",
   );
-  sb.writeln("    final _patchMap = _patcher.toPatch();");
+  sb.writeln("    final _patchMap = _patcher.patchMap;");
 
   var constructorSuffix = hidePublicConstructor ? "._" : "";
   sb.writeln("    return $classNameTrimmed$constructorSuffix(");
@@ -1403,7 +1316,7 @@ String getInterfacePatchWithMethods(
     sb.writeln(
       "    final _patcher = patchInput ?? $interfaceNameTrimmed" + "Patch();",
     );
-    sb.writeln("    final _patchMap = _patcher.toPatch();");
+    sb.writeln("    final _patchMap = _patcher.patchMap;");
 
     var constructorSuffix = hidePublicConstructor ? "._" : "";
     sb.writeln("    return $classNameTrimmed$constructorSuffix(");
