@@ -1,0 +1,1 @@
+sed -i '' "s/contains(r'final _json = Map<String, dynamic>.from((this as dynamic).toJson());\\\\n    _json.addAll(_patcher.toJson());')/contains(r'final _json = Map<String, dynamic>.from((this as dynamic).toJson());'),\n        );\n        expect(code, contains(r'_json.addAll(_patcher.toJson());')/" test/generation/change_to_generation_test.dart

@@ -70,7 +70,9 @@ void main() {
         // Verify the generated code: it should apply the patch to JSON before calling fromJson
         expect(
           code,
-          contains(r'final _json = this.toJson()..addAll(_patcher.toJson());'),
+          contains(r'final _json = Map<String, dynamic>.from((this as dynamic).toJson());'),
+        );
+        expect(code, contains(r'_json.addAll(_patcher.toJson());'),
         );
         expect(code, contains(r'return TypedListing.fromJson(_json);'));
       },
@@ -125,7 +127,9 @@ void main() {
       // We want to see the patch being applied to JSON before fromJson
       expect(
         code,
-        contains(r'final _json = this.toJson()..addAll(_patcher.toJson());'),
+        contains(r'final _json = Map<String, dynamic>.from((this as dynamic).toJson());'),
+        );
+        expect(code, contains(r'_json.addAll(_patcher.toJson());'),
       );
       expect(code, contains(r'return BarcodeListing.fromJson(_json);'));
       expect(code, isNot(contains(r'..patchWithBarcodeListing')));

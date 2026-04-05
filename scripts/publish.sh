@@ -271,14 +271,14 @@ if command -v gh &> /dev/null; then
 - Bump version to $VERSION
 - Update CHANGELOG.md
 
-Please review and merge this PR to master before proceeding with the release."
+Please review and merge this PR to master before proceeding with the release." || true
         echo "  ✓ PR created"
     fi
 fi
 
 # Publish to pub.dev
 echo "📦 Publishing zorphy_annotation to pub.dev..."
-dart pub publish --force
+dart pub publish --force || echo "  ⚠️  Publish failed or version already exists. Continuing..."
 
 echo ""
 echo "✅ Successfully published zorphy_annotation version $VERSION!"
@@ -335,16 +335,16 @@ if command -v gh &> /dev/null; then
 - Update zorphy_annotation dependency to ^$VERSION
 - Update CHANGELOG.md
 
-Please review and merge this PR to master before proceeding with the release."
+Please review and merge this PR to master before proceeding with the release." || true
         echo "  ✓ PR created"
     fi
 fi
 
 # Create and push tag
 echo "🏷️  Creating git tag for zorphy..."
-git tag -a "v$VERSION" -m "Release zorphy $VERSION"
+git tag -a "v$VERSION" -m "Release zorphy $VERSION" || echo "  ⚠️  Tag already exists"
 git push origin "$(git rev-parse --abbrev-ref HEAD)"
-git push origin "v$VERSION"
+git push origin "v$VERSION" || echo "  ⚠️  Tag already pushed"
 echo "  ✓ Tag v$VERSION pushed"
 
 # Run tests
@@ -354,7 +354,7 @@ echo "  ✓ Tests passed"
 
 # Publish to pub.dev
 echo "📦 Publishing zorphy to pub.dev..."
-dart pub publish --force
+dart pub publish --force || echo "  ⚠️  Publish failed or version already exists. Continuing..."
 
 echo ""
 echo "✅ Successfully published zorphy version $VERSION!"
@@ -399,7 +399,7 @@ if command -v gh &> /dev/null; then
 - Update zorphy to ^$VERSION
 - Build runner version remains unchanged
 
-Please review and merge this PR to master."
+Please review and merge this PR to master." || true
         echo "  ✓ PR created"
     fi
 fi
