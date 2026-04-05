@@ -342,9 +342,9 @@ fi
 
 # Create and push tag
 echo "🏷️  Creating git tag for zorphy..."
-git tag -a "v$VERSION" -m "Release zorphy $VERSION"
+git tag -a "v$VERSION" -m "Release zorphy $VERSION" || echo "  ⚠️  Tag already exists"
 git push origin "$(git rev-parse --abbrev-ref HEAD)"
-git push origin "v$VERSION"
+git push origin "v$VERSION" || echo "  ⚠️  Tag already pushed"
 echo "  ✓ Tag v$VERSION pushed"
 
 # Run tests
