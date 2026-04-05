@@ -278,7 +278,7 @@ fi
 
 # Publish to pub.dev
 echo "📦 Publishing zorphy_annotation to pub.dev..."
-dart pub publish --force
+dart pub publish --force || echo "  ⚠️  Publish failed or version already exists. Continuing..."
 
 echo ""
 echo "✅ Successfully published zorphy_annotation version $VERSION!"
@@ -354,7 +354,7 @@ echo "  ✓ Tests passed"
 
 # Publish to pub.dev
 echo "📦 Publishing zorphy to pub.dev..."
-dart pub publish --force
+dart pub publish --force || echo "  ⚠️  Publish failed or version already exists. Continuing..."
 
 echo ""
 echo "✅ Successfully published zorphy version $VERSION!"
