@@ -271,7 +271,7 @@ if command -v gh &> /dev/null; then
 - Bump version to $VERSION
 - Update CHANGELOG.md
 
-Please review and merge this PR to master before proceeding with the release."
+Please review and merge this PR to master before proceeding with the release." || true
         echo "  ✓ PR created"
     fi
 fi
@@ -335,7 +335,7 @@ if command -v gh &> /dev/null; then
 - Update zorphy_annotation dependency to ^$VERSION
 - Update CHANGELOG.md
 
-Please review and merge this PR to master before proceeding with the release."
+Please review and merge this PR to master before proceeding with the release." || true
         echo "  ✓ PR created"
     fi
 fi
@@ -399,7 +399,7 @@ if command -v gh &> /dev/null; then
 - Update zorphy to ^$VERSION
 - Build runner version remains unchanged
 
-Please review and merge this PR to master."
+Please review and merge this PR to master." || true
         echo "  ✓ PR created"
     fi
 fi
