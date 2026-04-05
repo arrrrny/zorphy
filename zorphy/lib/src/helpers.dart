@@ -494,7 +494,8 @@ String getChangeToExtension({
       }
     }
 
-    sb.writeln('    final _json = this.toJson()..addAll(_patcher.toJson());');
+    sb.writeln('    final _json = Map<String, dynamic>.from((this as dynamic).toJson());');
+    sb.writeln('    _json.addAll(_patcher.toJson());');
     sb.writeln(
       '    return $targetClassName.fromJson(_json);',
     );
