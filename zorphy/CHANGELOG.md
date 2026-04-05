@@ -1,3 +1,9 @@
+## [1.6.6] - 2026-04-05
+
+### Feature
+- Extracted Patch class boilerplate into `PatchBase` to drastically reduce generated code size.
+- Fixed `toJson()` bug on abstract base classes in explicit subtypes `changeTo` extension.
+
 ## [1.6.5] - 2026-04-01
 
 ### Change

@@ -66,8 +66,8 @@ void main() {
   print('');
 
   // Nested patching - update only the city in the address
-  final personPatch = PersonPatch.create()
-    ..withAddressPatch(AddressPatch.create()..withCity('Los Angeles'));
+  final personPatch = PersonPatch()
+    ..withAddressPatch(AddressPatch()..withCity('Los Angeles'));
 
   final updatedPerson = person.patchWithPerson(patchInput: personPatch);
 

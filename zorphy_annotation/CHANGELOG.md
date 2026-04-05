@@ -1,3 +1,8 @@
+## [1.6.6] - 2026-04-05
+
+### Feature
+- Added `PatchBase` class to centralize JSON serialization for leaner patch generation.
+
 ## [1.6.5] - 2026-04-01
 
 ### Change

@@ -43,7 +43,7 @@ void main() {
   print('');
 
   // Patch operations - partial updates
-  final userPatch = UserPatch.create()
+  final userPatch = UserPatch()
     ..withAge(32)
     ..withEmail('alice@example.com');
   final patchedUser = user1.patchWithUser(patchInput: userPatch);
