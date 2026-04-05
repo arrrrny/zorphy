@@ -248,7 +248,7 @@ cd zorphy_annotation
 # Commit changes
 echo "🔨 Committing zorphy_annotation changes..."
 git add pubspec.yaml CHANGELOG.md
-git commit -m "chore: release zorphy_annotation $VERSION"
+git commit -m "chore: release zorphy_annotation $VERSION" || true
 echo "  ✓ Changes committed"
 
 # Create PR (if gh CLI available)
@@ -311,7 +311,7 @@ echo "  ✓ Dependency updated to ^$VERSION"
 # Commit changes
 echo "🔨 Committing zorphy changes..."
 git add pubspec.yaml CHANGELOG.md
-git commit -m "chore: release zorphy $VERSION"
+git commit -m "chore: release zorphy $VERSION" || true
 echo "  ✓ Changes committed"
 
 # Create PR (if gh CLI available)
@@ -376,7 +376,7 @@ update_readme
 # Commit README changes
 echo "🔨 Committing README.md changes..."
 git add README.md
-git commit -m "chore: update README.md dependencies to v$VERSION"
+git commit -m "chore: update README.md dependencies to v$VERSION" || true
 echo "  ✓ Changes committed"
 
 # Create PR (if gh CLI available)
