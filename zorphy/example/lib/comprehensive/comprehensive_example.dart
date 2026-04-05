@@ -97,7 +97,7 @@ abstract class $Counter {
 // =============================================================================
 
 /// Address class for nesting
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Address {
   String get street;
   String get city;
@@ -106,7 +106,7 @@ abstract class $Address {
 }
 
 /// Person with nested address
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $PersonWithAddress {
   String get name;
   $Address get address;
@@ -131,20 +131,20 @@ abstract class $CategoryNode {
 // =============================================================================
 
 /// Timestamped entity
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Timestamped {
   DateTime get createdAt;
   DateTime? get updatedAt;
 }
 
 /// Entity with ID
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Identified {
   String get id;
 }
 
 /// Post combining multiple interfaces
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Post implements $Timestamped, $Identified {
   String get title;
   String get content;
@@ -177,7 +177,7 @@ abstract class $Result<T> {
 }
 
 /// Generic list response
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $ListResponse<T> {
   int get total;
   List<T> get items;
@@ -195,7 +195,7 @@ abstract class $$Shape {
   String get name;
 }
 
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Circle implements $$Shape {
   double get radius;
 
@@ -203,7 +203,7 @@ abstract class $Circle implements $$Shape {
   String get name => 'Circle';
 }
 
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Rectangle implements $$Shape {
   double get width;
   double get height;
@@ -217,7 +217,7 @@ abstract class $Rectangle implements $$Shape {
 // =============================================================================
 
 /// Color with constant constructor support
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Color {
   int get red;
   int get green;
@@ -226,7 +226,7 @@ abstract class $Color {
   const $Color();
 }
 
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $StartupOptions {
   const $StartupOptions();
 
@@ -236,7 +236,7 @@ abstract class $StartupOptions {
 }
 
 /// Employee in a company
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Employee {
   String get id;
   String get name;
@@ -245,7 +245,7 @@ abstract class $Employee {
 }
 
 /// Company with nested departments and employees
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Company {
   String get name;
   String get industry;
