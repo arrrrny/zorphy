@@ -1,26 +1,38 @@
-/// Base class for patch operations in Zorphy
-abstract class PatchBase<T> {
-  /// Applies the patch to the given object
-  T apply(T original);
+import 'patch.dart';
 
-  /// Merges this patch with another patch
-  PatchBase<T> merge(PatchBase<T> other);
+abstract class PatchBase<TEntity, TEnum extends Enum> implements Patch<TEntity> {
+  final Map<TEnum, dynamic> patchMap = {};
 
-  /// Checks if the patch is empty (makes no changes)
-  bool get isEmpty;
+  Map<TEnum, dynamic> toPatch() => Map.from(patchMap);
 
-  /// Creates a combined patch
-  PatchBase<T> combine(PatchBase<T> other) => merge(other);
-}
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{};
+    patchMap.forEach((key, value) {
+      if (value != null) {
+        if (value is Function) {
+          final result = value();
+          json[key.name] = _convertToJson(result);
+        } else {
+          json[key.name] = _convertToJson(value);
+        }
+      }
+    });
+    return json;
+  }
 
-/// Represents a patch that makes no changes
-class NoOpPatch<T> extends PatchBase<T> {
-  @override
-  T apply(T original) => original;
-
-  @override
-  PatchBase<T> merge(PatchBase<T> other) => other;
-
-  @override
-  bool get isEmpty => true;
+  dynamic _convertToJson(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value.toIso8601String();
+    if (value is Enum) return value.name;
+    if (value is List) return value.map((e) => _convertToJson(e)).toList();
+    if (value is Map) return value.map((k, v) => MapEntry(k.toString(), _convertToJson(v)));
+    if (value is num || value is bool || value is String) return value;
+    try {
+      if ((value as dynamic).toJsonLean != null) return (value as dynamic).toJsonLean();
+    } catch (_) {}
+    try {
+      if ((value as dynamic).toJson != null) return (value as dynamic).toJson();
+    } catch (_) {}
+    return value.toString();
+  }
 }
