@@ -1,3 +1,8 @@
+## [1.6.7] - 2026-04-06
+
+### Fix
+- Factory method parameter types now preserve import prefixes (`as` clauses) in generated code
+
 ## [1.6.6] - 2026-04-05
 
 ### Feature
