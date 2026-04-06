@@ -367,6 +367,7 @@ class ClassAnalyzer {
       var paramType = common_helpers.typeToString(
         param.type,
         currentClassName: classNameTrimmed,
+        library: classElement.library,
       );
 
       // CRITICAL FIX: If type is still InvalidType, try to recover from source code directly

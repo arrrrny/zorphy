@@ -305,12 +305,36 @@ cd zorphy
 
 # Update zorphy_annotation dependency in pubspec.yaml to match version
 echo "📝 Updating zorphy_annotation dependency in zorphy/pubspec.yaml..."
-perl -i -0777 -pe "s/^  zorphy_annotation:\s*\n\s*path:\s*\.\.\/zorphy_annotation\n/  zorphy_annotation: ^$VERSION\n/g; s/^  zorphy_annotation:\s*\S+\n/  zorphy_annotation: ^$VERSION\n/g" pubspec.yaml
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s/^  zorphy_annotation:.*/  zorphy_annotation: ^$VERSION/" pubspec.yaml
+else
+    sed -i "s/^  zorphy_annotation:.*/  zorphy_annotation: ^$VERSION/" pubspec.yaml
+fi
 echo "  ✓ Dependency updated to ^$VERSION"
+
+# Remove path overrides from pubspec_overrides.yaml before publishing
+if [ -f "pubspec_overrides.yaml" ]; then
+    echo "📝 Cleaning pubspec_overrides.yaml path overrides..."
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' '/^\s*zorphy_annotation:/d' pubspec_overrides.yaml
+        sed -i '' '/^\s*path:\s*\.\.\/zorphy_annotation/d' pubspec_overrides.yaml
+    else
+        sed -i '/^\s*zorphy_annotation:/d' pubspec_overrides.yaml
+        sed -i '/^\s*path:\s*\.\.\/zorphy_annotation/d' pubspec_overrides.yaml
+    fi
+    remaining=$(grep -v '^\s*#' pubspec_overrides.yaml | grep -v '^\s*$' || true)
+    if [ -z "$remaining" ]; then
+        rm -f pubspec_overrides.yaml
+        git add pubspec_overrides.yaml
+        echo "  ✓ Removed empty pubspec_overrides.yaml"
+    else
+        echo "  ✓ Cleaned path overrides from pubspec_overrides.yaml"
+    fi
+fi
 
 # Commit changes
 echo "🔨 Committing zorphy changes..."
-git add pubspec.yaml CHANGELOG.md
+git add pubspec.yaml pubspec_overrides.yaml CHANGELOG.md 2>/dev/null || git add pubspec.yaml CHANGELOG.md
 git commit -m "chore: release zorphy $VERSION" || true
 echo "  ✓ Changes committed"
 
