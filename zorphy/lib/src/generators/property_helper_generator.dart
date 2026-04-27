@@ -39,8 +39,10 @@ class PropertyHelperGenerator extends UniversalGenerator {
 
     // 2. Field-specific helpers (hasField, noField, Required, isEnumValue)
     // Wrap these in an extension so they are available on the class without pollulting it or requiring implementation
-    final fields = metadata.allFields;
-    if (fields.isNotEmpty) {
+    final ownFields = metadata.allFields
+        .where((f) => metadata.ownFieldNames.contains(f.name))
+        .toList();
+    if (ownFields.isNotEmpty) {
       final genericsStr = metadata.generics.isEmpty
           ? ''
           : '<${metadata.generics.map((g) => g.name).join(', ')}>';
@@ -52,9 +54,9 @@ class PropertyHelperGenerator extends UniversalGenerator {
         'extension ${metadata.cleanName}PropertyHelpers$genericsDefStr on ${metadata.cleanName}$genericsStr {',
       );
 
-      for (final field in fields) {
+      for (final field in ownFields) {
         var type = field.type ?? 'dynamic';
-        type = type.replaceAll('\$', '');
+        type = type.replaceAll(r'$', '');
 
         final fieldName = field.name;
         final isNullable = type.endsWith('?');

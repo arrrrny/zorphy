@@ -1,3 +1,7 @@
+## [1.6.9] - 2026-04-27
+
+### Change
+- Revert property helper generation to ownFields and fix automated publishing flow
 ## [1.6.8] - 2026-04-27
 
 ### Change
