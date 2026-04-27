@@ -1,3 +1,7 @@
+## [1.6.8] - 2026-04-27
+
+### Change
+- Streamline release process and fix PropertyHelpers extension generation for inherited fields
 ## [1.6.7] - 2026-04-06
 
 ### Fix

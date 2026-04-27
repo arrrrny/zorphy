@@ -40,25 +40,45 @@ safe_sed() {
     fi
 }
 
+# Function to update package
+update_package() {
+    local pkg_dir="$1"
+    local pkg_name="$2"
+
+    echo "📝 Updating $pkg_name..."
+
+    # Update pubspec version
+    safe_sed "s/^version: .*/version: $VERSION/" "$pkg_dir/pubspec.yaml"
+
+    # Update CHANGELOG
+    if grep -q "## \[Unreleased\]" "$pkg_dir/CHANGELOG.md"; then
+        safe_sed "s/## \[Unreleased\]/## [$VERSION] - $DATE/" "$pkg_dir/CHANGELOG.md"
+    elif ! grep -q "## \[$VERSION\]" "$pkg_dir/CHANGELOG.md"; then
+        # If no Unreleased and no current version, insert at top (after potential title)
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "1i\\
+## [$VERSION] - $DATE\\
+\\
+### Change\\
+- $DESCRIPTION\\
+" "$pkg_dir/CHANGELOG.md"
+        else
+            sed -i "1i ## [$VERSION] - $DATE\n\n### Change\n- $DESCRIPTION\n" "$pkg_dir/CHANGELOG.md"
+        fi
+    fi
+}
+
 # 1. Update zorphy_annotation
-echo "📝 Updating zorphy_annotation..."
-safe_sed "s/^version: .*/version: $VERSION/" zorphy_annotation/pubspec.yaml
-if grep -q "## \[Unreleased\]" zorphy_annotation/CHANGELOG.md; then
-    safe_sed "s/## \[Unreleased\]/## [$VERSION] - $DATE/" zorphy_annotation/CHANGELOG.md
-fi
+update_package "zorphy_annotation" "zorphy_annotation"
 
 # 2. Update zorphy
-echo "📝 Updating zorphy..."
-safe_sed "s/^version: .*/version: $VERSION/" zorphy/pubspec.yaml
-safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" zorphy/pubspec.yaml
-if grep -q "## \[Unreleased\]" zorphy/CHANGELOG.md; then
-    safe_sed "s/## \[Unreleased\]/## [$VERSION] - $DATE/" zorphy/CHANGELOG.md
-fi
+update_package "zorphy" "zorphy"
+# Also update the dependency on annotation
+safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "zorphy/pubspec.yaml"
 
-# Clean up pubspec_overrides.yaml (important for publishing)
+# Clean up pubspec_overrides.yaml if it exists
 if [ -f "zorphy/pubspec_overrides.yaml" ]; then
     echo "🧹 Cleaning zorphy/pubspec_overrides.yaml..."
-    # We remove path overrides so it uses the pub.dev version
     rm -f zorphy/pubspec_overrides.yaml
 fi
 
@@ -102,9 +122,5 @@ echo "✅ Release v$VERSION prepared and tags pushed!"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "The GitHub Action 'Publish to Pub.dev' has been triggered."
-echo "It will automatically publish:"
-echo "  1. zorphy_annotation: $VERSION"
-echo "  2. zorphy:            $VERSION"
-echo ""
 echo "Monitor progress here: https://github.com/arrrrny/zorphy/actions"
 echo ""
