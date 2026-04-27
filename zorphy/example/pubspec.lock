@@ -463,13 +463,13 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "1.6.6"
+    version: "1.6.7"
   zorphy_annotation:
     dependency: "direct main"
     description:
       path: "../../zorphy_annotation"
       relative: true
     source: path
-    version: "1.6.6"
+    version: "1.6.7"
 sdks:
   dart: ">=3.10.0 <4.0.0"

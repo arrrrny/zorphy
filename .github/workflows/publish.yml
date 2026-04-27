@@ -1,0 +1,31 @@
+name: Publish to Pub.dev
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'annotation-v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for authentication with pub.dev via OIDC
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Publish zorphy_annotation
+        if: startsWith(github.ref, 'refs/tags/annotation-v')
+        run: |
+          cd zorphy_annotation
+          dart pub get
+          dart pub publish --force
+
+      - name: Publish zorphy
+        if: startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/annotation-v')
+        run: |
+          cd zorphy
+          dart pub get
+          dart test
+          dart pub publish --force
