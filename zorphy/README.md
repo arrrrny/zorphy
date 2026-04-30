@@ -35,10 +35,10 @@ Add the dependencies to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zorphy_annotation: ^1.5.6
+  zorphy_annotation: ^1.7.0
 
 dev_dependencies:
-  zorphy: ^1.5.6
+  zorphy: ^1.7.0
   build_runner: ^2.4.0
 ```
 
@@ -102,13 +102,13 @@ Use the generated class:
 ```dart
 void main() {
   final user = User(name: 'Alice', age: 30);
-  
+
   // Copy with changes
   final olderUser = user.copyWith(age: 31);
-  
+
   // Convert to JSON (if generateJson: true)
   final json = user.toJson();
-  
+
   // Create from JSON
   final fromJson = User.fromJson(json);
 }
@@ -139,6 +139,7 @@ zorphy create [options]
 ```
 
 **Options:**
+
 - `-n, --name` - Entity name (required)
 - `-o, --output` - Output directory (default: `lib/entities`)
 - `-p, --package` - Package name for imports
@@ -191,11 +192,13 @@ zorphy new -n EntityName
 ```
 
 **Options:**
+
 - `-n, --name` - Entity name (required)
 - `-o, --output` - Output directory (default: `lib/entities`)
 - `--json` - Enable JSON (default: true)
 
 **Example:**
+
 ```bash
 zorphy new -n Product
 ```
@@ -209,11 +212,13 @@ zorphy build [options]
 ```
 
 **Options:**
+
 - `-w, --watch` - Watch for changes (default: false)
 - `-c, --clean` - Clean before build (default: false)
 - `-o, --output` - Build output directory
 
 **Examples:**
+
 ```bash
 # Build once
 zorphy build
@@ -234,19 +239,21 @@ zorphy list [options]
 ```
 
 **Options:**
+
 - `-o, --output` - Directory to search (default: `lib/entities`)
 
 **Example:**
+
 ```bash
 zorphy list
 # Output:
 # 📂 Zorphy Entities in lib/entities:
-# 
+#
 # 📄 User
 #    File: lib/entities/user.dart
 #    ✓ JSON support
 #    ✓ Function-based copyWith
-# 
+#
 # Total: 1 entity/entities
 ```
 
@@ -260,6 +267,7 @@ The CLI supports various field types:
 - **Custom types:** Any other class name
 
 **Examples:**
+
 ```bash
 --field name:String
 --field age:int
@@ -291,7 +299,7 @@ Field name (or press Enter to finish): address
 Field type (e.g., String, int, Address): Address
 ✓ Added field: address (Address)
 
-Field name (or press Enter to finish): 
+Field name (or press Enter to finish):
 
 ✓ Created entity file: lib/entities/user.dart
 
@@ -331,6 +339,7 @@ Add to your Claude/MCP client configuration:
 Create a new Zorphy entity programmatically.
 
 **Parameters:**
+
 ```json
 {
   "name": "string (required)",
@@ -355,14 +364,15 @@ Create a new Zorphy entity programmatically.
 ```
 
 **Example:**
+
 ```json
 {
   "name": "User",
   "fields": [
-    {"name": "id", "type": "String"},
-    {"name": "name", "type": "String"},
-    {"name": "email", "type": "String?", "nullable": true},
-    {"name": "age", "type": "int"}
+    { "name": "id", "type": "String" },
+    { "name": "name", "type": "String" },
+    { "name": "email", "type": "String?", "nullable": true },
+    { "name": "age", "type": "int" }
   ],
   "options": {
     "generateJson": true,
@@ -376,6 +386,7 @@ Create a new Zorphy entity programmatically.
 List all Zorphy entities in a directory.
 
 **Parameters:**
+
 ```json
 {
   "directory": "string (default: lib/entities)"
@@ -395,6 +406,7 @@ Generate entity code without writing to file (preview mode).
 Run build_runner to generate Zorphy code.
 
 **Parameters:**
+
 ```json
 {
   "clean": "boolean (default: false)",
@@ -407,6 +419,7 @@ Run build_runner to generate Zorphy code.
 Analyze an existing entity file and return its structure.
 
 **Parameters:**
+
 ```json
 {
   "file_path": "string (required)"
@@ -414,6 +427,7 @@ Analyze an existing entity file and return its structure.
 ```
 
 **Returns:**
+
 ```json
 {
   "name": "User",
@@ -431,15 +445,14 @@ Analyze an existing entity file and return its structure.
 Create a sealed class hierarchy with multiple variants.
 
 **Parameters:**
+
 ```json
 {
   "base_name": "string (required)",
   "variants": [
     {
       "name": "string",
-      "fields": [
-        {"name": "string", "type": "string", "nullable": "boolean"}
-      ]
+      "fields": [{ "name": "string", "type": "string", "nullable": "boolean" }]
     }
   ],
   "output_dir": "string (default: lib/entities)",
@@ -448,21 +461,20 @@ Create a sealed class hierarchy with multiple variants.
 ```
 
 **Example - Creating a Result type:**
+
 ```json
 {
   "base_name": "Result",
   "variants": [
     {
       "name": "Success",
-      "fields": [
-        {"name": "data", "type": "dynamic"}
-      ]
+      "fields": [{ "name": "data", "type": "dynamic" }]
     },
     {
       "name": "Error",
       "fields": [
-        {"name": "message", "type": "String"},
-        {"name": "code", "type": "int"}
+        { "name": "message", "type": "String" },
+        { "name": "code", "type": "int" }
       ]
     }
   ]
@@ -470,6 +482,7 @@ Create a sealed class hierarchy with multiple variants.
 ```
 
 This creates:
+
 - `$$Result` - Sealed base class
 - `$Success` - Success variant
 - `$Error` - Error variant
@@ -569,7 +582,7 @@ abstract class $$Shape {
 @Zorphy()
 abstract class $Circle implements $$Shape {
   double get radius;
-  
+
   @override
   double get area => 3.14159 * radius * radius;
 }
@@ -578,7 +591,7 @@ abstract class $Circle implements $$Shape {
 abstract class $Rectangle implements $$Shape {
   double get width;
   double get height;
-  
+
   @override
   double get area => width * height;
 }
@@ -616,6 +629,7 @@ abstract class $User {
 ```
 
 **Features:**
+
 - Automatic `toJson()` and `fromJson()`
 - `toJsonLean()` removes metadata for cleaner output
 - Handles nested objects and collections
@@ -845,19 +859,21 @@ abstract class $Event {
   DateTime get timestamp;
 }
 ```
-  T? find(String id);
-  List<T> getAll();
+
+T? find(String id);
+List<T> getAll();
 }
 
 @Zorphy()
 abstract class $UserRepository implements $$Repository<User> {
-  @override
-  User? find(String id);
-  
-  @override
-  List<User> getAll();
+@override
+User? find(String id);
+
+@override
+List<User> getAll();
 }
-```
+
+````
 
 #### Generic Classes with Type Constraints
 
@@ -871,10 +887,10 @@ abstract class $$Base<T> {
 abstract class $Derived<T extends num> implements $$Base<T> {
   @override
   T get value;
-  
+
   T get doubled => value * 2;
 }
-```
+````
 
 ### 6. Explicit Subtypes & ChangeTo
 
@@ -981,10 +997,10 @@ Support for custom factory constructors:
 abstract class $Person {
   String get firstName;
   String get lastName;
-  
+
   // Custom factory method
   factory $Person.fromNames(String first, String last) = _PersonFromNames;
-  
+
   // Default factory
   factory $Person.empty() => Person(firstName: '', lastName: '');
 }
@@ -1044,7 +1060,7 @@ abstract class $Color {
   int get red;
   int get green;
   int get blue;
-  
+
   const $Color();
 }
 
@@ -1121,10 +1137,10 @@ abstract class $ApiResponse<T> {
 abstract class $UserListResponse implements $ApiResponse<List<User>> {
   @override
   bool get success;
-  
+
   @override
   List<User>? get data;
-  
+
   @override
   String? get error;
 }
@@ -1186,15 +1202,15 @@ final fromJson = User.fromJson(json);
 
 The `@Zorphy` annotation supports these options:
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `generateJson` | `bool` | `false` | Enable JSON serialization (`toJson`/`fromJson`) |
-| `generateCopyWithFn` | `bool` | `false` | Generate function-based copyWith methods |
-| `generateCompareTo` | `bool` | `true` | Generate comparison methods |
-| `explicitSubTypes` | `List<Type>` | `null` | Specify explicit subtypes for polymorphic operations |
-| `explicitToJson` | `bool` | `true` | Control JSON serialization generation |
-| `hidePublicConstructor` | `bool` | `false` | Hide the public constructor for custom factories |
-| `nonSealed` | `bool` | `false` | Create non-sealed abstract classes instead of sealed |
+| Option                  | Type         | Default | Description                                          |
+| ----------------------- | ------------ | ------- | ---------------------------------------------------- |
+| `generateJson`          | `bool`       | `false` | Enable JSON serialization (`toJson`/`fromJson`)      |
+| `generateCopyWithFn`    | `bool`       | `false` | Generate function-based copyWith methods             |
+| `generateCompareTo`     | `bool`       | `true`  | Generate comparison methods                          |
+| `explicitSubTypes`      | `List<Type>` | `null`  | Specify explicit subtypes for polymorphic operations |
+| `explicitToJson`        | `bool`       | `true`  | Control JSON serialization generation                |
+| `hidePublicConstructor` | `bool`       | `false` | Hide the public constructor for custom factories     |
+| `nonSealed`             | `bool`       | `false` | Create non-sealed abstract classes instead of sealed |
 
 ## 🏗️ Build Configuration
 
@@ -1258,6 +1274,7 @@ Zorphy is designed for easy migration from Morphy:
 5. Run `dart run build_runner build`
 
 **Key Differences:**
+
 - Better patch system with nested support
 - Enhanced generic handling
 - Improved error messages
@@ -1269,6 +1286,7 @@ Zorphy is designed for easy migration from Morphy:
 ### Type Not Found Errors
 
 If you get type not found errors, ensure:
+
 1. You've added `part 'filename.zorphy.dart';` to your file
 2. You've run `dart run build_runner build` or `zorphy build`
 3. The import includes `package:zorphy_annotation/zorphy_annotation.dart`

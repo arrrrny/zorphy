@@ -8,7 +8,7 @@ environment:
 dependencies:
   zorphy_annotation:
     path: ../../zorphy_annotation
-  json_annotation: ^4.10.0
+  json_annotation: ^4.11.0
 
 dev_dependencies:
   zorphy:
