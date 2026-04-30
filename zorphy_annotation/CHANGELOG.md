@@ -1,3 +1,7 @@
+## [1.7.0] - 2026-04-30
+
+### Change
+- Upgrade to analyzer 13 and update dependencies
 ## [1.6.9] - 2026-04-27
 
 ### Change

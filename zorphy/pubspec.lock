@@ -5,18 +5,18 @@ packages:
     dependency: transitive
     description:
       name: _fe_analyzer_shared
-      sha256: "8d718c5c58904f9937290fd5dbf2d6a0e02456867706bfb6cd7b81d394e738d5"
+      sha256: cd6add6f846f35fb79f3c315296703c1a24f3cfd7f4739d91a74961c1c7e9f1b
       url: "https://pub.dev"
     source: hosted
-    version: "98.0.0"
+    version: "100.0.0"
   analyzer:
     dependency: "direct main"
     description:
       name: analyzer
-      sha256: "6141ad5d092d1e1d13929c0504658bbeccc1703505830d7c26e859908f5efc88"
+      sha256: "6ba98576948803398b69e3a444df24eacdbe12ed699c7014e120ea38552debbf"
       url: "https://pub.dev"
     source: hosted
-    version: "12.0.0"
+    version: "13.0.0"
   args:
     dependency: "direct main"
     description:
@@ -250,12 +250,13 @@ packages:
     source: hosted
     version: "4.11.0"
   json_serializable:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
-      name: json_serializable
-      sha256: fbcf404b03520e6e795f6b9b39badb2b788407dfc0a50cf39158a6ae1ca78925
-      url: "https://pub.dev"
-    source: hosted
+      path: json_serializable
+      ref: analyzer-13
+      resolved-ref: "447fb6766a7af34b62b50691431c0086371b46d2"
+      url: "https://github.com/arrrrny/json_serializable.dart.git"
+    source: git
     version: "6.13.1"
   logging:
     dependency: transitive
@@ -557,9 +558,9 @@ packages:
     dependency: "direct main"
     description:
       name: zorphy_annotation
-      sha256: "648ca6ac5ae859fae45939696f713f476b2acd7c4db4c49e27011237c1fe7d1f"
+      sha256: a35c2f4886d01fe20b1049415623ba11d29c920aa065f47c007ea74d33edfb1c
       url: "https://pub.dev"
     source: hosted
-    version: "1.6.8"
+    version: "1.6.9"
 sdks:
-  dart: ">=3.10.0 <4.0.0"
+  dart: ">=3.11.0 <4.0.0"
