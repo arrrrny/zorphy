@@ -1,8 +1,9 @@
 name: Build Binaries
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
 
 jobs:
@@ -74,46 +75,13 @@ jobs:
             zorphy/${{ matrix.mcp_output }}.tar.gz
             zorphy/${{ matrix.mcp_output }}.zip
 
-      - name: Upload CLI binary to release (Unix)
-        if: github.event_name == 'release' && runner.os != 'Windows'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./zorphy/${{ matrix.cli_output }}.tar.gz
-          asset_name: ${{ matrix.cli_output }}.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload CLI binary to release (Windows)
-        if: github.event_name == 'release' && runner.os == 'Windows'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./zorphy/${{ matrix.cli_output }}.zip
-          asset_name: ${{ matrix.cli_output }}.zip
-          asset_content_type: application/zip
-
-      - name: Upload MCP server binary to release (Unix)
-        if: github.event_name == 'release' && runner.os != 'Windows'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./zorphy/${{ matrix.mcp_output }}.tar.gz
-          asset_name: ${{ matrix.mcp_output }}.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload MCP server binary to release (Windows)
-        if: github.event_name == 'release' && runner.os == 'Windows'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./zorphy/${{ matrix.mcp_output }}.zip
-          asset_name: ${{ matrix.mcp_output }}.zip
-          asset_content_type: application/zip
+          files: |
+            zorphy/${{ matrix.cli_output }}.tar.gz
+            zorphy/${{ matrix.cli_output }}.zip
+            zorphy/${{ matrix.mcp_output }}.tar.gz
+            zorphy/${{ matrix.mcp_output }}.zip
+          fail_on_unmatched_files: false
