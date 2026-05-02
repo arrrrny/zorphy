@@ -24,18 +24,13 @@ dependencies:
 
 dev_dependencies:
   build_runner: ^2.11.0
-  json_serializable: ^6.13.1
+  json_serializable: ^6.13.2
   json_annotation: ^4.11.0
   test: ^1.29.0
 
 dependency_overrides:
   meta: ">=1.17.0 <2.0.0"
   analyzer: ^13.0.0
-  json_serializable:
-    git:
-      url: https://github.com/arrrrny/json_serializable.dart.git
-      ref: analyzer-13
-      path: json_serializable
 
 executables:
   zorphy: zorphy_cli
