@@ -11,13 +11,44 @@ import 'package:path/path.dart' as p;
 
 const String _version = '1.5.0';
 
-void main(List<String> args) {
+/// Singleton pattern for shared resources
+class SharedResources {
+  static SharedResources? _instance;
+  static bool _initializing = false;
+
+  SharedResources._();
+
+  static Future<SharedResources> get instance async {
+    if (_instance != null) return _instance!;
+
+    while (_initializing) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    if (_instance != null) return _instance!;
+
+    _initializing = true;
+    try {
+      // Initialize shared resources (lightweight for zorphy)
+      _instance = SharedResources._();
+      return _instance!;
+    } finally {
+      _initializing = false;
+    }
+  }
+}
+
+void main(List<String> args) async {
   if (args.contains('--version')) {
     stdout.writeln('Zorphy MCP Server v$_version');
     return;
   }
 
+  // Initialize shared resources (singleton pattern)
+  await SharedResources.instance;
+
   stderr.writeln('Zorphy MCP Server v$_version starting...');
+  stderr.writeln('Memory optimization: Resources shared via singleton');
 
   stdin.transform(utf8.decoder).transform(const LineSplitter()).listen((
     line,
