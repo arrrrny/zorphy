@@ -221,6 +221,7 @@ String createZorphy(
         generatedClassName,
         generateCopyWithFn,
         isSealedWithSubtypes: isSealedWithSubtypes,
+        hasConstConstructor: hasConstConstructor,
       ),
     );
   } else {

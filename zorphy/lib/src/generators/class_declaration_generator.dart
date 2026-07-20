@@ -62,6 +62,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         className,
         config.generateCopyWithFn,
         isSealedWithSubtypes: isSealedWithSubtypes,
+        hasConstConstructor: metadata.hasConstConstructor,
       ),
     );
 

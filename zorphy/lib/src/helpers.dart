@@ -585,6 +585,7 @@ String getPropertiesAbstract(
   String className,
   bool generateCopyWithFn, {
   bool isSealedWithSubtypes = false,
+  bool hasConstConstructor = false,
 }) {
   var sb = StringBuffer();
 
@@ -602,8 +603,9 @@ String getPropertiesAbstract(
   // Constructor for abstract classes
   if (!isSealedWithSubtypes) {
     // Abstract class - add public constructor (can't use _internal as it's library-private)
+    var constPrefix = hasConstConstructor ? "const " : "";
     sb.writeln("");
-    sb.writeln("  ${className}();");
+    sb.writeln("  ${constPrefix}${className}();");
   }
   // Sealed classes with subtypes don't need a constructor
 
