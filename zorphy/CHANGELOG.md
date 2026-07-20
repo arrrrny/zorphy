@@ -1,3 +1,9 @@
+## [1.8.5] - 2026-07-20
+
+### Fix
+
+- `List<EnumType>` fields in fromJson now use `$enumDecode(_$EnumTypeEnumMap, e)` for element conversion instead of incorrectly calling `EnumType.fromJson(e as Map<String, dynamic>)`
+
 ## [1.8.4] - 2026-07-20
 
 ### Fix

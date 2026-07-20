@@ -1,3 +1,8 @@
+## [1.8.5] - 2026-07-20
+
+### Change
+- Sync version with zorphy package for consistent release numbering
+
 ## [1.8.4] - 2026-07-20
 
 ### Change
