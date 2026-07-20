@@ -106,9 +106,18 @@ if command -v gh &> /dev/null; then
     fi
 fi
 
-# 6. Create and push tags
-# Pushing these tags will trigger the 'Publish to Pub.dev' GitHub Action
-echo "🏷️ Creating git tags..."
+# 6. Publish to pub.dev directly
+echo "📦 Publishing zorphy_annotation v$VERSION..."
+cd "$REPO_ROOT/zorphy_annotation"
+dart pub publish --force || echo "  ⚠️ zorphy_annotation publish failed or already published"
+
+echo "📦 Publishing zorphy v$VERSION..."
+cd "$REPO_ROOT/zorphy"
+dart pub get
+dart pub publish --force || echo "  ⚠️ zorphy publish failed or already published"
+
+echo "🏷️ Creating and pushing git tags..."
+cd "$REPO_ROOT"
 git tag -a "annotation-v$VERSION" -m "Release zorphy_annotation $VERSION" || echo "  ⚠️ Tag annotation-v$VERSION already exists"
 git tag -a "v$VERSION" -m "Release zorphy $VERSION" || echo "  ⚠️ Tag v$VERSION already exists"
 
@@ -118,9 +127,6 @@ git push origin --tags
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ Release v$VERSION prepared and tags pushed!"
+echo "✅ Release v$VERSION published and tags pushed!"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "The GitHub Action 'Publish to Pub.dev' has been triggered."
-echo "Monitor progress here: https://github.com/arrrrny/zorphy/actions"
 echo ""

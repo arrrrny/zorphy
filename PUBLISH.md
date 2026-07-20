@@ -12,7 +12,7 @@
 
 ## Scripts
 
-- **Publish**: `./scripts/publish.sh <version> [description]` — updates versions, dependencies, changelogs, commits, tags, and pushes to trigger GitHub Actions
+- **Publish**: `./scripts/publish.sh <version> [description]` — updates versions, dependencies, changelogs, publishes both packages to pub.dev directly, commits, tags, and pushes
 - **Build binaries**: `./scripts/build-binaries.sh [output-dir]` — compiles CLI and MCP server binaries
 - **Dev setup**: `./scripts/to_path.sh` — switches dependencies back to local path references for development
 
@@ -20,11 +20,11 @@
 
 1. Update changelogs with `changelog-manager` skill
 2. `./scripts/publish.sh <version> [description]`
-3. Tag `v<version>` pushes triggers GitHub Action "Publish to Pub.dev"
-4. Tag `annotation-v<version>` pushes for annotation package separately
+3. The script publishes to pub.dev directly (no CI involved). Tags are pushed for reference.
 
 ## Notes
 
 - Version numbers are synced between `zorphy` and `zorphy_annotation` — always bump together
-- The publish script commits directly to master and pushes tags — the CI pipeline handles actual pub.dev publication
+- The publish script publishes locally via `dart pub publish --force`, then pushes tags to git
 - After publishing, run `./scripts/to_path.sh` to restore path dependencies for development
+- GitHub Actions CI is no longer used for pub.dev publishing
