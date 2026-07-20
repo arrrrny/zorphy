@@ -1,3 +1,5 @@
+import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import '../common/NameType.dart';
 import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
@@ -373,8 +375,8 @@ class JsonGenerator extends UniversalGenerator {
     return sb.toString();
   }
 
-  /// Computes the set of known enum type names from a list of fields.
-  /// This drills into List<E>, Set<E>, and Map<K,V> to find enum element types.
+  /// Computes the set of known enum type names from a class's fields.
+  /// Checks both direct enum fields and generic type arguments (e.g., List<EnumType>).
   Set<String> _computeKnownEnumTypes(List<NameTypeClassComment> fields, [ClassMetadata? metadata]) {
     var result = <String>{};
     for (var f in fields) {
@@ -383,38 +385,19 @@ class JsonGenerator extends UniversalGenerator {
       if (f.isEnum) {
         result.add(cleanType.replaceAll('?', ''));
       }
-      // Extract generic type args from List<E>, Set<E>, Map<K,V> etc.
-      // and check if any other field has that type as a direct enum
-      var base = cleanType.replaceAll('?', '');
-      List<String> innerTypes;
-      if (base.startsWith('List<') || base.startsWith('Set<')) {
-        innerTypes = [base.substring(base.indexOf('<') + 1, base.lastIndexOf('>')).trim()];
-      } else if (base.startsWith('Map<')) {
-        var comma = base.indexOf(',');
-        var end = base.lastIndexOf('>');
-        innerTypes = [
-          base.substring(base.indexOf('<') + 1, comma).trim(),
-          base.substring(comma + 1, end).trim(),
-        ];
-      } else {
-        innerTypes = [];
-      }
-      for (var inner in innerTypes) {
-        if (fields.any((of) =>
-            of.type != null && of.isEnum &&
-            of.type!.replaceAll(r'$', '').replaceAll('?', '') == inner)) {
-          result.add(inner);
-        }
-      }
     }
-    // Scan the library for all enum types (covers List<EnumDefinedElsewhere>)
+    // Scan actual field types using the analyzer API to detect enum type arguments
+    // in List<E>, Set<E>, Map<K,V> — even when E isn't a standalone field type.
     if (metadata?.classElement != null) {
-      var lib = metadata!.classElement.library;
-      // Scan all fragments of the library for enum types
-      for (var fragment in lib.fragments) {
-        for (var enumFragment in fragment.enums) {
-          var enumName = enumFragment.element.name;
-          if (enumName != null) result.add(enumName);
+      for (var field in metadata!.classElement.fields) {
+        var dartType = field.type;
+        if (dartType is ParameterizedType) {
+          for (var arg in dartType.typeArguments) {
+            if (arg is InterfaceType && arg.element is EnumElement) {
+              var name = arg.element.name;
+              if (name != null) result.add(name);
+            }
+          }
         }
       }
     }
@@ -571,23 +554,23 @@ class JsonGenerator extends UniversalGenerator {
       final innerExpr = _elementCastExpression(innerContent, knownEnumTypes);
 
       if (isNullable) {
-        return "(ZorphyJsonHelper.cast<List<dynamic>?>(json, '$jsonKeyName'))"
+        return "(json['$jsonKeyName'] as List<dynamic>?)"
             "?.map((e) => $innerExpr).toList()";
       }
-      return "(ZorphyJsonHelper.cast<List<dynamic>>(json, '$jsonKeyName'))"
+      return "(json['$jsonKeyName'] as List<dynamic>)"
           ".map((e) => $innerExpr).toList()";
     }
 
-    // Set<E> - same as List<E>
+    // Set<E> - same as List<E> pattern
     if (baseType.startsWith('Set<')) {
       final innerContent = _extractGenericArg(baseType);
       final innerExpr = _elementCastExpression(innerContent, knownEnumTypes);
 
       if (isNullable) {
-        return "(ZorphyJsonHelper.cast<List<dynamic>?>(json, '$jsonKeyName'))"
+        return "(json['$jsonKeyName'] as List<dynamic>?)"
             "?.map((e) => $innerExpr).toSet()";
       }
-      return "(ZorphyJsonHelper.cast<List<dynamic>>(json, '$jsonKeyName'))"
+      return "(json['$jsonKeyName'] as List<dynamic>)"
           ".map((e) => $innerExpr).toSet()";
     }
 

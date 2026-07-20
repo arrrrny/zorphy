@@ -876,10 +876,10 @@ String _legacyFieldExpr(
     var innerExpr = _elementCastExpr(innerContent, knownEnumTypes);
 
     if (isNullable) {
-      return "(ZorphyJsonHelper.cast<List<dynamic>?>(json, '$jsonKeyName'))"
+      return "(json['$jsonKeyName'] as List<dynamic>?)"
           "?.map((e) => $innerExpr).toList()";
     }
-    return "(ZorphyJsonHelper.cast<List<dynamic>>(json, '$jsonKeyName'))"
+    return "(json['$jsonKeyName'] as List<dynamic>)"
         ".map((e) => $innerExpr).toList()";
   }
 
