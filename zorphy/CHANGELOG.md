@@ -1,3 +1,9 @@
+## [1.8.3] - 2026-07-20
+
+### Fix
+
+- Non-sealed abstract classes with `const` constructors now correctly generate `const ClassName();` instead of `ClassName();`
+
 ## [1.8.2] - 2026-07-20
 
 ### Refactor
