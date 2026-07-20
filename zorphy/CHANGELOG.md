@@ -1,3 +1,9 @@
+## [1.8.4] - 2026-07-20
+
+### Fix
+
+- Fields with `@JsonKey(fromJson: someConverter)` but no `includeFromJson: false` now correctly call the converter instead of falling through to `.fromJson()` on the raw type
+
 ## [1.8.3] - 2026-07-20
 
 ### Fix

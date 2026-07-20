@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Monorepo publish script for zorphy
-# Updates versions, CHANGELOGs, and pushes tags to trigger GitHub Actions publishing.
+# Updates versions, CHANGELOGs, publishes directly to pub.dev, then tags and pushes.
 # Usage: ./scripts/publish.sh <version> [description]
 
 set -e
