@@ -89,10 +89,10 @@ class PropertyHelperGenerator extends UniversalGenerator {
         if (isString) {
           if (isNullable) {
             sb.writeln(
-              '  bool get has$capitalized => $fieldName != null && $fieldName.isNotEmpty;',
+              '  bool get has$capitalized => $fieldName?.isNotEmpty == true;',
             );
             sb.writeln(
-              '  bool get no$capitalized => $fieldName == null || $fieldName.isEmpty;',
+              '  bool get no$capitalized => $fieldName?.isEmpty ?? true;',
             );
             final nonNullableType = type.substring(0, type.length - 1);
             sb.writeln(
