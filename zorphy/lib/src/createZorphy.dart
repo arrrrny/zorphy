@@ -453,30 +453,8 @@ String createZorphy(
       }
       sb.writeln("    );");
       sb.writeln("  }");
-      // Add _zc<T> safe cast helper
-      sb.writeln();
-      sb.writeln("  static T _zc<T>(Map<String, dynamic> json, String field) {");
-      sb.writeln("    final value = json[field];");
-      sb.writeln("    if (value is T) return value;");
-      sb.writeln("    if (value == null) {");
-      sb.writeln("      if (null is T) return null as T;");
-      sb.writeln("      throw TypeError.withStackTrace(");
-      sb.writeln(
-        "        \"Zorphy: Field '\$field' expected non-null \$T, got null\",",
-      );
-      sb.writeln("        StackTrace.current,");
-      sb.writeln("      );");
-      sb.writeln("    }");
-      sb.writeln("    throw TypeError.withStackTrace(");
-      sb.writeln(
-        "      \"Zorphy: Field '\$field' expected \$T, got \${value.runtimeType}\"",
-      );
-      sb.writeln(
-        "          ' (\${value is String ? \"'\${value}'\" : value})',",
-      );
-      sb.writeln("      StackTrace.current,");
-      sb.writeln("    );");
-      sb.writeln("  }");
+      // _zc helper is no longer generated per-class — ZorphyJsonHelper.cast is used instead
+      // from the shared annotation package
     } else if (shouldGenerateAbstractJson) {
       // Sealed class with explicit subtypes - dispatch to subtypes only, no fallback
       sb.writeln(
@@ -754,7 +732,7 @@ String createZorphy(
   return sb.toString();
 }
 
-/// Helper for the legacy pipeline: generates a _zc-based fromJson expression for a field.
+/// Helper for the legacy pipeline: generates a ZorphyJsonHelper.cast-based fromJson expression for a field.
 String _legacyFieldExpr(
   String baseType,
   bool isNullable,
@@ -765,28 +743,28 @@ String _legacyFieldExpr(
   // Simple types
   if (baseType == 'String') {
     return isNullable
-        ? "_zc<String?>(json, '$jsonKeyName')"
-        : "_zc<String>(json, '$jsonKeyName')";
+        ? "ZorphyJsonHelper.cast<String?>(json, '$jsonKeyName')"
+        : "ZorphyJsonHelper.cast<String>(json, '$jsonKeyName')";
   }
   if (baseType == 'int') {
     return isNullable
-        ? "(_zc<num?>(json, '$jsonKeyName'))?.toInt()"
-        : "(_zc<num>(json, '$jsonKeyName')).toInt()";
+        ? "(ZorphyJsonHelper.cast<num?>(json, '$jsonKeyName'))?.toInt()"
+        : "(ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toInt()";
   }
   if (baseType == 'double') {
     return isNullable
-        ? "(_zc<num?>(json, '$jsonKeyName'))?.toDouble()"
-        : "(_zc<num>(json, '$jsonKeyName')).toDouble()";
+        ? "(ZorphyJsonHelper.cast<num?>(json, '$jsonKeyName'))?.toDouble()"
+        : "(ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toDouble()";
   }
   if (baseType == 'num') {
     return isNullable
-        ? "_zc<num?>(json, '$jsonKeyName')"
-        : "_zc<num>(json, '$jsonKeyName')";
+        ? "ZorphyJsonHelper.cast<num?>(json, '$jsonKeyName')"
+        : "ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')";
   }
   if (baseType == 'bool') {
     return isNullable
-        ? "_zc<bool?>(json, '$jsonKeyName')"
-        : "_zc<bool>(json, '$jsonKeyName')";
+        ? "ZorphyJsonHelper.cast<bool?>(json, '$jsonKeyName')"
+        : "ZorphyJsonHelper.cast<bool>(json, '$jsonKeyName')";
   }
 
   // DateTime - parse from string
@@ -794,9 +772,9 @@ String _legacyFieldExpr(
     if (isNullable) {
       return "json['$jsonKeyName'] == null"
           " ? null"
-          " : DateTime.parse(_zc<String>(json, '$jsonKeyName'))";
+          " : DateTime.parse(ZorphyJsonHelper.cast<String>(json, '$jsonKeyName'))";
     }
-    return "DateTime.parse(_zc<String>(json, '$jsonKeyName'))";
+    return "DateTime.parse(ZorphyJsonHelper.cast<String>(json, '$jsonKeyName'))";
   }
 
   // Duration - parse from microseconds (num)
@@ -805,21 +783,21 @@ String _legacyFieldExpr(
       return "json['$jsonKeyName'] == null"
           " ? null"
           " : Duration(microseconds:"
-          " (_zc<num>(json, '$jsonKeyName')).toInt())";
+          " (ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toInt())";
     }
     return "Duration(microseconds:"
-        " (_zc<num>(json, '$jsonKeyName')).toInt())";
+        " (ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toInt())";
   }
 
-  // Enum - use $enumDecode with _zc<string> for field-name in error
+  // Enum - use $enumDecode with ZorphyJsonHelper.cast<string> for field-name in error
   if (f.isEnum && f.enumValues.isNotEmpty) {
     var enumMapName = "_\$${baseType}EnumMap";
     if (isNullable) {
       return "\$enumDecodeNullable($enumMapName,"
-          " _zc<String?>(json, '$jsonKeyName'))";
+          " ZorphyJsonHelper.cast<String?>(json, '$jsonKeyName'))";
     }
     return "\$enumDecode($enumMapName,"
-        " _zc<String>(json, '$jsonKeyName'))";
+        " ZorphyJsonHelper.cast<String>(json, '$jsonKeyName'))";
   }
 
   // List<E> - cast to List<dynamic>, then map elements
@@ -828,18 +806,18 @@ String _legacyFieldExpr(
     var innerExpr = _elementCastExpr(innerContent);
 
     if (isNullable) {
-      return "(_zc<List<dynamic>?>(json, '$jsonKeyName'))"
+      return "(ZorphyJsonHelper.cast<List<dynamic>?>(json, '$jsonKeyName'))"
           "?.map((e) => $innerExpr).toList()";
     }
-    return "(_zc<List<dynamic>>(json, '$jsonKeyName'))"
+    return "(ZorphyJsonHelper.cast<List<dynamic>>(json, '$jsonKeyName'))"
         ".map((e) => $innerExpr).toList()";
   }
 
-  // Map<K,V> - pass through with _zc
+  // Map<K,V> - pass through with ZorphyJsonHelper.cast
   if (baseType.startsWith('Map<')) {
     return isNullable
-        ? "_zc<$baseType?>(json, '$jsonKeyName')"
-        : "_zc<$baseType>(json, '$jsonKeyName')";
+        ? "ZorphyJsonHelper.cast<$baseType?>(json, '$jsonKeyName')"
+        : "ZorphyJsonHelper.cast<$baseType>(json, '$jsonKeyName')";
   }
 
   // dynamic / Object / never / void
@@ -853,10 +831,10 @@ String _legacyFieldExpr(
     return "json['$jsonKeyName'] == null"
         " ? null"
         " : ${baseType}.fromJson("
-        "_zc<Map<String, dynamic>>(json, '$jsonKeyName'))";
+        "ZorphyJsonHelper.cast<Map<String, dynamic>>(json, '$jsonKeyName'))";
   }
   return "${baseType}.fromJson("
-      "_zc<Map<String, dynamic>>(json, '$jsonKeyName'))";
+      "ZorphyJsonHelper.cast<Map<String, dynamic>>(json, '$jsonKeyName'))";
 }
 
 /// Extract the generic type argument from a type string like List<String> -> String
