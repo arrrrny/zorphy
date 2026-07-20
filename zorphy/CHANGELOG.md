@@ -1,3 +1,10 @@
+## [1.8.6] - 2026-07-20
+
+### Fix
+
+- Reverted `List`/`Set` field casts from `ZorphyJsonHelper.cast<List<dynamic>>` back to `(json['f'] as List<dynamic>)` — generic function return types don't satisfy Dart 3's type system for downstream typed list parameters
+- Enum detection now scans analyzer-level type arguments, catching enums that only appear inside generic types like `List<TransformationType>` without a bare `TransformationType` field
+
 ## [1.8.5] - 2026-07-20
 
 ### Fix
