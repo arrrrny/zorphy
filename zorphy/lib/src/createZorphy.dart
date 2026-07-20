@@ -393,6 +393,34 @@ String createZorphy(
       generateJson && isAbstract && typesExplicit.isNotEmpty;
   if (shouldGenerateJson || shouldGenerateAbstractJson) {
     var classNameTrimmed = className.replaceAll("\$", "");
+    // Compute set of enum types for proper list element decoding
+    var knownEnumTypes = <String>{};
+    for (var f in allFieldsDistinct) {
+      var cleanType = f.type!.replaceAll(r'$', '');
+      if (f.isEnum) {
+        knownEnumTypes.add(cleanType.replaceAll('?', ''));
+      }
+      // Also extract types from List<E>, Set<E>, Map<K,V> etc.
+      var base = cleanType.replaceAll('?', '');
+      if (base.startsWith('List<') || base.startsWith('Set<')) {
+        var inner = base.substring(base.indexOf('<') + 1, base.lastIndexOf('>')).trim();
+        if (allFieldsDistinct.any((of) =>
+            of.isEnum && of.type!.replaceAll(r'$', '').replaceAll('?', '') == inner)) {
+          knownEnumTypes.add(inner);
+        }
+      } else if (base.startsWith('Map<')) {
+        var comma = base.indexOf(',');
+        var end = base.lastIndexOf('>');
+        var keyType = base.substring(base.indexOf('<') + 1, comma).trim();
+        var valType = base.substring(comma + 1, end).trim();
+        for (var t in [keyType, valType]) {
+          if (allFieldsDistinct.any((of) =>
+              of.isEnum && of.type!.replaceAll(r'$', '').replaceAll('?', '') == t)) {
+            knownEnumTypes.add(t);
+          }
+        }
+      }
+    }
     sb.writeln();
     sb.writeln("  /// Creates a [${classNameTrimmed}] instance from JSON");
     if (typesExplicit.isEmpty && classGenerics.isEmpty) {
@@ -458,13 +486,13 @@ String createZorphy(
 
         // Generate the expression
         var expr = _legacyFieldExpr(
-          baseType, effectiveIsNullable, jsonKeyName, f, rawType,
+          baseType, effectiveIsNullable, jsonKeyName, f, rawType, knownEnumTypes,
         );
 
         // Handle default value
         if (hasDefault) {
           var nullableExpr = _legacyFieldExpr(
-            baseType, true, jsonKeyName, f, rawType,
+            baseType, true, jsonKeyName, f, rawType, knownEnumTypes,
           );
           expr = "$nullableExpr ?? ${f.jsonKeyInfo!.defaultValue}";
         }
@@ -572,9 +600,9 @@ String createZorphy(
         }
         var hasDefault = f.jsonKeyInfo?.defaultValue != null;
         var effectiveIsNullable = isNullable || hasDefault;
-        var expr = _legacyFieldExpr(baseType, effectiveIsNullable, jsonKeyName, f, rawType);
+        var expr = _legacyFieldExpr(baseType, effectiveIsNullable, jsonKeyName, f, rawType, knownEnumTypes);
         if (hasDefault) {
-          var nullableExpr = _legacyFieldExpr(baseType, true, jsonKeyName, f, rawType);
+          var nullableExpr = _legacyFieldExpr(baseType, true, jsonKeyName, f, rawType, knownEnumTypes);
           expr = "$nullableExpr ?? ${f.jsonKeyInfo!.defaultValue}";
         }
         sb.writeln("        ${f.name}: $expr,");
@@ -645,9 +673,9 @@ String createZorphy(
               }
               var hd = innerF.jsonKeyInfo?.defaultValue != null;
               var ei = innerNullable || hd;
-              var e = _legacyFieldExpr(bt, ei, jkn, innerF, rt);
+              var e = _legacyFieldExpr(bt, ei, jkn, innerF, rt, knownEnumTypes);
               if (hd) {
-                var ne = _legacyFieldExpr(bt, true, jkn, innerF, rt);
+                var ne = _legacyFieldExpr(bt, true, jkn, innerF, rt, knownEnumTypes);
                 e = "$ne ?? ${innerF.jsonKeyInfo!.defaultValue}";
               }
               sb.writeln("          ${innerF.name}: $e,");
@@ -780,6 +808,7 @@ String _legacyFieldExpr(
   String jsonKeyName,
   NameTypeClassComment f,
   String rawType,
+  Set<String> knownEnumTypes,
 ) {
   // Simple types
   if (baseType == 'String') {
@@ -844,7 +873,7 @@ String _legacyFieldExpr(
   // List<E> - cast to List<dynamic>, then map elements
   if (baseType.startsWith('List<')) {
     var innerContent = _extractGenericArg(baseType);
-    var innerExpr = _elementCastExpr(innerContent);
+    var innerExpr = _elementCastExpr(innerContent, knownEnumTypes);
 
     if (isNullable) {
       return "(ZorphyJsonHelper.cast<List<dynamic>?>(json, '$jsonKeyName'))"
@@ -887,7 +916,7 @@ String _extractGenericArg(String type) {
 }
 
 /// Generate a cast expression for a list element inside a .map() call.
-String _elementCastExpr(String innerType) {
+String _elementCastExpr(String innerType, [Set<String> knownEnumTypes = const {}]) {
   var trimmed = innerType.trim();
   var isNullable = trimmed.endsWith('?');
   var baseType = isNullable
@@ -910,6 +939,11 @@ String _elementCastExpr(String innerType) {
       return 'e';
     case 'DateTime':
       return 'DateTime.parse(e as String)';
+  }
+
+  // Check if the inner type is an enum
+  if (knownEnumTypes.contains(baseType)) {
+    return '\$enumDecode(_\$${baseType}EnumMap, e)';
   }
 
   if (baseType.startsWith('List<') || baseType.startsWith('Map<')) {

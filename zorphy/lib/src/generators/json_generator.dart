@@ -61,7 +61,7 @@ class JsonGenerator extends UniversalGenerator {
     if (metadata.explicitSubtypes.isEmpty && metadata.generics.isEmpty) {
       // Simple case - no generics, no explicit subtypes
       // Generate inline fromJson with ZorphyJsonHelper.cast<T>() safe casts
-      sb.writeln(_generateInlineFromJsonBody(className, metadata.allFields));
+      sb.writeln(_generateInlineFromJsonBody(className, metadata.allFields, metadata));
     } else if (metadata.explicitSubtypes.isNotEmpty) {
       // Abstract class with explicit subtypes - polymorphic JSON
       _generatePolymorphicFromJson(sb, metadata, config);
@@ -91,6 +91,7 @@ class JsonGenerator extends UniversalGenerator {
     final totalCases = metadata.explicitSubtypes.length + (hasSelfCase ? 1 : 0);
     var caseIndex = 0;
 
+    final knownEnumTypes = _computeKnownEnumTypes(metadata.allFields, metadata);
     if (hasSelfCase) {
       // Inline fromJson body since createFactory: false means _$FooFromJson won't exist
       sb.writeln(
@@ -103,7 +104,7 @@ class JsonGenerator extends UniversalGenerator {
         if (f.jsonKeyInfo?.includeFromJson == false &&
             f.jsonKeyInfo?.fromJson == null &&
             f.jsonKeyInfo?.converter == null) continue;
-        final expr = _fieldFromJsonExpression(f);
+        final expr = _fieldFromJsonExpression(f, knownEnumTypes);
         sb.writeln('        ${f.name}: $expr,');
       }
       sb.writeln('      );');
@@ -344,8 +345,10 @@ class JsonGenerator extends UniversalGenerator {
   /// Used for non-generic classes (direct) and for concrete self-cases in polymorphic hierarchies.
   String _generateInlineFromJsonBody(
     String className,
-    List<NameTypeClassComment> fields,
-  ) {
+    List<NameTypeClassComment> fields, [
+    ClassMetadata? metadata,
+  ]) {
+    final knownEnumTypes = _computeKnownEnumTypes(fields, metadata);
     final sb = StringBuffer();
     sb.writeln('');
     sb.writeln('  /// Creates a [$className] instance from JSON');
@@ -362,7 +365,7 @@ class JsonGenerator extends UniversalGenerator {
         // Excluded from JSON without custom converter/fromJson — rely on default value
         continue;
       }
-      final expr = _fieldFromJsonExpression(f);
+      final expr = _fieldFromJsonExpression(f, knownEnumTypes);
       sb.writeln('      ${f.name}: $expr,');
     }
     sb.writeln('    );');
@@ -370,12 +373,60 @@ class JsonGenerator extends UniversalGenerator {
     return sb.toString();
   }
 
+  /// Computes the set of known enum type names from a list of fields.
+  /// This drills into List<E>, Set<E>, and Map<K,V> to find enum element types.
+  Set<String> _computeKnownEnumTypes(List<NameTypeClassComment> fields, [ClassMetadata? metadata]) {
+    var result = <String>{};
+    for (var f in fields) {
+      if (f.type == null) continue;
+      var cleanType = f.type!.replaceAll(r'$', '');
+      if (f.isEnum) {
+        result.add(cleanType.replaceAll('?', ''));
+      }
+      // Extract generic type args from List<E>, Set<E>, Map<K,V> etc.
+      // and check if any other field has that type as a direct enum
+      var base = cleanType.replaceAll('?', '');
+      List<String> innerTypes;
+      if (base.startsWith('List<') || base.startsWith('Set<')) {
+        innerTypes = [base.substring(base.indexOf('<') + 1, base.lastIndexOf('>')).trim()];
+      } else if (base.startsWith('Map<')) {
+        var comma = base.indexOf(',');
+        var end = base.lastIndexOf('>');
+        innerTypes = [
+          base.substring(base.indexOf('<') + 1, comma).trim(),
+          base.substring(comma + 1, end).trim(),
+        ];
+      } else {
+        innerTypes = [];
+      }
+      for (var inner in innerTypes) {
+        if (fields.any((of) =>
+            of.type != null && of.isEnum &&
+            of.type!.replaceAll(r'$', '').replaceAll('?', '') == inner)) {
+          result.add(inner);
+        }
+      }
+    }
+    // Scan the library for all enum types (covers List<EnumDefinedElsewhere>)
+    if (metadata?.classElement != null) {
+      var lib = metadata!.classElement.library;
+      // Scan all fragments of the library for enum types
+      for (var fragment in lib.fragments) {
+        for (var enumFragment in fragment.enums) {
+          var enumName = enumFragment.element.name;
+          if (enumName != null) result.add(enumName);
+        }
+      }
+    }
+    return result;
+  }
+
   /// Generate a fromJson expression for a single field using ZorphyJsonHelper.cast safe casts.
   /// Produces expressions like:
   ///   ZorphyJsonHelper.cast<String>(json, 'name')
   ///   (ZorphyJsonHelper.cast<num>(json, 'price')).toDouble()
   ///   DateTime.parse(ZorphyJsonHelper.cast<String>(json, 'createdAt'))
-  String _fieldFromJsonExpression(NameTypeClassComment f) {
+  String _fieldFromJsonExpression(NameTypeClassComment f, [Set<String> knownEnumTypes = const {}]) {
     final jsonKeyName = f.jsonKeyInfo?.name ?? f.name;
     final rawType = f.type ?? 'dynamic';
 
@@ -433,12 +484,12 @@ class JsonGenerator extends UniversalGenerator {
     // Determine if there's a default value (forces nullable expression + ?? fallback)
     final hasDefault = info?.defaultValue != null;
 
-    var expr = _typeToFromJsonExpr(baseType, isNullable, jsonKeyName, f);
+    var expr = _typeToFromJsonExpr(baseType, isNullable, jsonKeyName, f, knownEnumTypes);
 
     // Handle default value: use nullable expression + ?? fallback
     if (hasDefault) {
       // Force nullable variant and append default
-      final nullableExpr = _typeToFromJsonExpr(baseType, true, jsonKeyName, f);
+      final nullableExpr = _typeToFromJsonExpr(baseType, true, jsonKeyName, f, knownEnumTypes);
       return '$nullableExpr ?? ${info!.defaultValue}';
     }
 
@@ -452,6 +503,7 @@ class JsonGenerator extends UniversalGenerator {
     bool isNullable,
     String jsonKeyName,
     NameTypeClassComment f,
+    Set<String> knownEnumTypes,
   ) {
     // Simple types
     if (baseType == 'String') {
@@ -516,7 +568,7 @@ class JsonGenerator extends UniversalGenerator {
     // List<E> - cast to List<dynamic>, then map elements
     if (baseType.startsWith('List<')) {
       final innerContent = _extractGenericArg(baseType);
-      final innerExpr = _elementCastExpression(innerContent);
+      final innerExpr = _elementCastExpression(innerContent, knownEnumTypes);
 
       if (isNullable) {
         return "(ZorphyJsonHelper.cast<List<dynamic>?>(json, '$jsonKeyName'))"
@@ -524,6 +576,19 @@ class JsonGenerator extends UniversalGenerator {
       }
       return "(ZorphyJsonHelper.cast<List<dynamic>>(json, '$jsonKeyName'))"
           ".map((e) => $innerExpr).toList()";
+    }
+
+    // Set<E> - same as List<E>
+    if (baseType.startsWith('Set<')) {
+      final innerContent = _extractGenericArg(baseType);
+      final innerExpr = _elementCastExpression(innerContent, knownEnumTypes);
+
+      if (isNullable) {
+        return "(ZorphyJsonHelper.cast<List<dynamic>?>(json, '$jsonKeyName'))"
+            "?.map((e) => $innerExpr).toSet()";
+      }
+      return "(ZorphyJsonHelper.cast<List<dynamic>>(json, '$jsonKeyName'))"
+          ".map((e) => $innerExpr).toSet()";
     }
 
     // Map<K,V> - pass through with ZorphyJsonHelper.cast
@@ -552,7 +617,7 @@ class JsonGenerator extends UniversalGenerator {
   }
 
   /// Generate a cast expression for a list element inside a .map() call.
-  String _elementCastExpression(String innerType) {
+  String _elementCastExpression(String innerType, [Set<String> knownEnumTypes = const {}]) {
     final trimmed = innerType.trim();
     final isNullable = trimmed.endsWith('?');
     final baseType = isNullable
@@ -575,6 +640,11 @@ class JsonGenerator extends UniversalGenerator {
         return 'e';
       case 'DateTime':
         return 'DateTime.parse(e as String)';
+    }
+
+    // Check if the inner type is an enum (uses $enumDecode)
+    if (knownEnumTypes.contains(baseType)) {
+      return '\$enumDecode(_\$${baseType}EnumMap, e)';
     }
 
     if (baseType.startsWith('List<') || baseType.startsWith('Map<')) {
