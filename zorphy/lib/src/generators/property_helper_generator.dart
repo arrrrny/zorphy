@@ -70,7 +70,9 @@ class PropertyHelperGenerator extends UniversalGenerator {
             : fieldName;
         final capitalized = baseName[0].toUpperCase() + baseName.substring(1);
 
-        if (isNullable && !isCollection) {
+        final isString = type.replaceAll('?', '') == 'String';
+
+        if (isNullable && !isCollection && !isString) {
           sb.writeln('  bool get has$capitalized => $fieldName != null;');
           sb.writeln('  bool get no$capitalized => $fieldName == null;');
           final nonNullableType = type.substring(0, type.length - 1);
@@ -82,6 +84,24 @@ class PropertyHelperGenerator extends UniversalGenerator {
           sb.writeln(
             '  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));',
           );
+        }
+
+        if (isString) {
+          if (isNullable) {
+            sb.writeln(
+              '  bool get has$capitalized => $fieldName != null && $fieldName.isNotEmpty;',
+            );
+            sb.writeln(
+              '  bool get no$capitalized => $fieldName == null || $fieldName.isEmpty;',
+            );
+            final nonNullableType = type.substring(0, type.length - 1);
+            sb.writeln(
+              '  $nonNullableType get ${baseName}Required => $fieldName ?? (throw StateError(\'$fieldName is required but was null\'));',
+            );
+          } else {
+            sb.writeln('  bool get has$capitalized => $fieldName.isNotEmpty;');
+            sb.writeln('  bool get no$capitalized => $fieldName.isEmpty;');
+          }
         }
 
         if (isCollection) {

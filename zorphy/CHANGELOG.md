@@ -1,3 +1,10 @@
+## [1.8.0] - 2026-07-20
+
+### Feature
+
+- Safe fromJson casts with field-level error messages — replaces json_serializable delegates with inline `_zc<T>()` wrapper that throws `TypeError.withStackTrace` including field name, expected type, actual type, and the value itself
+- Example error: `Zorphy: Field 'id' expected String, got int (42)`
+
 ## [1.7.1] - 2026-05-02
 
 ### Change
