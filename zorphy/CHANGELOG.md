@@ -1,3 +1,13 @@
+## [1.8.2] - 2026-07-20
+
+### Refactor
+
+- Simplified nullable string property helpers: `hasText` now uses `text?.isNotEmpty == true` instead of `text != null && text.isNotEmpty`
+
+### Chore
+
+- Removed CI-based pub.dev publishing; publish script now publishes directly via `dart pub publish --force`
+
 ## [1.8.1] - 2026-07-20
 
 ### Fix
