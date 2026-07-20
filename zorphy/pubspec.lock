@@ -557,9 +557,9 @@ packages:
     dependency: "direct main"
     description:
       name: zorphy_annotation
-      sha256: "17e680bc8e41f2552c8bf189ef784cb8476bddf3d760297b1a52c388679e59fe"
+      sha256: d9bfd90c1688e1c4cb0aedf0ed53f9d2b97fc35c5bc157e39e86c4448151e9f8
       url: "https://pub.dev"
     source: hosted
-    version: "1.8.1"
+    version: "1.8.2"
 sdks:
   dart: ">=3.11.0 <4.0.0"

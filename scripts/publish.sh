@@ -113,8 +113,18 @@ dart pub publish --force || echo "  ⚠️ zorphy_annotation publish failed or a
 
 echo "📦 Publishing zorphy v$VERSION..."
 cd "$REPO_ROOT/zorphy"
-dart pub get
-dart pub publish --force || echo "  ⚠️ zorphy publish failed or already published"
+# Retry pub get since zorphy_annotation may not be indexed yet
+for i in {1..10}; do
+  if dart pub get 2>/dev/null; then
+    dart pub publish --force && break
+  fi
+  if [ $i -lt 10 ]; then
+    echo "  ⏳ Waiting for pub.dev indexing (attempt $i/10)..."
+    sleep 15
+  else
+    echo "  ⚠️ zorphy publish failed after 10 attempts"
+  fi
+done
 
 echo "🏷️ Creating and pushing git tags..."
 cd "$REPO_ROOT"
