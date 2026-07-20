@@ -394,6 +394,21 @@ class JsonGenerator extends UniversalGenerator {
           "as Map<String, dynamic>) as $rawType";
     }
 
+    // Check for @JsonKey(fromJson: someFn) without includeFromJson: false
+    // This means json_serializable normally handles it, but since we use
+    // createFactory: false we need to replicate the call ourselves.
+    if (info != null && info.fromJson != null &&
+        info.includeFromJson != false) {
+      final jsonFieldName = info.name ?? f.name;
+      final isNullable = rawType.endsWith('?');
+      if (isNullable) {
+        return "json['$jsonFieldName'] == null"
+            " ? null"
+            " : ${info.fromJson}(json['$jsonFieldName'])";
+      }
+      return "${info.fromJson}(json['$jsonFieldName'])";
+    }
+
     // Check for @JsonKey(converter: SomeConverter()) — uses SomeConverter.fromJson(...)
     if (info?.converter != null) {
       final converterName = info!.converter!;

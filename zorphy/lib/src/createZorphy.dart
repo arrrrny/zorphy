@@ -433,6 +433,25 @@ String createZorphy(
           continue;
         }
 
+        // Check for @JsonKey(fromJson: fn) without includeFromJson: false.
+        // json_serializable would have handled this, but we use createFactory: false.
+        if (f.jsonKeyInfo != null && f.jsonKeyInfo!.fromJson != null &&
+            f.jsonKeyInfo!.includeFromJson != false) {
+          var jn = f.jsonKeyInfo!.name ?? f.name;
+          if (isNullable) {
+            sb.writeln(
+              "      ${f.name}: json['$jn'] == null"
+              " ? null"
+              " : ${f.jsonKeyInfo!.fromJson}(json['$jn']),",
+            );
+          } else {
+            sb.writeln(
+              "      ${f.name}: ${f.jsonKeyInfo!.fromJson}(json['$jn']),",
+            );
+          }
+          continue;
+        }
+
         // Default value handling
         var hasDefault = f.jsonKeyInfo?.defaultValue != null;
         var effectiveIsNullable = isNullable || hasDefault;
@@ -541,6 +560,16 @@ String createZorphy(
           );
           continue;
         }
+        if (f.jsonKeyInfo != null && f.jsonKeyInfo!.fromJson != null &&
+            f.jsonKeyInfo!.includeFromJson != false) {
+          var jn = f.jsonKeyInfo!.name ?? f.name;
+          sb.writeln(
+            isNullable
+                ? "        ${f.name}: json['$jn'] == null ? null : ${f.jsonKeyInfo!.fromJson}(json['$jn']),"
+                : "        ${f.name}: ${f.jsonKeyInfo!.fromJson}(json['$jn']),",
+          );
+          continue;
+        }
         var hasDefault = f.jsonKeyInfo?.defaultValue != null;
         var effectiveIsNullable = isNullable || hasDefault;
         var expr = _legacyFieldExpr(baseType, effectiveIsNullable, jsonKeyName, f, rawType);
@@ -600,6 +629,17 @@ String createZorphy(
                   innerNullable
                       ? "          ${innerF.name}: json['$jn'] != null ? ${innerF.jsonKeyInfo!.fromJson}(json['$jn'] as Map<String, dynamic>) as $rt : null,"
                       : "          ${innerF.name}: ${innerF.jsonKeyInfo!.fromJson}(json['$jn'] as Map<String, dynamic>) as $rt,",
+                );
+                continue;
+              }
+              if (innerF.jsonKeyInfo != null &&
+                  innerF.jsonKeyInfo!.fromJson != null &&
+                  innerF.jsonKeyInfo!.includeFromJson != false) {
+                var jn = innerF.jsonKeyInfo!.name ?? innerF.name;
+                sb.writeln(
+                  innerNullable
+                      ? "          ${innerF.name}: json['$jn'] == null ? null : ${innerF.jsonKeyInfo!.fromJson}(json['$jn']),"
+                      : "          ${innerF.name}: ${innerF.jsonKeyInfo!.fromJson}(json['$jn']),",
                 );
                 continue;
               }
