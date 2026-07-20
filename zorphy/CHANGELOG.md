@@ -1,3 +1,10 @@
+## [1.8.1] - 2026-07-20
+
+### Fix
+
+- Replaced per-class `_zc<T>()` static helpers with shared `ZorphyJsonHelper.cast<T>()` from `zorphy_annotation` for Dart 3.12+ compatibility
+- Added `ZorphyJsonCastError` with field-level context in error messages
+
 ## [1.8.0] - 2026-07-20
 
 ### Feature

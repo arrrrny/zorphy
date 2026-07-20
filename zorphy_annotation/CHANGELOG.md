@@ -1,3 +1,9 @@
+## [1.8.1] - 2026-07-20
+
+### Feature
+
+- Added `ZorphyJsonCastError` and `ZorphyJsonHelper` classes for shared safe JSON casting with field-level error messages
+
 ## [1.8.0] - 2026-07-20
 
 ### Change
