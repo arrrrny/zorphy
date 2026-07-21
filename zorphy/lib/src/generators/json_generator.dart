@@ -589,11 +589,11 @@ class JsonGenerator extends UniversalGenerator {
           ".map((e) => $innerExpr).toSet()";
     }
 
-    // Map<K,V> - pass through with ZorphyJsonHelper.cast
+    // Map<K,V> - pass through with direct cast (avoid generic type arg erasure issues)
     if (baseType.startsWith('Map<')) {
       return isNullable
-          ? "ZorphyJsonHelper.cast<$baseType?>(json, '$jsonKeyName')"
-          : "ZorphyJsonHelper.cast<$baseType>(json, '$jsonKeyName')";
+          ? "(json['$jsonKeyName'] as $baseType?)"
+          : "(json['$jsonKeyName'] as $baseType)";
     }
 
     // dynamic / Object / never
