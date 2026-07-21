@@ -914,7 +914,7 @@ String getEqualsAndHashCode(
   // hashCode
   sb.writeln("");
   sb.writeln("  @override");
-  sb.writeln("  @JsonKey(ignore: true)");
+  sb.writeln("  @JsonKey(includeToJson: false, includeFromJson: false)");
   sb.writeln("  int get hashCode {");
   if (fields.isEmpty) {
     sb.writeln("    return 0;");

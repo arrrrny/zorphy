@@ -11,8 +11,8 @@ void main() {
 
     final hashCodeBlock = helpers.getEqualsAndHashCode(fields, 'Foo');
 
-    expect(hashCodeBlock, contains('@JsonKey(ignore: true)'),
-        reason: 'hashCode should be annotated with @JsonKey(ignore: true) '
+    expect(hashCodeBlock, contains('includeToJson: false, includeFromJson: false'),
+        reason: 'hashCode should be annotated with @JsonKey(includeToJson: false, includeFromJson: false) '
             'to prevent json_serializable from serializing it');
     expect(hashCodeBlock, contains('int get hashCode'),
         reason: 'should still generate hashCode');
