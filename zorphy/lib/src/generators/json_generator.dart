@@ -553,6 +553,15 @@ class JsonGenerator extends UniversalGenerator {
       final innerContent = _extractGenericArg(baseType);
       final innerExpr = _elementCastExpression(innerContent, knownEnumTypes);
 
+      // When the element cast is just identity (e.g. Object, dynamic),
+      // cast directly to the target list type instead of List<dynamic> -> .map() -> toList()
+      // because List<dynamic> isn't assignable to List<Object> in Dart 3.
+      if (innerExpr == 'e') {
+        return isNullable
+            ? "(json['$jsonKeyName'] as $baseType?)"
+            : "(json['$jsonKeyName'] as $baseType)";
+      }
+
       if (isNullable) {
         return "(json['$jsonKeyName'] as List<dynamic>?)"
             "?.map((e) => $innerExpr).toList()";
@@ -565,6 +574,12 @@ class JsonGenerator extends UniversalGenerator {
     if (baseType.startsWith('Set<')) {
       final innerContent = _extractGenericArg(baseType);
       final innerExpr = _elementCastExpression(innerContent, knownEnumTypes);
+
+      if (innerExpr == 'e') {
+        return isNullable
+            ? "(json['$jsonKeyName'] as $baseType?)"
+            : "(json['$jsonKeyName'] as $baseType)";
+      }
 
       if (isNullable) {
         return "(json['$jsonKeyName'] as List<dynamic>?)"

@@ -875,12 +875,39 @@ String _legacyFieldExpr(
     var innerContent = _extractGenericArg(baseType);
     var innerExpr = _elementCastExpr(innerContent, knownEnumTypes);
 
+    // When the element cast is just identity (e.g. Object, dynamic),
+    // cast directly to the target list type
+    if (innerExpr == 'e') {
+      return isNullable
+          ? "(json['$jsonKeyName'] as $baseType?)"
+          : "(json['$jsonKeyName'] as $baseType)";
+    }
+
     if (isNullable) {
       return "(json['$jsonKeyName'] as List<dynamic>?)"
           "?.map((e) => $innerExpr).toList()";
     }
     return "(json['$jsonKeyName'] as List<dynamic>)"
         ".map((e) => $innerExpr).toList()";
+  }
+
+  // Set<E> - same as List<E>
+  if (baseType.startsWith('Set<')) {
+    var innerContent = _extractGenericArg(baseType);
+    var innerExpr = _elementCastExpr(innerContent, knownEnumTypes);
+
+    if (innerExpr == 'e') {
+      return isNullable
+          ? "(json['$jsonKeyName'] as $baseType?)"
+          : "(json['$jsonKeyName'] as $baseType)";
+    }
+
+    if (isNullable) {
+      return "(json['$jsonKeyName'] as List<dynamic>?)"
+          "?.map((e) => $innerExpr).toSet()";
+    }
+    return "(json['$jsonKeyName'] as List<dynamic>)"
+        ".map((e) => $innerExpr).toSet()";
   }
 
   // Map<K,V> - pass through with ZorphyJsonHelper.cast
