@@ -1,3 +1,9 @@
+## [1.8.8] - 2026-07-21
+
+### Fix
+
+- `hashCode` getter is now annotated with `@JsonKey(ignore: true)` to prevent json_serializable from including it in `toJson` output (regression from `createFactory: false` changes)
+
 ## [1.8.7] - 2026-07-21
 
 ### Fix
