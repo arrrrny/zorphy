@@ -1,3 +1,10 @@
+## [1.8.10] - 2026-07-21
+
+### Fix
+
+- Replaced deprecated `@JsonKey(ignore: true)` with `@JsonKey(includeToJson: false, includeFromJson: false)` on `hashCode` getter
+- `Map<K,V>` fields now use direct `(json['f'] as Map<K,V>?)` cast instead of `ZorphyJsonHelper.cast` to avoid runtime type erasure issues (e.g. `Map<String, dynamic>` vs `Map<String, String>`)
+
 ## [1.8.9] - 2026-07-21
 
 ### Fix
