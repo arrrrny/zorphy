@@ -1,3 +1,10 @@
+## [1.8.7] - 2026-07-21
+
+### Fix
+
+- `List<Object>` and other identity-cast list fields now cast directly to the target type (`as List<Object>?`) instead of going through `List<dynamic>` which isn't assignable in Dart 3
+- Fields like `List<Object>? get match` now generate `(json['match'] as List<Object>?)`
+
 ## [1.8.6] - 2026-07-20
 
 ### Fix
