@@ -1,3 +1,9 @@
+## [1.8.9] - 2026-07-21
+
+### Fix
+
+- Replaced deprecated `@JsonKey(ignore: true)` with `@JsonKey(includeToJson: false, includeFromJson: false)` on `hashCode` getter
+
 ## [1.8.8] - 2026-07-21
 
 ### Fix
