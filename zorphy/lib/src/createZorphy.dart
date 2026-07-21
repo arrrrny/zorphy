@@ -41,14 +41,8 @@ String createZorphy(
       elementName.startsWith("\$\$") && typesExplicit.isNotEmpty;
   if (generateJson && !isSealedClass && !isAbstractWithSubtypes) {
     var constructorParam = hidePublicConstructor ? ", constructor: '_'" : "";
-    // For non-generic classes: createFactory: false — we generate fromJson inline
-    // with _zc<T> safe casts. For generic classes, json_serializable still handles
-    // _$FooFromJson since type parameters require fromJsonT callbacks.
-    var createFactoryParam = classGenerics.isEmpty
-        ? ", createFactory: false"
-        : "";
     sb.writeln(
-      "@JsonSerializable(explicitToJson: $explicitToJson$createFactoryParam$constructorParam)",
+      "@JsonSerializable(explicitToJson: $explicitToJson, checked: true$constructorParam)",
     );
   }
 
@@ -393,116 +387,12 @@ String createZorphy(
       generateJson && isAbstract && typesExplicit.isNotEmpty;
   if (shouldGenerateJson || shouldGenerateAbstractJson) {
     var classNameTrimmed = className.replaceAll("\$", "");
-    // Compute set of enum types for proper list element decoding
-    var knownEnumTypes = <String>{};
-    for (var f in allFieldsDistinct) {
-      var cleanType = f.type!.replaceAll(r'$', '');
-      if (f.isEnum) {
-        knownEnumTypes.add(cleanType.replaceAll('?', ''));
-      }
-      // Also extract types from List<E>, Set<E>, Map<K,V> etc.
-      var base = cleanType.replaceAll('?', '');
-      if (base.startsWith('List<') || base.startsWith('Set<')) {
-        var inner = base.substring(base.indexOf('<') + 1, base.lastIndexOf('>')).trim();
-        if (allFieldsDistinct.any((of) =>
-            of.isEnum && of.type!.replaceAll(r'$', '').replaceAll('?', '') == inner)) {
-          knownEnumTypes.add(inner);
-        }
-      } else if (base.startsWith('Map<')) {
-        var comma = base.indexOf(',');
-        var end = base.lastIndexOf('>');
-        var keyType = base.substring(base.indexOf('<') + 1, comma).trim();
-        var valType = base.substring(comma + 1, end).trim();
-        for (var t in [keyType, valType]) {
-          if (allFieldsDistinct.any((of) =>
-              of.isEnum && of.type!.replaceAll(r'$', '').replaceAll('?', '') == t)) {
-            knownEnumTypes.add(t);
-          }
-        }
-      }
-    }
     sb.writeln();
     sb.writeln("  /// Creates a [${classNameTrimmed}] instance from JSON");
     if (typesExplicit.isEmpty && classGenerics.isEmpty) {
-      // Simple case — no generics, no explicit subtypes.
-      // Generate inline fromJson with _zc<T>() safe casts for field-level error messages.
       sb.writeln(
-        "  factory ${classNameTrimmed}.fromJson(Map<String, dynamic> json) {",
+        "  factory ${classNameTrimmed}.fromJson(Map<String, dynamic> json) => _\$${classNameTrimmed}FromJson(json);",
       );
-      sb.writeln("    return ${classNameTrimmed}(");
-      for (var f in allFieldsDistinct) {
-        var jsonKeyName = f.jsonKeyInfo?.name ?? f.name;
-        var rawType = f.type ?? "dynamic";
-        var cleanType = rawType.replaceAll(r'$', '');
-        var isNullable = cleanType.endsWith('?');
-        var baseType = isNullable
-            ? cleanType.substring(0, cleanType.length - 1)
-            : cleanType;
-
-        // Check for custom converter (manual fromJson like includeFromJson: false + fromJson: fn)
-        var manualConverter = f.jsonKeyInfo != null &&
-            f.jsonKeyInfo!.fromJson != null &&
-            f.jsonKeyInfo!.includeFromJson == false;
-        if (manualConverter) {
-          var jn = f.jsonKeyInfo!.name ?? f.name;
-          if (isNullable) {
-            sb.writeln(
-              "      ${f.name}: json['$jn'] != null"
-              " ? ${f.jsonKeyInfo!.fromJson}(json['$jn']"
-              " as Map<String, dynamic>) as $rawType"
-              " : null,",
-            );
-          } else {
-            sb.writeln(
-              "      ${f.name}: ${f.jsonKeyInfo!.fromJson}(json['$jn']"
-              " as Map<String, dynamic>) as $rawType,",
-            );
-          }
-          continue;
-        }
-
-        // Check for @JsonKey(fromJson: fn) without includeFromJson: false.
-        // json_serializable would have handled this, but we use createFactory: false.
-        if (f.jsonKeyInfo != null && f.jsonKeyInfo!.fromJson != null &&
-            f.jsonKeyInfo!.includeFromJson != false) {
-          var jn = f.jsonKeyInfo!.name ?? f.name;
-          if (isNullable) {
-            sb.writeln(
-              "      ${f.name}: json['$jn'] == null"
-              " ? null"
-              " : ${f.jsonKeyInfo!.fromJson}(json['$jn']),",
-            );
-          } else {
-            sb.writeln(
-              "      ${f.name}: ${f.jsonKeyInfo!.fromJson}(json['$jn']),",
-            );
-          }
-          continue;
-        }
-
-        // Default value handling
-        var hasDefault = f.jsonKeyInfo?.defaultValue != null;
-        var effectiveIsNullable = isNullable || hasDefault;
-
-        // Generate the expression
-        var expr = _legacyFieldExpr(
-          baseType, effectiveIsNullable, jsonKeyName, f, rawType, knownEnumTypes,
-        );
-
-        // Handle default value
-        if (hasDefault) {
-          var nullableExpr = _legacyFieldExpr(
-            baseType, true, jsonKeyName, f, rawType, knownEnumTypes,
-          );
-          expr = "$nullableExpr ?? ${f.jsonKeyInfo!.defaultValue}";
-        }
-
-        sb.writeln("      ${f.name}: $expr,");
-      }
-      sb.writeln("    );");
-      sb.writeln("  }");
-      // _zc helper is no longer generated per-class — ZorphyJsonHelper.cast is used instead
-      // from the shared annotation package
     } else if (shouldGenerateAbstractJson) {
       // Sealed class with explicit subtypes - dispatch to subtypes only, no fallback
       sb.writeln(
@@ -564,50 +454,8 @@ String createZorphy(
       sb.writeln(
         "  factory ${classNameTrimmed}.fromJson(Map<String, dynamic> json) {",
       );
-      // Inline the self-case body since createFactory: false means
-      // _\$FooFromJson won't exist from json_serializable.
       sb.writeln("    if (json['__typename'] == null) {");
-      sb.writeln("      return ${classNameTrimmed}(");
-      for (var f in allFieldsDistinct) {
-        var jsonKeyName = f.jsonKeyInfo?.name ?? f.name;
-        var rawType = f.type ?? "dynamic";
-        var cleanType = rawType.replaceAll(r'$', '');
-        var isNullable = cleanType.endsWith('?');
-        var baseType = isNullable
-            ? cleanType.substring(0, cleanType.length - 1)
-            : cleanType;
-        var manualConverter = f.jsonKeyInfo != null &&
-            f.jsonKeyInfo!.fromJson != null &&
-            f.jsonKeyInfo!.includeFromJson == false;
-        if (manualConverter) {
-          var jn = f.jsonKeyInfo!.name ?? f.name;
-          sb.writeln(
-            isNullable
-                ? "        ${f.name}: json['$jn'] != null ? ${f.jsonKeyInfo!.fromJson}(json['$jn'] as Map<String, dynamic>) as $rawType : null,"
-                : "        ${f.name}: ${f.jsonKeyInfo!.fromJson}(json['$jn'] as Map<String, dynamic>) as $rawType,",
-          );
-          continue;
-        }
-        if (f.jsonKeyInfo != null && f.jsonKeyInfo!.fromJson != null &&
-            f.jsonKeyInfo!.includeFromJson != false) {
-          var jn = f.jsonKeyInfo!.name ?? f.name;
-          sb.writeln(
-            isNullable
-                ? "        ${f.name}: json['$jn'] == null ? null : ${f.jsonKeyInfo!.fromJson}(json['$jn']),"
-                : "        ${f.name}: ${f.jsonKeyInfo!.fromJson}(json['$jn']),",
-          );
-          continue;
-        }
-        var hasDefault = f.jsonKeyInfo?.defaultValue != null;
-        var effectiveIsNullable = isNullable || hasDefault;
-        var expr = _legacyFieldExpr(baseType, effectiveIsNullable, jsonKeyName, f, rawType, knownEnumTypes);
-        if (hasDefault) {
-          var nullableExpr = _legacyFieldExpr(baseType, true, jsonKeyName, f, rawType, knownEnumTypes);
-          expr = "$nullableExpr ?? ${f.jsonKeyInfo!.defaultValue}";
-        }
-        sb.writeln("        ${f.name}: $expr,");
-      }
-      sb.writeln("      );");
+      sb.writeln("      return _\$${classNameTrimmed}FromJson(json);");
       sb.writeln("    }");
       var classesForJson = <Interface>[
         ...typesExplicit,
@@ -638,54 +486,9 @@ String createZorphy(
           sb.writeln(
             "    $prefix (json['__typename'] == \"$interfaceName\") {",
           );
-          if (isCurrentClass) {
-            // Inline self-body since createFactory: false means
-            // _$FooFromJson won't exist from json_serializable.
-            sb.writeln("      return $interfaceName(");
-            for (var innerF in allFieldsDistinct) {
-              var jkn = innerF.jsonKeyInfo?.name ?? innerF.name;
-              var rt = innerF.type ?? "dynamic";
-              var ct = rt.replaceAll(r'$', '');
-              var innerNullable = ct.endsWith('?');
-              var bt = innerNullable ? ct.substring(0, ct.length - 1) : ct;
-              var mc = innerF.jsonKeyInfo != null &&
-                  innerF.jsonKeyInfo!.fromJson != null &&
-                  innerF.jsonKeyInfo!.includeFromJson == false;
-              if (mc) {
-                var jn = innerF.jsonKeyInfo!.name ?? innerF.name;
-                sb.writeln(
-                  innerNullable
-                      ? "          ${innerF.name}: json['$jn'] != null ? ${innerF.jsonKeyInfo!.fromJson}(json['$jn'] as Map<String, dynamic>) as $rt : null,"
-                      : "          ${innerF.name}: ${innerF.jsonKeyInfo!.fromJson}(json['$jn'] as Map<String, dynamic>) as $rt,",
-                );
-                continue;
-              }
-              if (innerF.jsonKeyInfo != null &&
-                  innerF.jsonKeyInfo!.fromJson != null &&
-                  innerF.jsonKeyInfo!.includeFromJson != false) {
-                var jn = innerF.jsonKeyInfo!.name ?? innerF.name;
-                sb.writeln(
-                  innerNullable
-                      ? "          ${innerF.name}: json['$jn'] == null ? null : ${innerF.jsonKeyInfo!.fromJson}(json['$jn']),"
-                      : "          ${innerF.name}: ${innerF.jsonKeyInfo!.fromJson}(json['$jn']),",
-                );
-                continue;
-              }
-              var hd = innerF.jsonKeyInfo?.defaultValue != null;
-              var ei = innerNullable || hd;
-              var e = _legacyFieldExpr(bt, ei, jkn, innerF, rt, knownEnumTypes);
-              if (hd) {
-                var ne = _legacyFieldExpr(bt, true, jkn, innerF, rt, knownEnumTypes);
-                e = "$ne ?? ${innerF.jsonKeyInfo!.defaultValue}";
-              }
-              sb.writeln("          ${innerF.name}: $e,");
-            }
-            sb.writeln("      );");
-          } else {
-            sb.writeln(
-              "      return $interfaceName.fromJson(json);",
-            );
-          }
+          sb.writeln(
+            "      return ${isCurrentClass ? "_\$" : ""}$interfaceName${isCurrentClass ? "FromJson" : ".fromJson"}(json);",
+          );
         }
       }
       sb.writeln("    }");
@@ -799,184 +602,4 @@ String createZorphy(
   }
 
   return sb.toString();
-}
-
-/// Helper for the legacy pipeline: generates a ZorphyJsonHelper.cast-based fromJson expression for a field.
-String _legacyFieldExpr(
-  String baseType,
-  bool isNullable,
-  String jsonKeyName,
-  NameTypeClassComment f,
-  String rawType,
-  Set<String> knownEnumTypes,
-) {
-  // Simple types
-  if (baseType == 'String') {
-    return isNullable
-        ? "ZorphyJsonHelper.cast<String?>(json, '$jsonKeyName')"
-        : "ZorphyJsonHelper.cast<String>(json, '$jsonKeyName')";
-  }
-  if (baseType == 'int') {
-    return isNullable
-        ? "(ZorphyJsonHelper.cast<num?>(json, '$jsonKeyName'))?.toInt()"
-        : "(ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toInt()";
-  }
-  if (baseType == 'double') {
-    return isNullable
-        ? "(ZorphyJsonHelper.cast<num?>(json, '$jsonKeyName'))?.toDouble()"
-        : "(ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toDouble()";
-  }
-  if (baseType == 'num') {
-    return isNullable
-        ? "ZorphyJsonHelper.cast<num?>(json, '$jsonKeyName')"
-        : "ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')";
-  }
-  if (baseType == 'bool') {
-    return isNullable
-        ? "ZorphyJsonHelper.cast<bool?>(json, '$jsonKeyName')"
-        : "ZorphyJsonHelper.cast<bool>(json, '$jsonKeyName')";
-  }
-
-  // DateTime - parse from string
-  if (baseType == 'DateTime') {
-    if (isNullable) {
-      return "json['$jsonKeyName'] == null"
-          " ? null"
-          " : DateTime.parse(ZorphyJsonHelper.cast<String>(json, '$jsonKeyName'))";
-    }
-    return "DateTime.parse(ZorphyJsonHelper.cast<String>(json, '$jsonKeyName'))";
-  }
-
-  // Duration - parse from microseconds (num)
-  if (baseType == 'Duration') {
-    if (isNullable) {
-      return "json['$jsonKeyName'] == null"
-          " ? null"
-          " : Duration(microseconds:"
-          " (ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toInt())";
-    }
-    return "Duration(microseconds:"
-        " (ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toInt())";
-  }
-
-  // Enum - use $enumDecode with ZorphyJsonHelper.cast<string> for field-name in error
-  if (f.isEnum && f.enumValues.isNotEmpty) {
-    var enumMapName = "_\$${baseType}EnumMap";
-    if (isNullable) {
-      return "\$enumDecodeNullable($enumMapName,"
-          " ZorphyJsonHelper.cast<String?>(json, '$jsonKeyName'))";
-    }
-    return "\$enumDecode($enumMapName,"
-        " ZorphyJsonHelper.cast<String>(json, '$jsonKeyName'))";
-  }
-
-  // List<E> - cast to List<dynamic>, then map elements
-  if (baseType.startsWith('List<')) {
-    var innerContent = _extractGenericArg(baseType);
-    var innerExpr = _elementCastExpr(innerContent, knownEnumTypes);
-
-    // When the element cast is just identity (e.g. Object, dynamic),
-    // cast directly to the target list type
-    if (innerExpr == 'e') {
-      return isNullable
-          ? "(json['$jsonKeyName'] as $baseType?)"
-          : "(json['$jsonKeyName'] as $baseType)";
-    }
-
-    if (isNullable) {
-      return "(json['$jsonKeyName'] as List<dynamic>?)"
-          "?.map((e) => $innerExpr).toList()";
-    }
-    return "(json['$jsonKeyName'] as List<dynamic>)"
-        ".map((e) => $innerExpr).toList()";
-  }
-
-  // Set<E> - same as List<E>
-  if (baseType.startsWith('Set<')) {
-    var innerContent = _extractGenericArg(baseType);
-    var innerExpr = _elementCastExpr(innerContent, knownEnumTypes);
-
-    if (innerExpr == 'e') {
-      return isNullable
-          ? "(json['$jsonKeyName'] as $baseType?)"
-          : "(json['$jsonKeyName'] as $baseType)";
-    }
-
-    if (isNullable) {
-      return "(json['$jsonKeyName'] as List<dynamic>?)"
-          "?.map((e) => $innerExpr).toSet()";
-    }
-    return "(json['$jsonKeyName'] as List<dynamic>)"
-        ".map((e) => $innerExpr).toSet()";
-  }
-
-  // Map<K,V> - pass through with direct cast (avoid generic type arg erasure issues)
-  if (baseType.startsWith('Map<')) {
-    return isNullable
-        ? "(json['$jsonKeyName'] as $baseType?)"
-        : "(json['$jsonKeyName'] as $baseType)";
-  }
-
-  // dynamic / Object / never / void
-  if (baseType == 'dynamic' || baseType == 'Object' ||
-      baseType == 'Never' || baseType == 'void') {
-    return "json['$jsonKeyName']";
-  }
-
-  // Custom object - assume has fromJson(Map<String, dynamic>)
-  if (isNullable) {
-    return "json['$jsonKeyName'] == null"
-        " ? null"
-        " : ${baseType}.fromJson("
-        "ZorphyJsonHelper.cast<Map<String, dynamic>>(json, '$jsonKeyName'))";
-  }
-  return "${baseType}.fromJson("
-      "ZorphyJsonHelper.cast<Map<String, dynamic>>(json, '$jsonKeyName'))";
-}
-
-/// Extract the generic type argument from a type string like List<String> -> String
-String _extractGenericArg(String type) {
-  var start = type.indexOf('<');
-  var end = type.lastIndexOf('>');
-  if (start == -1 || end == -1) return type;
-  return type.substring(start + 1, end).trim();
-}
-
-/// Generate a cast expression for a list element inside a .map() call.
-String _elementCastExpr(String innerType, [Set<String> knownEnumTypes = const {}]) {
-  var trimmed = innerType.trim();
-  var isNullable = trimmed.endsWith('?');
-  var baseType = isNullable
-      ? trimmed.substring(0, trimmed.length - 1)
-      : trimmed;
-
-  switch (baseType) {
-    case 'String':
-      return 'e as String';
-    case 'int':
-      return '(e as num).toInt()';
-    case 'double':
-      return '(e as num).toDouble()';
-    case 'num':
-      return 'e as num';
-    case 'bool':
-      return 'e as bool';
-    case 'dynamic':
-    case 'Object':
-      return 'e';
-    case 'DateTime':
-      return 'DateTime.parse(e as String)';
-  }
-
-  // Check if the inner type is an enum
-  if (knownEnumTypes.contains(baseType)) {
-    return '\$enumDecode(_\$${baseType}EnumMap, e)';
-  }
-
-  if (baseType.startsWith('List<') || baseType.startsWith('Map<')) {
-    return 'e as $trimmed';
-  }
-
-  // Custom object
-  return '$baseType.fromJson(e as Map<String, dynamic>)';
 }

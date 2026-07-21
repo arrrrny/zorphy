@@ -100,14 +100,8 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       final constructorParam = config.hidePublicConstructor
           ? ", constructor: '_'"
           : "";
-      // For non-generic classes: createFactory: false — we generate fromJson inline
-      // with _zc<T> safe casts. For generic classes, json_serializable still handles
-      // _$FooFromJson since type parameters require fromJsonT callbacks.
-      final createFactoryParam = metadata.generics.isEmpty
-          ? ', createFactory: false'
-          : '';
       sb.writeln(
-        '@JsonSerializable(explicitToJson: ${config.explicitToJson}$genericParams$createFactoryParam$constructorParam)',
+        '@JsonSerializable(explicitToJson: ${config.explicitToJson}, checked: true$genericParams$constructorParam)',
       );
     }
 

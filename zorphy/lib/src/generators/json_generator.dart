@@ -1,5 +1,3 @@
-import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/type.dart';
 import '../common/NameType.dart';
 import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
@@ -31,7 +29,7 @@ class JsonGenerator extends UniversalGenerator {
 
     if (shouldGenerateJson || shouldGeneratePolymorphicJson) {
       // Generate fromJson factory constructor
-      _generateFromJson(sb, metadata, config);
+      sb.writeln(_generateFromJson(metadata, config));
       if (!metadata.nonSealed) {
         sb.writeln(_generateToJsonLean(metadata, config));
       }
@@ -56,28 +54,60 @@ class JsonGenerator extends UniversalGenerator {
     return context.config.generateJson;
   }
 
-  /// Generates fromJson deserialization code.
-  void _generateFromJson(StringBuffer sb, ClassMetadata metadata, GenerationConfig config) {
+  String _generateFromJson(ClassMetadata metadata, GenerationConfig config) {
+    final sb = StringBuffer();
     final className = metadata.cleanName;
+    //final genericsStr = _buildGenericsString(metadata);
 
     if (metadata.explicitSubtypes.isEmpty && metadata.generics.isEmpty) {
       // Simple case - no generics, no explicit subtypes
-      // Generate inline fromJson with ZorphyJsonHelper.cast<T>() safe casts
-      sb.writeln(_generateInlineFromJsonBody(className, metadata.allFields, metadata));
+      final manualFromJsonFields = _getManualFromJsonFields(metadata);
+      sb.writeln('');
+      sb.writeln('  /// Creates a [$className] instance from JSON');
+      if (manualFromJsonFields.isEmpty) {
+        sb.writeln(
+          '  factory $className.fromJson(Map<String, dynamic> json) => _\$$className' +
+              'FromJson(json);',
+        );
+      } else {
+        sb.writeln(
+          '  factory $className.fromJson(Map<String, dynamic> json) {',
+        );
+        sb.writeln('    final instance = _\$$className' + 'FromJson(json);');
+        sb.writeln('    return $className(');
+        for (var f in metadata.allFields) {
+          final manualField = manualFromJsonFields.where(
+            (m) => m.name == f.name,
+          );
+          if (manualField.isNotEmpty) {
+            final info = manualField.first.jsonKeyInfo!;
+            final jsonFieldName = info.name ?? f.name;
+            sb.writeln(
+              '      ${f.name}: json[\'$jsonFieldName\'] != null ? ${info.fromJson}(json[\'$jsonFieldName\'] as Map<String, dynamic>) as ${f.type} : null,',
+            );
+          } else {
+            sb.writeln('      ${f.name}: instance.${f.name},');
+          }
+        }
+        sb.writeln('    );');
+        sb.writeln('  }');
+      }
     } else if (metadata.explicitSubtypes.isNotEmpty) {
       // Abstract class with explicit subtypes - polymorphic JSON
-      _generatePolymorphicFromJson(sb, metadata, config);
+      sb.writeln(_generatePolymorphicFromJson(metadata, config));
     } else {
       // Generics without explicit subtypes
-      _generateGenericFromJson(sb, metadata, config);
+      sb.writeln(_generateGenericFromJson(metadata, config));
     }
+
+    return sb.toString();
   }
 
-  void _generatePolymorphicFromJson(
-    StringBuffer sb,
+  String _generatePolymorphicFromJson(
     ClassMetadata metadata,
     GenerationConfig config,
   ) {
+    final sb = StringBuffer();
     final className = metadata.cleanName;
 
     sb.writeln('');
@@ -93,23 +123,11 @@ class JsonGenerator extends UniversalGenerator {
     final totalCases = metadata.explicitSubtypes.length + (hasSelfCase ? 1 : 0);
     var caseIndex = 0;
 
-    final knownEnumTypes = _computeKnownEnumTypes(metadata.allFields, metadata);
     if (hasSelfCase) {
-      // Inline fromJson body since createFactory: false means _$FooFromJson won't exist
       sb.writeln(
         '    if (json[\'__typename\'] == null || json[\'__typename\'] == "$className") {',
       );
-      sb.writeln('      return $className(');
-      for (var f in metadata.allFields) {
-        // Skip ignored/excluded fields
-        if (f.jsonKeyInfo?.ignore == true) continue;
-        if (f.jsonKeyInfo?.includeFromJson == false &&
-            f.jsonKeyInfo?.fromJson == null &&
-            f.jsonKeyInfo?.converter == null) continue;
-        final expr = _fieldFromJsonExpression(f, knownEnumTypes);
-        sb.writeln('        ${f.name}: $expr,');
-      }
-      sb.writeln('      );');
+      sb.writeln('      return _\$${className}FromJson(json);');
       caseIndex++;
     }
 
@@ -180,13 +198,15 @@ class JsonGenerator extends UniversalGenerator {
       }
       sb.writeln('  }');
     }
+
+    return sb.toString();
   }
 
-  void _generateGenericFromJson(
-    StringBuffer sb,
+  String _generateGenericFromJson(
     ClassMetadata metadata,
     GenerationConfig config,
   ) {
+    final sb = StringBuffer();
     final className = metadata.cleanName;
 
     final fromJsonParams = metadata.generics
@@ -234,6 +254,8 @@ class JsonGenerator extends UniversalGenerator {
       sb.writeln('    );');
       sb.writeln('  }');
     }
+
+    return sb.toString();
   }
 
   String _generateToJsonLean(ClassMetadata metadata, GenerationConfig config) {
@@ -341,324 +363,6 @@ class JsonGenerator extends UniversalGenerator {
       }
     }
     return false;
-  }
-
-  /// Generates an inline fromJson factory constructor body with _zc<T> safe casts.
-  /// Used for non-generic classes (direct) and for concrete self-cases in polymorphic hierarchies.
-  String _generateInlineFromJsonBody(
-    String className,
-    List<NameTypeClassComment> fields, [
-    ClassMetadata? metadata,
-  ]) {
-    final knownEnumTypes = _computeKnownEnumTypes(fields, metadata);
-    final sb = StringBuffer();
-    sb.writeln('');
-    sb.writeln('  /// Creates a [$className] instance from JSON');
-    sb.writeln(
-      '  factory $className.fromJson(Map<String, dynamic> json) {',
-    );
-    sb.writeln('    return $className(');
-    for (var f in fields) {
-      // Skip ignored fields
-      if (f.jsonKeyInfo?.ignore == true) continue;
-      if (f.jsonKeyInfo?.includeFromJson == false &&
-          f.jsonKeyInfo?.fromJson == null &&
-          f.jsonKeyInfo?.converter == null) {
-        // Excluded from JSON without custom converter/fromJson — rely on default value
-        continue;
-      }
-      final expr = _fieldFromJsonExpression(f, knownEnumTypes);
-      sb.writeln('      ${f.name}: $expr,');
-    }
-    sb.writeln('    );');
-    sb.writeln('  }');
-    return sb.toString();
-  }
-
-  /// Computes the set of known enum type names from a class's fields.
-  /// Checks both direct enum fields and generic type arguments (e.g., List<EnumType>).
-  Set<String> _computeKnownEnumTypes(List<NameTypeClassComment> fields, [ClassMetadata? metadata]) {
-    var result = <String>{};
-    for (var f in fields) {
-      if (f.type == null) continue;
-      var cleanType = f.type!.replaceAll(r'$', '');
-      if (f.isEnum) {
-        result.add(cleanType.replaceAll('?', ''));
-      }
-    }
-    // Scan actual field types using the analyzer API to detect enum type arguments
-    // in List<E>, Set<E>, Map<K,V> — even when E isn't a standalone field type.
-    if (metadata?.classElement != null) {
-      for (var field in metadata!.classElement.fields) {
-        var dartType = field.type;
-        if (dartType is ParameterizedType) {
-          for (var arg in dartType.typeArguments) {
-            if (arg is InterfaceType && arg.element is EnumElement) {
-              var name = arg.element.name;
-              if (name != null) result.add(name);
-            }
-          }
-        }
-      }
-    }
-    return result;
-  }
-
-  /// Generate a fromJson expression for a single field using ZorphyJsonHelper.cast safe casts.
-  /// Produces expressions like:
-  ///   ZorphyJsonHelper.cast<String>(json, 'name')
-  ///   (ZorphyJsonHelper.cast<num>(json, 'price')).toDouble()
-  ///   DateTime.parse(ZorphyJsonHelper.cast<String>(json, 'createdAt'))
-  String _fieldFromJsonExpression(NameTypeClassComment f, [Set<String> knownEnumTypes = const {}]) {
-    final jsonKeyName = f.jsonKeyInfo?.name ?? f.name;
-    final rawType = f.type ?? 'dynamic';
-
-    // Check for custom converter (manual fromJson)
-    final info = f.jsonKeyInfo;
-    if (info != null && info.fromJson != null &&
-        info.includeFromJson == false) {
-      final jsonFieldName = info.name ?? f.name;
-      final isNullable = rawType.endsWith('?');
-      if (isNullable) {
-        return "json['$jsonFieldName'] != null ? "
-            "${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) "
-            "as $rawType : null";
-      }
-      return "${info.fromJson}(json['$jsonFieldName'] "
-          "as Map<String, dynamic>) as $rawType";
-    }
-
-    // Check for @JsonKey(fromJson: someFn) without includeFromJson: false
-    // This means json_serializable normally handles it, but since we use
-    // createFactory: false we need to replicate the call ourselves.
-    if (info != null && info.fromJson != null &&
-        info.includeFromJson != false) {
-      final jsonFieldName = info.name ?? f.name;
-      final isNullable = rawType.endsWith('?');
-      if (isNullable) {
-        return "json['$jsonFieldName'] == null"
-            " ? null"
-            " : ${info.fromJson}(json['$jsonFieldName'])";
-      }
-      return "${info.fromJson}(json['$jsonFieldName'])";
-    }
-
-    // Check for @JsonKey(converter: SomeConverter()) — uses SomeConverter.fromJson(...)
-    if (info?.converter != null) {
-      final converterName = info!.converter!;
-      // Strip trailing () if present (e.g. "LocaleConverter()" -> "LocaleConverter")
-      final converterBase = converterName.endsWith('()')
-          ? converterName.substring(0, converterName.length - 2)
-          : converterName;
-      final isNullable = rawType.endsWith('?');
-      if (isNullable) {
-        return "$converterBase.fromJson(json['$jsonKeyName'] as Map<String, dynamic>?)";
-      }
-      return "$converterBase.fromJson(json['$jsonKeyName'] as Map<String, dynamic>)";
-    }
-
-    // Clean $ prefixes from type for analysis
-    final cleanType = rawType.replaceAll(r'$', '');
-    final isNullable = cleanType.endsWith('?');
-    final baseType = isNullable
-        ? cleanType.substring(0, cleanType.length - 1)
-        : cleanType;
-
-    // Determine if there's a default value (forces nullable expression + ?? fallback)
-    final hasDefault = info?.defaultValue != null;
-
-    var expr = _typeToFromJsonExpr(baseType, isNullable, jsonKeyName, f, knownEnumTypes);
-
-    // Handle default value: use nullable expression + ?? fallback
-    if (hasDefault) {
-      // Force nullable variant and append default
-      final nullableExpr = _typeToFromJsonExpr(baseType, true, jsonKeyName, f, knownEnumTypes);
-      return '$nullableExpr ?? ${info!.defaultValue}';
-    }
-
-    return expr;
-  }
-
-  /// Core type-to-expression mapping for a single field value.
-  /// Returns the expression to get and cast json['jsonKeyName'] to the target type.
-  String _typeToFromJsonExpr(
-    String baseType,
-    bool isNullable,
-    String jsonKeyName,
-    NameTypeClassComment f,
-    Set<String> knownEnumTypes,
-  ) {
-    // Simple types
-    if (baseType == 'String') {
-      return isNullable
-          ? "ZorphyJsonHelper.cast<String?>(json, '$jsonKeyName')"
-          : "ZorphyJsonHelper.cast<String>(json, '$jsonKeyName')";
-    }
-    if (baseType == 'int') {
-      return isNullable
-          ? "(ZorphyJsonHelper.cast<num?>(json, '$jsonKeyName'))?.toInt()"
-          : "(ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toInt()";
-    }
-    if (baseType == 'double') {
-      return isNullable
-          ? "(ZorphyJsonHelper.cast<num?>(json, '$jsonKeyName'))?.toDouble()"
-          : "(ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toDouble()";
-    }
-    if (baseType == 'num') {
-      return isNullable
-          ? "ZorphyJsonHelper.cast<num?>(json, '$jsonKeyName')"
-          : "ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')";
-    }
-    if (baseType == 'bool') {
-      return isNullable
-          ? "ZorphyJsonHelper.cast<bool?>(json, '$jsonKeyName')"
-          : "ZorphyJsonHelper.cast<bool>(json, '$jsonKeyName')";
-    }
-
-    // DateTime - parse from string
-    if (baseType == 'DateTime') {
-      if (isNullable) {
-        return "json['$jsonKeyName'] == null"
-            " ? null"
-            " : DateTime.parse(ZorphyJsonHelper.cast<String>(json, '$jsonKeyName'))";
-      }
-      return "DateTime.parse(ZorphyJsonHelper.cast<String>(json, '$jsonKeyName'))";
-    }
-
-    // Duration - parse from microseconds (num)
-    if (baseType == 'Duration') {
-      if (isNullable) {
-        return "json['$jsonKeyName'] == null"
-            " ? null"
-            " : Duration(microseconds:"
-            " (ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toInt())";
-      }
-      return "Duration(microseconds:"
-          " (ZorphyJsonHelper.cast<num>(json, '$jsonKeyName')).toInt())";
-    }
-
-    // Enum - use $enumDecode with ZorphyJsonHelper.cast<string> for field-name in error
-    if (f.isEnum && f.enumValues.isNotEmpty) {
-      final enumMapName = "_\$${baseType}EnumMap";
-      if (isNullable) {
-        return "\$enumDecodeNullable($enumMapName,"
-            " ZorphyJsonHelper.cast<String?>(json, '$jsonKeyName'))";
-      }
-      return "\$enumDecode($enumMapName,"
-          " ZorphyJsonHelper.cast<String>(json, '$jsonKeyName'))";
-    }
-
-    // List<E> - cast to List<dynamic>, then map elements
-    if (baseType.startsWith('List<')) {
-      final innerContent = _extractGenericArg(baseType);
-      final innerExpr = _elementCastExpression(innerContent, knownEnumTypes);
-
-      // When the element cast is just identity (e.g. Object, dynamic),
-      // cast directly to the target list type instead of List<dynamic> -> .map() -> toList()
-      // because List<dynamic> isn't assignable to List<Object> in Dart 3.
-      if (innerExpr == 'e') {
-        return isNullable
-            ? "(json['$jsonKeyName'] as $baseType?)"
-            : "(json['$jsonKeyName'] as $baseType)";
-      }
-
-      if (isNullable) {
-        return "(json['$jsonKeyName'] as List<dynamic>?)"
-            "?.map((e) => $innerExpr).toList()";
-      }
-      return "(json['$jsonKeyName'] as List<dynamic>)"
-          ".map((e) => $innerExpr).toList()";
-    }
-
-    // Set<E> - same as List<E> pattern
-    if (baseType.startsWith('Set<')) {
-      final innerContent = _extractGenericArg(baseType);
-      final innerExpr = _elementCastExpression(innerContent, knownEnumTypes);
-
-      if (innerExpr == 'e') {
-        return isNullable
-            ? "(json['$jsonKeyName'] as $baseType?)"
-            : "(json['$jsonKeyName'] as $baseType)";
-      }
-
-      if (isNullable) {
-        return "(json['$jsonKeyName'] as List<dynamic>?)"
-            "?.map((e) => $innerExpr).toSet()";
-      }
-      return "(json['$jsonKeyName'] as List<dynamic>)"
-          ".map((e) => $innerExpr).toSet()";
-    }
-
-    // Map<K,V> - pass through with direct cast (avoid generic type arg erasure issues)
-    if (baseType.startsWith('Map<')) {
-      return isNullable
-          ? "(json['$jsonKeyName'] as $baseType?)"
-          : "(json['$jsonKeyName'] as $baseType)";
-    }
-
-    // dynamic / Object / never
-    if (baseType == 'dynamic' || baseType == 'Object' ||
-        baseType == 'Never' || baseType == 'void') {
-      return "json['$jsonKeyName']";
-    }
-
-    // Custom object - assume has fromJson(Map<String, dynamic>)
-    // For nullable, use null guard to avoid calling fromJson on null
-    if (isNullable) {
-      return "json['$jsonKeyName'] == null"
-          " ? null"
-          " : ${baseType}.fromJson("
-          "ZorphyJsonHelper.cast<Map<String, dynamic>>(json, '$jsonKeyName'))";
-    }
-    return "${baseType}.fromJson("
-        "ZorphyJsonHelper.cast<Map<String, dynamic>>(json, '$jsonKeyName'))";
-  }
-
-  /// Generate a cast expression for a list element inside a .map() call.
-  String _elementCastExpression(String innerType, [Set<String> knownEnumTypes = const {}]) {
-    final trimmed = innerType.trim();
-    final isNullable = trimmed.endsWith('?');
-    final baseType = isNullable
-        ? trimmed.substring(0, trimmed.length - 1)
-        : trimmed;
-
-    switch (baseType) {
-      case 'String':
-        return 'e as String';
-      case 'int':
-        return '(e as num).toInt()';
-      case 'double':
-        return '(e as num).toDouble()';
-      case 'num':
-        return 'e as num';
-      case 'bool':
-        return 'e as bool';
-      case 'dynamic':
-      case 'Object':
-        return 'e';
-      case 'DateTime':
-        return 'DateTime.parse(e as String)';
-    }
-
-    // Check if the inner type is an enum (uses $enumDecode)
-    if (knownEnumTypes.contains(baseType)) {
-      return '\$enumDecode(_\$${baseType}EnumMap, e)';
-    }
-
-    if (baseType.startsWith('List<') || baseType.startsWith('Map<')) {
-      return 'e as $trimmed';
-    }
-
-    // Custom object
-    return '$baseType.fromJson(e as Map<String, dynamic>)';
-  }
-
-  /// Extract the generic type argument from a type string like List<String> -> String
-  String _extractGenericArg(String type) {
-    final start = type.indexOf('<');
-    final end = type.lastIndexOf('>');
-    if (start == -1 || end == -1) return type;
-    return type.substring(start + 1, end).trim();
   }
 
   /// Fields excluded from json_serializable but having manual fromJson converters

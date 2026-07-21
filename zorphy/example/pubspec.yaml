@@ -8,13 +8,13 @@ environment:
 dependencies:
   zorphy_annotation:
     path: ../../zorphy_annotation
-  json_annotation: ^4.11.0
+  json_annotation: ^4.12.0
 
 dev_dependencies:
   zorphy:
     path: ../
-  build_runner: ^2.11.0
-  json_serializable: ^6.13.2
+  build_runner: ^2.15.2
+  json_serializable: ^6.14.0
 
 dependency_overrides:
   analyzer: ^13.0.0
