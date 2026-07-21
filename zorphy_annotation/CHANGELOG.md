@@ -1,3 +1,10 @@
+## [1.9.0] - 2026-07-21
+
+### Break
+
+- Removed `ZorphyJsonHelper` and `ZorphyJsonCastError` classes — no longer used; JSON deserialization is now fully handled by `json_serializable`'s native `checked: true` generation
+- Removed `export 'src/json_helper.dart'` and `export 'src/json_cast_error.dart'` from `zorphy.dart`
+
 ## [1.8.10] - 2026-07-21
 
 ### Change

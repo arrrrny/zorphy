@@ -44,10 +44,10 @@ Add the dependencies to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zorphy_annotation: ^1.8.10
+  zorphy_annotation: ^1.9.0
 
 dev_dependencies:
-  zorphy: ^1.8.10
+  zorphy: ^1.9.0
   build_runner: ^2.4.0
 ```
 

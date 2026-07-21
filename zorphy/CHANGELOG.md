@@ -1,3 +1,24 @@
+## [1.9.0] - 2026-07-21
+
+### Breaking
+
+- Replaced inline `_zc`/`ZorphyJsonHelper` safe-cast approach with native `json_serializable` deserialization using `checked: true` — field-level error messages are now provided by `CheckedFromJsonException` from the `json_serializable` package rather than custom `ZorphyJsonCastError`
+- Removed `zorphy_annotation` source files: `json_helper.dart` and `json_cast_error.dart` — these are no longer needed; all JSON deserialization is handled by `json_serializable` directly
+
+### Fix
+
+- `Map<K, V>` fields (e.g. `Map<String, String>?`, `Map<String, Entity>?`) now correctly deserialize because `checked: true` + native generation produces recursive `.map((k, e) => MapEntry(k, e as String))` conversions in the `.g.dart` file, resolving runtime `type '_Map<String, dynamic>' is not a subtype of type 'Map<String, String>'` errors
+
+### Chore
+
+- Upgraded `build_runner` to ^2.15.2, `source_gen` to ^4.2.3, `json_annotation` to ^4.12.0
+- Removed `dependency_overrides` for `analyzer` and `meta` — packages now resolve coherently against the SDK
+
+### Features preserved from earlier releases (cherry-picked)
+
+- Refined nullable-string property helpers: `text?.isNotEmpty == true` instead of `text != null && text.isNotEmpty`
+- Const constructor support for non-sealed abstract classes
+
 ## [1.8.10] - 2026-07-21
 
 ### Fix
