@@ -23,7 +23,7 @@ abstract class Attachment {
       return LinkAttachment.fromJson(json);
     }
     throw UnsupportedError(
-      "The __typename ' + ${json['__typename']}' is not supported by the Attachment.fromJson constructor.",
+      "The __typename '${json['__typename']}' is not supported by the $className.fromJson constructor.",
     );
   }
 

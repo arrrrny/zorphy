@@ -1124,7 +1124,9 @@ String getPatchClass(
             sb.writeln(
               "    patchMap[$enumName.$name] = (List<dynamic> list) {",
             );
-            sb.writeln("      var updatedList = List.from(list);");
+            sb.writeln(
+              "      var updatedList = List<$elementTypeWithoutDollars>.from(list);",
+            );
             sb.writeln("      if (index >= 0 && index < updatedList.length) {");
             sb.writeln(
               "        updatedList[index] = patch($elementPatchType()).applyTo(updatedList[index] as ${elementTypeWithoutDollars.replaceAll("?", "")});",

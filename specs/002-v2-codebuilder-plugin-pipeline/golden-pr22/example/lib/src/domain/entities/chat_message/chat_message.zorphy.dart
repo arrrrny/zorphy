@@ -26,7 +26,7 @@ abstract class ChatMessage {
       return AssistantMessage.fromJson(json);
     }
     throw UnsupportedError(
-      "The __typename ' + ${json['__typename']}' is not supported by the ChatMessage.fromJson constructor.",
+      "The __typename '${json['__typename']}' is not supported by the $className.fromJson constructor.",
     );
   }
 

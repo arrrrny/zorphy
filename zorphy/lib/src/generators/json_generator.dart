@@ -160,9 +160,7 @@ class JsonGenerator extends UniversalGenerator {
     }
 
     sb.writeln(
-      '    throw UnsupportedError("The __typename \' + '
-              r"${json['__typename']}" +
-          '\' is not supported by the $className.fromJson constructor.");',
+      "    throw UnsupportedError(\"The __typename '\${json['__typename']}' is not supported by the \$className.fromJson constructor.\");",
     );
     sb.writeln('  }');
 

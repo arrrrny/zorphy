@@ -90,7 +90,7 @@ class Vehicle {
       return Truck.fromJson(json);
     }
     throw UnsupportedError(
-      "The __typename ' + ${json['__typename']}' is not supported by the Vehicle.fromJson constructor.",
+      "The __typename '${json['__typename']}' is not supported by the $className.fromJson constructor.",
     );
   }
 

@@ -16,17 +16,17 @@ class ZorphyEmitter {
 
   /// Creates a new emitter with the default page width (120).
   ZorphyEmitter()
-      : _formatter = DartFormatter(
-          languageVersion: DartFormatter.latestLanguageVersion,
-          pageWidth: pageWidth,
-        );
+    : _formatter = DartFormatter(
+        languageVersion: DartFormatter.latestLanguageVersion,
+        pageWidth: pageWidth,
+      );
 
   /// Creates a new emitter with a custom page width.
   ZorphyEmitter.withPageWidth(int width)
-      : _formatter = DartFormatter(
-          languageVersion: DartFormatter.latestLanguageVersion,
-          pageWidth: width,
-        );
+    : _formatter = DartFormatter(
+        languageVersion: DartFormatter.latestLanguageVersion,
+        pageWidth: width,
+      );
 
   /// Emits the given [library] spec to a formatted Dart source string.
   ///
@@ -53,7 +53,7 @@ class ZorphyEmitter {
 
     // If there's already a Library spec, use it.
     final existingLib = specs.whereType<Library>().toList();
-    if (existingLib.length == 1) {
+    if (specs.length == 1 && existingLib.length == 1) {
       return emit(existingLib.first);
     }
 

@@ -19,7 +19,7 @@ sealed class Shape {
       return Rectangle.fromJson(json);
     }
     throw UnsupportedError(
-      "The __typename ' + ${json['__typename']}' is not supported by the Shape.fromJson constructor.",
+      "The __typename '${json['__typename']}' is not supported by the $className.fromJson constructor.",
     );
   }
 }

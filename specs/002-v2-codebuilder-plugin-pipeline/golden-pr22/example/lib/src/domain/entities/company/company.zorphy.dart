@@ -165,7 +165,7 @@ class CompanyPatch extends PatchBase<Company, Company$> {
     UserPatch Function(UserPatch) patch,
   ) {
     patchMap[Company$.employees] = (List<dynamic> list) {
-      var updatedList = List.from(list);
+      var updatedList = List<User>.from(list);
       if (index >= 0 && index < updatedList.length) {
         updatedList[index] = patch(
           UserPatch(),

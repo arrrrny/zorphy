@@ -22,7 +22,7 @@ sealed class PaymentMethod {
       return BankTransfer.fromJson(json);
     }
     throw UnsupportedError(
-      "The __typename ' + ${json['__typename']}' is not supported by the PaymentMethod.fromJson constructor.",
+      "The __typename '${json['__typename']}' is not supported by the $className.fromJson constructor.",
     );
   }
 }

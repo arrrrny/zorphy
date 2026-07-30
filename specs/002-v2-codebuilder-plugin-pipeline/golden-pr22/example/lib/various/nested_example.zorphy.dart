@@ -479,7 +479,7 @@ class CategoryNodePatch extends PatchBase<CategoryNode, CategoryNode$> {
     CategoryNodePatch Function(CategoryNodePatch) patch,
   ) {
     patchMap[CategoryNode$.children] = (List<dynamic> list) {
-      var updatedList = List.from(list);
+      var updatedList = List<CategoryNode>.from(list);
       if (index >= 0 && index < updatedList.length) {
         updatedList[index] = patch(
           CategoryNodePatch(),

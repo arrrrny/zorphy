@@ -526,7 +526,7 @@ class TreeNodePatch extends PatchBase<TreeNode, TreeNode$> {
     TreeNodePatch Function(TreeNodePatch) patch,
   ) {
     patchMap[TreeNode$.children] = (List<dynamic> list) {
-      var updatedList = List.from(list);
+      var updatedList = List<TreeNode>.from(list);
       if (index >= 0 && index < updatedList.length) {
         updatedList[index] = patch(
           TreeNodePatch(),

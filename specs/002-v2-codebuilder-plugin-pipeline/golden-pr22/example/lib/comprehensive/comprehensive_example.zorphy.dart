@@ -353,7 +353,7 @@ sealed class PaymentMethod {
       return PayPal.fromJson(json);
     }
     throw UnsupportedError(
-      "The __typename ' + ${json['__typename']}' is not supported by the PaymentMethod.fromJson constructor.",
+      "The __typename '${json['__typename']}' is not supported by the $className.fromJson constructor.",
     );
   }
 }
@@ -1693,7 +1693,7 @@ class CategoryNodePatch extends PatchBase<CategoryNode, CategoryNode$> {
     CategoryNodePatch Function(CategoryNodePatch) patch,
   ) {
     patchMap[CategoryNode$.children] = (List<dynamic> list) {
-      var updatedList = List.from(list);
+      var updatedList = List<CategoryNode>.from(list);
       if (index >= 0 && index < updatedList.length) {
         updatedList[index] = patch(
           CategoryNodePatch(),
@@ -4090,7 +4090,7 @@ class CompanyPatch extends PatchBase<Company, Company$> {
     EmployeePatch Function(EmployeePatch) patch,
   ) {
     patchMap[Company$.employees] = (List<dynamic> list) {
-      var updatedList = List.from(list);
+      var updatedList = List<Employee>.from(list);
       if (index >= 0 && index < updatedList.length) {
         updatedList[index] = patch(
           EmployeePatch(),

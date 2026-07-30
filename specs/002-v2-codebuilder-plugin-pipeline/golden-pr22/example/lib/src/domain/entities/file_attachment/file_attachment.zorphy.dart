@@ -99,7 +99,7 @@ class FileAttachment extends Attachment {
       return ImageFileAttachment.fromJson(json);
     }
     throw UnsupportedError(
-      "The __typename ' + ${json['__typename']}' is not supported by the FileAttachment.fromJson constructor.",
+      "The __typename '${json['__typename']}' is not supported by the $className.fromJson constructor.",
     );
   }
 
