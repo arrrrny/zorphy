@@ -1020,11 +1020,6 @@ String getPatchClass(
   List<String> knownClasses, [
   List<String> genericTypeNames = const [],
 ]) {
-  if (fields.isEmpty) {
-    // Don't generate patch classes for classes with no fields
-    return '';
-  }
-
   String classNameTrimmed = '${className.replaceAll("\$", "")}';
   String enumName = '${classNameTrimmed}\$';
 
@@ -1040,6 +1035,18 @@ String getPatchClass(
   sb.writeln("    return entity.patchWith$classNameTrimmed(patchInput: this);");
   sb.writeln("  }");
   sb.writeln();
+
+  if (fields.isEmpty) {
+    // Fieldless class (e.g. an empty explicit subtype): emit a minimal
+    // patch class — changeTo extensions on sibling subtypes reference it.
+    // PatchBase's type parameters are used covariantly, so a shared
+    // placeholder enum keeps the generic signature satisfied.
+    sb.writeln('}');
+    sb.writeln();
+    sb.writeln('/// Placeholder field enum for fieldless [$classNameTrimmed].');
+    sb.writeln('enum $enumName { none }');
+    return sb.toString();
+  }
 
   // Generate with methods
   for (var field in fields) {
@@ -1248,10 +1255,16 @@ String getPatchWithMethod(
   String className, {
   bool hidePublicConstructor = false,
 }) {
-  if (fields.isEmpty) return '';
-
   var classNameTrimmed = className.replaceAll("\$", "");
   var enumName = '${classNameTrimmed}\$';
+
+  if (fields.isEmpty) {
+    // Fieldless class: emit an identity patchWith so a generated patch
+    // class's applyTo has a target (changeTo chains depend on it).
+    return "  $classNameTrimmed patchWith$classNameTrimmed({"
+        "$classNameTrimmed"
+        "Patch? patchInput}) => this;\n";
+  }
 
   var sb = StringBuffer();
 

@@ -40,10 +40,14 @@ class PatchGenerator extends ConcreteClassGenerator {
   @override
   /// Returns true when patch generation is enabled for the context.
   bool shouldGenerate(GenerationContext context) {
-    // Don't generate patchWith for classes with explicitSubTypes (can't be instantiated)
-    return context.config.generatePatch &&
-        context.metadata.allFields.isNotEmpty &&
-        !context.metadata.isAbstract;
+    // Don't generate patchWith for classes with explicitSubTypes
+    // (can't be instantiated). Fieldless explicit subtypes still need
+    // patchWith — their patch class's applyTo calls it.
+    if (!context.config.generatePatch || context.metadata.isAbstract) {
+      return false;
+    }
+    return context.metadata.allFields.isNotEmpty ||
+        context.metadata.isInParentExplicitSubtypes;
   }
 }
 
@@ -76,10 +80,14 @@ class PatchClassGenerator extends ConcreteClassGenerator {
   @override
   /// Returns true when Patch classes should be generated.
   bool shouldGenerate(GenerationContext context) {
-    // Generate patch class even for explicitSubTypes (needed for changeTo methods)
-    return context.config.generatePatch &&
-        context.metadata.allFields.isNotEmpty &&
-        !context.metadata.isAbstract;
+    // Generate patch class even for explicitSubTypes (needed for changeTo
+    // methods). Fieldless explicit subtypes still need a patch class —
+    // changeTo extensions on sibling subtypes reference it.
+    if (!context.config.generatePatch || context.metadata.isAbstract) {
+      return false;
+    }
+    return context.metadata.allFields.isNotEmpty ||
+        context.metadata.isInParentExplicitSubtypes;
   }
 }
 
