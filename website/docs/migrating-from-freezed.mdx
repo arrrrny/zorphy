@@ -1,0 +1,63 @@
+---
+sidebar_position: 4
+title: Migrating from Freezed
+---
+
+# Migrating from Freezed
+
+`zorphy_migrator` is a codemod that converts freezed model classes to
+zorphy using resolved AST analysis — not regex — so union variants,
+generics, defaults, and `@JsonKey` renames are handled correctly.
+
+## Usage
+
+```bash
+dart pub global activate zorphy_migrator
+# or add it as a dev dependency and: dart run zorphy_migrator ...
+
+zorphy_migrator migrate lib/ --dry-run                    # preview unified diff (default)
+zorphy_migrator migrate lib/ --apply --report MIGRATION.md
+zorphy_migrator migrate lib/ --apply --fail-on-manual     # CI: exit 1 if anything needs a human
+```
+
+Exit codes: `0` = clean migration, `1` = items need manual attention,
+`2` = analysis error.
+
+## What gets converted
+
+| freezed construct | zorphy output |
+| --- | --- |
+| `@freezed class Foo with _$Foo { const factory Foo({...}) = _Foo; }` | `@Zorphy(preset: ZorphyPreset.lean) abstract class $Foo { ... }` |
+| Union `factory Foo.ok(T v) = Ok;` | sealed `$$Foo` base + `$Ok implements $$Foo` subtypes |
+| `factory Foo.fromJson(...)` | `generateJson: true` on the annotation |
+| `@Default(expr)` | `@JsonKey(defaultValue: expr)` on the getter |
+| `@JsonKey(...)` | preserved verbatim on the getter |
+| Field types referencing other migrated classes | rewritten to `$`-prefixed form (`List<CartItem>` → `List<$CartItem>`) |
+
+Classes that provably use only lean features are emitted with
+`preset: ZorphyPreset.lean`; everything else uses the standard preset
+(byte-compatible with zorphy 1.x defaults).
+
+## What is NOT converted (always reported, never dropped)
+
+- `@unfreezed` mutable classes — zorphy is immutable-first
+- Custom getters/methods in the class body
+- Non-factory constructors and asserts
+- `@Default` expressions that reference their own field
+
+Every skipped construct appears in the report with `file:line` and a
+reason. The tool never deletes your files.
+
+## After `--apply`
+
+The report tail walks you through it:
+
+1. Remove `freezed` / `freezed_annotation` from pubspec; add `zorphy`
+   (dev) + `zorphy_annotation`.
+2. Delete `*.freezed.dart` files; keep `.g.dart` only where
+   `generateJson: true` was emitted.
+3. Update `part` directives: drop `.freezed.dart`, add `.zorphy.dart`.
+4. Replace `when`/`map` calls with Dart 3 `switch` expressions on the
+   sealed base.
+5. `dart run build_runner build --delete-conflicting-outputs`, then
+   `dart analyze`.

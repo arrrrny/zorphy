@@ -1,3 +1,16 @@
+## [2.0.0] - 2026-07-30
+
+### Break
+
+- All feature flags on `@Zorphy`/`@Zorphy2` are now `bool?` (default `null` = inherit from preset). Source-compatible for named-argument use; the resolved semantics are unchanged for defaults
+- `ZorphyX.generateFilter` getter type changed `bool` → `bool?`
+
+### Feat
+
+- New `ZorphyPreset` enum (`lean` / `standard` / `full`) and `preset` parameter on both annotations (default `standard`, reproducing 1.9.0 output)
+- New flags: `generateCopyWith`, `generatePropertyHelpers`, `generateEqualsToString`, `generateChangeTo`
+- `@zorphy2`/`Zorphy2` deprecated — the generator is single-pass since 2.0; the alias behaves identically and will be removed in a later major
+
 ## [1.9.0] - 2026-07-21
 
 ### Break
