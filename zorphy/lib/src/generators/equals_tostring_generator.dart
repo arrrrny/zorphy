@@ -22,4 +22,12 @@ class EqualsToStringGenerator extends ConcreteClassGenerator {
 
     return sb.toString();
   }
+
+  @override
+  /// Returns true when equality/toString generation is enabled.
+  bool shouldGenerate(GenerationContext context) {
+    // Concrete classes only (base gate) and flag-enabled.
+    return !context.metadata.isAbstract &&
+        context.config.generateEqualsToString;
+  }
 }
