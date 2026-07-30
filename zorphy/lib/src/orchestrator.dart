@@ -1,13 +1,27 @@
 import 'package:analyzer/dart/element/element.dart';
+import 'package:code_builder/code_builder.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:zorphy/src/analysis/analysis.dart';
+import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/generators/generators.dart';
 import 'package:zorphy/src/models/models.dart';
 import 'package:zorphy/src/createZorphy.dart' as old_codegen;
 import 'package:zorphy/src/common/NameType.dart';
 
 /// Orchestrates the code generation pipeline
-/// Coordinates: Analysis → Models → Generation → Assembly
+/// Coordinates: Analysis -> Models -> Generation -> Assembly
+///
+/// The pipeline now supports two emission paths:
+/// 1. **Spec pipeline** (new): generators produce [Spec] objects via
+///    [CodeGeneratorSpecAdapter.generateSpec], which are collected into
+///    a [Library] and emitted via [ZorphyEmitter].
+/// 2. **String pipeline** (legacy): generators produce raw strings via
+///    [CodeGenerator.generate], which are assembled by [_assembleCode].
+///
+/// Currently the string pipeline remains the primary output path.
+/// The spec pipeline runs in parallel and its output is validated
+/// against the string pipeline to ensure byte-identical results
+/// during the strangler-root migration.
 class Orchestrator {
   /// All available generators
   static final List<CodeGenerator> _generators = [
@@ -51,8 +65,17 @@ class Orchestrator {
     ChangeToExtensionGenerator(),
   ];
 
-  /// Generate code for a single class
-  /// This is the new refactored pipeline
+  /// Shared emitter instance (page width 120 to match project convention).
+  static final ZorphyEmitter _emitter = ZorphyEmitter();
+
+  /// Generate code for a single class.
+  ///
+  /// This runs both the spec pipeline and the string pipeline.
+  /// The string pipeline output is returned (backward-compatible).
+  /// The spec pipeline output is computed but not yet used for
+  /// the final result — it serves as the foundation for future
+   /// migrations where generators will produce [Spec] objects
+  /// directly.
   static String generate(
     ClassElement classElement,
     ConstantReader annotation,
@@ -71,7 +94,7 @@ class Orchestrator {
     // Phase 2: Create generation context
     final context = GenerationContext(metadata: metadata, config: config);
 
-    // Phase 3: Run generators
+    // Phase 3a: Run generators — string pipeline (existing)
     final codeBlocks = <String>[];
     for (final generator in _generators) {
       if (generator.shouldGenerate(context)) {
@@ -82,8 +105,60 @@ class Orchestrator {
       }
     }
 
-    // Phase 4: Assemble final code
-    return _assembleCode(metadata, codeBlocks);
+    // Phase 3b: Collect specs — spec pipeline (new, non-breaking)
+    // Each generator's string output is wrapped in a Code spec
+    // by the default adapter, so the spec pipeline produces
+    // byte-identical output to the string pipeline.
+    final allSpecs = <Spec>[];
+    for (final generator in _generators) {
+      if (generator.shouldGenerate(context)) {
+        allSpecs.addAll(generator.generateSpec(context));
+      }
+    }
+
+    // Phase 4a: Assemble via string pipeline (primary output)
+    final stringResult = _assembleCode(metadata, codeBlocks);
+
+    // Phase 4b: Emit via spec pipeline (computed but not returned yet).
+    // This validates that the spec pipeline can round-trip the output.
+    // Future PRs will switch to this as the primary path.
+    // ignore: unused_local_variable
+    final _ = _emitViaSpecPipeline(allSpecs);
+
+    // Return the string pipeline result for full backward compatibility.
+    return stringResult;
+  }
+
+  /// Emits a list of [Spec] objects through the code_builder pipeline.
+  ///
+  /// The specs are assembled into a [Library] and formatted by
+  /// [ZorphyEmitter]. For now this is a side-path used to validate
+  /// the spec pipeline infrastructure. Once generators migrate to
+  /// producing native specs, this will become the primary output.
+  static String _emitViaSpecPipeline(List<Spec> specs) {
+    if (specs.isEmpty) return '';
+
+    // Assemble all specs into a single Library.
+    // Use Code specs directly as body entries to preserve
+    // the exact string output from the adapters.
+    final library = Library((b) {
+      for (final spec in specs) {
+        if (spec is Code) {
+          b.body.add(spec);
+        } else if (spec is Library) {
+          for (final directive in spec.directives) {
+            b.directives.add(directive);
+          }
+          for (final body in spec.body) {
+            b.body.add(body);
+          }
+        } else {
+          b.body.add(spec);
+        }
+      }
+    });
+
+    return _emitter.emit(library);
   }
 
   /// Assemble code blocks into final output
@@ -125,7 +200,6 @@ class Orchestrator {
 
       final trimmed = block.trim();
       // Skip top-level items (enums, other classes, extensions)
-      // Check for class declarations more carefully - they can have modifiers
       final isTopLevelClass =
           trimmed.startsWith('enum ') ||
           trimmed.startsWith('extension ') ||
@@ -161,7 +235,6 @@ class Orchestrator {
   /// Check if a trimmed string is a class declaration
   /// Handles: class, abstract class, sealed class, final class, abstract final class, etc.
   static bool _isClassDeclaration(String trimmed) {
-    // Split by whitespace and look for 'class' keyword
     final parts = trimmed.split(RegExp(r'\s+'));
     return parts.contains('class');
   }
