@@ -136,8 +136,10 @@ class PropertyHelperGenerator extends UniversalGenerator {
   }
 
   @override
-  /// Returns true when there are fields or subtypes to support.
+  /// Returns true when property helpers are enabled and there are fields
+  /// or subtypes to support.
   bool shouldGenerate(GenerationContext context) {
+    if (!context.config.generatePropertyHelpers) return false;
     // Generate if there are fields or subtypes
     return context.metadata.allFields.isNotEmpty ||
         context.metadata.polymorphicSubtypes.isNotEmpty;

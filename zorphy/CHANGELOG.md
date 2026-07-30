@@ -1,3 +1,26 @@
+## [2.0.0] - 2026-07-30
+
+### Break
+
+- `analyzer` constraint widened to `>=13.0.0 <15.0.0` — consumers on modern Dart toolchains (analyzer 14.x) now resolve without overrides
+- `build.yaml` consolidated to a single builder: one generation pass per library (roughly 2x faster consumer builds). The second pass (`zorphy2` builder) no longer exists; `@zorphy2`/`@Zorphy2` keep working as deprecated aliases of `@zorphy`
+- Removed process-global static cross-asset state (`_allAnnotatedClasses`) — annotated-class graphs are now built per library, so build_runner caching/invalidation works correctly
+- Fieldless explicit subtypes now emit a minimal patch class and identity `patchWith` — `changeTo` extensions reference them (previously produced undefined-method errors)
+
+### Feat
+
+- `ZorphyPreset` (`lean` / `standard` / `full`) plus per-feature `bool?` flags (`generateCopyWith`, `generatePropertyHelpers`, `generateEqualsToString`, `generateChangeTo`, and existing flags now nullable) — `null` inherits from the preset, explicit values override it
+- `standard` preset reproduces 1.9.0 output semantics — upgrading with no annotation changes keeps full output (see note on `generateFilter` below)
+- `lean` preset emits only class + constructor + copyWith + `==`/hashCode/toString; `full` adds `copyWithFn`
+- All flag resolution is centralized in `GenerationConfig`; generators no longer read annotations directly
+- CI matrix verifies `dart test` against analyzer 13.x and 14.x
+
+### Note
+
+- The deprecated `const zorphy`/`const zorphy2` top-level constants previously carried `generateFilter: false` (while the class default was `true`); in 2.0 both paths resolve consistently to the `standard` preset (`generateFilter: true`). Affected files gain `Fields` filter descriptors on regeneration. Pin `generateFilter: false` explicitly to opt out.
+
+See MIGRATION-v2.md for the upgrade path.
+
 ## [1.9.0] - 2026-07-21
 
 ### Breaking

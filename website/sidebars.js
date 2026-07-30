@@ -11,6 +11,16 @@ const sidebars = {
       label: 'Features'
     },
     {
+      type: 'doc',
+      id: 'vs-freezed',
+      label: 'Zorphy vs Freezed'
+    },
+    {
+      type: 'doc',
+      id: 'migrating-from-freezed',
+      label: 'Migrating from Freezed'
+    },
+    {
       type: 'category',
       label: 'Examples',
       items: [

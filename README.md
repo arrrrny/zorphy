@@ -38,6 +38,117 @@ You can also find the package on **[pub.dev](https://pub.dev/packages/zorphy)**.
 - 🤖 **AI-Friendly CLI** - Command-line tool optimized for AI agents and developers
 - 🔌 **MCP Server** - Model Context Protocol server for agentic integration
 
+## ⚖️ Zorphy vs Freezed
+
+Both generate immutable data classes. Zorphy goes further — it is a full
+**entity toolkit** with a nested patch system, filter/query descriptors,
+compareTo diffs, and an AI-agent CLI/MCP server.
+
+| Capability | zorphy 2.0 | freezed 3.2.5 |
+| --- | --- | --- |
+| Immutable data classes + copyWith | ✅ | ✅ |
+| Function-based copyWith (`copyWithFn`) | ✅ opt-in (`ZorphyPreset.full`) | ❌ |
+| JSON + polymorphic discriminators + `toJsonLean` | ✅ | ✅ (no `toJsonLean`) |
+| Sealed unions | ✅ sealed `$$Base` + Dart 3 pattern matching | ✅ via `when`/`map` helpers |
+| **Nested patch system** (partial updates of deep graphs) | ✅ `UserPatch()..withAddressPatch(...)` | ❌ manual nested copyWith chains |
+| **Filter/query descriptors** (`Field<E, T>`) | ✅ | ❌ |
+| **compareTo diffs** between instances | ✅ | ❌ |
+| **changeTo conversions** between subtypes | ✅ | ❌ |
+| Multiple interface inheritance with generics | ✅ | ❌ |
+| Self-referencing types | ✅ | ✅ |
+| CLI + MCP server for scaffolding | ✅ | ❌ |
+| Output size control | ✅ `ZorphyPreset.lean/standard/full` + per-feature flags | ❌ |
+| analyzer 14 support | ✅ `>=13.0.0 <15.0.0` | ❌ caps `analyzer <11.0.0` (as of 2026-07-30) |
+
+**Where freezed differs (honest notes):** freezed's mixin pattern
+(`with _$Foo`) keeps the annotated class itself concrete; zorphy uses
+`abstract class $Foo` + generated `Foo`. freezed's `when`/`map` helpers
+are answered in zorphy by Dart 3's native exhaustive `switch` on the
+sealed base. Freezed's ecosystem is older and larger.
+
+### Side by side
+
+**1. Simple data class** — freezed:
+
+```dart
+@freezed
+class User with _$User {
+  const factory User({required String id, required String name, String? email}) = _User;
+  factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
+}
+```
+
+zorphy (lean preset — no patch/filter/compareTo bloat):
+
+```dart
+@Zorphy(preset: ZorphyPreset.lean, generateJson: true)
+abstract class $User {
+  String get id;
+  String get name;
+  String? get email;
+}
+```
+
+**2. Sealed union** — freezed:
+
+```dart
+@freezed
+class Result with _$Result {
+  const factory Result.ok(String value) = Ok;
+  const factory Result.err(String message) = Err;
+}
+```
+
+zorphy (real sealed hierarchy, exhaustive Dart 3 switch):
+
+```dart
+@Zorphy(explicitSubTypes: [$Ok, $Err])
+abstract class $$Result {}
+
+@Zorphy()
+abstract class $Ok implements $$Result { String get value; }
+
+@Zorphy()
+abstract class $Err implements $$Result { String get message; }
+
+String describe(Result r) => switch (r) {
+  Ok(:final value) => 'ok: $value',
+  Err(:final message) => 'err: $message', // exhaustive — no default needed
+};
+```
+
+**3. Nested partial update** — freezed requires manual deep copyWith:
+
+```dart
+user.copyWith(address: user.address.copyWith(city: 'Berlin'));
+```
+
+zorphy's patch system composes:
+
+```dart
+final patch = ProfilePatch()
+  ..withName('Ada')
+  ..withAddressPatch(AddressPatch()..withCity('Berlin'));
+final updated = patch.applyTo(profile);
+```
+
+All three zorphy examples are real, compilable code — see
+[`zorphy/example/lib/comparison/`](zorphy/example/lib/comparison/).
+
+**Migrating from freezed?** Use the
+[`zorphy_migrator`](zorphy_migrator/) codemod:
+
+```bash
+dart pub global activate zorphy_migrator
+zorphy_migrator migrate lib/ --dry-run    # preview unified diff
+zorphy_migrator migrate lib/ --apply --report MIGRATION.md
+```
+
+It converts simple classes, sealed unions, `@Default`, `@JsonKey`, and
+fromJson/toJson automatically, and reports anything that needs human
+attention with `file:line` — nothing is silently dropped. See the
+[migration guide](https://arrrrny.github.io/zorphy/docs/migrating-from-freezed).
+
 ## 📦 Installation
 
 Add the dependencies to your `pubspec.yaml`:
