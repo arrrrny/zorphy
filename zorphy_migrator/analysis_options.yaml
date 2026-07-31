@@ -1,0 +1,6 @@
+analyzer:
+  exclude:
+    # Golden fixtures are intentionally not analyzable: input.dart files
+    # reference not-yet-generated .freezed.dart parts and expected.dart
+    # files are zorphy output staged before build_runner runs.
+    - test/fixtures/**

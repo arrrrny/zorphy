@@ -55,8 +55,9 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
   }
 
   @override
-  /// Returns true when explicit subtypes are defined.
+  /// Returns true when changeTo is enabled and explicit subtypes exist.
   bool shouldGenerate(GenerationContext context) {
-    return context.metadata.explicitSubtypes.isNotEmpty;
+    return context.config.generateChangeTo &&
+        context.metadata.explicitSubtypes.isNotEmpty;
   }
 }

@@ -5,6 +5,9 @@ targets:
         enabled: true
 
 builders:
+  # Single unified builder (since 2.0): one PartBuilder pass per library
+  # handles both @Zorphy and @Zorphy2 annotations and resolves polymorphic
+  # ordering internally — the former second pass (zorphy2) no longer exists.
   zorphy:
     target: "zorphy"
     import: "package:zorphy/builder.dart"
@@ -14,11 +17,3 @@ builders:
     build_to: source
     applies_builders: ["source_gen|combining_builder"]
     runs_before: ["json_serializable:json_serializable"]
-  zorphy2:
-    target: ":zorphy2_generator"
-    import: "package:zorphy/builder2.dart"
-    builder_factories: ["zorphy2Builder"]
-    build_extensions: { ".dart": [".zorphy2.dart"] }
-    auto_apply: dependents
-    build_to: source
-    runs_before: ["json_serializable|json_serializable", "zorphy:zorphy"]

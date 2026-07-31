@@ -63,11 +63,10 @@ class CopyWithGenerator extends UniversalGenerator {
   @override
   /// Returns true when copyWith generation is enabled for the context.
   bool shouldGenerate(GenerationContext context) {
-    // CopyWith is always generated for concrete classes
     // For abstract classes, only if generateCopyWithFn is true
     if (context.metadata.isAbstract) {
       return context.config.generateCopyWithFn;
     }
-    return true;
+    return context.config.generateCopyWith;
   }
 }
