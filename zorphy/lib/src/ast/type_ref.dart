@@ -44,8 +44,27 @@ TypeReference withLibrary(TypeReference ref, String library) {
   });
 }
 
-TypeReference referConcreteType(String type) =>
-    referType(type.replaceAll('\$', ''));
+TypeReference referConcreteType(String type) {
+  // Remove dollar signs from type names but preserve import prefixes like api$
+  final processed = type.replaceAllMapped(
+    RegExp(r'(\w+\$\.)?(\$+)?(\w+)(<[^>]+>)?(\?)?'),
+    (m) {
+      final prefix = m.group(1) ?? ''; // e.g., "api$."
+      final dollarPrefix = m.group(2) ?? ''; // e.g., "$$" or "$"
+      final typeName = m.group(3) ?? ''; // e.g., "Order"
+      final typeArgs = m.group(4) ?? ''; // e.g., "<String>"
+      final nullable = m.group(5) ?? ''; // e.g., "?"
+
+      // Recursively clean type arguments
+      final cleanTypeArgs = typeArgs.isEmpty
+          ? ''
+          : '<${typeArgs.substring(1, typeArgs.length - 1).split(',').map((arg) => referConcreteType(arg.trim()).symbol).join(', ')}>';
+
+      return '$prefix$typeName$cleanTypeArgs$nullable';
+    },
+  );
+  return referType(processed);
+}
 
 List<String> _splitTypeArgs(String args) {
   if (args.isEmpty) return [];

@@ -57,7 +57,7 @@ class CopyWithGenerator extends UniversalGenerator implements SpecGenerator {
     }
 
     final copyWithClassName = metadata.isAbstract
-        ? (metadata.originalName.startsWith(r'\$\$')
+        ? (metadata.originalName.startsWith(r'$$')
               ? metadata.cleanName
               : '\$${metadata.cleanName}')
         : metadata.cleanName;
@@ -106,7 +106,7 @@ class CopyWithGenerator extends UniversalGenerator implements SpecGenerator {
     }
 
     final copyWithClassName = metadata.isAbstract
-        ? (metadata.originalName.startsWith(r'\$\$')
+        ? (metadata.originalName.startsWith(r'$$')
               ? metadata.cleanName
               : '\$${metadata.cleanName}')
         : metadata.cleanName;
@@ -147,6 +147,7 @@ class CopyWithGenerator extends UniversalGenerator implements SpecGenerator {
       specs.add(_buildCopyWithFnMethod(
         activeFields,
         classNameTrimmed,
+        hidePublicConstructor: context.config.hidePublicConstructor,
       ));
     }
 
@@ -198,6 +199,9 @@ class CopyWithGenerator extends UniversalGenerator implements SpecGenerator {
         p.name = f.name;
         p.type = refer(nullableType);
         p.named = true;
+        if (covariantFields.contains(f.name)) {
+          p.covariant = true;
+        }
       }));
     }
 
@@ -259,8 +263,9 @@ class CopyWithGenerator extends UniversalGenerator implements SpecGenerator {
 
   Method _buildCopyWithFnMethod(
     List<NameTypeClassComment> fields,
-    String classNameTrimmed,
-  ) {
+    String classNameTrimmed, {
+    bool hidePublicConstructor = false,
+  }) {
     final params = <Parameter>[];
     for (final f in fields) {
       final fieldType = helpers.replaceDollarTypesWithConcrete(
@@ -274,7 +279,8 @@ class CopyWithGenerator extends UniversalGenerator implements SpecGenerator {
     }
 
     final body = StringBuffer();
-    body.writeln('return $classNameTrimmed(');
+    final constructorSuffix = hidePublicConstructor ? '._' : '';
+    body.writeln('return $classNameTrimmed$constructorSuffix(');
     for (final f in fields) {
       body.writeln(
         '  ${f.name}: ${f.name} != null ? ${f.name}(this.${f.name}) : this.${f.name},',

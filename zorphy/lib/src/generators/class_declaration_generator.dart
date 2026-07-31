@@ -208,9 +208,11 @@ class ClassDeclarationGenerator extends UniversalGenerator
 
           // JsonKey annotation
           if (f.jsonKeyInfo != null) {
+            final annStr = f.jsonKeyInfo!.toAnnotationString();
+            final cleanAnn = annStr.startsWith('@') ? annStr.substring(1) : annStr;
             m.annotations.add(
               CodeExpression(
-                Code(f.jsonKeyInfo!.toAnnotationString()),
+                Code(cleanAnn),
               ),
             );
           }
@@ -282,7 +284,7 @@ class ClassDeclarationGenerator extends UniversalGenerator
         c.annotations.add(
           CodeExpression(
             Code(
-              '@JsonSerializable(explicitToJson: ${config.explicitToJson}, checked: true$genericParams$constructorParam)',
+              'JsonSerializable(explicitToJson: ${config.explicitToJson}, checked: true$genericParams$constructorParam)',
             ),
           ),
         );
@@ -389,19 +391,20 @@ class ClassDeclarationGenerator extends UniversalGenerator
 
         // JsonKey annotation
         if (f.jsonKeyInfo != null) {
+          final annStr = f.jsonKeyInfo!
+              .toAnnotationString(includeDefaultValue: true);
+          final cleanAnn = annStr.startsWith('@') ? annStr.substring(1) : annStr;
           fd.annotations.add(
             CodeExpression(
-              Code(
-                f.jsonKeyInfo!
-                    .toAnnotationString(includeDefaultValue: true),
-              ),
+              Code(cleanAnn),
             ),
           );
         }
 
         // Additional annotations
         for (final ann in f.additionalAnnotations) {
-          fd.annotations.add(CodeExpression(Code(ann)));
+          final cleanAnn = ann.startsWith('@') ? ann.substring(1) : ann;
+          fd.annotations.add(CodeExpression(Code(cleanAnn)));
         }
       });
 
@@ -492,10 +495,9 @@ class ClassDeclarationGenerator extends UniversalGenerator
           'this.${f.name} = ${f.name} ?? $defaultValueString',
         );
       } else {
-        var safeFieldType = fieldType ?? 'dynamic';
         params.add(Parameter((p) {
           p.name = f.name;
-          p.type = referType(safeFieldType);
+          p.toThis = true;
           p.named = true;
           p.required = !isNullable;
         }));
@@ -520,10 +522,11 @@ class ClassDeclarationGenerator extends UniversalGenerator
         initParts.add('super()');
       } else if (hasExtends && !extendsAbstractClass) {
         initParts.addAll(initializers);
-        // Super call with parent fields
+        // Super call with parent fields (only those present in params)
+        final paramNames = params.map((p) => p.name).toSet();
         final superArgs = <String>[];
         for (final f in fields) {
-          if (parentFields.contains(f.name)) {
+          if (parentFields.contains(f.name) && paramNames.contains(f.name)) {
             superArgs.add('${f.name}: ${f.name}');
           }
         }
@@ -568,18 +571,16 @@ class ClassDeclarationGenerator extends UniversalGenerator
               !(f.isGetterOnly &&
                   f.jsonKeyInfo?.defaultValue == null))
           .toList();
-      for (var i = 0; i < copyWithFields.length; i++) {
-        final f = copyWithFields[i];
-        final comma =
-            i == copyWithFields.length - 1 ? ';' : ',';
+      for (final f in copyWithFields) {
         copyWithInitializers.add(
-          '${f.name} = ${f.name} ?? (() { throw ArgumentError("${f.name} is required"); })()$comma',
+          '${f.name} = ${f.name} ?? (() { throw ArgumentError("${f.name} is required"); })()',
         );
       }
 
       c.constructors.add(Constructor((con) {
         con.name = 'copyWith';
         con.optionalParameters.addAll(copyWithParams);
+        // Constructor.initializers accepts Expression objects; code_builder handles separators
         for (final init in copyWithInitializers) {
           con.initializers.add(Code(init));
         }
