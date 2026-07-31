@@ -89,7 +89,7 @@ String getProperties(
     // For concrete classes, replace $-prefixed types with concrete class names
     var fieldType = f.type;
     if (!isAbstract && fieldType != null) {
-      fieldType = _replaceDollarTypesWithConcrete(fieldType);
+      fieldType = replaceDollarTypesWithConcrete(fieldType);
     }
 
     if (isAbstract) {
@@ -165,7 +165,7 @@ String getProperties(
         // Determine the field type (same logic as above for field declarations)
         var fieldType = f.type;
         if (fieldType != null) {
-          fieldType = _replaceDollarTypesWithConcrete(fieldType);
+          fieldType = replaceDollarTypesWithConcrete(fieldType);
         }
 
         // Check if field is nullable - if it ends with ?, don't add required
@@ -286,7 +286,7 @@ String getProperties(
           }
 
           var fieldType = f.type != null
-              ? _replaceDollarTypesWithConcrete(f.type!)
+              ? replaceDollarTypesWithConcrete(f.type!)
               : f.type;
           // For copyWith, we want all parameters to be nullable, so add ? if not already present
           var nullableFieldType = fieldType!.endsWith('?')
@@ -338,7 +338,7 @@ String generateFactoryMethod(
               var suffix = p.hasDefaultValue && p.defaultValue != null
                   ? " = ${p.defaultValue}"
                   : "";
-              var cleanType = _replaceDollarTypesWithConcrete(p.type);
+              var cleanType = replaceDollarTypesWithConcrete(p.type);
               return "${prefix}${cleanType} ${p.name}${suffix}";
             })
             .join(", "),
@@ -351,7 +351,7 @@ String generateFactoryMethod(
               var suffix = p.hasDefaultValue && p.defaultValue != null
                   ? " = ${p.defaultValue}"
                   : "";
-              var cleanType = _replaceDollarTypesWithConcrete(p.type);
+              var cleanType = replaceDollarTypesWithConcrete(p.type);
               return "${cleanType} ${p.name}${suffix}";
             })
             .join(", "),
@@ -431,7 +431,7 @@ String getChangeToExtension({
     for (var field in targetFieldsDistinct) {
       var fieldName = field.name;
       var fieldTypeRaw = field.type ?? '';
-      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
+      var fieldType = replaceDollarTypesWithConcrete(fieldTypeRaw);
       var isTargetNullable = fieldType.endsWith('?');
 
       var existsInSource = sourceFieldMap.containsKey(fieldName);
@@ -439,7 +439,7 @@ String getChangeToExtension({
       if (existsInSource) {
         var sourceField = sourceFieldMap[fieldName]!;
         var sourceFieldTypeRaw = sourceField.type ?? '';
-        var sourceFieldType = _replaceDollarTypesWithConcrete(
+        var sourceFieldType = replaceDollarTypesWithConcrete(
           sourceFieldTypeRaw,
         );
         var isSourceNullable = sourceFieldType.endsWith('?');
@@ -480,7 +480,7 @@ String getChangeToExtension({
     for (var field in targetFieldsDistinct) {
       var fieldName = field.name;
       var fieldTypeRaw = field.type ?? '';
-      var fieldType = _replaceDollarTypesWithConcrete(fieldTypeRaw);
+      var fieldType = replaceDollarTypesWithConcrete(fieldTypeRaw);
       var fieldNameCap = fieldName[0].toUpperCase() + fieldName.substring(1);
 
       if (params.contains('required $fieldType $fieldName')) {
@@ -510,7 +510,7 @@ String getChangeToExtension({
 /// Replace $-prefixed types with concrete class names for JSON serialization
 /// For example: $TreeNode -> TreeNode, List<$TreeNode> -> List<TreeNode>
 /// Also handles nested generics like Map<String, List<$TreeNode>> -> Map<String, List<TreeNode>>
-String _replaceDollarTypesWithConcrete(String type) {
+String replaceDollarTypesWithConcrete(String type) {
   // Handle outer nullability
   final isOuterNullable = type.endsWith('?');
   final baseType = isOuterNullable ? type.substring(0, type.length - 1) : type;
@@ -595,7 +595,7 @@ String getPropertiesAbstract(
       sb.writeln("  ${f.jsonKeyInfo!.toAnnotationString()}");
     }
     var fieldType = f.type != null
-        ? _replaceDollarTypesWithConcrete(f.type!)
+        ? replaceDollarTypesWithConcrete(f.type!)
         : f.type;
     sb.writeln("  $fieldType get ${f.name};");
   }
@@ -615,7 +615,7 @@ String getPropertiesAbstract(
     sb.writeln("  factory ${className}.copyWith({");
     for (var f in fields) {
       var cwFieldType = f.type != null
-          ? _replaceDollarTypesWithConcrete(f.type!)
+          ? replaceDollarTypesWithConcrete(f.type!)
           : f.type;
       sb.writeln("    $cwFieldType? ${f.name},");
     }
@@ -660,7 +660,7 @@ String getCopyWith(
         continue;
       }
 
-      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+      var fieldType = replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
       var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
       var covariant = covariantFields.contains(f.name) ? 'covariant ' : '';
       sb.writeln("    $covariant$nullableType ${f.name},");
@@ -693,7 +693,7 @@ String getCopyWith(
         continue;
       }
 
-      var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+      var fieldType = replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
       var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
       sb.writeln("    $nullableType ${f.name},");
     }
@@ -722,7 +722,7 @@ String getCopyWith(
         if (f.isGetterOnly) {
           continue;
         }
-        var fieldType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+        var fieldType = replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
         // Function parameter and return type match the field type exactly
         // Only the function itself is nullable
         sb.writeln("    $fieldType Function($fieldType)? ${f.name},");
@@ -754,14 +754,14 @@ Set<String> _getCovariantFields(
 ) {
   var covariantFields = <String>{};
   for (var f in classFields) {
-    var classType = _replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
+    var classType = replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
     for (var iface in interfaces) {
       var ifaceField = iface.fields.cast<NameType?>().firstWhere(
         (x) => x?.name == f.name,
         orElse: () => null,
       );
       if (ifaceField != null) {
-        var ifaceType = _replaceDollarTypesWithConcrete(
+        var ifaceType = replaceDollarTypesWithConcrete(
           ifaceField.type ?? 'dynamic',
         );
         if (classType != ifaceType) {
@@ -812,7 +812,7 @@ String getInterfaceCopyWithMethods(
         (cf) => cf.name == f.name,
         orElse: () => NameTypeClassComment(f.name, f.type, ''),
       );
-      var fieldType = _replaceDollarTypesWithConcrete(
+      var fieldType = replaceDollarTypesWithConcrete(
         classField.type ?? f.type ?? 'dynamic',
       );
       var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
@@ -867,7 +867,7 @@ String getInterfaceCopyWithFnMethods(
         (cf) => cf.name == f.name,
         orElse: () => NameTypeClassComment(f.name, f.type, ''),
       );
-      var fieldType = _replaceDollarTypesWithConcrete(
+      var fieldType = replaceDollarTypesWithConcrete(
         classField.type ?? f.type ?? 'dynamic',
       );
       var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
