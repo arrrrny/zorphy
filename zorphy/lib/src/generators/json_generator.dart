@@ -154,7 +154,7 @@ class JsonGenerator extends UniversalGenerator implements SpecGenerator {
   String _generateGenericFromJson(ClassMetadata metadata, GenerationConfig config) {
     final sb = StringBuffer();
     final className = metadata.cleanName;
-    final fromJsonParams = metadata.generics.map((g) => 'T Function(Object? json) fromJson${g.name}'.replaceAll('T', g.name)).join(', ');
+    final fromJsonParams = metadata.generics.map((g) => '${g.name} Function(Object? json) fromJson${g.name}').join(', ');
     final fromJsonArgs = metadata.generics.map((g) => 'fromJson${g.name}').join(', ');
     final manualFromJsonFields = _getManualFromJsonFields(metadata);
 
@@ -198,7 +198,7 @@ class JsonGenerator extends UniversalGenerator implements SpecGenerator {
         sb.writeln('    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);');
       }
     } else {
-      final toJsonParams = metadata.generics.map((g) => 'Object? Function(T value) toJson${g.name}'.replaceAll('T', g.name)).join(', ');
+      final toJsonParams = metadata.generics.map((g) => 'Object? Function(${g.name} value) toJson${g.name}').join(', ');
       final toJsonArgs = metadata.generics.map((g) => 'toJson${g.name}').join(', ');
       sb.writeln('  Map<String, dynamic> toJsonLean($toJsonParams) {');
       if (metadata.isAbstract) {
@@ -269,7 +269,7 @@ class JsonGenerator extends UniversalGenerator implements SpecGenerator {
   @override
   List<Spec> generateSpec(GenerationContext context) {
     final code = generate(context);
-    if (code.isEmpty) return [];
+    if (code.trim().isEmpty) return [];
     // fromJson is a factory constructor; toJsonLean/_sanitizeJson/toJson
     // are instance methods.  code_builder's [Constructor] does not
     // implement [Spec], so these cannot be native specs (same constraint
@@ -366,7 +366,9 @@ class JsonExtensionGenerator extends ConcreteClassGenerator implements SpecGener
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    return context.config.generateJson && context.metadata.explicitSubtypes.isEmpty;
+    return context.config.generateJson &&
+           !context.metadata.isAbstract &&
+           context.metadata.explicitSubtypes.isEmpty;
   }
 
   String _buildGenericsString(ClassMetadata metadata) {
@@ -390,6 +392,7 @@ class JsonExtensionGenerator extends ConcreteClassGenerator implements SpecGener
     final metadata = context.metadata;
     final config = context.config;
     if (!config.generateJson) return [];
+    if (metadata.isAbstract) return [];
     if (metadata.explicitSubtypes.isNotEmpty) return [];
 
     final className = metadata.cleanName;
@@ -427,13 +430,13 @@ class JsonExtensionGenerator extends ConcreteClassGenerator implements SpecGener
           m.name = 'toJson';
           m.returns = referType('Map<String, dynamic>');
           for (final g in metadata.generics) {
-            m.optionalParameters.add(Parameter((p) {
+            m.requiredParameters.add(Parameter((p) {
               p.name = 'toJson${g.name}';
               p.type = referType('Object? Function(${g.name} value)');
-              p.named = true;
             }));
           }
-          m.body = Code('return _\$$className' + 'ToJson(this, $toJsonArgs);');
+          m.lambda = true;
+          m.body = Code('_\$$className' + 'ToJson(this, $toJsonArgs)');
         }));
       } else {
         final body = StringBuffer();
@@ -448,10 +451,9 @@ class JsonExtensionGenerator extends ConcreteClassGenerator implements SpecGener
           m.name = 'toJson';
           m.returns = referType('Map<String, dynamic>');
           for (final g in metadata.generics) {
-            m.optionalParameters.add(Parameter((p) {
+            m.requiredParameters.add(Parameter((p) {
               p.name = 'toJson${g.name}';
               p.type = referType('Object? Function(${g.name} value)');
-              p.named = true;
             }));
           }
           m.body = Code(body.toString());
@@ -488,10 +490,9 @@ class JsonExtensionGenerator extends ConcreteClassGenerator implements SpecGener
         m.name = 'toJsonLean';
         m.returns = referType('Map<String, dynamic>');
         for (final g in metadata.generics) {
-          m.optionalParameters.add(Parameter((p) {
+          m.requiredParameters.add(Parameter((p) {
             p.name = 'toJson${g.name}';
             p.type = referType('Object? Function(${g.name} value)');
-            p.named = true;
           }));
         }
         m.body = Code(body.toString());

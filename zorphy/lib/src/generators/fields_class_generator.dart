@@ -47,7 +47,7 @@ class FieldsClassGenerator extends UniversalGenerator implements SpecGenerator {
           '  static $fieldType _\$get$fieldName($className e) => e.$fieldName;',
         );
         sb.writeln(
-          "  static const $fieldName = Field<$className, $fieldType>('\$fieldName', _\$get$fieldName);",
+          "  static const $fieldName = Field<$className, $fieldType>('$fieldName', _\$get$fieldName);",
         );
       }
     }
@@ -83,6 +83,7 @@ class FieldsClassGenerator extends UniversalGenerator implements SpecGenerator {
     return Class((c) {
       c.name = '${className}Fields';
       c.abstract = true;
+      c.modifier = ClassModifier.final$;
       c.docs.add('Field descriptors for [$className] query construction');
 
       for (final g in metadata.generics) {
@@ -100,6 +101,14 @@ class FieldsClassGenerator extends UniversalGenerator implements SpecGenerator {
           c.methods.add(Method((m) {
             m.name = '_\$get$fieldName';
             m.static = true;
+            for (final g in metadata.generics) {
+              m.types.add(TypeReference((t) {
+                t.symbol = g.name;
+                if (g.bound != null) {
+                  t.bound = referType(g.bound);
+                }
+              }));
+            }
             m.returns = referType(fieldType);
             m.requiredParameters.add(Parameter((p) {
               p.name = 'e';
@@ -110,6 +119,14 @@ class FieldsClassGenerator extends UniversalGenerator implements SpecGenerator {
           c.methods.add(Method((m) {
             m.name = fieldName;
             m.static = true;
+            for (final g in metadata.generics) {
+              m.types.add(TypeReference((t) {
+                t.symbol = g.name;
+                if (g.bound != null) {
+                  t.bound = referType(g.bound);
+                }
+              }));
+            }
             m.returns = referType('Field<$classType, $fieldType>');
             m.body = Code(
               "return Field<$classType, $fieldType>('$fieldName', _\$get$fieldName$genericsArgsStr);",
@@ -128,9 +145,8 @@ class FieldsClassGenerator extends UniversalGenerator implements SpecGenerator {
           }));
           c.fields.add(Field((f) {
             f.name = fieldName;
-            f.type = referType('Field<$className, $fieldType>');
             f.modifier = FieldModifier.constant;
-            f.assignment = Code("Field('$fieldName', _\$get$fieldName)");
+            f.assignment = Code("Field<$className, $fieldType>('$fieldName', _\$get$fieldName)");
           }));
         }
       }
