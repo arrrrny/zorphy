@@ -1,14 +1,21 @@
 import '../helpers.dart' as helpers;
 import 'base_generator.dart';
 
-/// Generates factory method constructors
-/// Wraps the existing generateFactoryMethod function
+/// Generates factory method constructors.
+///
+/// Migrated (T011): [generateSpec] is intentionally NOT overridden
+/// because code_builder's [Constructor] does not implement [Spec],
+/// so factory constructors cannot be returned as standalone specs.
+/// The default [CodeGeneratorSpecAdapter.generateSpec] wraps the
+/// string output in a [Code] spec, which the orchestrator places
+/// inside the Class body.
+///
+/// The legacy [generate] path is preserved for backward compatibility.
 class FactoryMethodGenerator extends ConcreteClassGenerator {
   /// Creates a generator for factory constructors.
   FactoryMethodGenerator();
 
   @override
-  /// Generates factory constructors for the current class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final sb = StringBuffer();
@@ -17,8 +24,6 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
       final className = metadata.cleanName;
       for (var factory in metadata.factoryMethods) {
         var factoryClass = factory.className;
-
-        // A factory is truly recursive if it's in the same class it tried to create
         var isTrulyRecursive = factoryClass == className;
 
         if (!isTrulyRecursive) {
@@ -37,12 +42,10 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
   }
 
   @override
-  /// Returns true when non-recursive factory methods exist.
   bool shouldGenerate(GenerationContext context) {
     final metadata = context.metadata;
     final className = metadata.cleanName;
 
-    // Run if it's a concrete class (handled by base class) AND has factory methods
     if (metadata.isAbstract) return false;
 
     return metadata.factoryMethods.any((f) {

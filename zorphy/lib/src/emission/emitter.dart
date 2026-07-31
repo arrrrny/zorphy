@@ -7,23 +7,30 @@ import 'package:dart_style/dart_style.dart';
 /// Generators produce [Spec] objects; this class turns them into a
 /// single formatted Dart library string.
 class ZorphyEmitter {
-  /// Page width used by [DartFormatter].
-  /// 120 matches the Zorphy project convention.
-  static const int pageWidth = 120;
+  /// Default page width used by [DartFormatter].
+  ///
+  /// 80 follows the Dart style guide convention.
+  /// Use [ZorphyEmitter.withPageWidth] to override.
+  static const int defaultPageWidth = 80;
+
+  /// Page width configured for this emitter instance.
+  final int pageWidth;
 
   /// The underlying formatter instance (created once, reused).
   final DartFormatter _formatter;
 
-  /// Creates a new emitter with the default page width (120).
+  /// Creates a new emitter with the default page width (80).
   ZorphyEmitter()
-      : _formatter = DartFormatter(
+      : pageWidth = defaultPageWidth,
+        _formatter = DartFormatter(
           languageVersion: DartFormatter.latestLanguageVersion,
-          pageWidth: pageWidth,
+          pageWidth: defaultPageWidth,
         );
 
   /// Creates a new emitter with a custom page width.
   ZorphyEmitter.withPageWidth(int width)
-      : _formatter = DartFormatter(
+      : pageWidth = width,
+        _formatter = DartFormatter(
           languageVersion: DartFormatter.latestLanguageVersion,
           pageWidth: width,
         );

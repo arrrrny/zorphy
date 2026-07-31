@@ -66,7 +66,7 @@ class FieldsClassGenerator extends UniversalGenerator {
   String _cleanType(String type) {
     if (type.contains('<')) {
       // For generics, use a more robust approach (or just delegate if we had the helper)
-      // Since this is a simple generator, let's just use the same logic as _replaceDollarTypesWithConcrete
+      // Since this is a simple generator, let's just use the same logic as replaceDollarTypesWithConcrete
       // but without the full recursive implementation for now, or just use a regex
       // Actually, replaceAll('$', '') is mostly fine UNLESS prefix has $.
       // Let's at least preserve prefix dots.

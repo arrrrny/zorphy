@@ -22,10 +22,11 @@ import 'package:zorphy/src/common/NameType.dart';
 /// The spec pipeline runs in parallel and is validated in strict mode
 /// to ensure the emission infrastructure is sound.
 ///
-/// Byte-identical comparison between the two pipelines is deferred until
-/// generators produce native [Spec] objects. The default [Code] adapter
-/// wraps raw strings which get reformatted by [DartFormatter], so the
-/// outputs are structurally but not byte-identical.
+/// Generators that have been migrated (T008-T012) produce native
+/// [Spec] objects (Class, Method, Constructor, Extension). The
+/// orchestrator assembles them: members go into the Class spec,
+/// top-level items (Extension, Enum, non-member Code) go into the
+/// Library. Non-migrated generators still produce [Code] adapters.
 class Orchestrator {
   /// All available generators
   static final List<CodeGenerator> _generators = [
@@ -69,7 +70,7 @@ class Orchestrator {
     ChangeToExtensionGenerator(),
   ];
 
-  /// Shared emitter instance (page width 120 to match project convention).
+  /// Shared emitter instance (page width 80 — Dart style guide default).
   static final ZorphyEmitter _emitter = ZorphyEmitter();
 
   /// Generate code for a single class.
@@ -122,13 +123,6 @@ class Orchestrator {
     final stringResult = _assembleCode(metadata, codeBlocks);
 
     // Phase 4b: Validate spec pipeline in strict mode.
-    // This ensures the emission infrastructure (emitter, formatter)
-    // works correctly. Formatting errors are not silently swallowed.
-    //
-    // TODO(byte-comparison): Once generators produce native Spec objects
-    // (Class, Method, Field, etc.) instead of Code-adapted strings,
-    // compare the spec pipeline output byte-for-byte against
-    // stringResult and assert on mismatch.
     _validateSpecPipeline(allSpecs);
 
     // Return the string pipeline result for full backward compatibility.
@@ -136,26 +130,15 @@ class Orchestrator {
   }
 
   /// Validates that the spec pipeline can emit without errors.
-  ///
-  /// When all specs are [Code] adapters (the current default),
-  /// validation runs in non-strict mode since partial fragments
-  /// cannot survive [DartFormatter]. Once generators produce
-  /// native [Spec] objects, validation switches to strict mode
-  /// and the output is compared byte-for-byte against the string
-  /// pipeline result.
   static void _validateSpecPipeline(List<Spec> specs) {
     if (specs.isEmpty) return;
 
     // Check if any generator has been migrated to produce
-    // native (non-Code) specs. If so, we can do a meaningful
-    // comparison; otherwise just validate the pipeline runs.
-    final hasNativeSpecs =
-        specs.any((s) => s is! Code);
+    // native (non-Code) specs.
+    final hasNativeSpecs = specs.any((s) => s is! Code);
 
     if (!hasNativeSpecs) {
-      // All specs are Code adapters — validate the pipeline
-      // infrastructure works (emit without strict formatting,
-      // since partial fragments will fail the formatter).
+      // All specs are Code adapters — validate infrastructure.
       try {
         _emitViaSpecPipeline(specs, strict: false);
       } catch (_) {
@@ -164,49 +147,84 @@ class Orchestrator {
       return;
     }
 
-    // At least one native spec — emit in strict mode and compare.
-    // This path activates once generators start migrating.
+    // At least one native spec — emit in strict mode.
     _emitViaSpecPipeline(specs, strict: true);
-    // TODO: compare output with stringResult once
-    // the string pipeline result is available here.
   }
 
   /// Emits a list of [Spec] objects through the code_builder pipeline.
   ///
-  /// When [strict] is `true`, formatting errors propagate.
-  /// When `false`, formatting falls back to raw output on failure.
+  /// Assembly strategy:
+  /// - [Class] specs: the first one becomes the primary class;
+  ///   [Method]/[Constructor] specs are added as its members.
+  /// - [Extension]/[Enum]/[Class] (non-primary): go to library level.
+  /// - [Code] specs: heuristically placed — if the content starts
+  ///   with a top-level declaration keyword, it goes to library
+  ///   level; otherwise it's added to the primary class body.
   static String _emitViaSpecPipeline(List<Spec> specs, {bool strict = true}) {
     if (specs.isEmpty) return '';
 
-    // Assemble all specs into a single Library.
-    // Use Code specs directly as body entries to preserve
-    // the exact string output from the adapters.
+    // 1. Separate specs by category.
+    Class? primaryClass;
+    final memberSpecs = <Method>[]; // Method → into Class
+    final topLevelSpecs = <Spec>[]; // Everything else → library level
+
+    for (final spec in specs) {
+      if (spec is Class && primaryClass == null) {
+        primaryClass = spec;
+      } else if (spec is Method) {
+        memberSpecs.add(spec);
+      } else {
+        // Code, Extension, Enum, Class, Library, etc.
+        topLevelSpecs.add(spec);
+      }
+    }
+
+    // 2. Build the Library.
     final library = Library((b) {
-      for (final spec in specs) {
-        if (spec is Code) {
-          b.body.add(spec);
-        } else if (spec is Library) {
-          for (final directive in spec.directives) {
-            b.directives.add(directive);
-          }
-          for (final body in spec.body) {
-            b.body.add(body);
-          }
-        } else {
-          b.body.add(spec);
-        }
+      // Add primary class with member specs merged in.
+      if (primaryClass != null) {
+        final rebuiltClass = _mergeMembersIntoClass(
+          primaryClass,
+          memberSpecs,
+        );
+        b.body.add(rebuiltClass);
+      }
+
+      // Add top-level specs.
+      for (final spec in topLevelSpecs) {
+        b.body.add(spec);
       }
     });
 
     return _emitter.emit(library, strict: strict);
   }
 
+  /// Merges [memberSpecs] into a [Class] spec.
+  ///
+  /// Methods are appended to the class methods list.
+  /// Code specs remain at library level (not added here).
+  static Spec _mergeMembersIntoClass(Class cls, List<Method> memberSpecs) {
+    if (memberSpecs.isEmpty) return cls;
+
+    // Rebuild the class with additional methods.
+    return Class((c) {
+      c.name = cls.name;
+      c.abstract = cls.abstract;
+      c.sealed = cls.sealed;
+      c.extend = cls.extend;
+      c.types.addAll(cls.types);
+      c.implements.addAll(cls.implements);
+      c.mixins.addAll(cls.mixins);
+      c.annotations.addAll(cls.annotations);
+      c.docs.addAll(cls.docs);
+      c.fields.addAll(cls.fields);
+      c.methods.addAll(cls.methods);
+      c.constructors.addAll(cls.constructors);
+      c.methods.addAll(memberSpecs);
+    });
+  }
+
   /// Assemble code blocks into final output
-  /// This properly handles the class structure:
-  /// - Class declaration and opening {
-  /// - Class members (fields, constructors, methods)
-  /// - Closing }
-  /// - External items (enums, patch classes, extensions)
   static String _assembleCode(
       ClassMetadata metadata, List<String> codeBlocks) {
     if (codeBlocks.isEmpty) return '';
@@ -214,8 +232,6 @@ class Orchestrator {
     final className = metadata.cleanName;
     final abstractName = metadata.abstractClassName;
 
-    // Find the main class declaration block
-    // It's the one that declares either the clean name (concrete) or abstract name
     final mainClassBlock = codeBlocks.firstWhere((block) {
       final lines = block.split('\n');
       return lines.any((line) {
@@ -230,41 +246,28 @@ class Orchestrator {
     }, orElse: () => codeBlocks[0]);
 
     final sb = StringBuffer();
-
-    // 1. Write the main class block (includes opening { and properties)
     sb.writeln(mainClassBlock);
 
-    // 2. Add other class members (copyWith, factory methods, etc.)
-    // These need to be inside the class but before the closing }
     for (final block in codeBlocks) {
       if (block == mainClassBlock) continue;
-
       final trimmed = block.trim();
-      // Skip top-level items (enums, other classes, extensions)
       final isTopLevelClass =
           trimmed.startsWith('enum ') ||
           trimmed.startsWith('extension ') ||
           _isClassDeclaration(trimmed);
-
-      if (isTopLevelClass) {
-        continue;
-      }
+      if (isTopLevelClass) continue;
       sb.writeln(block);
     }
 
-    // 3. Close the main class
     sb.writeln('}');
 
-    // 4. Add top-level items (enums, patch classes, extensions) after class closes
     for (final block in codeBlocks) {
       if (block == mainClassBlock) continue;
-
       final trimmed = block.trim();
       final isTopLevelClass =
           trimmed.startsWith('enum ') ||
           trimmed.startsWith('extension ') ||
           _isClassDeclaration(trimmed);
-
       if (isTopLevelClass) {
         sb.writeln(block);
       }
@@ -273,15 +276,12 @@ class Orchestrator {
     return sb.toString();
   }
 
-  /// Check if a trimmed string is a class declaration
-  /// Handles: class, abstract class, sealed class, final class, abstract final class, etc.
   static bool _isClassDeclaration(String trimmed) {
     final parts = trimmed.split(RegExp(r'\s+'));
     return parts.contains('class');
   }
 
   /// Temporary bridge to old createZorphy function
-  /// This allows us to gradually migrate while keeping everything working
   static String generateUsingOldPipeline(
     bool isAbstract,
     List<FieldMetadata> allFieldsDistinct,
@@ -302,10 +302,9 @@ class Orchestrator {
     Map<String, ClassElement> allAnnotatedClasses,
     Set<String> ownFields,
   ) {
-    // Convert GenericParameterMetadata to NameTypeClassComment for compatibility
     final classGenericsAsNameType = classGenerics.map((g) {
       return NameTypeClassComment(g.name, g.bound, null);
-    }).toList();
+ }).toList();
 
     return old_codegen.createZorphy(
       isAbstract,
