@@ -1,20 +1,19 @@
+import 'package:code_builder/code_builder.dart';
+
+import '../ast/ast.dart';
 import 'base_generator.dart';
 
 /// Generates the static Fields class containing Field descriptors for the entity
-class FieldsClassGenerator extends UniversalGenerator {
-  /// Creates a generator for field descriptor classes.
+///
+/// Migrated (T016): [generateSpec] now produces native [Class] spec
+/// instead of building strings via StringBuffer.
+class FieldsClassGenerator extends UniversalGenerator implements SpecGenerator {
   FieldsClassGenerator();
 
   @override
-  /// Generates a Fields helper class for query construction.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final className = metadata.cleanName;
-
-    // Check if we should generate fields class
-    // We only generate for concrete classes or abstract classes that serve as entities
-    // But maybe for all? The user requirement E says "Zorphy generates only field descriptors per entity"
-
     if (metadata.allFields.isEmpty) return '';
 
     final hasGenerics = metadata.generics.isNotEmpty;
@@ -33,12 +32,8 @@ class FieldsClassGenerator extends UniversalGenerator {
 
     for (final field in metadata.allFields) {
       final fieldName = field.name;
-      var fieldType = field.type;
-      if (fieldType == null) {
-        fieldType = 'dynamic';
-      } else {
-        fieldType = _cleanType(fieldType);
-      }
+      var fieldType = field.type ?? 'dynamic';
+      fieldType = _cleanType(fieldType);
 
       if (hasGenerics) {
         sb.writeln(
@@ -52,53 +47,117 @@ class FieldsClassGenerator extends UniversalGenerator {
           '  static $fieldType _\$get$fieldName($className e) => e.$fieldName;',
         );
         sb.writeln(
-          '  static const $fieldName = Field<$className, $fieldType>(\'$fieldName\', _\$get$fieldName);',
+          "  static const $fieldName = Field<$className, $fieldType>('\$fieldName', _\$get$fieldName);",
         );
       }
     }
 
     sb.writeln('}');
-
     return sb.toString();
   }
 
-  /// Removes $ and $$ prefixes from Zorphy entity types while preserving library prefixes
+  @override
+  bool shouldGenerate(GenerationContext context) {
+    return context.config.generateFilter &&
+        context.metadata.allFields.isNotEmpty;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SPEC PIPELINE (T016)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @override
+  List<Spec> generateSpec(GenerationContext context) {
+    if (context.metadata.allFields.isEmpty) return [];
+    return [_buildFieldsClassSpec(context.metadata)];
+  }
+
+  Class _buildFieldsClassSpec(dynamic metadata) {
+    final className = metadata.cleanName;
+    final hasGenerics = metadata.generics.isNotEmpty;
+    final genericsArgsStr = hasGenerics
+        ? '<${metadata.generics.map((g) => g.name).join(', ')}>'
+        : '';
+    final classType = '$className$genericsArgsStr';
+
+    return Class((c) {
+      c.name = '${className}Fields';
+      c.abstract = true;
+      c.docs.add('Field descriptors for [$className] query construction');
+
+      for (final g in metadata.generics) {
+        c.types.add(referType(
+          g.bound != null ? '${g.name} extends ${g.bound}' : g.name,
+        ));
+      }
+
+      for (final field in metadata.allFields) {
+        final fieldName = field.name;
+        var fieldType = field.type ?? 'dynamic';
+        fieldType = _cleanType(fieldType);
+
+        if (hasGenerics) {
+          c.methods.add(Method((m) {
+            m.name = '_\$get$fieldName';
+            m.static = true;
+            m.returns = referType(fieldType);
+            m.requiredParameters.add(Parameter((p) {
+              p.name = 'e';
+              p.type = referType(classType);
+            }));
+            m.body = Code('return e.$fieldName;');
+          }));
+          c.methods.add(Method((m) {
+            m.name = fieldName;
+            m.static = true;
+            m.returns = referType('Field<$classType, $fieldType>');
+            m.body = Code(
+              "return Field<$classType, $fieldType>('$fieldName', _\$get$fieldName$genericsArgsStr);",
+            );
+          }));
+        } else {
+          c.methods.add(Method((m) {
+            m.name = '_\$get$fieldName';
+            m.static = true;
+            m.returns = referType(fieldType);
+            m.requiredParameters.add(Parameter((p) {
+              p.name = 'e';
+              p.type = referType(className);
+            }));
+            m.body = Code('return e.$fieldName;');
+          }));
+          c.fields.add(Field((f) {
+            f.name = fieldName;
+            f.type = referType('Field<$className, $fieldType>');
+            f.modifier = FieldModifier.constant;
+            f.assignment = Code("Field('$fieldName', _\$get$fieldName)");
+          }));
+        }
+      }
+    });
+  }
+
   String _cleanType(String type) {
     if (type.contains('<')) {
-      // For generics, use a more robust approach (or just delegate if we had the helper)
-      // Since this is a simple generator, let's just use the same logic as replaceDollarTypesWithConcrete
-      // but without the full recursive implementation for now, or just use a regex
-      // Actually, replaceAll('$', '') is mostly fine UNLESS prefix has $.
-      // Let's at least preserve prefix dots.
-      if (!type.contains('.')) return type.replaceAll('\$', '');
-
+      if (!type.contains('.')) return type.replaceAll(r'\$', '');
       return type
           .split('.')
           .map((part) {
             if (part.contains('<')) {
               final base = part.substring(0, part.indexOf('<'));
               final rest = part.substring(part.indexOf('<'));
-              return base.replaceAll('\$', '') + rest.replaceAll('\$', '');
+              return base.replaceAll(r'\$', '') + rest.replaceAll(r'\$', '');
             }
-            return part.replaceAll('\$', '');
+            return part.replaceAll(r'\$', '');
           })
           .join('.');
     }
-
     if (type.contains('.')) {
       final lastDot = type.lastIndexOf('.');
       final prefix = type.substring(0, lastDot + 1);
       final name = type.substring(lastDot + 1);
-      return prefix + name.replaceAll('\$', '');
+      return prefix + name.replaceAll(r'\$', '');
     }
-
-    return type.replaceAll('\$', '');
-  }
-
-  @override
-  /// Returns true when filter descriptors should be generated.
-  bool shouldGenerate(GenerationContext context) {
-    return context.config.generateFilter &&
-        context.metadata.allFields.isNotEmpty;
+    return type.replaceAll(r'\$', '');
   }
 }
