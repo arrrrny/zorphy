@@ -31,7 +31,7 @@ class PropertyHelperGenerator extends UniversalGenerator
         'extension ${metadata.cleanName}PolymorphicE$genericsDefStr on ${metadata.cleanName}$genericsStr {',
       );
       for (final subtype in metadata.explicitSubtypes) {
-        final subtypeName = subtype.interfaceName.replaceAll(r'\$', '');
+        final subtypeName = subtype.interfaceName.replaceAll(r'$', '');
         if (metadata.cleanName != subtypeName) {
           sb.writeln('  bool get is$subtypeName => this is $subtypeName;');
           sb.writeln(
@@ -61,7 +61,7 @@ class PropertyHelperGenerator extends UniversalGenerator
 
       for (final field in ownFields) {
         var type = field.type ?? 'dynamic';
-        type = type.replaceAll(r'\$', '');
+        type = type.replaceAll(r'$', '');
 
         final fieldName = field.name;
         final isNullable = type.endsWith('?');
@@ -188,7 +188,7 @@ class PropertyHelperGenerator extends UniversalGenerator
 
     final methods = <Method>[];
     for (final subtype in metadata.explicitSubtypes) {
-      final subtypeName = subtype.interfaceName.replaceAll(r'\$', '');
+      final subtypeName = subtype.interfaceName.replaceAll(r'$', '');
       if (metadata.cleanName != subtypeName) {
         methods.add(Method((m) {
           m.name = 'is$subtypeName';
@@ -231,7 +231,7 @@ class PropertyHelperGenerator extends UniversalGenerator
 
     for (final field in ownFields) {
       var type = field.type ?? 'dynamic';
-      type = type.replaceAll(r'\$', '');
+      type = type.replaceAll(r'$', '');
 
       final fieldName = field.name;
       final isNullable = type.endsWith('?');
