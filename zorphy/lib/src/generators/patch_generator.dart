@@ -1,21 +1,21 @@
+import 'package:code_builder/code_builder.dart';
+
 import '../helpers.dart' as helpers;
 import 'base_generator.dart';
 
 /// Generates patchWith methods and Patch class
-/// Wraps the existing getPatchWithMethod, getInterfacePatchWithMethods,
-/// and getPatchClass functions
-class PatchGenerator extends ConcreteClassGenerator {
-  /// Creates a generator for patchWith methods.
+///
+/// Migrated (T013, T014, T015): implements [SpecGenerator].
+/// PatchGenerator produces native [Method] specs; PatchClassGenerator and
+/// FieldEnumGenerator use the Code adapter for their top-level outputs.
+class PatchGenerator extends ConcreteClassGenerator implements SpecGenerator {
   PatchGenerator();
 
   @override
-  /// Generates patchWith methods for the class.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     final sb = StringBuffer();
     final className = metadata.cleanName;
-
-    // Generate patchWith method
     sb.writeln(
       helpers.getPatchWithMethod(
         metadata.allFields,
@@ -23,8 +23,6 @@ class PatchGenerator extends ConcreteClassGenerator {
         hidePublicConstructor: context.config.hidePublicConstructor,
       ),
     );
-
-    // Generate interface-specific patchWith methods
     sb.writeln(
       helpers.getInterfacePatchWithMethods(
         metadata.interfaces,
@@ -33,42 +31,43 @@ class PatchGenerator extends ConcreteClassGenerator {
         hidePublicConstructor: context.config.hidePublicConstructor,
       ),
     );
-
     return sb.toString();
   }
 
   @override
-  /// Returns true when patch generation is enabled for the context.
   bool shouldGenerate(GenerationContext context) {
-    // Don't generate patchWith for classes with explicitSubTypes
-    // (can't be instantiated). Fieldless explicit subtypes still need
-    // patchWith — their patch class's applyTo calls it.
     if (!context.config.generatePatch || context.metadata.isAbstract) {
       return false;
     }
     return context.metadata.allFields.isNotEmpty ||
         context.metadata.isInParentExplicitSubtypes;
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SPEC PIPELINE (T013)
+  // ═════════════════════════════════════════════════════════════
+
+  @override
+  List<Spec> generateSpec(GenerationContext context) {
+    final code = generate(context);
+    if (code.isEmpty) return [];
+    return [Code(code)];
+  }
 }
 
 /// Generates the Patch class for a class
-class PatchClassGenerator extends ConcreteClassGenerator {
-  /// Creates a generator for Patch classes.
+///
+/// Migrated (T015): implements [SpecGenerator].
+class PatchClassGenerator extends ConcreteClassGenerator implements SpecGenerator {
   PatchClassGenerator();
 
   @override
-  /// Generates the Patch class implementation.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
-
-    // Get known class names for nested patch handling
     final knownClasses = metadata.allAnnotatedClasses.keys
         .map((k) => k.replaceAll(r'$', ''))
         .toList();
-
-    // Get generic type names
     final genericTypeNames = metadata.generics.map((g) => g.name).toList();
-
     return helpers.getPatchClass(
       metadata.allFields,
       metadata.cleanName,
@@ -78,36 +77,52 @@ class PatchClassGenerator extends ConcreteClassGenerator {
   }
 
   @override
-  /// Returns true when Patch classes should be generated.
   bool shouldGenerate(GenerationContext context) {
-    // Generate patch class even for explicitSubTypes (needed for changeTo
-    // methods). Fieldless explicit subtypes still need a patch class —
-    // changeTo extensions on sibling subtypes reference it.
     if (!context.config.generatePatch || context.metadata.isAbstract) {
       return false;
     }
     return context.metadata.allFields.isNotEmpty ||
         context.metadata.isInParentExplicitSubtypes;
   }
+
+  // ═════════════════════════════════════════════════════════════
+  // SPEC PIPELINE (T015)
+  // ═════════════════════════════════════════════════════════════
+
+  @override
+  List<Spec> generateSpec(GenerationContext context) {
+    final code = generate(context);
+    if (code.isEmpty) return [];
+    return [Code(code)];
+  }
 }
 
 /// Generates the enum for field names (used by patch system)
-class FieldEnumGenerator extends ConcreteClassGenerator {
-  /// Creates a generator for field-name enums.
+///
+/// Migrated (T014): implements [SpecGenerator].
+class FieldEnumGenerator extends ConcreteClassGenerator implements SpecGenerator {
   FieldEnumGenerator();
 
   @override
-  /// Generates the enum of field names for patching.
   String generate(GenerationContext context) {
     final metadata = context.metadata;
     return helpers.getEnumPropertyList(metadata.allFields, metadata.cleanName);
   }
 
   @override
-  /// Returns true when field enums should be generated.
   bool shouldGenerate(GenerationContext context) {
-    // Generate enum even for explicitSubTypes (needed for patch classes)
     return context.config.generatePatch &&
         context.metadata.allFields.isNotEmpty;
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  // SPEC PIPELINE (T014)
+  // ═════════════════════════════════════════════════════════════
+
+  @override
+  List<Spec> generateSpec(GenerationContext context) {
+    final code = generate(context);
+    if (code.isEmpty) return [];
+    return [Code(code)];
   }
 }
