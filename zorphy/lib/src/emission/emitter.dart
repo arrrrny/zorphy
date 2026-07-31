@@ -16,45 +16,53 @@ class ZorphyEmitter {
 
   /// Creates a new emitter with the default page width (120).
   ZorphyEmitter()
-    : _formatter = DartFormatter(
-        languageVersion: DartFormatter.latestLanguageVersion,
-        pageWidth: pageWidth,
-      );
+      : _formatter = DartFormatter(
+          languageVersion: DartFormatter.latestLanguageVersion,
+          pageWidth: pageWidth,
+        );
 
   /// Creates a new emitter with a custom page width.
   ZorphyEmitter.withPageWidth(int width)
-    : _formatter = DartFormatter(
-        languageVersion: DartFormatter.latestLanguageVersion,
-        pageWidth: width,
-      );
+      : _formatter = DartFormatter(
+          languageVersion: DartFormatter.latestLanguageVersion,
+          pageWidth: width,
+        );
 
   /// Emits the given [library] spec to a formatted Dart source string.
   ///
-  /// Returns the complete library source including any imports and
-  /// directives that the [Library] contains, formatted according to
-  /// the Dart style guide.
-  String emit(Library library) {
+  /// When [strict] is `true` (used during validation), a
+  /// [FormatterException] is propagated instead of falling back
+  /// to raw output. This ensures that the spec pipeline's output
+  /// can be compared byte-for-byte against the string pipeline.
+  String emit(Library library, {bool strict = false}) {
     final raw = library.accept(DartEmitter()).toString();
     try {
       return _formatter.format(raw);
     } on FormatterException {
+      if (strict) rethrow;
       // If formatting fails (e.g. the spec is a partial fragment),
       // return the raw output so the pipeline doesn't crash.
       return raw;
     }
   }
 
+  /// Emits the given [library] spec with strict formatting.
+  ///
+  /// Convenience wrapper for [emit] with [strict] set to `true`.
+  /// Used by the validation/comparison path in the orchestrator.
+  String emitStrict(Library library) => emit(library, strict: true);
+
   /// Convenience: emits a list of [Spec] objects as a single library.
   ///
   /// If the list contains a [Library], that library is used directly.
   /// Otherwise, a new [Library] is created with the given specs as body.
-  String emitSpecs(List<Spec> specs) {
+  String emitSpecs(List<Spec> specs, {bool strict = false}) {
     if (specs.isEmpty) return '';
 
     // If there's already a Library spec, use it.
     final existingLib = specs.whereType<Library>().toList();
     if (specs.length == 1 && existingLib.length == 1) {
-      return emit(existingLib.first);
+      return emit(existingLib.first, strict: strict);
     }
 
     // Otherwise wrap in a new Library.
@@ -74,6 +82,6 @@ class ZorphyEmitter {
       }
     });
 
-    return emit(library);
+    return emit(library, strict: strict);
   }
 }
