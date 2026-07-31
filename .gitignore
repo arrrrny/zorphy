@@ -24,6 +24,8 @@
 *.morphy2.dart
 *.zorphy.dart
 *.zorphy2.dart
+n# Allow golden reference files for v2 pipeline
+!specs/
 *.g.dart
 
 # Flutter/Dart/Pub related
