@@ -8,20 +8,20 @@ import 'base_generator.dart';
 
 /// Generates JSON serialization methods.
 ///
-/// Migrated (T019): implements [SpecGenerator]. The fromJson members are
-/// factory constructors which cannot be represented as native [Spec] objects
-/// (code_builder's [Constructor] does not implement [Spec], same issue as
-/// T011 FactoryMethodGenerator). Therefore [generateSpec] returns [Code]
-/// specs wrapping the string output. The [JsonExtensionGenerator] counterpart
-/// produces a native [Extension] spec.
-class JsonGenerator extends UniversalGenerator implements SpecGenerator {
+/// Produces [Code] specs wrapping the string output. fromJson is a factory
+/// constructor which cannot be represented as a native [Spec] object
+/// (code_builder's [Constructor] does not implement [Spec]).
+class JsonGenerator extends UniversalGenerator {
   JsonGenerator();
 
   @override
-  String generate(GenerationContext context) {
+  bool shouldGenerate(GenerationContext context) => context.config.generateJson;
+
+  @override
+  List<Spec> generateSpec(GenerationContext context) {
     final metadata = context.metadata;
     final config = context.config;
-    if (!config.generateJson) return '';
+    if (!config.generateJson) return [];
 
     final sb = StringBuffer();
     final shouldGenerateJson = !metadata.isAbstract && metadata.explicitSubtypes.isEmpty;
@@ -39,13 +39,12 @@ class JsonGenerator extends UniversalGenerator implements SpecGenerator {
     if (!metadata.isAbstract && metadata.isInParentExplicitSubtypes) {
       sb.writeln(_generateToJsonWithDiscriminator(metadata));
     }
-    return sb.toString();
+    final code = sb.toString();
+    if (code.trim().isEmpty) return [];
+    return [Code(code)];
   }
 
-  @override
-  bool shouldGenerate(GenerationContext context) => context.config.generateJson;
-
-  // ── String helpers ───────────────────────────────────────────
+  // ── Private string builders ──────────────────────────────────
 
   String _generateFromJson(ClassMetadata metadata, GenerationConfig config) {
     final sb = StringBuffer();
@@ -103,7 +102,7 @@ class JsonGenerator extends UniversalGenerator implements SpecGenerator {
 
     for (var i = 0; i < metadata.explicitSubtypes.length; i++) {
       final subtype = metadata.explicitSubtypes[i];
-      final interfaceName = subtype.interfaceName.replaceAll(r'\$', '');
+      final interfaceName = subtype.interfaceName.replaceAll(r'$', '');
       final isLast = caseIndex == totalCases - 1;
       final prefix = caseIndex == 0 ? 'if' : '} else if';
 
@@ -131,7 +130,7 @@ class JsonGenerator extends UniversalGenerator implements SpecGenerator {
       sb.writeln('');
       sb.writeln('  Map<String, dynamic> toJson() {');
       for (var i = 0; i < metadata.explicitSubtypes.length; i++) {
-        final subtype = metadata.explicitSubtypes[i].interfaceName.replaceAll(r'\$', '');
+        final subtype = metadata.explicitSubtypes[i].interfaceName.replaceAll(r'$', '');
         final keyword = i == 0 ? 'if' : '} else if';
         sb.writeln('    $keyword (this is $subtype) {');
         sb.writeln('      final json = (this as $subtype).toJsonLean();');
@@ -261,108 +260,14 @@ class JsonGenerator extends UniversalGenerator implements SpecGenerator {
       return info != null && info.includeToJson == false && info.toJson != null;
     }).toList();
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SPEC PIPELINE (T019)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  @override
-  List<Spec> generateSpec(GenerationContext context) {
-    final code = generate(context);
-    if (code.trim().isEmpty) return [];
-    // fromJson is a factory constructor; toJsonLean/_sanitizeJson/toJson
-    // are instance methods.  code_builder's [Constructor] does not
-    // implement [Spec], so these cannot be native specs (same constraint
-    // as T011 FactoryMethodGenerator).  Return as [Code] to participate
-    // in the spec pipeline validation.
-    return [Code(code)];
-  }
 }
 
 /// Generates JSON extension for concrete classes.
 ///
-/// Migrated (T019): [generateSpec] now produces a native [Extension] spec
-/// with individual [Method] specs for toJson, toJsonLean, and _sanitizeJson.
-class JsonExtensionGenerator extends ConcreteClassGenerator implements SpecGenerator {
+/// Produces a native [Extension] spec with [Method] specs for toJson,
+/// toJsonLean, and _sanitizeJson.
+class JsonExtensionGenerator extends ConcreteClassGenerator {
   JsonExtensionGenerator();
-
-  @override
-  String generate(GenerationContext context) {
-    final metadata = context.metadata;
-    final config = context.config;
-    if (!config.generateJson) return '';
-
-    final className = metadata.cleanName;
-    final genericsStr = _buildGenericsString(metadata);
-    final sb = StringBuffer();
-    final manualToJsonFields = _getManualToJsonFields(metadata);
-
-    sb.writeln('');
-    sb.writeln('extension ${className}Serialization$genericsStr on $className$genericsStr {');
-
-    if (metadata.generics.isEmpty) {
-      if (manualToJsonFields.isEmpty) {
-        sb.writeln('  Map<String, dynamic> toJson() => _\$$className' + 'ToJson(this);');
-      } else {
-        sb.writeln('  Map<String, dynamic> toJson() {');
-        sb.writeln('    final data = _\$$className' + 'ToJson(this);');
-        for (var f in manualToJsonFields) {
-          final info = f.jsonKeyInfo!;
-          final jsonFieldName = info.name ?? f.name;
-          sb.writeln("    if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
-        }
-        sb.writeln('    return data;');
-        sb.writeln('  }');
-      }
-    } else {
-      final toJsonParams = metadata.generics.map((g) => 'Object? Function(${g.name} value) toJson${g.name}').join(', ');
-      final toJsonArgs = metadata.generics.map((g) => 'toJson${g.name}').join(', ');
-      if (manualToJsonFields.isEmpty) {
-        sb.writeln('  Map<String, dynamic> toJson($toJsonParams) => _\$$className' + 'ToJson(this, $toJsonArgs);');
-      } else {
-        sb.writeln('  Map<String, dynamic> toJson($toJsonParams) {');
-        sb.writeln('    final data = _\$$className' + 'ToJson(this, $toJsonArgs);');
-        for (var f in manualToJsonFields) {
-          final info = f.jsonKeyInfo!;
-          final jsonFieldName = info.name ?? f.name;
-          sb.writeln("    if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
-        }
-        sb.writeln('    return data;');
-        sb.writeln('  }');
-      }
-    }
-    if (metadata.generics.isEmpty) {
-      sb.writeln('  Map<String, dynamic> toJsonLean() {');
-      sb.writeln('    final Map<String, dynamic> data = _\$$className' + 'ToJson(this);');
-    } else {
-      final toJsonParams = metadata.generics.map((g) => 'Object? Function(${g.name} value) toJson${g.name}').join(', ');
-      final toJsonArgs = metadata.generics.map((g) => 'toJson${g.name}').join(', ');
-      sb.writeln('  Map<String, dynamic> toJsonLean($toJsonParams) {');
-      sb.writeln('    final Map<String, dynamic> data = _\$$className' + 'ToJson(this, $toJsonArgs);');
-    }
-    for (var f in manualToJsonFields) {
-      final info = f.jsonKeyInfo!;
-      final jsonFieldName = info.name ?? f.name;
-      sb.writeln("    if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
-    }
-    sb.writeln('    return _sanitizeJson(data);');
-    sb.writeln('  }');
-    sb.writeln('');
-    sb.writeln('  dynamic _sanitizeJson(dynamic json) {');
-    sb.writeln('    if (json is Map<String, dynamic>) {');
-    sb.writeln("      json.remove('__typename');");
-    sb.writeln('      return json..forEach((key, value) {');
-    sb.writeln('        json[key] = _sanitizeJson(value);');
-    sb.writeln('      });');
-    sb.writeln('    } else if (json is List) {');
-    sb.writeln('      return json.map((e) => _sanitizeJson(e)).toList();');
-    sb.writeln('    }');
-    sb.writeln('    return json;');
-    sb.writeln('  }');
-    sb.writeln('}');
-
-    return sb.toString();
-  }
 
   @override
   bool shouldGenerate(GenerationContext context) {
@@ -382,10 +287,6 @@ class JsonExtensionGenerator extends ConcreteClassGenerator implements SpecGener
       return info != null && info.includeToJson == false && info.toJson != null;
     }).toList();
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SPEC PIPELINE (T019)
-  // ═══════════════════════════════════════════════════════════════════════════
 
   @override
   List<Spec> generateSpec(GenerationContext context) {

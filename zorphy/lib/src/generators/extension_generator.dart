@@ -4,22 +4,11 @@ import '../ast/ast.dart';
 import '../helpers.dart' as helpers;
 import 'base_generator.dart';
 
-/// Generates compareTo extension method
+/// Generates compareTo extension method.
 ///
-/// Migrated (T017): [generateSpec] now produces a native [Extension] spec
-/// instead of delegating to string-based helpers.
-class CompareToExtensionGenerator extends ConcreteClassGenerator implements SpecGenerator {
+/// Produces a native [Extension] spec.
+class CompareToExtensionGenerator extends ConcreteClassGenerator {
   CompareToExtensionGenerator();
-
-  @override
-  String generate(GenerationContext context) {
-    final metadata = context.metadata;
-    return helpers.getCompareToExtension(
-      metadata.cleanName,
-      metadata.allFields,
-      metadata.allValueTInterfaces,
-    );
-  }
 
   @override
   bool shouldGenerate(GenerationContext context) =>
@@ -60,27 +49,11 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator implements Spec
   }
 }
 
-/// Generates changeTo extension methods for explicit subtypes
+/// Generates changeTo extension methods for explicit subtypes.
 ///
-/// Migrated (T018): [generateSpec] now produces a native [Extension] spec
-/// instead of delegating to string-based helpers.
-class ChangeToExtensionGenerator extends UniversalGenerator implements SpecGenerator {
+/// Produces a native [Extension] spec.
+class ChangeToExtensionGenerator extends UniversalGenerator {
   ChangeToExtensionGenerator();
-
-  @override
-  String generate(GenerationContext context) {
-    final metadata = context.metadata;
-    if (metadata.explicitSubtypes.isEmpty) return '';
-    final knownClasses = metadata.allAnnotatedClasses.keys
-        .map((k) => k.replaceAll(r'$', ''))
-        .toList();
-    return helpers.getChangeToExtension(
-      sourceFields: metadata.allFields,
-      sourceClassName: metadata.cleanName,
-      explicitSubTypes: metadata.explicitSubtypes,
-      knownClasses: knownClasses,
-    );
-  }
 
   @override
   bool shouldGenerate(GenerationContext context) {

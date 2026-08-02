@@ -1,33 +1,14 @@
 import 'package:code_builder/code_builder.dart';
 
 import '../common/NameType.dart';
-import '../helpers.dart' as helpers;
 import 'base_generator.dart';
 
 /// Generates equals, hashCode, and toString methods.
 ///
-/// Migrated (T009): [generateSpec] now produces native [Method] specs
-/// instead of delegating to string-based helpers. The legacy [generate]
-/// path is preserved for backward compatibility with the string pipeline.
-class EqualsToStringGenerator extends ConcreteClassGenerator
-    implements SpecGenerator {
+/// Produces native [Method] specs.
+class EqualsToStringGenerator extends ConcreteClassGenerator {
   /// Creates a generator for equality and toString members.
   EqualsToStringGenerator();
-
-  @override
-  String generate(GenerationContext context) {
-    final metadata = context.metadata;
-    final sb = StringBuffer();
-    final className = metadata.cleanName;
-
-    // Generate equals and hashCode
-    sb.writeln(helpers.getEqualsAndHashCode(metadata.allFields, className));
-
-    // Generate toString
-    sb.writeln(helpers.getToString(metadata.allFields, className));
-
-    return sb.toString();
-  }
 
   @override
   List<Spec> generateSpec(GenerationContext context) {

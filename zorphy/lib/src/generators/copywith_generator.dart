@@ -40,61 +40,10 @@ Set<String> _getCovariantFields(
 
 /// Generates copyWith methods.
 ///
-/// Migrated (T010): [generateSpec] now produces native [Method] specs
-/// instead of delegating to string-based helpers. The legacy [generate]
-/// path is preserved for backward compatibility with the string pipeline.
-class CopyWithGenerator extends UniversalGenerator implements SpecGenerator {
+/// Migrated (T010): produces native [Method] specs.
+class CopyWithGenerator extends UniversalGenerator {
   /// Creates a generator for copyWith helpers.
   CopyWithGenerator();
-
-  @override
-  String generate(GenerationContext context) {
-    final metadata = context.metadata;
-    final config = context.config;
-
-    if (metadata.isAbstract && !config.generateCopyWithFn) {
-      return '';
-    }
-
-    final copyWithClassName = metadata.isAbstract
-        ? (metadata.originalName.startsWith(r'\$\$')
-              ? metadata.cleanName
-              : '\$${metadata.cleanName}')
-        : metadata.cleanName;
-
-    final sb = StringBuffer();
-    sb.writeln(
-      helpers.getCopyWith(
-        metadata.allFields,
-        copyWithClassName,
-        config.generateCopyWithFn,
-        hidePublicConstructor: config.hidePublicConstructor,
-        interfaces: metadata.allValueTInterfaces,
-        ownFields: metadata.ownFieldNames,
-      ),
-    );
-
-    sb.writeln(
-      helpers.getInterfaceCopyWithMethods(
-        metadata.allValueTInterfaces,
-        metadata.allFields,
-        metadata.cleanName,
-      ),
-    );
-
-    if (config.generateCopyWithFn) {
-      sb.writeln(
-        helpers.getInterfaceCopyWithFnMethods(
-          metadata.allValueTInterfaces,
-          metadata.allFields,
-          metadata.cleanName,
-          metadata.allFields,
-        ),
-      );
-    }
-
-    return sb.toString();
-  }
 
   @override
   List<Spec> generateSpec(GenerationContext context) {

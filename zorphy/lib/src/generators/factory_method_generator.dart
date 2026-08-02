@@ -1,22 +1,17 @@
+import 'package:code_builder/code_builder.dart';
+
 import '../helpers.dart' as helpers;
 import 'base_generator.dart';
 
 /// Generates factory method constructors.
 ///
-/// Migrated (T011): [generateSpec] is intentionally NOT overridden
-/// because code_builder's [Constructor] does not implement [Spec],
-/// so factory constructors cannot be returned as standalone specs.
-/// The default [CodeGeneratorSpecAdapter.generateSpec] wraps the
-/// string output in a [Code] spec, which the orchestrator places
-/// inside the Class body.
-///
-/// The legacy [generate] path is preserved for backward compatibility.
+/// Produces [Code] specs wrapping the helper output.
 class FactoryMethodGenerator extends ConcreteClassGenerator {
   /// Creates a generator for factory constructors.
   FactoryMethodGenerator();
 
   @override
-  String generate(GenerationContext context) {
+  List<Spec> generateSpec(GenerationContext context) {
     final metadata = context.metadata;
     final sb = StringBuffer();
 
@@ -38,7 +33,9 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
       }
     }
 
-    return sb.toString();
+    final code = sb.toString();
+    if (code.trim().isEmpty) return [];
+    return [Code(code)];
   }
 
   @override

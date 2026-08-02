@@ -11,25 +11,10 @@ import 'base_generator.dart';
 
 /// Generates class declaration, properties, and constructor.
 ///
-/// Migrated (T008): [generateSpec] now produces a native [Class] spec
-/// instead of building strings via StringBuffer. The legacy [generate]
-/// path is preserved for backward compatibility with the string pipeline.
-class ClassDeclarationGenerator extends UniversalGenerator
-    implements SpecGenerator {
+/// Produces a native [Class] spec.
+class ClassDeclarationGenerator extends UniversalGenerator {
   /// Creates a generator for class declarations and constructors.
   ClassDeclarationGenerator();
-
-  @override
-  String generate(GenerationContext context) {
-    final metadata = context.metadata;
-    final config = context.config;
-
-    if (metadata.isAbstract) {
-      return _generateAbstractClass(metadata, config);
-    } else {
-      return _generateConcreteClass(metadata, config);
-    }
-  }
 
   @override
   List<Spec> generateSpec(GenerationContext context) {
@@ -42,129 +27,6 @@ class ClassDeclarationGenerator extends UniversalGenerator
       return [_buildConcreteClassSpec(metadata, config)];
     }
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  // STRING PIPELINE (legacy — preserved for backward compat)
-  // ═══════════════════════════════════════════════════════════════
-
-  String _generateAbstractClass(
-    ClassMetadata metadata,
-    GenerationConfig config,
-  ) {
-    final className = metadata.originalName.startsWith(r'$$')
-        ? metadata.cleanName
-        : '\$${metadata.cleanName}';
-
-    final sealedModifier = metadata.nonSealed ? '' : 'sealed ';
-    final abstractModifier = metadata.nonSealed ? 'abstract ' : '';
-    final implementsStr = _buildImplementsClause(
-      metadata,
-      config,
-      isAbstract: true,
-    );
-    final genericsStr = _buildGenericsString(metadata);
-
-    final sb = StringBuffer();
-    final isSealedWithSubtypes =
-        metadata.isSealed && metadata.explicitSubtypes.isNotEmpty;
-
-    sb.writeln(
-      '${sealedModifier}${abstractModifier}class $className$genericsStr$implementsStr {',
-    );
-    sb.writeln(
-      helpers.getPropertiesAbstract(
-        metadata.allFields,
-        className,
-        config.generateCopyWithFn,
-        isSealedWithSubtypes: isSealedWithSubtypes,
-        hasConstConstructor: metadata.hasConstConstructor,
-      ),
-    );
-
-    return sb.toString();
-  }
-
-  String _generateConcreteClass(
-    ClassMetadata metadata,
-    GenerationConfig config,
-  ) {
-    final className = metadata.cleanName;
-    final genericsStr = _buildGenericsString(metadata);
-    final extendsStr = _buildExtendsClause(metadata, config);
-    final implementsStr = _buildImplementsClause(
-      metadata,
-      config,
-      isAbstract: false,
-    );
-
-    final sb = StringBuffer();
-
-    final hasFactoryMethods = config.factoryMethods.isNotEmpty;
-    final isAbstractClass = metadata.originalName.startsWith(r'$$');
-    final shouldSkipJsonAnnotation =
-        hasFactoryMethods && isAbstractClass;
-
-    if (config.generateJson && !shouldSkipJsonAnnotation) {
-      final genericParams = metadata.generics.isNotEmpty
-          ? ', genericArgumentFactories: true'
-          : '';
-      final constructorParam = config.hidePublicConstructor
-          ? ", constructor: '_'"
-          : "";
-      sb.writeln(
-        '@JsonSerializable(explicitToJson: ${config.explicitToJson}, checked: true$genericParams$constructorParam)',
-      );
-    }
-
-    sb.writeln('class $className$genericsStr$extendsStr$implementsStr {');
-
-    final hasExtendsParam = extendsStr.isNotEmpty;
-    final extendsAbstractClass = _determineExtendsAbstractClass(
-      metadata,
-      config,
-    );
-    final parentConcreteClassName = _getConcreteParentName(metadata);
-    final hasConcreteParent = parentConcreteClassName != null;
-    final parentHasConst = hasConcreteParent
-        ? _parentHasConstConstructor(metadata, parentConcreteClassName)
-        : true;
-    final shouldGenerateConstConstructor =
-        metadata.hasConstConstructor &&
-        (!hasConcreteParent || parentHasConst);
-
-    final fieldsToGenerate = metadata.allFields;
-    final parentFields = hasConcreteParent
-        ? _getParentFieldsForSuper(metadata, config)
-        : <String>{};
-
-    final allParentInterfaceFields = <String>{};
-    for (final iface in metadata.interfaces) {
-      allParentInterfaceFields.addAll(iface.fields.map((f) => f.name));
-    }
-
-    sb.writeln(
-      helpers.getProperties(
-        fieldsToGenerate,
-        className,
-        false,
-        config.hidePublicConstructor,
-        config.generateCopyWithFn,
-        config.generateJson,
-        shouldGenerateConstConstructor,
-        hasExtendsParam,
-        extendsAbstractClass: extendsAbstractClass,
-        parentFields: parentFields,
-        ownFields: metadata.ownFieldNames,
-        allInheritedFields: allParentInterfaceFields,
-      ),
-    );
-
-    return sb.toString();
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // SPEC PIPELINE (new — code_builder native specs)
-  // ═══════════════════════════════════════════════════════════════
 
   /// Builds a [Class] spec for an abstract class.
   Class _buildAbstractClassSpec(
@@ -225,12 +87,6 @@ class ClassDeclarationGenerator extends UniversalGenerator
           }
         }));
       }
-
-      // Named copyWith factory constructor (abstract classes with
-      // generateCopyWithFn) is handled by the string pipeline via
-      // helpers.getPropertiesAbstract. The code_builder Class spec doesn't
-      // support redirecting factory constructors, so the spec path omits it.
-      // The string pipeline remains the primary output.
     });
   }
 
@@ -428,8 +284,7 @@ class ClassDeclarationGenerator extends UniversalGenerator
 
     for (final f in fields) {
       // Skip getter-only without default value
-      if (f.isGetterOnly &&
-          f.jsonKeyInfo?.defaultValue == null) {
+      if (f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null) {
         continue;
       }
 
@@ -533,7 +388,6 @@ class ClassDeclarationGenerator extends UniversalGenerator
       }
 
       // Set initializers as Code expressions
-      // Note: code_builder's Constructor.initializers takes Expression objects
       for (final init in initParts) {
         con.initializers.add(Code(init));
       }
@@ -545,8 +399,7 @@ class ClassDeclarationGenerator extends UniversalGenerator
     if (config.generateCopyWithFn) {
       final copyWithParams = <Parameter>[];
       for (final f in fields) {
-        if (f.isGetterOnly &&
-            f.jsonKeyInfo?.defaultValue == null) {
+        if (f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null) {
           continue;
         }
         var fieldType = f.type != null
@@ -565,8 +418,7 @@ class ClassDeclarationGenerator extends UniversalGenerator
       final copyWithInitializers = <String>[];
       final copyWithFields = fields
           .where((f) =>
-              !(f.isGetterOnly &&
-                  f.jsonKeyInfo?.defaultValue == null))
+              !(f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null))
           .toList();
       for (var i = 0; i < copyWithFields.length; i++) {
         final f = copyWithFields[i];
@@ -588,54 +440,13 @@ class ClassDeclarationGenerator extends UniversalGenerator
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // SHARED HELPERS (used by both pipelines)
+  // HELPERS
   // ═══════════════════════════════════════════════════════════════
 
   /// Null-safe type reference helper.
   TypeReference _referFieldType(String? type) {
     if (type == null || type.isEmpty) return referType('dynamic');
     return referType(type);
-  }
-
-  String _buildGenericsString(ClassMetadata metadata) {
-    if (metadata.generics.isEmpty) return '';
-    final parts = metadata.generics
-        .map((g) {
-          if (g.bound != null && g.bound!.isNotEmpty) {
-            return '${g.name} extends ${g.bound}';
-          }
-          return g.name;
-        })
-        .join(', ');
-    return '<$parts>';
-  }
-
-  String _buildImplementsClause(
-    ClassMetadata metadata,
-    GenerationConfig config, {
-    required bool isAbstract,
-  }) {
-    final interfaces = metadata.interfaces;
-
-    if (isAbstract) {
-      final clause = interfaces
-          .map((i) => i.interfaceName)
-          .where((name) => name.isNotEmpty)
-          .join(', ');
-      return clause.isNotEmpty ? ' implements $clause' : '';
-    } else {
-      final extendedParent = _getExtendedParentName(metadata, config);
-      final clauseParts = interfaces
-          .map((i) => _trimInterfaceName(i.interfaceName))
-          .where(
-            (name) =>
-                name.isNotEmpty &&
-                    name != _trimInterfaceName(extendedParent),
-          )
-          .toList();
-      final clause = clauseParts.join(', ');
-      return clause.isNotEmpty ? ' implements $clause' : '';
-    }
   }
 
   bool _parentHasConstConstructor(
@@ -654,8 +465,7 @@ class ClassDeclarationGenerator extends UniversalGenerator
     }
     final parentElement =
         metadata.allAnnotatedClasses[parentConcreteClassName] ??
-            metadata
-                .allAnnotatedClasses['\$$parentConcreteClassName'];
+            metadata.allAnnotatedClasses['\$$parentConcreteClassName'];
     return parentElement?.constructors.any((e) => e.isConst) ?? false;
   }
 
