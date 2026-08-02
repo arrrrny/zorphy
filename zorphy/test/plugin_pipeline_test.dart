@@ -35,7 +35,7 @@ class _TelemetryPlugin extends ZorphyPlugin {
       // Add the telemetry field.
       c.fields.add(
         Field((f) {
-          f.name = r'_\$telemetry';
+          f.name = r'_$telemetry';
           f.type = refer('Map<String, dynamic>');
           f.modifier = FieldModifier.final$;
         }),
@@ -75,7 +75,7 @@ void main() {
       // Verify the plugin added the field.
       expect(result, isA<Class>());
       final cls = result as Class; // ignore: unnecessary_cast
-      expect(cls.fields.any((f) => f.name == r'_\$telemetry'), isTrue);
+      expect(cls.fields.any((f) => f.name == r'_$telemetry'), isTrue);
 
       // Verify the plugin context accumulated the import.
       context.addImport('package:telemetry/telemetry.dart');
@@ -96,7 +96,7 @@ void main() {
       final emitter = ZorphyEmitter();
       final code = emitter.emit(library);
 
-      expect(code, contains(r'_\$telemetry'));
+      expect(code, contains(r'_$telemetry'));
       expect(code, contains("import 'package:telemetry/telemetry.dart'"));
     });
 

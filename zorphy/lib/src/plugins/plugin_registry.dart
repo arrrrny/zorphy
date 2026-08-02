@@ -63,13 +63,16 @@ class PluginRegistry {
             .toList();
 
         // p.runBefore: names that must run AFTER p.
-        // We also need to check: does any other remaining plugin
-        // declare runBefore=[p.name]? That would mean that plugin
-        // must run before p, so p must wait for it.
-        // Since we iterate in source order, if that plugin has
-        // no pending deps it will emit first naturally.
+        // Check if any other remaining plugin declares runBefore=[p.name].
+        // That would mean that plugin must run before p, so p must wait.
+        final pendingBefore = remaining
+            .where((other) =>
+                other != p &&
+                other.runBefore.contains(p.name) &&
+                !emitted.contains(other.name))
+            .toList();
 
-        if (pendingAfter.isEmpty) {
+        if (pendingAfter.isEmpty && pendingBefore.isEmpty) {
           result.add(p);
           emitted.add(p.name);
           remaining.remove(p);

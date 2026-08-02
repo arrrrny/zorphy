@@ -114,5 +114,15 @@ void main() {
       expect(ordered.length, 1);
       expect(ordered.first.name, 'solo');
     });
+
+    test('runBefore enforced even when registered after target', () {
+      // a must run before b, but a is registered AFTER b
+      final registry = PluginRegistry();
+      registry.register(_NoOpPlugin('b'));
+      registry.register(_RunBeforePlugin('a', {'b'})); // a runs before b
+
+      final ordered = registry.ordered();
+      expect(ordered.map((p) => p.name), equals(['a', 'b']));
+    });
   });
 }

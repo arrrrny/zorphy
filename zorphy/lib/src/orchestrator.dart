@@ -116,6 +116,11 @@ class Orchestrator {
   /// Plugins mutate the [Class], [Method], and [Field] specs
   /// in-place. Imports and diagnostics accumulate into the
   /// [PluginContext].
+  ///
+  /// Plugins are filtered by [ZorphyPlugin.decoratorNames]: only plugins
+  /// whose decoratorNames are empty (unscoped) or intersect with the
+  /// class's decorators will run. Once the annotation supports a
+  /// `decorators` field, this filtering becomes active.
   static PluginContext _runPluginPass(
     List<Spec> specs,
     PluginRegistry registry,
@@ -128,7 +133,17 @@ class Orchestrator {
     );
     final orderedPlugins = registry.ordered();
 
+    // Class decorators (empty set until annotation supports decorators field)
+    final classDecorators = <String>{};
+
     for (final plugin in orderedPlugins) {
+      // Check if plugin should run for this class based on decoratorNames
+      final pluginDecorators = plugin.decoratorNames;
+      final shouldRun = pluginDecorators.isEmpty ||
+          classDecorators.any((d) => pluginDecorators.contains(d));
+
+      if (!shouldRun) continue;
+
       for (int i = 0; i < specs.length; i++) {
         final spec = specs[i];
         if (spec is Class) {

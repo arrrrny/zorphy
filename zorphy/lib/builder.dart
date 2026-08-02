@@ -5,11 +5,12 @@ import 'src/zorphy_generator.dart';
 
 /// Creates the build_runner builder for Zorphy code generation.
 ///
-/// If the `plugins` builder option is provided (a list of import-URI
-/// strings), those URIs are passed to [ZorphyGenerator] which stores
-/// them for deferred plugin resolution at generate() time.
+/// **Note:** The `plugins` builder option is currently reserved for
+/// future use (v2.1+). URI-based plugin loading is not yet implemented.
+/// For now, plugins must be registered programmatically by passing a
+/// pre-populated [PluginRegistry] to [ZorphyGenerator].
 ///
-/// Example `build.yaml`:
+/// Example `build.yaml` (future feature):
 /// ```yaml
 /// targets:
 ///   $default:
