@@ -63,7 +63,7 @@ class PatchClassGenerator extends ConcreteClassGenerator {
   List<Spec> generateSpec(GenerationContext context) {
     final metadata = context.metadata;
     final knownClasses = metadata.allAnnotatedClasses.keys
-        .map((k) => k.replaceAll(r'\$', ''))
+        .map((k) => k.replaceAll(r'$', ''))
         .toList();
     final genericTypeNames = metadata.generics.map((g) => g.name).toList();
     final code = helpers.getPatchClass(
@@ -86,6 +86,7 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
   @override
   bool shouldGenerate(GenerationContext context) {
     return context.config.generatePatch &&
+        !context.metadata.isAbstract &&
         context.metadata.allFields.isNotEmpty;
   }
 

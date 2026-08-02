@@ -104,16 +104,16 @@ class FieldsClassGenerator extends UniversalGenerator {
 
   String _cleanType(String type) {
     if (type.contains('<')) {
-      if (!type.contains('.')) return type.replaceAll(r'\$', '');
+      if (!type.contains('.')) return type.replaceAll(r'$', '');
       return type
           .split('.')
           .map((part) {
             if (part.contains('<')) {
               final base = part.substring(0, part.indexOf('<'));
               final rest = part.substring(part.indexOf('<'));
-              return base.replaceAll(r'\$', '') + rest.replaceAll(r'\$', '');
+              return base.replaceAll(r'$', '') + rest.replaceAll(r'$', '');
             }
-            return part.replaceAll(r'\$', '');
+            return part.replaceAll(r'$', '');
           })
           .join('.');
     }
@@ -121,8 +121,8 @@ class FieldsClassGenerator extends UniversalGenerator {
       final lastDot = type.lastIndexOf('.');
       final prefix = type.substring(0, lastDot + 1);
       final name = type.substring(lastDot + 1);
-      return prefix + name.replaceAll(r'\$', '');
+      return prefix + name.replaceAll(r'$', '');
     }
-    return type.replaceAll(r'\$', '');
+    return type.replaceAll(r'$', '');
   }
 }

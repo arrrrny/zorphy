@@ -66,7 +66,7 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
     final metadata = context.metadata;
     if (metadata.explicitSubtypes.isEmpty) return [];
     final knownClasses = metadata.allAnnotatedClasses.keys
-        .map((k) => k.replaceAll(r'\$', ''))
+        .map((k) => k.replaceAll(r'$', ''))
         .toList();
     return [_buildChangeToExtension(
       sourceFields: metadata.allFields,
@@ -82,11 +82,11 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
     required List<dynamic> explicitSubTypes,
     required List<String> knownClasses,
   }) {
-    final sourceClassNameTrimmed = sourceClassName.replaceAll(r'\$', '');
+    final sourceClassNameTrimmed = sourceClassName.replaceAll(r'$', '');
     final methods = <Method>[];
 
     for (final targetInterface in explicitSubTypes) {
-      final targetClassName = targetInterface.interfaceName.replaceAll(r'\$', '');
+      final targetClassName = targetInterface.interfaceName.replaceAll(r'$', '');
       final targetFields = targetInterface.fields;
       final targetFieldsDistinct = <dynamic>[];
       final targetFieldNames = <String>{};

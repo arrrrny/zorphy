@@ -102,7 +102,7 @@ class JsonGenerator extends UniversalGenerator {
 
     for (var i = 0; i < metadata.explicitSubtypes.length; i++) {
       final subtype = metadata.explicitSubtypes[i];
-      final interfaceName = subtype.interfaceName.replaceAll(r'\$', '');
+      final interfaceName = subtype.interfaceName.replaceAll(r'$', '');
       final isLast = caseIndex == totalCases - 1;
       final prefix = caseIndex == 0 ? 'if' : '} else if';
 
@@ -130,7 +130,7 @@ class JsonGenerator extends UniversalGenerator {
       sb.writeln('');
       sb.writeln('  Map<String, dynamic> toJson() {');
       for (var i = 0; i < metadata.explicitSubtypes.length; i++) {
-        final subtype = metadata.explicitSubtypes[i].interfaceName.replaceAll(r'\$', '');
+        final subtype = metadata.explicitSubtypes[i].interfaceName.replaceAll(r'$', '');
         final keyword = i == 0 ? 'if' : '} else if';
         sb.writeln('    $keyword (this is $subtype) {');
         sb.writeln('      final json = (this as $subtype).toJsonLean();');

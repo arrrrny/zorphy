@@ -478,7 +478,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       if (name.startsWith(r'$$') && !iface.isSealed) {
         return name;
       }
-      if (name.startsWith(r'\$') && !name.startsWith(r'$$')) {
+      if (name.startsWith(r'$') && !name.startsWith(r'$$')) {
         return name;
       }
     }
@@ -497,7 +497,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
   String? _getConcreteParentName(ClassMetadata metadata) {
     for (final iface in metadata.interfaces) {
       final name = iface.interfaceName;
-      if (name.startsWith(r'\$') && !name.startsWith(r'$$')) {
+      if (name.startsWith(r'$') && !name.startsWith(r'$$')) {
         final trimmedName = _trimInterfaceName(name);
         final parentElement =
             metadata.allAnnotatedClasses[trimmedName];
@@ -516,7 +516,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
   String _trimInterfaceName(String name) {
     if (name.startsWith(r'$$')) return name.substring(2);
-    if (name.startsWith(r'\$')) return name.substring(1);
+    if (name.startsWith(r'$')) return name.substring(1);
     return name;
   }
 
