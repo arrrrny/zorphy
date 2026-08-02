@@ -6,6 +6,7 @@ import 'package:source_gen/source_gen.dart';
 import 'package:zorphy/src/analysis/analysis.dart';
 import 'package:zorphy/src/models/models.dart';
 import 'package:zorphy/src/orchestrator.dart';
+import 'package:zorphy/src/plugins/plugin_registry.dart';
 
 /// Unified single-pass generator for `@Zorphy` and `@Zorphy2` classes.
 ///
@@ -14,9 +15,30 @@ import 'package:zorphy/src/orchestrator.dart';
 /// order over the `implements $$Base` graph, computed per library), and
 /// keeps NO process-global mutable state — the annotated-class graph is
 /// rebuilt from the library's class list on every pass.
+///
+/// When [pluginUris] are provided (via `build.yaml` options), they are
+/// stored for deferred resolution. When [pluginRegistry] is provided
+/// (programmatic registration), those plugins are used directly.
 class ZorphyGenerator extends Generator {
   /// Creates the unified generator.
-  const ZorphyGenerator();
+  ///
+  /// [pluginRegistry] is an optional pre-populated registry of
+  /// [ZorphyPlugin] instances. If non-null, the orchestrator runs
+  /// the plugin transform pass after spec collection.
+  ///
+  /// [pluginUris] are import-URI strings from `build.yaml` options.
+  /// They are stored but not resolved at construction time;
+  /// dynamic URI-based plugin loading is a v2.1 feature.
+  const ZorphyGenerator({
+    this.pluginRegistry,
+    this.pluginUris = const [],
+  });
+
+  /// Optional pre-populated plugin registry.
+  final PluginRegistry? pluginRegistry;
+
+  /// Plugin import URIs from build.yaml (deferred resolution).
+  final List<String> pluginUris;
 
   static const _zorphyChecker = TypeChecker.fromUrl(
     'package:zorphy_annotation/src/annotations.dart#Zorphy',
@@ -105,13 +127,14 @@ class ZorphyGenerator extends Generator {
       ownFields: ownFields,
     );
 
-    // Use the orchestrator pipeline
+    // Use the orchestrator pipeline (with optional plugin registry)
     return Orchestrator.generate(
       classElement,
       annotation,
       graph.annotated,
       config,
       graph.classesInExplicitSubtypes,
+      pluginRegistry: pluginRegistry,
     );
   }
 }

@@ -5,15 +5,18 @@ import 'package:zorphy/src/analysis/analysis.dart';
 import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/generators/generators.dart';
 import 'package:zorphy/src/models/models.dart';
+import 'package:zorphy/src/plugins/plugin_context.dart';
+import 'package:zorphy/src/plugins/plugin_registry.dart';
 
 /// Orchestrates the code generation pipeline.
 ///
-/// Coordinates: Analysis -> Models -> Generation -> Spec Assembly -> Emission
+/// Coordinates: Analysis -> Models -> Generation -> Spec Assembly ->
+/// Plugin Transform -> Emission
 ///
 /// Generators produce [Spec] objects which are collected into a [Library]
-/// and emitted via [ZorphyEmitter]. Generators that produce [Method] specs
-/// have them merged into the primary [Class]; top-level specs (Extension,
-/// Enum, additional Class, Code) go directly into the Library body.
+/// and emitted via [ZorphyEmitter]. If a [PluginRegistry] is provided,
+/// plugins run after spec collection and before emission, mutating
+/// specs and accumulating imports into the [Library].
 class Orchestrator {
   /// All available generators.
   static final List<CodeGenerator> _generators = [
@@ -62,15 +65,18 @@ class Orchestrator {
 
   /// Generate code for a single class.
   ///
-  /// Runs all generators, collects their [Spec] outputs, assembles them
-  /// into a [Library], and emits via [ZorphyEmitter].
+  /// Runs all generators, collects their [Spec] outputs, runs the
+  /// plugin transform pass (if [pluginRegistry] is non-null and
+  /// non-empty), assembles specs into a [Library], and emits
+  /// via [ZorphyEmitter].
   static String generate(
     ClassElement classElement,
     ConstantReader annotation,
     Map<String, ClassElement> allAnnotatedClasses,
     GenerationConfig config,
-    Set<String> classesInExplicitSubtypes,
-  ) {
+    Set<String> classesInExplicitSubtypes, {
+    PluginRegistry? pluginRegistry,
+  }) {
     // Phase 1: Analysis
     final metadata = ClassAnalyzer.analyze(
       classElement,
@@ -90,8 +96,108 @@ class Orchestrator {
       }
     }
 
-    // Phase 4: Assemble and emit via spec pipeline
-    return _emitViaSpecPipeline(allSpecs);
+    // Phase 4: Plugin transform pass (if registry provided and non-empty)
+    PluginContext? pluginContext;
+    if (pluginRegistry != null && !pluginRegistry.isEmpty) {
+      pluginContext = _runPluginPass(
+        allSpecs,
+        pluginRegistry,
+        metadata,
+        config,
+      );
+    }
+
+    // Phase 5: Assemble and emit via spec pipeline
+    return _emitViaSpecPipeline(allSpecs, pluginImports: pluginContext?.imports);
+  }
+
+  /// Runs the plugin transform pass over collected specs.
+  ///
+  /// Plugins mutate the [Class], [Method], and [Field] specs
+  /// in-place. Imports and diagnostics accumulate into the
+  /// [PluginContext].
+  ///
+  /// Plugins are filtered by [ZorphyPlugin.decoratorNames]: only plugins
+  /// whose decoratorNames are empty (unscoped) or intersect with the
+  /// class's decorators will run. Once the annotation supports a
+  /// `decorators` field, this filtering becomes active.
+  static PluginContext _runPluginPass(
+    List<Spec> specs,
+    PluginRegistry registry,
+    ClassMetadata metadata,
+    GenerationConfig config,
+  ) {
+    final pluginContext = PluginContext(
+      metadata: metadata,
+      config: config,
+    );
+    final orderedPlugins = registry.ordered();
+
+    // Class decorators (empty set until annotation supports decorators field)
+    final classDecorators = <String>{};
+
+    for (final plugin in orderedPlugins) {
+      // Check if plugin should run for this class based on decoratorNames
+      final pluginDecorators = plugin.decoratorNames;
+      final shouldRun = pluginDecorators.isEmpty ||
+          classDecorators.any((d) => pluginDecorators.contains(d));
+
+      if (!shouldRun) continue;
+
+      for (int i = 0; i < specs.length; i++) {
+        final spec = specs[i];
+        if (spec is Class) {
+          // Transform class-level, then its fields and methods.
+          var transformed = plugin.transformClass(spec, pluginContext);
+          if (transformed is Class) {
+            final originalClass = transformed;
+            // Transform fields within the class.
+            final transformedFields = <Field>[];
+            for (final field in originalClass.fields) {
+              final fieldResult = plugin.transformField(
+                field,
+                pluginContext,
+              );
+              transformedFields.add(fieldResult is Field ? fieldResult : field);
+            }
+            // Transform methods within the class.
+            final transformedMethods = <Method>[];
+            for (final method in originalClass.methods) {
+              final methodResult = plugin.transformMethod(
+                method,
+                pluginContext,
+              );
+              transformedMethods
+                  .add(methodResult is Method ? methodResult : method);
+            }
+            // Rebuild the class with transformed members.
+            transformed = Class((c) {
+              c.name = originalClass.name;
+              c.abstract = originalClass.abstract;
+              c.sealed = originalClass.sealed;
+              c.extend = originalClass.extend;
+              c.types.addAll(originalClass.types);
+              c.implements.addAll(originalClass.implements);
+              c.mixins.addAll(originalClass.mixins);
+              c.annotations.addAll(originalClass.annotations);
+              c.docs.addAll(originalClass.docs);
+              c.fields.addAll(transformedFields);
+              c.methods.addAll(transformedMethods);
+              c.constructors.addAll(originalClass.constructors);
+            });
+            specs[i] = transformed;
+          } else {
+            specs[i] = transformed;
+          }
+        } else if (spec is Method) {
+          specs[i] = plugin.transformMethod(spec, pluginContext);
+        } else if (spec is Field) {
+          specs[i] = plugin.transformField(spec, pluginContext);
+        }
+      }
+    }
+
+    return pluginContext;
   }
 
   /// Emits a list of [Spec] objects through the code_builder pipeline.
@@ -101,7 +207,13 @@ class Orchestrator {
   ///   [Method]/[Constructor] specs are added as its members.
   /// - [Extension]/[Enum]/[Class] (non-primary): go to library level.
   /// - [Code] specs: placed at library level (top-level declarations).
-  static String _emitViaSpecPipeline(List<Spec> specs) {
+  ///
+  /// [pluginImports] are accumulated import directives from the
+  /// plugin pass, folded into the [Library] directives.
+  static String _emitViaSpecPipeline(
+    List<Spec> specs, {
+    List<Directive>? pluginImports,
+  }) {
     if (specs.isEmpty) return '';
 
     // 1. Separate specs by category.
@@ -122,6 +234,13 @@ class Orchestrator {
 
     // 2. Build the Library.
     final library = Library((b) {
+      // Add plugin-accumulated imports.
+      if (pluginImports != null) {
+        for (final directive in pluginImports) {
+          b.directives.add(directive);
+        }
+      }
+
       // Add primary class with member specs merged in.
       if (primaryClass != null) {
         final rebuiltClass = _mergeMembersIntoClass(
@@ -140,10 +259,9 @@ class Orchestrator {
     return _emitter.emit(library);
   }
 
-  /// Merges [memberSpecs] into a [Class] spec.
+  /// Merges member specs into a [Class] spec.
   ///
   /// Methods are appended to the class methods list.
-  /// Code specs remain at library level (not added here).
   static Spec _mergeMembersIntoClass(Class cls, List<Method> memberSpecs) {
     if (memberSpecs.isEmpty) return cls;
 
