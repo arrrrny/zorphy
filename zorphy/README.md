@@ -28,6 +28,7 @@
 - 🔄 **ChangeTo** - Convert between related types in inheritance hierarchies
 - 🤖 **AI-Friendly CLI** - Command-line tool optimized for AI agents and developers
 - 🔌 **MCP Server** - Model Context Protocol server for agentic integration
+- 🔮 **Plugin API** - Extensible compiler pipeline with third-party plugin support
 
 ## 📦 Installation
 
@@ -312,6 +313,73 @@ Field name (or press Enter to finish):
   - name: String
   - age: int
 ```
+
+## 🔮 Plugin API
+
+Zorphy 2.0 supports third-party plugins that can inspect and mutate generated code before it is emitted. Plugins are Dart classes that extend `ZorphyPlugin` and implement transform hooks for classes, methods, and fields.
+
+**Quick example** — a plugin that adds a timestamp field:
+
+```dart
+import 'package:code_builder/code_builder.dart';
+import 'package:zorphy/zorphy_plugin.dart';
+
+class TimestampPlugin extends ZorphyPlugin {
+  @override
+  String get name => 'timestamp';
+
+  @override
+  Spec transformClass(Spec spec, PluginContext context) {
+    if (spec is! Class) return spec;
+    context.addImport('package:my_package/timestamp.dart');
+    return Class((c) {
+      c.name = spec.name;
+      c.abstract = spec.abstract;
+      c.sealed = spec.sealed;
+      c.extend = spec.extend;
+      c.types.addAll(spec.types);
+      c.implements.addAll(spec.implements);
+      c.mixins.addAll(spec.mixins);
+      c.annotations.addAll(spec.annotations);
+      c.docs.addAll(spec.docs);
+      c.fields.addAll(spec.fields);
+      c.methods.addAll(spec.methods);
+      c.constructors.addAll(spec.constructors);
+      c.fields.add(Field((f) {
+        f.name = 'generatedAt';
+        f.type = refer('DateTime');
+        f.modifier = FieldModifier.final$;
+      }));
+    });
+  }
+}
+```
+
+**Register via `build.yaml`:**
+
+```yaml
+targets:
+  $default:
+    builders:
+      zorphy:zorphy:
+        options:
+          plugins:
+            - package:my_package/timestamp_plugin.dart
+```
+
+**Programmatic registration:**
+
+```dart
+import 'package:zorphy/src/plugins/plugin_registry.dart';
+
+final registry = PluginRegistry();
+registry.register(TimestampPlugin());
+final generator = ZorphyGenerator(pluginRegistry: registry);
+```
+
+Plugins execute in topological order via `runBefore`/`runAfter` constraints. When no plugins are registered, output is byte-identical to the pre-plugin pipeline.
+
+📚 **[Full Plugin API docs](https://arrrrny.github.io/zorphy/docs/plugins)** · [Example](./example/lib/plugin_example.dart)
 
 ## 🔌 Zorphy MCP Server
 
