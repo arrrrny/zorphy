@@ -50,7 +50,7 @@ class EqualsToStringGenerator extends ConcreteClassGenerator {
 
     return Method((m) {
       m.annotations.add(refer('override'));
-      m.name = '==';
+      m.name = 'operator ==';
       m.returns = refer('bool');
       m.requiredParameters.add(Parameter((p) {
         p.name = 'other';

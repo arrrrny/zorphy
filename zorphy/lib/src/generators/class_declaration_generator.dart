@@ -420,12 +420,9 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           .where((f) =>
               !(f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null))
           .toList();
-      for (var i = 0; i < copyWithFields.length; i++) {
-        final f = copyWithFields[i];
-        final comma =
-            i == copyWithFields.length - 1 ? ';' : ',';
+      for (final f in copyWithFields) {
         copyWithInitializers.add(
-          '${f.name} = ${f.name} ?? (() { throw ArgumentError("${f.name} is required"); })()$comma',
+          '${f.name} = ${f.name} ?? (() { throw ArgumentError("${f.name} is required"); })()',
         );
       }
 
