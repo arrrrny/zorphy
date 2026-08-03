@@ -29,9 +29,14 @@ class ZorphyGenerator extends Generator {
   /// [pluginUris] are import-URI strings from `build.yaml` options.
   /// They are stored but not resolved at construction time;
   /// dynamic URI-based plugin loading is a v2.1 feature.
+  ///
+  /// [isDryRun] when true, prevents file changes (preview mode).
+  /// [isForce] when true, bypasses smart merge and regenerates from scratch.
   const ZorphyGenerator({
     this.pluginRegistry,
     this.pluginUris = const [],
+    this.isDryRun = false,
+    this.isForce = false,
   });
 
   /// Optional pre-populated plugin registry.
@@ -39,6 +44,12 @@ class ZorphyGenerator extends Generator {
 
   /// Plugin import URIs from build.yaml (deferred resolution).
   final List<String> pluginUris;
+
+  /// Dry-run mode: preview changes without writing.
+  final bool isDryRun;
+
+  /// Force mode: bypass merge and regenerate from scratch.
+  final bool isForce;
 
   static const _zorphyChecker = TypeChecker.fromUrl(
     'package:zorphy_annotation/src/annotations.dart#Zorphy',

@@ -10,7 +10,7 @@ import 'src/zorphy_generator.dart';
 /// For now, plugins must be registered programmatically by passing a
 /// pre-populated [PluginRegistry] to [ZorphyGenerator].
 ///
-/// Example `build.yaml` (future feature):
+/// Example `build.yaml`:
 /// ```yaml
 /// targets:
 ///   $default:
@@ -19,14 +19,22 @@ import 'src/zorphy_generator.dart';
 ///         options:
 ///           plugins:
 ///             - package:my_plugin/my_plugin.dart
+///           dry_run: false
+///           force: false
 /// ```
 ///
 /// When no `plugins` option is present, behavior is byte-identical
 /// to the pre-plugin pipeline (zero regressions).
 Builder zorphyBuilder(BuilderOptions options) {
   final pluginUris = _extractPluginUris(options);
+  final isDryRun = options.config['dry_run'] == true;
+  final isForce = options.config['force'] == true;
   return PartBuilder(
-    [ZorphyGenerator(pluginUris: pluginUris)],
+    [ZorphyGenerator(
+      pluginUris: pluginUris,
+      isDryRun: isDryRun,
+      isForce: isForce,
+    )],
     '.zorphy.dart',
     header: '''
 // ignore_for_file: UNNECESSARY_CAST
