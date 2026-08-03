@@ -7,8 +7,16 @@ on:
     branches: [ master, main, development ]
 
 jobs:
+  version_sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version sync
+        run: bash scripts/check_version_sync.sh
+
   analyze_and_test:
     runs-on: ubuntu-latest
+    needs: version_sync
 
     steps:
       - uses: actions/checkout@v4
@@ -62,6 +70,7 @@ jobs:
     # Verifies zorphy resolves, analyzes, and tests green against both
     # analyzer 13.x and 14.x (published constraint: >=13.0.0 <15.0.0).
     runs-on: ubuntu-latest
+    needs: version_sync
     strategy:
       fail-fast: false
       matrix:
