@@ -141,16 +141,38 @@ class MergeStrategy {
 
   /// Try to find the replacement content in the generated source
   /// for a given existing generated region.
+  ///
+  /// When the generated content contains `// GENERATED` / `// END GENERATED`
+  /// markers, returns the full generated block (markers included) so the
+  /// output preserves the marker structure.
+  /// Otherwise falls back to declaration-level matching.
   static String? _findGeneratedReplacement({
     required SourceRegion existingRegion,
     required String generatedContent,
   }) {
-    // Extract declaration names from the existing region.
+    final generatedLines = generatedContent.split('\n');
+
+    // If the generated content has GENERATED markers, use the full
+    // block (including markers) as the replacement.
+    final genStartIdx = generatedLines.indexWhere(
+      (l) => l.trim().startsWith('// GENERATED'),
+    );
+    final genEndIdx = generatedLines.lastIndexWhere(
+      (l) => l.trim().startsWith('// END GENERATED'),
+    );
+
+    if (genStartIdx >= 0 && genEndIdx > genStartIdx) {
+      return generatedLines
+          .sublist(genStartIdx, genEndIdx + 1)
+          .join('\n');
+    }
+
+    // Fallback: match declarations by name.
     final regionContent = existingRegion.content;
     final declNames = <String>[];
 
     final classMatch = RegExp(
-      r'(?:abstract\s+|sealed\s+)?class\s+(\$?[A-Za-z_][A-Za-z0-9_$]*)',
+      r'(?:abstract\s+|sealed\s+)?class\s+(\$?[A-Za-z_][A-Za-z0-9_\$]*)',
     ).firstMatch(regionContent);
     if (classMatch != null) {
       declNames.add(classMatch.group(1)!);
@@ -172,8 +194,6 @@ class MergeStrategy {
 
     if (declNames.isEmpty) return null;
 
-    // Find matching declarations in the generated content.
-    final generatedLines = generatedContent.split('\n');
     final generatedDecls = extractDeclarationsFromSource(generatedContent);
     final matchingDecls = <Declaration>[];
 
@@ -205,8 +225,6 @@ class MergeStrategy {
   ) {
     if (preservedBlocks.isEmpty) return replacement;
 
-    // Append preserved blocks at the end of the replacement class
-    // (before the closing brace of the last class).
     final lines = replacement.split('\n');
 
     // Find the last closing brace at column 0 (end of class).
