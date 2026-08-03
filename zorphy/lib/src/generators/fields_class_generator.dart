@@ -33,7 +33,7 @@ class FieldsClassGenerator extends UniversalGenerator {
       c.name = '${className}Fields';
       c.abstract = true;
       c.modifier = ClassModifier.final$;
-      c.docs.add('Field descriptors for [$className] query construction');
+      c.docs.add('/// Field descriptors for [$className] query construction');
 
       for (final g in metadata.generics) {
         c.types.add(referType(
