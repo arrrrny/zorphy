@@ -9,6 +9,7 @@
 import 'package:dart_style/dart_style.dart';
 
 import 'ast_diff.dart';
+import 'declaration_scanner.dart';
 import 'merge_strategy.dart';
 import 'merge_types.dart';
 import 'region_parser.dart';
@@ -89,8 +90,8 @@ class MergeOrchestrator {
     final existingLines = existingContent.split('\n');
     final generatedLines = generatedContent.split('\n');
 
-    final existingDecls = extractDecls(existingLines);
-    final generatedDecls = extractDecls(generatedLines);
+    final existingDecls = extractDeclarationsFromSource(existingContent);
+    final generatedDecls = extractDeclarationsFromSource(generatedContent);
     final generatedNames = {for (final d in generatedDecls) d.name};
 
     final userDecls = existingDecls
@@ -150,70 +151,4 @@ class MergeOrchestrator {
     }
     return buffer.toString().trimRight();
   }
-
-  /// Extract top-level declarations from lines.
-  static List<_SD> extractDecls(List<String> lines) {
-    final decls = <_SD>[];
-    int? braceStart, currentStartLine, depth;
-    String? currentName, currentKind;
-
-    for (int i = 0; i < lines.length; i++) {
-      final line = lines[i].trimRight();
-      if (line.isEmpty || line.startsWith('//') || line.startsWith('@')) {
-        if (braceStart != null) {
-          for (final ch in line.runes) {
-            if (ch == 0x7B) depth = depth! + 1;
-            if (ch == 0x7D) depth = depth! - 1;
-          }
-          if (depth! <= 0) {
-            decls.add(_SD(currentName!, currentKind!, currentStartLine!, i + 1));
-            braceStart = null;
-          }
-        }
-        continue;
-      }
-      if (braceStart == null) {
-        final m = matchDecl(line);
-        if (m != null) {
-          currentName = m.$1; currentKind = m.$2;
-          currentStartLine = i; braceStart = i; depth = 0;
-        }
-      }
-      if (braceStart != null) {
-        for (final ch in line.runes) {
-          if (ch == 0x7B) depth = depth! + 1;
-          if (ch == 0x7D) depth = depth! - 1;
-        }
-        if (depth! <= 0) {
-          decls.add(_SD(currentName!, currentKind!, currentStartLine!, i + 1));
-          braceStart = null;
-        }
-      }
-    }
-    return decls;
-  }
-
-  static (String, String)? matchDecl(String line) {
-    var c = line;
-    while (c.startsWith('@')) {
-      final s = c.indexOf(' ');
-      if (s < 0) return null;
-      c = c.substring(s + 1).trimLeft();
-    }
-    final cm = RegExp(r'^(abstract\s+|sealed\s+)?class\s+(\$?[A-Za-z_][A-Za-z0-9_\$]*)').firstMatch(c);
-    if (cm != null) return (cm.group(2)!, 'class');
-    final em = RegExp(r'^extension\s+(\w+)?').firstMatch(c);
-    if (em != null) return (em.group(1) ?? '<unnamed>', 'extension');
-    final enm = RegExp(r'^enum\s+([A-Za-z_][A-Za-z0-9_]*)').firstMatch(c);
-    if (enm != null) return (enm.group(1)!, 'enum');
-    final mx = RegExp(r'^mixin\s+([A-Za-z_][A-Za-z0-9_]*)').firstMatch(c);
-    if (mx != null) return (mx.group(1)!, 'mixin');
-    return null;
-  }
-}
-
-class _SD {
-  final String name, kind;
-  final int startLine, endLine;
-  const _SD(this.name, this.kind, this.startLine, this.endLine);
 }

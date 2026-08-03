@@ -1,5 +1,3 @@
-import 'merge_types.dart';
-
 /// Identifies and classifies line ranges in a Dart source file.
 ///
 /// The merge engine treats the file as a sequence of **regions**:

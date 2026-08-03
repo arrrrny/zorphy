@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:dart_style/dart_style.dart';
 
+import 'declaration_scanner.dart';
 import 'merge_types.dart';
 import 'region_parser.dart';
 
@@ -54,6 +55,11 @@ class MergeStrategy {
     int cursor = 0;
 
     for (final region in sorted) {
+      // Skip regions that are already covered by previously emitted content.
+      if (region.startLine < cursor) {
+        continue;
+      }
+
       // Emit user code before this region.
       if (cursor < region.startLine) {
         final userCode =
@@ -112,7 +118,7 @@ class MergeStrategy {
         }
       }
 
-      cursor = region.endLine;
+      cursor = region.endLine > cursor ? region.endLine : cursor;
     }
 
     // Emit remaining user code after the last region.
@@ -123,7 +129,7 @@ class MergeStrategy {
     final result = buffer.toString();
     final formatted = _safeFormat(result);
     final hasChanges = formatted.trimRight() !=
-        existingContent.trimRight();
+        _safeFormat(existingContent).trimRight();
 
     return MergeResult(
       content: formatted,
@@ -139,49 +145,57 @@ class MergeStrategy {
     required SourceRegion existingRegion,
     required String generatedContent,
   }) {
-    // Extract the declaration name from the existing region.
+    // Extract declaration names from the existing region.
     final regionContent = existingRegion.content;
-    String? declName;
+    final declNames = <String>[];
 
     final classMatch = RegExp(
       r'(?:abstract\s+|sealed\s+)?class\s+(\$?[A-Za-z_][A-Za-z0-9_$]*)',
     ).firstMatch(regionContent);
     if (classMatch != null) {
-      declName = classMatch.group(1);
+      declNames.add(classMatch.group(1)!);
     }
 
     final extMatch = RegExp(
       r'extension\s+(\w+)',
     ).firstMatch(regionContent);
-    if (extMatch != null) {
-      declName = extMatch.group(1);
+    if (extMatch != null && !declNames.contains(extMatch.group(1))) {
+      declNames.add(extMatch.group(1)!);
     }
 
     final enumMatch = RegExp(
       r'enum\s+([A-Za-z_][A-Za-z0-9_]*)',
     ).firstMatch(regionContent);
-    if (enumMatch != null) {
-      declName = enumMatch.group(1);
+    if (enumMatch != null && !declNames.contains(enumMatch.group(1))) {
+      declNames.add(enumMatch.group(1)!);
     }
 
-    if (declName == null) return generatedContent;
+    if (declNames.isEmpty) return null;
 
-    // Find the matching declaration in the generated content.
+    // Find matching declarations in the generated content.
     final generatedLines = generatedContent.split('\n');
-    final generatedDecls = _extractDeclarations(generatedLines);
+    final generatedDecls = extractDeclarationsFromSource(generatedContent);
+    final matchingDecls = <Declaration>[];
 
     for (final decl in generatedDecls) {
-      if (decl.name == declName) {
-        return generatedLines
-            .sublist(decl.startLine, decl.endLine)
-            .join('\n');
+      if (declNames.contains(decl.name)) {
+        matchingDecls.add(decl);
       }
     }
 
-    // Fallback: return the entire generated content.
-    // This handles the case where the generated file structure
-    // changed significantly.
-    return generatedContent;
+    if (matchingDecls.isEmpty) return null;
+
+    // Return concatenated declarations in source order.
+    final buffer = StringBuffer();
+    for (int i = 0; i < matchingDecls.length; i++) {
+      final decl = matchingDecls[i];
+      if (i > 0) buffer.writeln();
+      buffer.write(generatedLines
+          .sublist(decl.startLine, decl.endLine)
+          .join('\n'));
+    }
+
+    return buffer.toString();
   }
 
   /// Splice preserved blocks into the replacement content.
@@ -258,123 +272,4 @@ class MergeStrategy {
 
     return buffer.toString().trimRight();
   }
-
-  /// Extract top-level declarations (same logic as AstDiff).
-  static List<_Decl> _extractDeclarations(List<String> lines) {
-    final decls = <_Decl>[];
-    int? braceStart;
-    String? currentName;
-    String? currentKind;
-    int? currentStartLine;
-    int depth = 0;
-
-    for (int i = 0; i < lines.length; i++) {
-      final line = lines[i].trimRight();
-
-      if (line.isEmpty || line.startsWith('//') || line.startsWith('@')) {
-        if (braceStart != null) {
-          for (final ch in line.runes) {
-            if (ch == 0x7B) depth++;
-            if (ch == 0x7D) depth--;
-          }
-          if (depth <= 0) {
-            decls.add(_Decl(
-              name: currentName!,
-              kind: currentKind!,
-              startLine: currentStartLine!,
-              endLine: i + 1,
-            ));
-            braceStart = null;
-            currentName = null;
-            currentKind = null;
-          }
-        }
-        continue;
-      }
-
-      if (braceStart == null) {
-        final declMatch = _matchDeclaration(line);
-        if (declMatch != null) {
-          currentName = declMatch.$1;
-          currentKind = declMatch.$2;
-          currentStartLine = i;
-          braceStart = i;
-          depth = 0;
-        }
-      }
-
-      if (braceStart != null) {
-        for (final ch in line.runes) {
-          if (ch == 0x7B) depth++;
-          if (ch == 0x7D) depth--;
-        }
-        if (depth <= 0) {
-          decls.add(_Decl(
-            name: currentName!,
-            kind: currentKind!,
-            startLine: currentStartLine!,
-            endLine: i + 1,
-          ));
-          braceStart = null;
-          currentName = null;
-          currentKind = null;
-        }
-      }
-    }
-
-    return decls;
-  }
-
-  static (String, String)? _matchDeclaration(String line) {
-    var cleaned = line;
-    while (cleaned.startsWith('@')) {
-      final spaceIdx = cleaned.indexOf(' ');
-      if (spaceIdx < 0) return null;
-      cleaned = cleaned.substring(spaceIdx + 1).trimLeft();
-    }
-
-    final classMatch = RegExp(
-      r'^(abstract\s+|sealed\s+)?class\s+(\$?[A-Za-z_][A-Za-z0-9_$]*)',
-    ).firstMatch(cleaned);
-    if (classMatch != null) {
-      return (classMatch.group(2)!, 'class');
-    }
-
-    final extMatch = RegExp(
-      r'^extension\s+(\w+)?\s*(on\s+)?',
-    ).firstMatch(cleaned);
-    if (extMatch != null) {
-      return (extMatch.group(1) ?? '<unnamed>', 'extension');
-    }
-
-    final enumMatch = RegExp(
-      r'^enum\s+([A-Za-z_][A-Za-z0-9_]*)',
-    ).firstMatch(cleaned);
-    if (enumMatch != null) {
-      return (enumMatch.group(1)!, 'enum');
-    }
-
-    final mixinMatch = RegExp(
-      r'^mixin\s+([A-Za-z_][A-Za-z0-9_]*)',
-    ).firstMatch(cleaned);
-    if (mixinMatch != null) {
-      return (mixinMatch.group(1)!, 'mixin');
-    }
-
-    return null;
-  }
-}
-
-class _Decl {
-  final String name;
-  final String kind;
-  final int startLine;
-  final int endLine;
-
-  const _Decl({
-    required this.name,
-    required this.kind,
-    required this.startLine,
-    required this.endLine,
-  });
 }

@@ -250,5 +250,37 @@ class \$Todo {
       expect(result.content, contains('TodoUtils'));
       expect(result.content, contains('format'));
     });
+
+    test('nested preserved blocks are not written twice', () {
+      final existing = '''// GENERATED - DO NOT EDIT
+class \$User {
+  final String name;
+  // @preserve
+  String get custom => "custom";
+  // @end-preserve
+}
+// END GENERATED
+''';
+      final generated = '''// GENERATED - DO NOT EDIT
+class \$User {
+  final String name;
+  final String email;
+}
+// END GENERATED
+''';
+      final result = MergeOrchestrator.merge(
+        existingContent: existing,
+        generatedContent: generated,
+      );
+      // Verify the merged output contains exactly one END GENERATED marker
+      final endGeneratedCount = '// END GENERATED'.allMatches(result.content).length;
+      expect(endGeneratedCount, equals(1),
+          reason: 'Should have exactly one END GENERATED marker');
+
+      // Verify the preserved block appears exactly once
+      final customCount = 'get custom =>'.allMatches(result.content).length;
+      expect(customCount, equals(1),
+          reason: 'Preserved block should appear exactly once');
+    });
   });
 }

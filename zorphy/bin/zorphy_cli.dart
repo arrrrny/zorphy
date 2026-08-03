@@ -337,9 +337,6 @@ class _BuildCommand extends Command<void> {
 
     if (isDryRun) {
       print('Dry-run mode: previewing changes...');
-      print('(Smart merge dry-run is available when consuming projects
-'
-          'integrate the MergeOrchestrator in their build pipeline.)');
     }
 
     if (isForce) {
@@ -353,6 +350,16 @@ class _BuildCommand extends Command<void> {
       '--delete-conflicting-outputs',
     ];
     if (isClean) args.insert(2, 'clean');
+
+    // Pass dry-run and force flags to the builder via --define
+    if (isDryRun) {
+      args.add('--define');
+      args.add('zorphy:zorphy=dry_run=true');
+    }
+    if (isForce) {
+      args.add('--define');
+      args.add('zorphy:zorphy=force=true');
+    }
 
     final process = await Process.start(
       'dart',
