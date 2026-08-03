@@ -1,0 +1,145 @@
+# Plugin API
+
+Zorphy 2.0 introduces a **Plugin API** that lets third-party code inspect and mutate the generated `code_builder` specs before they are emitted. This is the foundation of the Extensible Compiler Pipeline.
+
+## How It Works
+
+The code generation pipeline runs in these phases:
+
+1. **Analysis** — `ClassAnalyzer` produces `ClassMetadata` from the annotated element.
+2. **Generation** — Built-in generators produce `Spec` objects (Class, Method, Extension, etc.).
+3. **Plugin Transform** *(new)* — Registered plugins mutate the specs in topological order.
+4. **Emission** — The mutated specs are assembled into a `Library` and emitted once via `ZorphyEmitter`.
+
+```
+┌──────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│ Analysis  │───>│  Generation  │───>│Plugin Pass   │───>│   Emission   │
+└──────────┘    └──────────────┘    └──────────────┘    └──────────────┘
+                                      │
+                              ┌───────┴────────┐
+                              │ Plugin A       │
+                              │ Plugin B       │
+                              │ Plugin C       │
+                              └────────────────┘
+```
+
+## Writing a Plugin
+
+Extend `ZorphyPlugin` and implement one or more transform hooks:
+
+```dart
+import 'package:code_builder/code_builder.dart';
+import 'package:zorphy/zorphy_plugin.dart';
+
+class TimestampPlugin extends ZorphyPlugin {
+  @override
+  String get name => 'timestamp';
+
+  @override
+  Set<String> get runAfter => const {'logging'};
+
+  @override
+  Spec transformClass(Spec spec, PluginContext context) {
+    if (spec is! Class) return spec;
+
+    // Rebuild the class with an additional field.
+    return spec.rebuild((c) => c
+      ..fields.add(
+        Field((f) {
+          f.name = 'generatedAt';
+          f.type = refer('DateTime');
+          f.modifier = FieldModifier.final$;
+        }),
+      ));
+  }
+}
+```
+
+## Plugin Contract
+
+### `ZorphyPlugin`
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `name` | `String` | Unique identifier for ordering and registration. |
+| `decoratorNames` | `Set<String>` | Which decorator names this plugin reacts to. Empty = runs for every class. |
+| `runBefore` | `Set<String>` | Plugin names that must run **after** this one. |
+| `runAfter` | `Set<String>` | Plugin names that must run **before** this one. |
+| `transformClass` | `Spec` Function | Mutate a `Class` spec. Return the (possibly replaced) spec. |
+| `transformMethod` | `Spec` Function | Mutate a `Method` spec. Called for each method in a class. |
+| `transformField` | `Spec` Function | Mutate a `Field` spec. Called for each field in a class. |
+
+All transform hooks have pass-through defaults — override only the ones you need.
+
+### `PluginContext`
+
+Passed to every transform hook. Provides:
+
+| Method | Description |
+|--------|-------------|
+| `addImport(uri, {asName, showNames, hideNames})` | Add an import directive to the output library. |
+| `diagnostic(message, {level})` | Record a diagnostic (info / warning / error). |
+| `imports` | Read accumulated import directives. |
+| `diagnostics` | Read accumulated diagnostics. |
+| `metadata` | The `ClassMetadata` for the class being transformed. |
+| `config` | The `GenerationConfig` (preset, flags). |
+
+## Plugin Ordering
+
+Plugins are executed in **topological order** determined by `runBefore` / `runAfter` constraints, using Kahn's algorithm with registration-order fallback for unordered plugins.
+
+```dart
+// A runs before B, B runs before C.
+final registry = PluginRegistry();
+registry.register(PluginA()); // runBefore: {'B'}
+registry.register(PluginB()); // runBefore: {'C'}
+registry.register(PluginC());
+
+print(registry.ordered().map((p) => p.name).toList());
+// [A, B, C]
+```
+
+Unknown names in `runBefore`/`runAfter` are treated as no-ops. Cycles do not crash — remaining plugins emit in registration order.
+
+## Registration via `build.yaml`
+
+Add plugin URIs to the builder options:
+
+```yaml
+targets:
+  $default:
+    builders:
+      zorphy:zorphy:
+        options:
+          plugins:
+            - package:my_plugin/my_plugin.dart
+```
+
+The builder reads the `plugins` list and passes the URIs to `ZorphyGenerator`. When no `plugins` option is present, output is byte-identical to the pre-plugin pipeline — **zero regressions**.
+
+## Programmatic Registration
+
+For tests or custom pipelines, register plugins directly:
+
+```dart
+import 'package:zorphy/zorphy_plugin.dart';
+
+final registry = PluginRegistry();
+registry.register(TimestampPlugin());
+
+// Pass to ZorphyGenerator:
+final generator = ZorphyGenerator(pluginRegistry: registry);
+```
+
+## v2.1 Extension Surface
+
+The following hooks are planned for v2.1 and are documented in `ZorphyPlugin`'s doc comments as anchor points:
+
+- `transformExtension` — mutate `Extension` specs
+- `transformConstructor` — mutate `Constructor` specs
+- `transformLibrary` — mutate the `Library` spec itself
+- `onGenerateStart` / `onGenerateEnd` — lifecycle hooks for side effects (logging, metrics)
+
+## Example
+
+See [`example/lib/plugin_example.dart`](https://github.com/arrrrny/zorphy/blob/development/zorphy/example/lib/plugin_example.dart) for a compilable no-op plugin that demonstrates the full contract.

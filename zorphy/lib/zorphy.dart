@@ -10,6 +10,7 @@ export 'package:zorphy_annotation/zorphy_annotation.dart';
 
 // Plugin API
 export 'zorphy_plugin.dart';
+export 'src/plugins/plugin_context.dart';
 
 // CLI module - Entity creation utilities
 export 'src/cli/entity_creator.dart';

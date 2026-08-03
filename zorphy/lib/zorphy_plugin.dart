@@ -2,6 +2,9 @@ import 'package:code_builder/code_builder.dart';
 
 import 'src/plugins/plugin_context.dart';
 
+export 'src/plugins/plugin_context.dart';
+export 'src/plugins/plugin_registry.dart';
+
 /// Abstract contract for a Zorphy code-generation plugin.
 ///
 /// Plugins inspect and mutate [code_builder] specs (classes, methods,
