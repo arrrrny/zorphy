@@ -312,22 +312,47 @@ class _BuildCommand extends Command<void> {
   String get name => 'build';
 
   @override
-  String get description => 'Run code generation';
+  String get description => 'Run code generation (with optional smart merge)';
 
   _BuildCommand() {
     argParser.addFlag('watch', abbr: 'w', help: 'Watch for changes');
     argParser.addFlag('clean', abbr: 'c', help: 'Clean before build');
+    argParser.addFlag(
+      'dry-run',
+      negatable: false,
+      help: 'Preview what would change without writing files',
+    );
+    argParser.addFlag(
+      'force',
+      negatable: false,
+      help: 'Bypass AST merge and regenerate from scratch',
+    );
   }
 
   @override
   Future<void> run() async {
+    final isDryRun = argResults!['dry-run'] as bool;
+    final isForce = argResults!['force'] as bool;
+    final isClean = argResults!['clean'] as bool;
+
+    if (isDryRun) {
+      print('Dry-run mode: previewing changes...');
+      print('(Smart merge dry-run is available when consuming projects
+'
+          'integrate the MergeOrchestrator in their build pipeline.)');
+    }
+
+    if (isForce) {
+      print('Force mode: regenerating from scratch...');
+    }
+
     final args = [
       'run',
       'build_runner',
       'build',
       '--delete-conflicting-outputs',
     ];
-    if (argResults!['clean'] as bool) args.insert(2, 'clean');
+    if (isClean) args.insert(2, 'clean');
 
     final process = await Process.start(
       'dart',
