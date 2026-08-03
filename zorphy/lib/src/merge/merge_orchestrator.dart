@@ -88,7 +88,6 @@ class MergeOrchestrator {
     }
 
     final existingLines = existingContent.split('\n');
-    final generatedLines = generatedContent.split('\n');
 
     final existingDecls = extractDeclarationsFromSource(existingContent);
     final generatedDecls = extractDeclarationsFromSource(generatedContent);
