@@ -1,10 +1,10 @@
 name: zorphy_annotation
 description: Annotations for zorphy code generation package that provides clean class definitions with copyWith, JSON serialization, toString, equality, and inheritance support
-version: 2.0.0
+version: 2.1.0
 homepage: https://github.com/arrrrny/zorphy
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: ">=3.8.0 <4.0.0"
 
 dependencies:
   collection: ^1.19.1

@@ -1,3 +1,22 @@
+## [2.1.0] - 2026-08-03
+
+### Feat
+
+- AST-based smart regeneration engine — non-destructive merge of
+  generated output with user edits (region markers, structural diff,
+  conflict reporting)
+- Plugin API & registry (`ZorphyPlugin`, `PluginContext`,
+  `PluginRegistry`) — post-spec transform hooks with topological
+  ordering, import injection, and diagnostic accumulation
+- `MergeMode` enum (`smart` / `force`) and `isForce` builder/
+  generator flag to bypass smart merge
+- `ZorphyPlugin` abstract class exported from `zorphy.dart`
+
+### Change
+
+- Version synced with `zorphy_annotation` 2.1.0
+- `zorphy_annotation` dependency bumped to `^2.1.0`
+
 ## [2.0.0] - 2026-07-30
 
 ### Break
