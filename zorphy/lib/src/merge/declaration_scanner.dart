@@ -45,14 +45,14 @@ class Declaration {
 /// Pattern for top-level declarations we care about.
 ///
 /// Matches:
-/// - `(abstract |sealed )?class Name`
+/// - `(abstract |sealed |final |base |interface )?class Name`
 /// - `extension Name`
 /// - `enum Name`
 /// - `mixin Name`
 /// - `typedef Name`
 /// - top-level `FutureOr<T> name(` or `T name(` functions
 final _declPattern = RegExp(
-  r'^(?:abstract\s+|sealed\s+)?'
+  r'^(?:abstract\s+|sealed\s+|final\s+|base\s+|interface\s+)?'
   r'(class|extension|enum|mixin|typedef)\s+'
   r'(\$?[A-Za-z_][A-Za-z0-9_\$]*)',
 );
@@ -84,13 +84,15 @@ List<Declaration> extractDeclarationsFromSource(String source) {
     final line = lines[i];
     final trimmed = line.trimLeft();
 
-    // Skip non-declaration lines.
-    if (trimmed.isEmpty || skipPrefixes.any((p) => trimmed.startsWith(p))) {
+    // Skip empty lines.
+    if (trimmed.isEmpty) {
       i++;
       continue;
     }
 
-    // Try class/extension/enum/mixin/typedef.
+    // Try class/extension/enum/mixin/typedef BEFORE applying skipPrefixes,
+    // so that modifier-prefixed declarations (e.g. "final class Foo") are
+    // properly recognized.
     final declMatch = _declPattern.firstMatch(trimmed);
     if (declMatch != null) {
       final kind = declMatch.group(1)!;
@@ -103,6 +105,12 @@ List<Declaration> extractDeclarationsFromSource(String source) {
         endLine: endLine,
       ));
       i = endLine;
+      continue;
+    }
+
+    // Skip non-declaration lines (imports, comments, top-level variables).
+    if (skipPrefixes.any((p) => trimmed.startsWith(p))) {
+      i++;
       continue;
     }
 
@@ -136,8 +144,11 @@ List<Declaration> extractDeclarationsFromSource(String source) {
 /// the declaration ends. Returns the line index **after** the closing
 /// brace (exclusive, for use with `List.sublist`).
 ///
-/// If no opening brace is found, returns [startLine + 1] (single-line
-/// declaration).
+/// For brace-less declarations (e.g. typedefs), returns [startLine + 1]
+/// when a semicolon is encountered before any opening brace.
+///
+/// **Limitation:** Does not ignore braces inside string literals or comments,
+/// so unusual constructs may confuse the scanner.
 int _findDeclarationEnd(List<String> lines, int startLine) {
   int depth = 0;
   bool foundOpen = false;
@@ -149,6 +160,9 @@ int _findDeclarationEnd(List<String> lines, int startLine) {
         foundOpen = true;
       } else if (ch == 0x7D) { // '}'
         depth--;
+      } else if (ch == 0x3B && !foundOpen) { // ';' before any '{'
+        // Brace-less declaration (e.g. typedef) — end after this line.
+        return i + 1;
       }
     }
     if (foundOpen && depth <= 0) {
@@ -157,7 +171,7 @@ int _findDeclarationEnd(List<String> lines, int startLine) {
     }
   }
 
-  // Unterminated brace — return end of file.
+  // Unterminated brace or declaration — return end of file.
   return lines.length;
 }
 
