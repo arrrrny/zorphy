@@ -1,6 +1,6 @@
 # Plugin API
 
-Zorphy 2.0 introduces a **Plugin API** that lets third-party code inspect and mutate the generated `code_builder` specs before they are emitted. This is the foundation of the Extensible Compiler Pipeline (Pillar 2) that powers Zuraffa v6's Decorator-Driven Architecture.
+Zorphy 2.0 introduces a **Plugin API** that lets third-party code inspect and mutate the generated `code_builder` specs before they are emitted. This is the foundation of the Extensible Compiler Pipeline.
 
 ## How It Works
 
@@ -42,31 +42,15 @@ class TimestampPlugin extends ZorphyPlugin {
   Spec transformClass(Spec spec, PluginContext context) {
     if (spec is! Class) return spec;
 
-    // Add an import that the generated code will need.
-    context.addImport('package:my_package/timestamp.dart');
-
     // Rebuild the class with an additional field.
-    return Class((c) {
-      c.name = spec.name;
-      c.abstract = spec.abstract;
-      c.sealed = spec.sealed;
-      c.extend = spec.extend;
-      c.types.addAll(spec.types);
-      c.implements.addAll(spec.implements);
-      c.mixins.addAll(spec.mixins);
-      c.annotations.addAll(spec.annotations);
-      c.docs.addAll(spec.docs);
-      c.fields.addAll(spec.fields);
-      c.methods.addAll(spec.methods);
-      c.constructors.addAll(spec.constructors);
-      c.fields.add(
+    return spec.rebuild((c) => c
+      ..fields.add(
         Field((f) {
           f.name = 'generatedAt';
           f.type = refer('DateTime');
           f.modifier = FieldModifier.final$;
         }),
-      );
-    });
+      ));
   }
 }
 ```
@@ -111,7 +95,7 @@ registry.register(PluginA()); // runBefore: {'B'}
 registry.register(PluginB()); // runBefore: {'C'}
 registry.register(PluginC());
 
-print(registry.ordered().map((p) => p.name));
+print(registry.ordered().map((p) => p.name).toList());
 // [A, B, C]
 ```
 
@@ -138,7 +122,7 @@ The builder reads the `plugins` list and passes the URIs to `ZorphyGenerator`. W
 For tests or custom pipelines, register plugins directly:
 
 ```dart
-import 'package:zorphy/src/plugins/plugin_registry.dart';
+import 'package:zorphy/zorphy_plugin.dart';
 
 final registry = PluginRegistry();
 registry.register(TimestampPlugin());

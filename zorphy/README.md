@@ -36,10 +36,10 @@ Add the dependencies to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zorphy_annotation: ^1.7.0
+  zorphy_annotation: ^2.0.0
 
 dev_dependencies:
-  zorphy: ^1.7.0
+  zorphy: ^2.0.0
   build_runner: ^2.4.0
 ```
 
@@ -331,26 +331,14 @@ class TimestampPlugin extends ZorphyPlugin {
   @override
   Spec transformClass(Spec spec, PluginContext context) {
     if (spec is! Class) return spec;
-    context.addImport('package:my_package/timestamp.dart');
-    return Class((c) {
-      c.name = spec.name;
-      c.abstract = spec.abstract;
-      c.sealed = spec.sealed;
-      c.extend = spec.extend;
-      c.types.addAll(spec.types);
-      c.implements.addAll(spec.implements);
-      c.mixins.addAll(spec.mixins);
-      c.annotations.addAll(spec.annotations);
-      c.docs.addAll(spec.docs);
-      c.fields.addAll(spec.fields);
-      c.methods.addAll(spec.methods);
-      c.constructors.addAll(spec.constructors);
-      c.fields.add(Field((f) {
-        f.name = 'generatedAt';
-        f.type = refer('DateTime');
-        f.modifier = FieldModifier.final$;
-      }));
-    });
+    return spec.rebuild((c) => c
+      ..methods.add(Method((m) {
+        m.name = 'generatedAt';
+        m.type = MethodType.getter;
+        m.returns = refer('DateTime');
+        m.lambda = true;
+        m.body = refer('DateTime').property('now').call([]).code;
+      })));
   }
 }
 ```
@@ -370,7 +358,7 @@ targets:
 **Programmatic registration:**
 
 ```dart
-import 'package:zorphy/src/plugins/plugin_registry.dart';
+import 'package:zorphy/zorphy_plugin.dart';
 
 final registry = PluginRegistry();
 registry.register(TimestampPlugin());

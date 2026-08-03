@@ -1,9 +1,8 @@
 /// Example demonstrating how to write and register a Zorphy plugin.
 ///
 /// This file defines a no-op plugin (`LoggingPlugin`) that logs every
-/// class it transforms and adds an import. It compiles with
-/// `dart analyze` and shows the registration pattern you would use
-/// in your own projects.
+/// class it transforms. It compiles with `dart analyze` and shows the
+/// registration pattern you would use in your own projects.
 ///
 /// To activate this plugin, add it to your `build.yaml`:
 ///
@@ -14,7 +13,7 @@
 ///       zorphy:zorphy:
 ///         options:
 ///           plugins:
-///             - example/lib/plugin_example.dart
+///             - package:your_package/your_plugin.dart
 /// ```
 
 import 'package:code_builder/code_builder.dart';
@@ -48,11 +47,11 @@ class LoggingPlugin extends ZorphyPlugin {
   Spec transformField(Spec spec, PluginContext context) => spec;
 }
 
-/// A plugin that adds a `createdAt` timestamp field to every class.
+/// A plugin that adds a `generatedAt` timestamp field to every class.
 ///
 /// Demonstrates:
 /// - Adding a field via [transformClass]
-/// - Adding an import via [PluginContext.addImport]
+/// - Using spec.rebuild to preserve all class properties
 class TimestampPlugin extends ZorphyPlugin {
   @override
   String get name => 'timestamp';
@@ -65,31 +64,15 @@ class TimestampPlugin extends ZorphyPlugin {
   Spec transformClass(Spec spec, PluginContext context) {
     if (spec is! Class) return spec;
 
-    // Add the import needed for the field type.
-    context.addImport('package:zorphy_example/timestamp.dart');
-
     // Rebuild the class with an additional field.
-    return Class((c) {
-      c.name = spec.name;
-      c.abstract = spec.abstract;
-      c.sealed = spec.sealed;
-      c.extend = spec.extend;
-      c.types.addAll(spec.types);
-      c.implements.addAll(spec.implements);
-      c.mixins.addAll(spec.mixins);
-      c.annotations.addAll(spec.annotations);
-      c.docs.addAll(spec.docs);
-      c.fields.addAll(spec.fields);
-      c.methods.addAll(spec.methods);
-      c.constructors.addAll(spec.constructors);
-      c.fields.add(
+    return spec.rebuild((c) => c
+      ..fields.add(
         Field((f) {
           f.name = 'generatedAt';
           f.type = refer('DateTime');
           f.modifier = FieldModifier.final$;
         }),
-      );
-    });
+      ));
   }
 
   @override
@@ -107,7 +90,7 @@ class TimestampPlugin extends ZorphyPlugin {
 /// registry directly:
 ///
 /// ```dart
-/// import 'package:zorphy/src/plugins/plugin_registry.dart';
+/// import 'package:zorphy/zorphy_plugin.dart';
 ///
 /// final registry = PluginRegistry();
 /// registry.register(LoggingPlugin());
@@ -116,5 +99,5 @@ class TimestampPlugin extends ZorphyPlugin {
 /// // Plugins execute in topological order:
 /// // 'logging' runs first, then 'timestamp'.
 /// final ordered = registry.ordered();
-/// print(ordered.map((p) => p.name)); // [logging, timestamp]
+/// print(ordered.map((p) => p.name).toList()); // [logging, timestamp]
 /// ```
