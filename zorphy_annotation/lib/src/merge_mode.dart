@@ -2,11 +2,10 @@
 ///
 /// - [smart]: Parse existing file, merge intelligently (default).
 ///   Preserves user edits in non-generated regions.
-/// - [force]: Overwrite the entire file (legacy build_runner behavior).
+/// - [force]: Overwrite the entire file (current build_runner behavior).
 ///
-/// This enum is re-exported from `zorphy_annotation` for use in
-/// annotation parameters (e.g. future per-class merge control).
-/// The canonical definition lives in `zorphy`'s merge engine.
+/// This is the canonical MergeMode definition used by both the annotation
+/// package and zorphy's merge engine (MergeOrchestrator).
 enum MergeMode {
   /// Parse existing file, merge intelligently (default).
   smart,

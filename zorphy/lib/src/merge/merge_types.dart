@@ -2,14 +2,9 @@
 ///
 /// Defines the data structures used by the merge engine.
 
-/// How the merge engine should operate.
-enum MergeMode {
-  /// Parse existing file, merge intelligently (default).
-  smart,
-
-  /// Overwrite the entire file (current build_runner behavior).
-  force,
-}
+// Re-export canonical MergeMode from zorphy_annotation to ensure
+// type identity between annotation consumers and the merge engine.
+export 'package:zorphy_annotation/src/merge_mode.dart' show MergeMode;
 
 /// The kind of change a [DiffEntry] represents.
 enum DiffType { added, removed, modified, unchanged }
