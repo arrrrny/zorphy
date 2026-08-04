@@ -60,32 +60,34 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         c.implements.add(referType(iface.interfaceName));
       }
       for (final f in metadata.allFields) {
-        c.methods.add(Method((m) {
-          m.type = MethodType.getter;
-          m.name = f.name;
-          var fieldType = f.type != null
-              ? helpers.replaceDollarTypesWithConcrete(f.type!)
-              : f.type;
-          m.returns = _referFieldType(fieldType);
+        c.methods.add(
+          Method((m) {
+            m.type = MethodType.getter;
+            m.name = f.name;
+            var fieldType = f.type != null
+                ? helpers.replaceDollarTypesWithConcrete(f.type!)
+                : f.type;
+            m.returns = _referFieldType(fieldType);
 
-          // JsonKey annotation
-          if (f.jsonKeyInfo != null) {
-            m.annotations.add(
-              CodeExpression(
-                Code(f.jsonKeyInfo!.toAnnotationString()),
-              ),
-            );
-          }
-        }));
+            // JsonKey annotation
+            if (f.jsonKeyInfo != null) {
+              m.annotations.add(
+                CodeExpression(Code(f.jsonKeyInfo!.toAnnotationString())),
+              );
+            }
+          }),
+        );
       }
 
       // Constructor for non-sealed abstract classes
       if (!isSealedWithSubtypes) {
-        c.constructors.add(Constructor((con) {
-          if (metadata.hasConstConstructor) {
-            con.constant = true;
-          }
-        }));
+        c.constructors.add(
+          Constructor((con) {
+            if (metadata.hasConstConstructor) {
+              con.constant = true;
+            }
+          }),
+        );
       }
     });
   }
@@ -98,8 +100,10 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final className = metadata.cleanName;
     final extendsStr = _buildExtendsClause(metadata, config);
     final hasExtendsParam = extendsStr.isNotEmpty;
-    final extendsAbstractClass =
-        _determineExtendsAbstractClass(metadata, config);
+    final extendsAbstractClass = _determineExtendsAbstractClass(
+      metadata,
+      config,
+    );
 
     final parentConcreteClassName = _getConcreteParentName(metadata);
     final hasConcreteParent = parentConcreteClassName != null;
@@ -107,8 +111,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         ? _parentHasConstConstructor(metadata, parentConcreteClassName)
         : true;
     final shouldGenerateConstConstructor =
-        metadata.hasConstConstructor &&
-        (!hasConcreteParent || parentHasConst);
+        metadata.hasConstConstructor && (!hasConcreteParent || parentHasConst);
 
     final parentFields = hasConcreteParent
         ? _getParentFieldsForSuper(metadata, config)
@@ -127,8 +130,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       // DartEmitter adds `@` automatically when emitting annotations.
       final hasFactoryMethods = config.factoryMethods.isNotEmpty;
       final isAbstractClass = metadata.originalName.startsWith(r'$$');
-      final shouldSkipJsonAnnotation =
-          hasFactoryMethods && isAbstractClass;
+      final shouldSkipJsonAnnotation = hasFactoryMethods && isAbstractClass;
 
       if (config.generateJson && !shouldSkipJsonAnnotation) {
         final genericParams = metadata.generics.isNotEmpty
@@ -250,8 +252,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           fd.annotations.add(
             CodeExpression(
               Code(
-                f.jsonKeyInfo!
-                    .toAnnotationString(includeDefaultValue: true),
+                f.jsonKeyInfo!.toAnnotationString(includeDefaultValue: true),
               ),
             ),
           );
@@ -299,10 +300,10 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           ? helpers.replaceDollarTypesWithConcrete(f.type!)
           : f.type;
 
-      final isNullable =
-          fieldType != null && fieldType.endsWith('?');
+      final isNullable = fieldType != null && fieldType.endsWith('?');
 
-      final isParentField = hasExtends &&
+      final isParentField =
+          hasExtends &&
           !extendsAbstractClass &&
           parentFields.contains(f.name) &&
           !ownFields.contains(f.name);
@@ -311,25 +312,27 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         var safeFieldType = fieldType ?? 'dynamic';
         var isNull = safeFieldType.endsWith('?');
         var paramType = (isNull || hasDefaultValue)
-            ? (safeFieldType.endsWith('?')
-                ? safeFieldType
-                : '$safeFieldType?')
+            ? (safeFieldType.endsWith('?') ? safeFieldType : '$safeFieldType?')
             : safeFieldType;
-        params.add(Parameter((p) {
-          p.name = f.name;
-          p.type = referType(paramType);
-          p.named = true;
-          p.required = !(isNull || hasDefaultValue);
-        }));
+        params.add(
+          Parameter((p) {
+            p.name = f.name;
+            p.type = referType(paramType);
+            p.named = true;
+            p.required = !(isNull || hasDefaultValue);
+          }),
+        );
       } else if (hasDefaultValue) {
         var safeFieldType = fieldType ?? 'dynamic';
         var isNull = safeFieldType.endsWith('?');
         var paramType = isNull ? safeFieldType : '$safeFieldType?';
-        params.add(Parameter((p) {
-          p.name = f.name;
-          p.type = referType(paramType);
-          p.named = true;
-        }));
+        params.add(
+          Parameter((p) {
+            p.name = f.name;
+            p.type = referType(paramType);
+            p.named = true;
+          }),
+        );
 
         var defaultValueString = defaultValue.toString();
         if (!defaultValueString.startsWith('const ') &&
@@ -348,9 +351,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           }
         }
 
-        initializers.add(
-          'this.${f.name} = ${f.name} ?? $defaultValueString',
-        );
+        initializers.add('this.${f.name} = ${f.name} ?? $defaultValueString');
       } else {
         var safeFieldType = fieldType ?? 'dynamic';
         params.add(Parameter((p) {
@@ -414,17 +415,20 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         var nullableFieldType = fieldType!.endsWith('?')
             ? fieldType
             : '$fieldType?';
-        copyWithParams.add(Parameter((p) {
-          p.name = f.name;
-          p.type = referType(nullableFieldType);
-          p.named = true;
-        }));
+        copyWithParams.add(
+          Parameter((p) {
+            p.name = f.name;
+            p.type = referType(nullableFieldType);
+            p.named = true;
+          }),
+        );
       }
 
       final copyWithInitializers = <String>[];
       final copyWithFields = fields
-          .where((f) =>
-              !(f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null))
+          .where(
+            (f) => !(f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null),
+          )
           .toList();
       for (final f in copyWithFields) {
         copyWithInitializers.add(
@@ -432,13 +436,15 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         );
       }
 
-      c.constructors.add(Constructor((con) {
-        con.name = 'copyWith';
-        con.optionalParameters.addAll(copyWithParams);
-        for (final init in copyWithInitializers) {
-          con.initializers.add(Code(init));
-        }
-      }));
+      c.constructors.add(
+        Constructor((con) {
+          con.name = 'copyWith';
+          con.optionalParameters.addAll(copyWithParams);
+          for (final init in copyWithInitializers) {
+            con.initializers.add(Code(init));
+          }
+        }),
+      );
     }
   }
 
@@ -458,8 +464,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
   ) {
     for (final iface in metadata.interfaces) {
       final ifaceName = iface.element.name ?? '';
-      final trimmedIfaceName =
-          _trimInterfaceName(iface.interfaceName);
+      final trimmedIfaceName = _trimInterfaceName(iface.interfaceName);
       if (ifaceName == parentConcreteClassName ||
           ifaceName == '\$$parentConcreteClassName' ||
           trimmedIfaceName == parentConcreteClassName) {
@@ -468,7 +473,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     }
     final parentElement =
         metadata.allAnnotatedClasses[parentConcreteClassName] ??
-            metadata.allAnnotatedClasses['\$$parentConcreteClassName'];
+        metadata.allAnnotatedClasses['\$$parentConcreteClassName'];
     return parentElement?.constructors.any((e) => e.isConst) ?? false;
   }
 
@@ -488,10 +493,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     return '';
   }
 
-  String _buildExtendsClause(
-    ClassMetadata metadata,
-    GenerationConfig config,
-  ) {
+  String _buildExtendsClause(ClassMetadata metadata, GenerationConfig config) {
     final parent = _getExtendedParentName(metadata, config);
     if (parent.isEmpty) return '';
     return ' extends ${_trimInterfaceName(parent)}';
@@ -502,8 +504,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       final name = iface.interfaceName;
       if (name.startsWith(r'$') && !name.startsWith(r'$$')) {
         final trimmedName = _trimInterfaceName(name);
-        final parentElement =
-            metadata.allAnnotatedClasses[trimmedName];
+        final parentElement = metadata.allAnnotatedClasses[trimmedName];
         if (parentElement != null) {
           final parentIsAbstract =
               parentElement.name?.startsWith(r'$$') ?? false;

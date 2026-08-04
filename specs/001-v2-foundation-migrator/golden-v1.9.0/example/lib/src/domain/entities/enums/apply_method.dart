@@ -1,1 +1,0 @@
-enum ApplyMethod { urldecode, mapToList }
