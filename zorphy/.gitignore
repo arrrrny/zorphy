@@ -57,3 +57,4 @@ app.*.map.json
 
 **/build
 /example/build_output
+.contracts
