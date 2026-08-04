@@ -147,6 +147,9 @@ class CopyWithGenerator extends UniversalGenerator {
         p.name = f.name;
         p.type = refer(nullableType);
         p.named = true;
+        if (covariantFields.contains(f.name)) {
+          p.covariant = true;
+        }
       }));
     }
 
