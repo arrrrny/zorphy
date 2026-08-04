@@ -1,7 +1,6 @@
 import 'package:dartx/dartx.dart';
 import 'package:zorphy/src/common/NameType.dart';
 import 'package:zorphy/src/common/classes.dart';
-import 'package:zorphy/src/factory_method.dart';
 
 /// Deduplicates fields, prioritizing interface definitions first.
 List<NameTypeClassComment> getDistinctFields(
@@ -40,81 +39,6 @@ List<NameTypeClassComment> getDistinctFields(
 }
 
 
-String generateFactoryMethod(
-  FactoryMethodInfo factory,
-  String classNameTrimmed,
-  List<NameTypeClassComment> allFields,
-) {
-  var sb = StringBuffer();
-
-  sb.write("  factory ${classNameTrimmed}.${factory.name}(");
-
-  if (factory.parameters.isNotEmpty) {
-    if (factory.parameters.any((p) => p.isNamed)) {
-      sb.write("{");
-      sb.write(
-        factory.parameters
-            .map((p) {
-              var prefix = p.isRequired ? "required " : "";
-              var suffix = p.hasDefaultValue && p.defaultValue != null
-                  ? " = ${p.defaultValue}"
-                  : "";
-              var cleanType = replaceDollarTypesWithConcrete(p.type);
-              return "${prefix}${cleanType} ${p.name}${suffix}";
-            })
-            .join(", "),
-      );
-      sb.write("}");
-    } else {
-      sb.write(
-        factory.parameters
-            .map((p) {
-              var suffix = p.hasDefaultValue && p.defaultValue != null
-                  ? " = ${p.defaultValue}"
-                  : "";
-              var cleanType = replaceDollarTypesWithConcrete(p.type);
-              return "${cleanType} ${p.name}${suffix}";
-            })
-            .join(", "),
-      );
-    }
-  }
-
-  sb.write(") => ");
-
-  var bodyCode = factory.bodyCode;
-  var useAbstractFactoryCall = bodyCode.trim().isEmpty;
-  if (useAbstractFactoryCall) {
-    var callArgs = factory.parameters
-        .map((p) => p.isNamed ? "${p.name}: ${p.name}" : p.name)
-        .join(", ");
-    var abstractClassName =
-        factory.className; // Use original name (e.g. $AssistantMessage)
-    bodyCode = "${abstractClassName}.${factory.name}($callArgs)";
-  }
-
-  if (bodyCode.contains('return ') && bodyCode.endsWith(';')) {
-    bodyCode = bodyCode.substring(7, bodyCode.length - 1);
-  }
-
-  if (!useAbstractFactoryCall) {
-    bodyCode = bodyCode
-        .replaceAll(
-          '${factory.className.replaceAll('\$', '')}._',
-          '${classNameTrimmed}._',
-        )
-        .replaceAll('\$', '');
-  }
-
-  sb.writeln("${bodyCode};");
-  sb.writeln();
-
-  return sb.toString();
-}
-
-/// Generates changeTo extension methods for explicitSubTypes
-/// This allows converting from one concrete class to another explicit subtype
-
 String replaceDollarTypesWithConcrete(String type) {
   // Handle outer nullability
   final isOuterNullable = type.endsWith('?');
@@ -134,24 +58,24 @@ String replaceDollarTypesWithConcrete(String type) {
       // Split inner content by commas, but only at top level (not inside nested brackets)
       final arguments = <String>[];
       var bracketDepth = 0;
-      var currentArgument = StringBuffer();
+      var currentArgument = <String>[];
 
       for (var i = 0; i < innerContent.length; i++) {
         final char = innerContent[i];
         if (char == '<') {
           bracketDepth++;
-          currentArgument.write(char);
+          currentArgument.add(char);
         } else if (char == '>') {
           bracketDepth--;
-          currentArgument.write(char);
+          currentArgument.add(char);
         } else if (char == ',' && bracketDepth == 0) {
-          arguments.add(currentArgument.toString().trim());
-          currentArgument.clear();
+          arguments.add(currentArgument.join().trim());
+          currentArgument = <String>[];
         } else {
-          currentArgument.write(char);
+          currentArgument.add(char);
         }
       }
-      arguments.add(currentArgument.toString().trim());
+      arguments.add(currentArgument.join().trim());
 
       final processedArgs = arguments
           .map((arg) => _processNestedType(arg))
@@ -195,17 +119,18 @@ String getEnumPropertyList(
   String classNameTrimmed = '${className.replaceAll("\$", "")}';
   String enumName = '${classNameTrimmed}\$';
 
-  var sb = StringBuffer();
+  final lines = <String>[];
 
   // Generate enum
-  sb.writeln("enum $enumName {");
-  sb.writeln(
+  lines.add("enum $enumName {");
+  lines.add(
     fields
         .map((e) => e.name.startsWith("_") ? e.name.substring(1) : e.name)
         .join(","),
   );
-  sb.writeln("}\n");
-  return sb.toString();
+  lines.add("}");
+  lines.add('');
+  return lines.join('\n');
 }
 
 /// Generates a Patch class for partial updates.
@@ -218,29 +143,29 @@ String getPatchClass(
   String classNameTrimmed = '${className.replaceAll("\$", "")}';
   String enumName = '${classNameTrimmed}\$';
 
-  var sb = StringBuffer();
+  final lines = <String>[];
 
   // Add Patch<T> implementation
-  sb.writeln(
+  lines.add(
     "class ${classNameTrimmed}Patch extends PatchBase<$classNameTrimmed, $enumName> {",
   );
-  sb.writeln();
+  lines.add('');
 
-  sb.writeln("  $classNameTrimmed applyTo($classNameTrimmed entity) {");
-  sb.writeln("    return entity.patchWith$classNameTrimmed(this);");
-  sb.writeln("  }");
-  sb.writeln();
+  lines.add("  $classNameTrimmed applyTo($classNameTrimmed entity) {");
+  lines.add("    return entity.patchWith$classNameTrimmed(this);");
+  lines.add("  }");
+  lines.add('');
 
   if (fields.isEmpty) {
     // Fieldless class (e.g. an empty explicit subtype): emit a minimal
     // patch class — changeTo extensions on sibling subtypes reference it.
     // PatchBase's type parameters are used covariantly, so a shared
     // placeholder enum keeps the generic signature satisfied.
-    sb.writeln('}');
-    sb.writeln();
-    sb.writeln('/// Placeholder field enum for fieldless [$classNameTrimmed].');
-    sb.writeln('enum $enumName { none }');
-    return sb.toString();
+    lines.add('}');
+    lines.add('');
+    lines.add('/// Placeholder field enum for fieldless [$classNameTrimmed].');
+    lines.add('enum $enumName { none }');
+    return lines.join('\n');
   }
 
   // Generate with methods
@@ -248,7 +173,8 @@ String getPatchClass(
     var name = field.name.startsWith("_")
         ? field.name.substring(1)
         : field.name;
-    var baseType = getDataTypeWithoutDollars(field.type ?? "dynamic");
+    var baseType = field.type ?? "dynamic";
+    baseType = baseType.replaceAll('\$', '');
     var capitalizedName =
         name.substring(0, 1).toUpperCase() + name.substring(1);
 
@@ -262,17 +188,17 @@ String getPatchClass(
         ? 'dynamic'
         : (baseType.endsWith('?') ? baseType : "$baseType?");
 
-    sb.writeln(
+    lines.add(
       "  ${classNameTrimmed}Patch with$capitalizedName($parameterType value) {",
     );
-    sb.writeln("    patchMap[$enumName.$name] = value;");
-    sb.writeln("    return this;");
-    sb.writeln("  }");
-    sb.writeln();
+    lines.add("    patchMap[$enumName.$name] = value;");
+    lines.add("    return this;");
+    lines.add("  }");
+    lines.add('');
 
     // Generate cross-file nested patch methods for Zorphy types
     var fieldType = field.type ?? "";
-    var fieldTypeWithoutDollars = getDataTypeWithoutDollars(fieldType);
+    var fieldTypeWithoutDollars = fieldType.replaceAll('\$', '');
     var innerType = fieldTypeWithoutDollars.replaceAll("?", "");
 
     // Check if this is a Zorphy type (starts with $ and not a generic)
@@ -283,7 +209,7 @@ String getPatchClass(
       if (type.startsWith("\$")) return true;
       if (knownClasses.any((k) => type == k)) return true;
 
-      // Only treat it as Zorphy type if it's NOT a primitive AND it's NOT a generic
+      // Only treat it as a Zorphy type if it's NOT a primitive AND it's NOT a generic
       // AND it's NOT an enum (usually enums don't have $ prefix)
       // Since we don't have full type info for cross-file types, we use the $ prefix
       // as the primary indicator for Zorphy entities.
@@ -293,15 +219,15 @@ String getPatchClass(
     var isZorphyType =
         isKnownClassType(innerType, field.isEnum) ||
         (innerType.startsWith("List<") &&
-            isKnownClassType(
-              innerType.replaceAll(RegExp(r'^List<(.+)>$'), r'$1'),
-              false, // Lists are not enums themselves
-            )) ||
+            (() {
+              final match = RegExp(r'^List<(.+)>$').firstMatch(innerType);
+              return match != null && isKnownClassType(match.group(1) ?? "", false);
+            })()) ||
         (innerType.startsWith("Map<") &&
-            isKnownClassType(
-              innerType.replaceAll(RegExp(r'^Map<(.+, .+)>$'), r'$2'),
-              false, // Maps are not enums themselves
-            ));
+            (() {
+              final match = RegExp(r'^Map<(.+), (.+)>$').firstMatch(innerType);
+              return match != null && isKnownClassType(match.group(2) ?? "", false);
+            })());
 
     if (isZorphyType && !isGenericType) {
       // Handle List types
@@ -309,9 +235,7 @@ String getPatchClass(
         var listMatch = RegExp(r'^List<(.+)>$').firstMatch(innerType);
         if (listMatch != null) {
           var elementType = listMatch.group(1) ?? "";
-          var elementTypeWithoutDollars = getDataTypeWithoutDollars(
-            elementType,
-          );
+          var elementTypeWithoutDollars = elementType.replaceAll('\$', '');
           var elementTypeIsZorphy =
               elementType.startsWith("\$") ||
               isKnownClassType(elementTypeWithoutDollars, false);
@@ -320,25 +244,26 @@ String getPatchClass(
           var isAbstractType = fieldType.contains("\$\$");
           if (elementTypeIsZorphy && !isAbstractType) {
             var elementPatchType = elementTypeWithoutDollars + "Patch";
-            sb.writeln(
+            lines.add(
               "  ${classNameTrimmed}Patch update${capitalizedName}At(int index, $elementPatchType Function($elementPatchType) patch) {",
             );
-            sb.writeln(
+            lines.add(
               "    patchMap[$enumName.$name] = (List<dynamic> list) {",
             );
-            sb.writeln(
+            lines.add(
               "      var updatedList = List<$elementTypeWithoutDollars>.from(list);",
             );
-            sb.writeln("      if (index >= 0 && index < updatedList.length) {");
-            sb.writeln(
+            lines.add("      if (index >= 0 && index < updatedList.length) {");
+            lines.add(
               "        updatedList[index] = patch($elementPatchType()).applyTo(updatedList[index] as ${elementTypeWithoutDollars.replaceAll("?", "")});",
             );
-            sb.writeln("      }");
-            sb.writeln("      return updatedList;");
-            sb.writeln("    };");
-            sb.writeln("    return this;");
-            sb.writeln("  }");
-            sb.writeln();
+            lines.add("      }");
+            lines.add("      return updatedList;");
+            lines.add("    };"
+            );
+            lines.add("    return this;");
+            lines.add("  }");
+            lines.add('');
           }
         }
       }
@@ -348,29 +273,30 @@ String getPatchClass(
         if (mapMatch != null) {
           var keyType = mapMatch.group(1) ?? "";
           var valueType = mapMatch.group(2) ?? "";
-          var valueTypeWithoutDollars = getDataTypeWithoutDollars(valueType);
+          var valueTypeWithoutDollars = valueType.replaceAll('\$', '');
           var valueTypeIsZorphy =
               valueType.startsWith("\$") ||
               isKnownClassType(valueTypeWithoutDollars, false);
           if (valueTypeIsZorphy) {
             var valuePatchType = valueTypeWithoutDollars + "Patch";
-            sb.writeln(
+            lines.add(
               "  ${classNameTrimmed}Patch update${capitalizedName}Value($keyType key, $valuePatchType Function($valuePatchType) patch) {",
             );
-            sb.writeln(
+            lines.add(
               "    patchMap[$enumName.$name] = (Map<dynamic, dynamic> map) {",
             );
-            sb.writeln("      var updatedMap = Map.from(map);");
-            sb.writeln("      if (updatedMap.containsKey(key)) {");
-            sb.writeln(
+            lines.add("      var updatedMap = Map.from(map);");
+            lines.add("      if (updatedMap.containsKey(key)) {");
+            lines.add(
               "        updatedMap[key] = patch($valuePatchType()).applyTo(updatedMap[key] as ${valueTypeWithoutDollars.replaceAll("?", "")});",
             );
-            sb.writeln("      }");
-            sb.writeln("      return updatedMap;");
-            sb.writeln("    };");
-            sb.writeln("    return this;");
-            sb.writeln("  }");
-            sb.writeln();
+            lines.add("      }");
+            lines.add("      return updatedMap;");
+            lines.add("    };"
+            );
+            lines.add("    return this;");
+            lines.add("  }");
+            lines.add('');
           }
         }
       }
@@ -384,211 +310,34 @@ String getPatchClass(
 
         var patchType = innerType + "Patch";
         // with{CapitalizedName}Patch method for direct patch application
-        sb.writeln(
+        lines.add(
           "  ${classNameTrimmed}Patch with${capitalizedName}Patch($patchType patch) {",
         );
-        sb.writeln("    patchMap[$enumName.$name] = patch;");
-        sb.writeln("    return this;");
-        sb.writeln("  }");
-        sb.writeln();
+        lines.add("    patchMap[$enumName.$name] = patch;");
+        lines.add("    return this;");
+        lines.add("  }");
+        lines.add('');
 
         // with{CapitalizedName}PatchFunc method for function-based patching
         var funcParamType = "$patchType Function($patchType)";
-        sb.writeln(
+        lines.add(
           "  ${classNameTrimmed}Patch with${capitalizedName}PatchFunc($funcParamType patch) {",
         );
-        sb.writeln("    patchMap[$enumName.$name] = (dynamic current) {");
-        sb.writeln("      var currentPatch = $patchType();");
-        sb.writeln(
+        lines.add("    patchMap[$enumName.$name] = (dynamic current) {");
+        lines.add("      var currentPatch = $patchType();");
+        lines.add(
           "      return patch(currentPatch).applyTo(current as ${innerType.replaceAll("?", "")});",
         );
-        sb.writeln("    };");
-        sb.writeln("    return this;");
-        sb.writeln("  }");
-        sb.writeln();
-      }
-    }
-  }
-
-  sb.writeln("}");
-
-  return sb.toString();
-}
-
-/// Strips all $ prefixes from a Dart type string.
-String getDataTypeWithoutDollars(String type) {
-  return type.replaceAll('\$', '');
-}
-
-const PRIMITIVE_TYPES = [
-  'BigInt',
-  'bool',
-  'DateTime',
-  'double',
-  'Duration',
-  'dynamic',
-  'Enum',
-  'Function',
-  'int',
-  'Iterable',
-  'List',
-  'Map',
-  'Never',
-  'Null',
-  'num',
-  'Object',
-  'Record',
-  'Runes',
-  'Set',
-  'String',
-  'Symbol',
-  'Uri',
-  'void',
-];
-
-/// Generates a patchWith method for a class.
-String getPatchWithMethod(
-  List<NameTypeClassComment> fields,
-  String className, {
-  bool hidePublicConstructor = false,
-}) {
-  var classNameTrimmed = className.replaceAll("\$", "");
-  var enumName = '${classNameTrimmed}\$';
-
-  if (fields.isEmpty) {
-    // Fieldless class: emit an identity patchWith so a generated patch
-    // class's applyTo has a target (changeTo chains depend on it).
-    return "  $classNameTrimmed patchWith$classNameTrimmed({"
-        "$classNameTrimmed"
-        "Patch? patchInput}) => this;\n";
-  }
-
-  var sb = StringBuffer();
-
-  sb.writeln("  $classNameTrimmed patchWith$classNameTrimmed({");
-  sb.writeln("    $classNameTrimmed" + "Patch? patchInput,");
-  sb.writeln("  }) {");
-  sb.writeln(
-    "    final _patcher = patchInput ?? $classNameTrimmed" + "Patch();",
-  );
-  sb.writeln("    final _patchMap = _patcher.patchMap;");
-
-  var constructorSuffix = hidePublicConstructor ? "._" : "";
-  sb.writeln("    return $classNameTrimmed$constructorSuffix(");
-
-  for (var i = 0; i < fields.length; i++) {
-    var f = fields[i];
-    var comma = i == fields.length - 1 ? "" : ",";
-    sb.writeln(
-      "      ${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name}$comma",
-    );
-  }
-
-  sb.writeln("    );");
-  sb.writeln("  }");
-
-  return sb.toString();
-}
-
-/// Generates patchWith methods for implemented interfaces.
-String getInterfacePatchWithMethods(
-  List<Interface> interfaces,
-  List<NameTypeClassComment> classFields,
-  String className, {
-  bool hidePublicConstructor = false,
-}) {
-  var sb = StringBuffer();
-  var classNameTrimmed = className.replaceAll("\$", "");
-  var classFieldNames = classFields.map((f) => f.name).toSet();
-
-  for (var i in interfaces) {
-    var interfaceName = i.interfaceName;
-    if (!interfaceName.startsWith("\$") || interfaceName.startsWith("\$\$")) {
-      continue;
-    }
-    var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
-    if (interfaceNameTrimmed == classNameTrimmed) continue;
-
-    var seenFields = <String>{};
-    var interfaceFields = i.fields.where((f) {
-      if (classFieldNames.contains(f.name) && !seenFields.contains(f.name)) {
-        seenFields.add(f.name);
-        return true;
-      }
-      return false;
-    }).toList();
-    if (interfaceFields.isEmpty) continue;
-
-    var enumName = '${interfaceNameTrimmed}\$';
-    var interfaceFieldNames = interfaceFields.map((f) => f.name).toSet();
-
-    sb.writeln("");
-    sb.writeln("  $classNameTrimmed patchWith$interfaceNameTrimmed({");
-    sb.writeln("    $interfaceNameTrimmed" + "Patch? patchInput,");
-    sb.writeln("  }) {");
-    sb.writeln(
-      "    final _patcher = patchInput ?? $interfaceNameTrimmed" + "Patch();",
-    );
-    sb.writeln("    final _patchMap = _patcher.patchMap;");
-
-    var constructorSuffix = hidePublicConstructor ? "._" : "";
-    sb.writeln("    return $classNameTrimmed$constructorSuffix(");
-
-    for (var f in classFields) {
-      if (interfaceFieldNames.contains(f.name)) {
-        sb.writeln(
-          "      ${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name},",
+        lines.add("    };"
         );
-      } else {
-        sb.writeln("      ${f.name}: this.${f.name},");
+        lines.add("    return this;");
+        lines.add("  }");
+        lines.add('');
       }
     }
-
-    sb.writeln("    );");
-    sb.writeln("  }");
   }
 
-  return sb.toString();
-}
+  lines.add("}");
 
-/// Generates a compareTo extension for diffing fields.
-String getCompareToExtension(
-  String classNameTrimmed,
-  List<NameTypeClassComment> allFields,
-  List<Interface> knownInterfaces,
-) {
-  var sb = StringBuffer();
-  sb.writeln();
-  sb.writeln("extension ${classNameTrimmed}CompareE on $classNameTrimmed {");
-  sb.writeln(
-    "  Map<String, dynamic> compareTo$classNameTrimmed($classNameTrimmed other) {",
-  );
-  sb.writeln("    final Map<String, dynamic> diff = {};");
-  sb.writeln();
-
-  for (var field in allFields) {
-    var fieldType = field.type ?? '';
-    var fieldName = field.name;
-    var isNullable = fieldType.endsWith('?');
-
-    if (fieldType.contains('Function')) {
-      continue; // Skip functions
-    }
-
-    if (isNullable) {
-      sb.writeln("    if ($fieldName != other.$fieldName) {");
-      sb.writeln("      diff['$fieldName'] = () => other.$fieldName;");
-      sb.writeln("    }");
-    } else {
-      sb.writeln("    if ($fieldName != other.$fieldName) {");
-      sb.writeln("      diff['$fieldName'] = () => other.$fieldName;");
-      sb.writeln("    }");
-    }
-  }
-
-  sb.writeln("    return diff;");
-  sb.writeln("  }");
-  sb.writeln("}");
-
-  return sb.toString();
+  return lines.join('\n');
 }

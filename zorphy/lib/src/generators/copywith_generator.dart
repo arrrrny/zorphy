@@ -150,19 +150,19 @@ class CopyWithGenerator extends UniversalGenerator {
       }));
     }
 
-    final body = StringBuffer();
+    final body = <String>[];
     final constructorSuffix = hidePublicConstructor ? '._' : '';
-    body.writeln('return $classNameTrimmed$constructorSuffix(');
+    body.add('return $classNameTrimmed$constructorSuffix(');
     for (final f in fields) {
-      body.writeln('  ${f.name}: ${f.name} ?? this.${f.name},');
+      body.add('  ${f.name}: ${f.name} ?? this.${f.name},');
     }
-    body.writeln(');');
+    body.add(');');
 
     return Method((m) {
       m.name = 'copyWith';
       m.returns = refer(classNameTrimmed);
       m.optionalParameters.addAll(params);
-      m.body = Code(body.toString());
+      m.body = Code(body.join('\n'));
     });
   }
 
@@ -186,21 +186,21 @@ class CopyWithGenerator extends UniversalGenerator {
       }));
     }
 
-    final body = StringBuffer();
-    body.writeln('return copyWith(');
+    final body = <String>[];
+    body.add('return copyWith(');
     if (fields.isNotEmpty) {
       final paramStr = fields
           .map((f) => '${f.name}: ${f.name}')
           .join(', ');
-      body.writeln('  $paramStr,');
+      body.add('  $paramStr,');
     }
-    body.writeln(');');
+    body.add(');');
 
     return Method((m) {
       m.name = 'copyWith$classNameTrimmed';
       m.returns = refer(classNameTrimmed);
       m.optionalParameters.addAll(params);
-      m.body = Code(body.toString());
+      m.body = Code(body.join('\n'));
     });
   }
 
@@ -222,20 +222,20 @@ class CopyWithGenerator extends UniversalGenerator {
       }));
     }
 
-    final body = StringBuffer();
-    body.writeln('return $classNameTrimmed(');
+    final body = <String>[];
+    body.add('return $classNameTrimmed(');
     for (final f in fields) {
-      body.writeln(
+      body.add(
         '  ${f.name}: ${f.name} != null ? ${f.name}(this.${f.name}) : this.${f.name},',
       );
     }
-    body.writeln(');');
+    body.add(');');
 
     return Method((m) {
       m.name = 'copyWithFn';
       m.returns = refer(classNameTrimmed);
       m.optionalParameters.addAll(params);
-      m.body = Code(body.toString());
+      m.body = Code(body.join('\n'));
     });
   }
 
@@ -288,19 +288,19 @@ class CopyWithGenerator extends UniversalGenerator {
         }));
       }
 
-      final body = StringBuffer();
-      body.writeln('return copyWith(');
+      final body = <String>[];
+      body.add('return copyWith(');
       final paramStr = interfaceFields
           .map((f) => '${f.name}: ${f.name}')
           .join(', ');
-      body.writeln('  $paramStr,');
-      body.writeln(');');
+      body.add('  $paramStr,');
+      body.add(');');
 
       methods.add(Method((m) {
         m.name = 'copyWith$interfaceNameTrimmed';
         m.returns = refer(classNameTrimmed);
         m.optionalParameters.addAll(params);
-        m.body = Code(body.toString());
+        m.body = Code(body.join('\n'));
       }));
     }
 
@@ -355,22 +355,22 @@ class CopyWithGenerator extends UniversalGenerator {
         }));
       }
 
-      final body = StringBuffer();
-      body.writeln('return copyWith(');
+      final body = <String>[];
+      body.add('return copyWith(');
       final paramStr = interfaceFields
           .map(
             (f) =>
                 '${f.name}: ${f.name} != null ? ${f.name}() : this.${f.name}',
           )
           .join(', ');
-      body.writeln('  $paramStr,');
-      body.writeln(');');
+      body.add('  $paramStr,');
+      body.add(');');
 
       methods.add(Method((m) {
         m.name = 'copyWith${interfaceNameTrimmed}Fn';
         m.returns = refer(classNameTrimmed);
         m.optionalParameters.addAll(params);
-        m.body = Code(body.toString());
+        m.body = Code(body.join('\n'));
       }));
     }
 
