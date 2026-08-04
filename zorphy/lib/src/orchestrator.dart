@@ -2,6 +2,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:zorphy/src/analysis/analysis.dart';
+import 'package:zorphy/src/ast/ast.dart';
 import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/generators/generators.dart';
 import 'package:zorphy/src/models/models.dart';
@@ -204,9 +205,13 @@ class Orchestrator {
   ///
   /// Assembly strategy:
   /// - [Class] specs: the first one becomes the primary class;
-  ///   [Method]/[Constructor] specs are added as its members.
+  ///   [Method] specs are added as its members.
+  /// - [ClassMemberCode] specs: injected into the primary class body
+  ///   (for constructs like factory constructors that cannot be
+  ///   represented as native [Spec] objects but must live inside
+  ///   the class to compile).
   /// - [Extension]/[Enum]/[Class] (non-primary): go to library level.
-  /// - [Code] specs: placed at library level (top-level declarations).
+  /// - [Code] specs (plain): placed at library level.
   ///
   /// [pluginImports] are accumulated import directives from the
   /// plugin pass, folded into the [Library] directives.
@@ -219,6 +224,7 @@ class Orchestrator {
     // 1. Separate specs by category.
     Class? primaryClass;
     final memberSpecs = <Method>[]; // Method -> into Class
+    final classMemberCodes = <ClassMemberCode>[]; // ClassMemberCode -> into Class
     final topLevelSpecs = <Spec>[]; // Everything else -> library level
 
     for (final spec in specs) {
@@ -226,6 +232,8 @@ class Orchestrator {
         primaryClass = spec;
       } else if (spec is Method) {
         memberSpecs.add(spec);
+      } else if (spec is ClassMemberCode) {
+        classMemberCodes.add(spec);
       } else {
         // Code, Extension, Enum, Class, Library, etc.
         topLevelSpecs.add(spec);
@@ -246,6 +254,7 @@ class Orchestrator {
         final rebuiltClass = _mergeMembersIntoClass(
           primaryClass,
           memberSpecs,
+          classMemberCodes: classMemberCodes,
         );
         b.body.add(rebuiltClass);
       }
@@ -262,10 +271,16 @@ class Orchestrator {
   /// Merges member specs into a [Class] spec.
   ///
   /// Methods are appended to the class methods list.
-  static Spec _mergeMembersIntoClass(Class cls, List<Method> memberSpecs) {
-    if (memberSpecs.isEmpty) return cls;
+  /// [ClassMemberCode] entries are unwrapped: constructors go to
+  /// the constructors list, methods go to the methods list.
+  static Spec _mergeMembersIntoClass(
+    Class cls,
+    List<Method> memberSpecs, {
+    List<ClassMemberCode> classMemberCodes = const [],
+  }) {
+    if (memberSpecs.isEmpty && classMemberCodes.isEmpty) return cls;
 
-    // Rebuild the class with additional methods.
+    // Rebuild the class with additional members.
     return Class((c) {
       c.name = cls.name;
       c.abstract = cls.abstract;
@@ -280,6 +295,15 @@ class Orchestrator {
       c.methods.addAll(cls.methods);
       c.constructors.addAll(cls.constructors);
       c.methods.addAll(memberSpecs);
+      // Unwrap ClassMemberCode entries into the class.
+      for (final memberCode in classMemberCodes) {
+        if (memberCode.constructor != null) {
+          c.constructors.add(memberCode.constructor!);
+        }
+        if (memberCode.method != null) {
+          c.methods.add(memberCode.method!);
+        }
+      }
     });
   }
 }

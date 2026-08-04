@@ -123,6 +123,8 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       c.name = className;
 
       // @JsonSerializable annotation
+      // NOTE: Do NOT include the `@` prefix here — code_builder's
+      // DartEmitter adds `@` automatically when emitting annotations.
       final hasFactoryMethods = config.factoryMethods.isNotEmpty;
       final isAbstractClass = metadata.originalName.startsWith(r'$$');
       final shouldSkipJsonAnnotation =
@@ -138,7 +140,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         c.annotations.add(
           CodeExpression(
             Code(
-              '@JsonSerializable(explicitToJson: ${config.explicitToJson}, checked: true$genericParams$constructorParam)',
+              'JsonSerializable(explicitToJson: ${config.explicitToJson}, checked: true$genericParams$constructorParam)',
             ),
           ),
         );
@@ -256,8 +258,11 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         }
 
         // Additional annotations
+        // Strip leading '@' — code_builder's DartEmitter adds it
+        // automatically.
         for (final ann in f.additionalAnnotations) {
-          fd.annotations.add(CodeExpression(Code(ann)));
+          final clean = ann.startsWith('@') ? ann.substring(1) : ann;
+          fd.annotations.add(CodeExpression(Code(clean)));
         }
       });
 
@@ -353,6 +358,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           p.type = referType(safeFieldType);
           p.named = true;
           p.required = !isNullable;
+          p.toThis = true;
         }));
       }
     }
