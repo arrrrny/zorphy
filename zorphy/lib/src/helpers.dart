@@ -227,7 +227,7 @@ String getPatchClass(
   sb.writeln();
 
   sb.writeln("  $classNameTrimmed applyTo($classNameTrimmed entity) {");
-  sb.writeln("    return entity.patchWith$classNameTrimmed(patchInput: this);");
+  sb.writeln("    return entity.patchWith$classNameTrimmed(this);");
   sb.writeln("  }");
   sb.writeln();
 
