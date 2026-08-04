@@ -359,6 +359,11 @@ class ClassDeclarationGenerator extends UniversalGenerator {
             p.type = referType(safeFieldType);
             p.named = true;
             p.required = !isNullable;
+            // Field-initializing formal: emits `this.<field>` in the
+            // constructor so final fields are actually initialized
+            // (previously emitted a plain param, leaving final fields
+            // uninitialized: "All final variables must be initialized").
+            p.toThis = true;
           }),
         );
       }
