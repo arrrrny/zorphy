@@ -101,7 +101,11 @@ Field mapField(FieldMetadata field) {
 
     // Additional annotations (e.g. @JsonSerializable, custom ones)
     for (final ann in field.additionalAnnotations) {
-      f.annotations.add(CodeExpression(Code(ann)));
+      // code_builder's DartEmitter adds the '@' prefix for annotations,
+      // so the source string must NOT include it (m.toSource() includes
+      // it, which produced '@@override' before).
+      final cleaned = ann.startsWith('@') ? ann.substring(1) : ann;
+      f.annotations.add(CodeExpression(Code(cleaned)));
     }
   });
 }
@@ -117,16 +121,12 @@ Field mapField(FieldMetadata field) {
 /// `TypeReference(symbol: 'Comparable', types: [refer('T')])`.
 TypeReference mapInterfaceToTypeReference(InterfaceMetadata iface) {
   final name = iface.interfaceName;
-  final typeRefs =
-      iface.typeParams
-          .where((tp) => tp.name.isNotEmpty)
-          .map((tp) {
-            if (tp.type != null && tp.type!.isNotEmpty) {
-              return referType('${tp.name}<${tp.type}>');
-            }
-            return referType(tp.name);
-          })
-          .toList();
+  final typeRefs = iface.typeParams.where((tp) => tp.name.isNotEmpty).map((tp) {
+    if (tp.type != null && tp.type!.isNotEmpty) {
+      return referType('${tp.name}<${tp.type}>');
+    }
+    return referType(tp.name);
+  }).toList();
 
   if (typeRefs.isEmpty) {
     return referType(name);

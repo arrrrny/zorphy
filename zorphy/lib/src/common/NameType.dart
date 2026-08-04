@@ -137,8 +137,8 @@ class JsonKeyInfo {
     if (fromJson != null) params.add("fromJson: $fromJson");
     if (converter != null) params.add("converter: $converter");
 
-    if (params.isEmpty) return "@JsonKey()";
-    return "@JsonKey(${params.join(", ")})";
+    if (params.isEmpty) return "JsonKey()";
+    return "JsonKey(${params.join(", ")})";
   }
 
   /// Returns true when at least one annotation parameter is set.
