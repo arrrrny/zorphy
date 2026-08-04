@@ -32,7 +32,7 @@ class Opt<T> {
   /// Executes [consumer] when a value is present.
   void ifPresent(void Function(T value) consumer) {
     if (_value != null) {
-      consumer(_value!);
+      consumer(_value);
     }
   }
 
@@ -41,7 +41,7 @@ class Opt<T> {
     if (_value == null) {
       return Opt.empty<U>();
     }
-    return Opt.ofNullable(mapper(_value!));
+    return Opt.ofNullable(mapper(_value));
   }
 }
 
