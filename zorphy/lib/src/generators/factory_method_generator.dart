@@ -60,7 +60,7 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
     if (useAbstractFactoryCall) {
       // Static method delegated to abstract class
       final callArgs = factory.parameters
-          .map((p) => '${p.name}: ${p.name}')
+          .map((p) => p.isNamed ? '${p.name}: ${p.name}' : p.name)
           .join(', ');
       bodyCode = '${factory.className}.${factory.name}($callArgs)';
     } else {
@@ -68,25 +68,26 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
     }
 
     // Process bodyCode (mirrors helpers.generateFactoryMethod logic)
-    if (bodyCode.contains('return ') && bodyCode.endsWith(';')) {
-      bodyCode = bodyCode.substring(7, bodyCode.length - 1);
+    final trimmedBody = bodyCode.trim();
+    if (trimmedBody.startsWith('return ') && trimmedBody.endsWith(';')) {
+      bodyCode = trimmedBody.substring(7, trimmedBody.length - 1);
     }
 
     if (!useAbstractFactoryCall) {
       // Strip $ prefix from class references in real factory bodies
-      final dollarPattern = String.fromCharCode(0x24);
-      final plainClassName = factory.className.replaceAll(dollarPattern, '');
+      final plainClassName = factory.className.replaceAll('\$', '');
       bodyCode = bodyCode
-          .replaceAll('${plainClassName}._', '${classNameTrimmed}._')
-          .replaceAll(dollarPattern, '');
+          .replaceAll('${factory.className}._', '${classNameTrimmed}._')
+          .replaceAll('${plainClassName}._', '${classNameTrimmed}._');
     }
 
     // Build parameters from structured data
-    final params = <Parameter>[];
+    final requiredParams = <Parameter>[];
+    final namedParams = <Parameter>[];
 
     for (final p in factory.parameters) {
       final cleanType = helpers.replaceDollarTypesWithConcrete(p.type);
-      params.add(Parameter((param) {
+      final param = Parameter((param) {
         param.name = p.name;
         param.type = referType(cleanType);
         if (p.isNamed) {
@@ -96,7 +97,13 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
         if (p.hasDefaultValue && p.defaultValue != null) {
           param.defaultTo = Code(p.defaultValue!);
         }
-      }));
+      });
+
+      if (p.isNamed) {
+        namedParams.add(param);
+      } else {
+        requiredParams.add(param);
+      }
     }
 
     return Constructor((c) {
@@ -104,7 +111,8 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
       c.name = factory.name;
       c.lambda = true;
       c.body = Code(bodyCode);
-      c.optionalParameters.addAll(params);
+      c.requiredParameters.addAll(requiredParams);
+      c.optionalParameters.addAll(namedParams);
     });
   }
 }
