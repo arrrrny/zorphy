@@ -7,6 +7,14 @@ library;
 import 'package:code_builder/code_builder.dart';
 
 /// References an arbitrary Dart type by its fully-qualified or simple name.
+///
+/// Works around a code_builder 4.x bug where [TypeReference.isNullable]
+/// is silently ignored when emitting [Field] types, [Parameter] types,
+/// and method return types — the `?` suffix is always dropped.
+///
+/// The workaround: for any nullable type, the full type string
+/// (including `?`) is stored in [TypeReference.symbol] with an empty
+/// `types` list, so code_builder emits it verbatim.
 TypeReference referType(String type) {
   final isNullable = type.endsWith('?');
   final cleanType = isNullable ? type.substring(0, type.length - 1) : type;
@@ -15,16 +23,34 @@ TypeReference referType(String type) {
     final rtIndex = cleanType.lastIndexOf('>');
     final baseName = cleanType.substring(0, ltIndex);
     final typeArgsStr = cleanType.substring(ltIndex + 1, rtIndex);
+
+    if (isNullable) {
+      // Workaround: code_builder 4.x ignores isNullable when types is
+      // non-empty. Store the full type string (with ?) in symbol
+      // and leave types empty so code_builder emits it verbatim.
+      return TypeReference((t) {
+        t.symbol = type;
+      });
+    }
+
     final typeArgs = _splitTypeArgs(typeArgsStr).map(referType).toList();
     return TypeReference((t) {
       t.symbol = baseName;
       t.types.addAll(typeArgs);
-      t.isNullable = isNullable;
     });
   }
+
+  if (isNullable) {
+    // Workaround: code_builder 4.x ignores isNullable for Field and
+    // Parameter types. Store the full type string (with ?) in symbol
+    // and leave types empty so code_builder emits it verbatim.
+    return TypeReference((t) {
+      t.symbol = type;
+    });
+  }
+
   return TypeReference((t) {
     t.symbol = cleanType;
-    t.isNullable = isNullable;
   });
 }
 
