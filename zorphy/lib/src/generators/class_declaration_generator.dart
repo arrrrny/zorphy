@@ -126,6 +126,8 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       c.name = className;
 
       // @JsonSerializable annotation
+      // NOTE: Do NOT include the `@` prefix here — code_builder's
+      // DartEmitter adds `@` automatically when emitting annotations.
       final hasFactoryMethods = config.factoryMethods.isNotEmpty;
       final isAbstractClass = metadata.originalName.startsWith(r'$$');
       final shouldSkipJsonAnnotation = hasFactoryMethods && isAbstractClass;
@@ -257,12 +259,11 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         }
 
         // Additional annotations
+        // Strip leading '@' — code_builder's DartEmitter adds it
+        // automatically.
         for (final ann in f.additionalAnnotations) {
-          // code_builder's DartEmitter adds the '@' prefix for annotations,
-          // so the source string must NOT include it (m.toSource() includes
-          // it, which produced '@@override' before).
-          final cleaned = ann.startsWith('@') ? ann.substring(1) : ann;
-          fd.annotations.add(CodeExpression(Code(cleaned)));
+          final clean = ann.startsWith('@') ? ann.substring(1) : ann;
+          fd.annotations.add(CodeExpression(Code(clean)));
         }
       });
 
@@ -353,19 +354,13 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         initializers.add('this.${f.name} = ${f.name} ?? $defaultValueString');
       } else {
         var safeFieldType = fieldType ?? 'dynamic';
-        params.add(
-          Parameter((p) {
-            p.name = f.name;
-            p.type = referType(safeFieldType);
-            p.named = true;
-            p.required = !isNullable;
-            // Field-initializing formal: emits `this.<field>` in the
-            // constructor so final fields are actually initialized
-            // (previously emitted a plain param, leaving final fields
-            // uninitialized: "All final variables must be initialized").
-            p.toThis = true;
-          }),
-        );
+        params.add(Parameter((p) {
+          p.name = f.name;
+          p.type = referType(safeFieldType);
+          p.named = true;
+          p.required = !isNullable;
+          p.toThis = true;
+        }));
       }
     }
 
