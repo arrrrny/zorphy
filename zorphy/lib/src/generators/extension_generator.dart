@@ -21,18 +21,18 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
   }
 
   Extension _buildCompareToExtension(String classNameTrimmed, List<dynamic> allFields) {
-    final body = StringBuffer();
-    body.writeln('final Map<String, dynamic> diff = {};');
+    final body = <String>[];
+    body.add('final Map<String, dynamic> diff = {};');
     for (final field in allFields) {
       final fieldType = field.type ?? '';
       final fieldName = field.name;
       if (fieldType.contains('Function')) continue;
-      body.writeln('');
-      body.writeln("if ($fieldName != other.$fieldName) {");
-      body.writeln("  diff['$fieldName'] = () => other.$fieldName;");
-      body.writeln('}');
+      body.add('');
+      body.add("if ($fieldName != other.$fieldName) {");
+      body.add("  diff['$fieldName'] = () => other.$fieldName;");
+      body.add('}');
     }
-    body.writeln('return diff;');
+    body.add('return diff;');
     return Extension((e) {
       e.name = '${classNameTrimmed}CompareE';
       e.on = referType(classNameTrimmed);
@@ -43,7 +43,7 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
           p.name = 'other';
           p.type = referType(classNameTrimmed);
         }));
-        m.body = Code(body.toString());
+        m.body = Code(body.join('\n'));
       }));
     });
   }
@@ -66,7 +66,7 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
     final metadata = context.metadata;
     if (metadata.explicitSubtypes.isEmpty) return [];
     final knownClasses = metadata.allAnnotatedClasses.keys
-        .map((k) => k.replaceAll(r'$', ''))
+        .map((k) => k.replaceAll(r'\$', ''))
         .toList();
     return [_buildChangeToExtension(
       sourceFields: metadata.allFields,
@@ -82,11 +82,11 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
     required List<dynamic> explicitSubTypes,
     required List<String> knownClasses,
   }) {
-    final sourceClassNameTrimmed = sourceClassName.replaceAll(r'$', '');
+    final sourceClassNameTrimmed = sourceClassName.replaceAll(r'\$', '');
     final methods = <Method>[];
 
     for (final targetInterface in explicitSubTypes) {
-      final targetClassName = targetInterface.interfaceName.replaceAll(r'$', '');
+      final targetClassName = targetInterface.interfaceName.replaceAll(r'\$', '');
       final targetFields = targetInterface.fields;
       final targetFieldsDistinct = <dynamic>[];
       final targetFieldNames = <String>{};
@@ -129,7 +129,7 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
           } else {
             params.add(Parameter((p) {
               p.name = fieldName;
-              p.type = referType('$fieldType?');
+              p.type = referType('${fieldType}?');
               p.named = true;
             }));
             setFieldNames[fieldName] = false;
@@ -154,8 +154,8 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
         }
       }
 
-      final body = StringBuffer();
-      body.writeln('final _patcher = ${targetClassName}Patch();');
+      final body = <String>[];
+      body.add('final _patcher = ${targetClassName}Patch();');
 
       for (final field in targetFieldsDistinct) {
         final fieldName = field.name;
@@ -164,25 +164,25 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
         final isRequired = setFieldNames[fieldName] ?? false;
 
         if (isRequired) {
-          body.writeln('_patcher.with$fieldNameCap($fieldName);');
+          body.add('_patcher.with$fieldNameCap($fieldName);');
         } else {
-          body.writeln('if ($fieldName != null) {');
-          body.writeln('  _patcher.with$fieldNameCap($fieldName);');
-          body.writeln('}');
+          body.add('if ($fieldName != null) {');
+          body.add('  _patcher.with$fieldNameCap($fieldName);');
+          body.add('}');
         }
       }
 
-      body.writeln(
+      body.add(
         "final _json = Map<String, dynamic>.from((this as dynamic).toJson());",
       );
-      body.writeln('_json.addAll(_patcher.toJson());');
-      body.writeln('return $targetClassName.fromJson(_json);');
+      body.add('_json.addAll(_patcher.toJson());');
+      body.add('return $targetClassName.fromJson(_json);');
 
       methods.add(Method((m) {
         m.name = 'changeTo$targetClassName';
         m.returns = referType(targetClassName);
         m.optionalParameters.addAll(params);
-        m.body = Code(body.toString());
+        m.body = Code(body.join('\n'));
       }));
     }
 

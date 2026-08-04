@@ -292,36 +292,36 @@ class JsonGenerator extends UniversalGenerator {
 
     // toJsonLean method
     if (metadata.generics.isEmpty) {
-      final body = StringBuffer();
-      body.writeln(
+      final body = <String>[];
+      body.add(
           'final Map<String, dynamic> data = _\$$className' +
               'ToJson(this);');
       for (final f in manualToJsonFields) {
         final info = f.jsonKeyInfo!;
         final jsonFieldName = info.name ?? f.name;
-        body.writeln(
+        body.add(
             "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
       }
-      body.writeln('return _sanitizeJson(data);');
+      body.add('return _sanitizeJson(data);');
       specs.add(Method((m) {
         m.name = 'toJsonLean';
         m.returns = referType('Map<String, dynamic>');
-        m.body = Code(body.toString());
+        m.body = Code(body.join('\n'));
       }));
     } else {
       final toJsonArgs =
           metadata.generics.map((g) => 'toJson${g.name}').join(', ');
-      final body = StringBuffer();
-      body.writeln(
+      final body = <String>[];
+      body.add(
           'final Map<String, dynamic> data = _\$$className' +
               'ToJson(this, $toJsonArgs);');
       for (final f in manualToJsonFields) {
         final info = f.jsonKeyInfo!;
         final jsonFieldName = info.name ?? f.name;
-        body.writeln(
+        body.add(
             "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
       }
-      body.writeln('return _sanitizeJson(data);');
+      body.add('return _sanitizeJson(data);');
       specs.add(Method((m) {
         m.name = 'toJsonLean';
         m.returns = referType('Map<String, dynamic>');
@@ -332,7 +332,7 @@ class JsonGenerator extends UniversalGenerator {
                 referType('Object? Function(${g.name} value)');
           }));
         }
-        m.body = Code(body.toString());
+        m.body = Code(body.join('\n'));
       }));
     }
 
@@ -361,14 +361,14 @@ return json;''');
   void _addToJsonWithDiscriminator(
       List<Spec> specs, ClassMetadata metadata) {
     final className = metadata.cleanName;
-    final body = StringBuffer();
-    body.writeln('final json = _\$$className' + 'ToJson(this);');
-    body.writeln("json['__typename'] = '$className';");
-    body.writeln('return json;');
+    final body = <String>[];
+    body.add('final json = _\$$className' + 'ToJson(this);');
+    body.add("json['__typename'] = '$className';");
+    body.add('return json;');
     specs.add(ClassMemberCode.method(Method((m) {
       m.name = 'toJson';
       m.returns = referType('Map<String, dynamic>');
-      m.body = Code(body.toString());
+      m.body = Code(body.join('\n'));
     })));
   }
 
@@ -453,19 +453,19 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
           m.body = Code('return _\$$className' + 'ToJson(this);');
         }));
       } else {
-        final body = StringBuffer();
-        body.writeln('final data = _\$$className' + 'ToJson(this);');
+        final body = <String>[];
+        body.add('final data = _\$$className' + 'ToJson(this);');
         for (final f in manualToJsonFields) {
           final info = f.jsonKeyInfo!;
           final jsonFieldName = info.name ?? f.name;
-          body.writeln(
+          body.add(
               "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
         }
-        body.writeln('return data;');
+        body.add('return data;');
         methods.add(Method((m) {
           m.name = 'toJson';
           m.returns = referType('Map<String, dynamic>');
-          m.body = Code(body.toString());
+          m.body = Code(body.join('\n'));
         }));
       }
     } else {
@@ -486,16 +486,16 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
           m.body = Code('_\$$className' + 'ToJson(this, $toJsonArgs)');
         }));
       } else {
-        final body = StringBuffer();
-        body.writeln(
+        final body = <String>[];
+        body.add(
             'final data = _\$$className' + 'ToJson(this, $toJsonArgs);');
         for (final f in manualToJsonFields) {
           final info = f.jsonKeyInfo!;
           final jsonFieldName = info.name ?? f.name;
-          body.writeln(
+          body.add(
               "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
         }
-        body.writeln('return data;');
+        body.add('return data;');
         methods.add(Method((m) {
           m.name = 'toJson';
           m.returns = referType('Map<String, dynamic>');
@@ -506,7 +506,7 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
                   referType('Object? Function(${g.name} value)');
             }));
           }
-          m.body = Code(body.toString());
+          m.body = Code(body.join('\n'));
         }));
       }
     }
