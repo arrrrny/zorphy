@@ -219,15 +219,15 @@ String getPatchClass(
     var isZorphyType =
         isKnownClassType(innerType, field.isEnum) ||
         (innerType.startsWith("List<") &&
-            isKnownClassType(
-              innerType.replaceAll(RegExp(r'^List<(.+)>$'), r'\$1'),
-              false, // Lists are not enums themselves
-            )) ||
+            (() {
+              final match = RegExp(r'^List<(.+)>$').firstMatch(innerType);
+              return match != null && isKnownClassType(match.group(1) ?? "", false);
+            })()) ||
         (innerType.startsWith("Map<") &&
-            isKnownClassType(
-              innerType.replaceAll(RegExp(r'^Map<(.+, .+)>$'), r'\$2'),
-              false, // Maps are not enums themselves
-            ));
+            (() {
+              final match = RegExp(r'^Map<(.+), (.+)>$').firstMatch(innerType);
+              return match != null && isKnownClassType(match.group(2) ?? "", false);
+            })());
 
     if (isZorphyType && !isGenericType) {
       // Handle List types
@@ -304,7 +304,7 @@ String getPatchClass(
       else {
         // Don't generate patch methods for abstract/sealed types (starting with $$)
         // as they don't have concrete Patch classes we can instantiate
-        if (fieldType.trim().startsWith(r'\$\$')) {
+        if (fieldType.trim().startsWith(r'$$')) {
           continue;
         }
 

@@ -87,8 +87,8 @@ class EqualsToStringGenerator extends ConcreteClassGenerator {
             .map((f) => 'this.${f.name}')
             .join(', ');
 
-        if (c == 0) {
-          parts.add('Object.hash($fieldRefs)');
+        if (chunkFields.length == 1) {
+          parts.add('Object.hash($fieldRefs, 0)');
         } else {
           parts.add('Object.hash($fieldRefs)');
         }
