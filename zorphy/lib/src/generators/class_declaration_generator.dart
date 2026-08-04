@@ -57,7 +57,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
       // Implements
       for (final iface in metadata.interfaces) {
-        c.implements.add(referType(iface.interfaceName));
+        c.implements.add(referType(_trimInterfaceName(iface.interfaceName)));
       }
       for (final f in metadata.allFields) {
         c.methods.add(
@@ -166,7 +166,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         final trimmedName = _trimInterfaceName(iface.interfaceName);
         if (trimmedName != _trimInterfaceName(extendedParent) &&
             trimmedName.isNotEmpty) {
-          c.implements.add(referType(iface.interfaceName));
+          c.implements.add(referType(_trimInterfaceName(iface.interfaceName)));
         }
       }
 
