@@ -65,3 +65,5 @@ app.*.map.json
 .**
 # But allow .github directory for workflows
 !.github/
+.handoffs
+.contracts
