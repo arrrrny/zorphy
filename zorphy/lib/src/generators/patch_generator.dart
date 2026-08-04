@@ -23,7 +23,7 @@ class PatchGenerator extends ConcreteClassGenerator {
   List<Spec> generateSpec(GenerationContext context) {
     final metadata = context.metadata;
     final config = context.config;
-    final classNameTrimmed = metadata.cleanName.replaceAll(r'\$', '');
+    final classNameTrimmed = metadata.cleanName.replaceAll(r'$', '');
     final specs = <Spec>[];
 
     // Main patchWith method
@@ -161,7 +161,7 @@ class PatchClassGenerator extends ConcreteClassGenerator {
   List<Spec> generateSpec(GenerationContext context) {
     final metadata = context.metadata;
     final knownClasses = metadata.allAnnotatedClasses.keys
-        .map((k) => k.replaceAll(r'\$', ''))
+        .map((k) => k.replaceAll(r'$', ''))
         .toList();
     final genericTypeNames = metadata.generics.map((g) => g.name).toList();
     final code = helpers.getPatchClass(
