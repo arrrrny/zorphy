@@ -105,6 +105,10 @@ class CopyWithGenerator extends UniversalGenerator {
       metadata.allFields,
       metadata.cleanName,
       classNameTrimmed,
+      covariantFields: _getCovariantFields(
+        fields,
+        metadata.allValueTInterfaces,
+      ),
     ));
 
     // 5. Interface-scoped copyWithFn methods
@@ -248,8 +252,9 @@ class CopyWithGenerator extends UniversalGenerator {
     List<Interface> interfaces,
     List<NameTypeClassComment> classFields,
     String className,
-    String classNameTrimmed,
-  ) {
+    String classNameTrimmed, {
+    Set<String> covariantFields = const {},
+  }) {
     final classFieldNames = classFields.map((f) => f.name).toSet();
     final methods = <Method>[];
 
@@ -288,6 +293,9 @@ class CopyWithGenerator extends UniversalGenerator {
           p.name = f.name;
           p.type = refer(nullableType);
           p.named = true;
+          if (covariantFields.contains(f.name)) {
+            p.covariant = true;
+          }
         }));
       }
 
