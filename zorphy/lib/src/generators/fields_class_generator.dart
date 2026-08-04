@@ -95,6 +95,7 @@ class FieldsClassGenerator extends UniversalGenerator {
           c.fields.add(Field((f) {
             f.name = fieldName;
             f.modifier = FieldModifier.constant;
+            f.static = true;
             f.assignment = Code("Field<$className, $fieldType>('$fieldName', _\$$fieldName)");
           }));
         }
