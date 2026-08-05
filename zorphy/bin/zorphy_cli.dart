@@ -560,7 +560,7 @@ class _ValidateCommand extends Command<void> {
   Future<void> run() async {
     final dir = argResults!['dir'] as String? ?? Directory.current.path;
     final extraSources = (argResults!['source'] as List<String>?) ?? [];
-    final sourceDirs = ['lib', ...extraSources];
+    final sourceDirs = ['lib', ...extraSources.where((s) => s != 'lib')];
     final asJson = argResults!['json'] as bool;
 
     final projectDir = Directory(dir);
@@ -747,7 +747,7 @@ class _DoctorCommand extends Command<void> {
   Future<void> run() async {
     final dir = argResults!['dir'] as String? ?? Directory.current.path;
     final extraSources = (argResults!['source'] as List<String>?) ?? [];
-    final sourceDirs = ['lib', ...extraSources];
+    final sourceDirs = ['lib', ...extraSources.where((s) => s != 'lib')];
     final dryRun = argResults!['dry-run'] as bool;
     final asJson = argResults!['json'] as bool;
 
