@@ -155,10 +155,10 @@ Add the dependencies to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zorphy_annotation: ^1.9.0
+  zorphy_annotation: ^2.0.0
 
 dev_dependencies:
-  zorphy: ^1.9.0
+  zorphy: ^2.0.0
   build_runner: ^2.4.0
 ```
 
@@ -175,7 +175,7 @@ dart pub global activate zorphy
 The Zorphy CLI is designed for optimal AI agent usage:
 
 ```bash
-# Interactive entity creation
+# Create entity
 zorphy create -n User
 
 # Create with fields
@@ -261,25 +261,24 @@ zorphy create [options]
 **Options:**
 
 - `-n, --name` - Entity name (required)
-- `-o, --output` - Output directory (default: `lib/entities`)
+- `-o, --output` - Output directory (default: `lib/src/domain/entities`)
 - `-p, --package` - Package name for imports
 - `--json` - Enable JSON serialization (default: true)
 - `--copywith-fn` - Enable function-based copyWith (default: false)
 - `--compare` - Enable compareTo (default: true)
+- `--filter` - Enable filter descriptors (default: false)
 - `--sealed` - Create sealed class (default: false)
 - `--non-sealed` - Create non-sealed class (default: false)
-- `-f, --fields` - Interactive field prompts (default: true)
-- `--field` - Add fields directly (`name:type` or `name:type?`)
+- `--field` - Add fields directly (`name:type` or `name:type?`), repeatable
 - `--extends` - Interface to extend (e.g., `$BaseEntity`)
-- `--subtype` - Explicit subtypes for polymorphism
+- `--subtypes` - Explicit subtypes for polymorphism (repeatable)
+- `--generate-subs` - Auto-generate subtype stubs for sealed classes
+- `--dry-run` - Preview generated code without writing files
 
 **Examples:**
 
 ```bash
-# Interactive creation
-zorphy create -n User
-
-# With fields
+# Create with fields
 zorphy create -n User \
   --field name:String \
   --field age:int \
@@ -294,8 +293,13 @@ zorphy create -n Product \
   --field price:double \
   --field category:String?
 
-# Sealed class
-zorphy create -n Result --sealed
+# Sealed class with subtypes
+zorphy create -n Result --sealed \
+  --subtypes Ok \
+  --subtypes Err
+
+# Dry run (preview only)
+zorphy create -n User --field name:String --dry-run
 
 # With inheritance
 zorphy create -n Admin \
@@ -314,7 +318,7 @@ zorphy new -n EntityName
 **Options:**
 
 - `-n, --name` - Entity name (required)
-- `-o, --output` - Output directory (default: `lib/entities`)
+- `-o, --output` - Output directory (default: `lib/src/domain/entities`)
 - `--json` - Enable JSON (default: true)
 
 **Example:**
@@ -335,7 +339,8 @@ zorphy build [options]
 
 - `-w, --watch` - Watch for changes (default: false)
 - `-c, --clean` - Clean before build (default: false)
-- `-o, --output` - Build output directory
+- `--dry-run` - Preview without writing (default: false)
+- `--force` - Force rebuild even if up to date (default: false)
 
 **Examples:**
 
@@ -348,6 +353,9 @@ zorphy build --clean
 
 # Watch mode
 zorphy build --watch
+
+# Force rebuild
+zorphy build --force
 ```
 
 #### `list` - List Entities
@@ -360,17 +368,17 @@ zorphy list [options]
 
 **Options:**
 
-- `-o, --output` - Directory to search (default: `lib/entities`)
+- `-o, --output` - Directory to search (default: `lib/src/domain/entities`)
 
 **Example:**
 
 ```bash
 zorphy list
 # Output:
-# 📂 Zorphy Entities in lib/entities:
+# 📂 Zorphy Entities in lib/src/domain/entities:
 #
 # 📄 User
-#    File: lib/entities/user.dart
+#    File: lib/src/domain/entities/user.dart
 #    ✓ JSON support
 #    ✓ Function-based copyWith
 #
@@ -397,37 +405,67 @@ The CLI supports various field types:
 --field createdAt:DateTime
 ```
 
-### Interactive Mode
+#### `enum` - Create Enum
 
-When using `create` with `--fields` (default), the CLI prompts for fields:
+Create a new Zorphy-compatible enum:
 
 ```bash
-$ zorphy create -n User
-
-📝 Creating Zorphy Entity: User
-Enter fields one by one. Press Enter without input to finish.
-
-Field name (or press Enter to finish): name
-Field type (e.g., String, int, List<String>): String
-✓ Added field: name (String)
-
-Field name (or press Enter to finish): age
-Field type (e.g., String, int, List<String>): int
-✓ Added field: age (int)
-
-Field name (or press Enter to finish):
-
-✓ Created entity file: lib/entities/user.dart
-
-📋 Next steps:
-  1. Run: zorphy build
-  2. Or run: dart run build_runner build
-  3. Import and use your User class
-
-✨ Generated 2 fields:
-  - name: String
-  - age: int
+zorphy enum -n Status --value active,inactive,pending
 ```
+
+**Options:**
+
+- `-n, --name` - Enum name (required)
+- `--value` - Comma-separated enum values (required)
+- `-o, --output` - Output directory (default: `lib/src/domain/entities`)
+
+**Example:**
+
+```bash
+zorphy enum -n UserRole --value admin,user,guest
+```
+
+#### `add-field` - Add Field to Existing Entity
+
+Add a field to an existing Zorphy entity file:
+
+```bash
+zorphy add-field -n User -f email:String?
+```
+
+**Options:**
+
+- `-n, --name` - Entity name (required)
+- `-f, --field` - Field to add (`name:type` or `name:type?`) (required)
+
+**Example:**
+
+```bash
+zorphy add-field -n User -f avatarUrl:String?
+zorphy add-field -n Product -f tags:List<String>
+```
+
+#### `watch` - Watch and Rebuild
+
+Watch for file changes and automatically rebuild:
+
+```bash
+zorphy watch
+```
+
+#### `from-json` - Create Entity from JSON
+
+Generate a Zorphy entity from a JSON sample:
+
+```bash
+zorphy from-json -n User --json-input '{"name": "Alice", "age": 30}'
+```
+
+**Options:**
+
+- `-n, --name` - Entity name (required)
+- `--json-input` - JSON string to generate from (required)
+- `-o, --output` - Output directory (default: `lib/src/domain/entities`)
 
 ## 🔌 Zorphy MCP Server
 
@@ -441,12 +479,13 @@ Add to your Claude/MCP client configuration:
 {
   "mcpServers": {
     "zorphy": {
-      "command": "dart",
-      "args": ["run", "zorphy:zorphy_mcp_server"]
+      "command": "zorphy_mcp_server"
     }
   }
 }
 ```
+
+> The `zorphy_mcp_server` executable is registered when you run `dart pub global activate zorphy`. Alternatively, use `dart run zorphy:zorphy_mcp_server`.
 
 ### Available MCP Tools
 
@@ -459,25 +498,24 @@ Create a new Zorphy entity programmatically.
 ```json
 {
   "name": "string (required)",
-  "output_dir": "string (default: lib/entities)",
+  "outputDir": "string (default: lib/src/domain/entities)",
+  "package": "string (optional)",
+  "generateJson": "boolean (default: true)",
+  "generateCompareTo": "boolean (default: true)",
+  "sealed": "boolean (default: false)",
+  "nonSealed": "boolean (default: false)",
+  "extends": "string (optional)",
+  "explicitSubTypes": ["string"],
   "fields": [
     {
       "name": "string",
-      "type": "string",
-      "nullable": "boolean (default: false)"
+      "type": "string"
     }
-  ],
-  "options": {
-    "generateJson": "boolean (default: true)",
-    "generateCopyWithFn": "boolean (default: false)",
-    "generateCompareTo": "boolean (default: true)",
-    "sealed": "boolean (default: false)",
-    "nonSealed": "boolean (default: false)"
-  },
-  "extends": "string (optional)",
-  "explicit_subtypes": ["string"]
+  ]
 }
 ```
+
+> **Note:** Parameters are flat (no nested `options` object). Fields use the `?` suffix in the type string for nullable fields (e.g., `"type": "String?"`).
 
 **Example:**
 
@@ -487,13 +525,61 @@ Create a new Zorphy entity programmatically.
   "fields": [
     { "name": "id", "type": "String" },
     { "name": "name", "type": "String" },
-    { "name": "email", "type": "String?", "nullable": true },
+    { "name": "email", "type": "String?" },
     { "name": "age", "type": "int" }
   ],
-  "options": {
-    "generateJson": true,
-    "generateCompareTo": true
-  }
+  "generateJson": true,
+  "generateCompareTo": true
+}
+```
+
+#### `create_enum`
+
+Create a new Zorphy-compatible enum.
+
+**Parameters:**
+
+```json
+{
+  "name": "string (required)",
+  "values": ["string (required)"],
+  "outputDir": "string (default: lib/src/domain/entities)"
+}
+```
+
+**Example:**
+
+```json
+{
+  "name": "UserRole",
+  "values": ["admin", "user", "guest"]
+}
+```
+
+#### `add_field`
+
+Add a field to an existing Zorphy entity.
+
+**Parameters:**
+
+```json
+{
+  "name": "string (required) — entity name",
+  "fields": [
+    {
+      "name": "string (required)",
+      "type": "string (required)"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```json
+{
+  "name": "User",
+  "fields": [{ "name": "avatarUrl", "type": "String?" }]
 }
 ```
 
@@ -505,103 +591,9 @@ List all Zorphy entities in a directory.
 
 ```json
 {
-  "directory": "string (default: lib/entities)"
+  "directory": "string (default: lib/src/domain/entities)"
 }
 ```
-
-#### `generate_entity_code`
-
-Generate entity code without writing to file (preview mode).
-
-**Parameters:** Same as `create_entity`
-
-**Use case:** Preview generated code before creating the file.
-
-#### `build_entities`
-
-Run build_runner to generate Zorphy code.
-
-**Parameters:**
-
-```json
-{
-  "clean": "boolean (default: false)",
-  "watch": "boolean (default: false)"
-}
-```
-
-#### `analyze_entity`
-
-Analyze an existing entity file and return its structure.
-
-**Parameters:**
-
-```json
-{
-  "file_path": "string (required)"
-}
-```
-
-**Returns:**
-
-```json
-{
-  "name": "User",
-  "path": "lib/entities/user.dart",
-  "hasJson": true,
-  "hasCopyWithFn": false,
-  "isSealed": false,
-  "fields": ["id: String", "name: String", "email: String?", "age: int"],
-  "extends": null
-}
-```
-
-#### `create_sealed_hierarchy`
-
-Create a sealed class hierarchy with multiple variants.
-
-**Parameters:**
-
-```json
-{
-  "base_name": "string (required)",
-  "variants": [
-    {
-      "name": "string",
-      "fields": [{ "name": "string", "type": "string", "nullable": "boolean" }]
-    }
-  ],
-  "output_dir": "string (default: lib/entities)",
-  "generate_json": "boolean (default: true)"
-}
-```
-
-**Example - Creating a Result type:**
-
-```json
-{
-  "base_name": "Result",
-  "variants": [
-    {
-      "name": "Success",
-      "fields": [{ "name": "data", "type": "dynamic" }]
-    },
-    {
-      "name": "Error",
-      "fields": [
-        { "name": "message", "type": "String" },
-        { "name": "code", "type": "int" }
-      ]
-    }
-  ]
-}
-```
-
-This creates:
-
-- `$$Result` - Sealed base class
-- `$Success` - Success variant
-- `$Error` - Error variant
 
 ### Agentic Usage Examples
 
@@ -614,54 +606,59 @@ mcp.call_tool("create_entity", {
     "fields": [
         {"name": "id", "type": "String"},
         {"name": "username", "type": "String"},
-        {"name": "email", "type": "String?", "nullable": true},
+        {"name": "email", "type": "String?"},
         {"name": "createdAt", "type": "DateTime"}
     ],
-    "options": {
-        "generateJson": True,
-        "generateCompareTo": True
-    }
+    "generateJson": True,
+    "generateCompareTo": True
 })
 ```
 
-**Example 2: Agent Creating a Payment Hierarchy**
+**Example 2: Agent Creating a Sealed Hierarchy**
 
 ```python
-mcp.call_tool("create_sealed_hierarchy", {
-    "base_name": "PaymentMethod",
-    "variants": [
-        {
-            "name": "CreditCard",
-            "fields": [
-                {"name": "cardNumber", "type": "String"},
-                {"name": "expiryDate", "type": "String"}
-            ]
-        },
-        {
-            "name": "PayPal",
-            "fields": [
-                {"name": "email", "type": "String"}
-            ]
-        }
-    ]
-})
-```
-
-**Example 3: Agent Analyzing and Extending**
-
-```python
-# Analyze existing entity
-analysis = mcp.call_tool("analyze_entity", {
-    "file_path": "lib/entities/user.dart"
-})
-
-# Extend with new field
+# Create the sealed base
 mcp.call_tool("create_entity", {
-    "name": "Admin",
-    "extends": "$User",
+    "name": "PaymentMethod",
+    "sealed": True,
+    "explicitSubTypes": ["$CreditCard", "$PayPal"]
+})
+
+# Create each variant
+mcp.call_tool("create_entity", {
+    "name": "CreditCard",
+    "extends": "$$PaymentMethod",
     "fields": [
-        {"name": "permissions", "type": "List<String>"}
+        {"name": "cardNumber", "type": "String"},
+        {"name": "expiryDate", "type": "String"}
     ]
+})
+
+mcp.call_tool("create_entity", {
+    "name": "PayPal",
+    "extends": "$$PaymentMethod",
+    "fields": [
+        {"name": "email", "type": "String"}
+    ]
+})
+```
+
+**Example 3: Agent Adding a Field and Listing Entities**
+
+```python
+# List existing entities
+entities = mcp.call_tool("list_entities", {})
+
+# Add a field to an existing entity
+mcp.call_tool("add_field", {
+    "name": "User",
+    "fields": [{"name": "avatarUrl", "type": "String?"}]
+})
+
+# Create an enum
+mcp.call_tool("create_enum", {
+    "name": "UserRole",
+    "values": ["admin", "user", "guest"]
 })
 ```
 
@@ -1274,15 +1271,22 @@ final fromJson = User.fromJson(json);
 
 The `@Zorphy` annotation supports these options:
 
-| Option                  | Type         | Default | Description                                          |
-| ----------------------- | ------------ | ------- | ---------------------------------------------------- |
-| `generateJson`          | `bool`       | `false` | Enable JSON serialization (`toJson`/`fromJson`)      |
-| `generateCopyWithFn`    | `bool`       | `false` | Generate function-based copyWith methods             |
-| `generateCompareTo`     | `bool`       | `true`  | Generate comparison methods                          |
-| `explicitSubTypes`      | `List<Type>` | `null`  | Specify explicit subtypes for polymorphic operations |
-| `explicitToJson`        | `bool`       | `true`  | Control JSON serialization generation                |
-| `hidePublicConstructor` | `bool`       | `false` | Hide the public constructor for custom factories     |
-| `nonSealed`             | `bool`       | `false` | Create non-sealed abstract classes instead of sealed |
+| Option                     | Type             | Default | Description                                              |
+| -------------------------- | ---------------- | --------- | -------------------------------------------------------- |
+| `preset`                   | `ZorphyPreset?` | `null`    | Preset that controls defaults for multiple options (`lean`, `standard`, `full`). When set, per-flag defaults inherit from the preset |
+| `generateJson`             | `bool`          | `false`    | Enable JSON serialization (`toJson`/`fromJson`) |
+| `generateCopyWith`         | `bool?`          | `null`    | Generate `copyWith` methods; inherits from preset if `null` |
+| `generateCopyWithFn`       | `bool?`          | `null`    | Generate function-based copyWith methods; inherits from preset if `null` |
+| `generatePatch`            | `bool?`          | `null`    | Generate patch classes for partial updates; inherits from preset if `null` |
+| `generateFilter`           | `bool?`          | `null`    | Generate filter/query descriptor fields; inherits from preset if `null` |
+| `generateCompareTo`        | `bool?`          | `null`    | Generate comparison methods; inherits from preset if `null` |
+| `generatePropertyHelpers`  | `bool?`          | `null`    | Generate property helper extensions; inherits from preset if `null` |
+| `generateEqualsToString`   | `bool?`          | `null`    | Generate `==`, `hashCode`, and `toString`; inherits from preset if `null` |
+| `generateChangeTo`         | `bool?`          | `null`    | Generate `changeTo` conversion methods between subtypes; inherits from preset if `null` |
+| `explicitSubTypes`         | `List<Type>`     | `null`    | Specify explicit subtypes for polymorphic operations |
+| `explicitToJson`           | `bool`           | `true`    | Control JSON serialization generation |
+| `hidePublicConstructor`    | `bool`           | `false`   | Hide the public constructor for custom factories |
+| `nonSealed`                | `bool`           | `false`   | Create non-sealed abstract classes instead of sealed |
 
 ## 🏗️ Build Configuration
 
@@ -1325,7 +1329,6 @@ zorphy build --clean
 ### Generated Files
 
 - **`*.zorphy.dart`** - Generated code from `@Zorphy` annotation
-- **`*.zorphy2.dart`** - Generated code from `@Zorphy2` annotation (builds before zorphy)
 
 ### Generated Enums
 
@@ -1379,19 +1382,9 @@ abstract class $B<T2> implements $A<T1> { }
 
 ### Circular Dependencies
 
-Use `@Zorphy2` for classes that need to be built before others:
+> **Note:** `@Zorphy2` is **deprecated** in v2. The single-pass v2 generator handles ordering automatically — you no longer need to annotate build-order dependencies manually.
 
-```dart
-@Zorphy2()
-abstract class $Base {
-  String get id;
-}
-
-@Zorphy()
-abstract class $Derived implements $Base {
-  String get extra;
-}
-```
+If you are migrating from v1 code that uses `@Zorphy2`, simply replace all `@Zorphy2()` annotations with `@Zorphy()` — the v2 generator will resolve the correct build order.
 
 ## License
 

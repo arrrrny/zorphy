@@ -9,7 +9,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
 
-const String _version = '1.5.0';
+const String _version = '2.0.0';
 
 /// Singleton pattern for shared resources
 class SharedResources {

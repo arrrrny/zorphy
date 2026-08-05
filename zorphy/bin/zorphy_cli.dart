@@ -11,7 +11,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import 'package:zorphy/zorphy_cli.dart';
 
-const String _version = '1.5.0';
+const String _version = '2.0.0';
 
 Future<void> main(List<String> args) async {
   var showVersion = false;
@@ -91,6 +91,7 @@ class _CreateCommand extends Command<void> {
     final config = EntityConfig(
       name: name,
       outputDir: output,
+      packageName: argResults!['package'] as String?,
       fields: fields,
       generateJson: argResults!['json'] as bool,
       generateCopyWithFn: argResults!['copywith-fn'] as bool,

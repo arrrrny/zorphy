@@ -233,6 +233,8 @@ expect(fromJson.history[1], isA<PayPal>());
 ```dart
 @Zorphy(generateJson: true)
 abstract class $Company {
+  String get companyId;
+  String get name;
   $CompanyAddress get address;
   List<$Department> get departments;
   Map<String, $Employee> get employeeDirectory;
@@ -240,6 +242,9 @@ abstract class $Company {
 
 @Zorphy(generateJson: true)
 abstract class $CompanyAddress {
+  String get street;
+  String get city;
+  String get country;
   $GeoLocation? get location;  // Nested nullable Zorphy object
 }
 
@@ -251,12 +256,16 @@ abstract class $GeoLocation {
 
 @Zorphy(generateJson: true)
 abstract class $Department {
+  String get departmentId;
+  String get name;
   $Employee get manager;
   List<$Employee> get members;
 }
 
 @Zorphy(generateJson: true)
 abstract class $Employee {
+  String get employeeId;
+  String get name;
   $ContactInfo get contactInfo;
 }
 
@@ -268,6 +277,7 @@ abstract class $ContactInfo {
 // Deep nesting works at any level
 final company = Company(
   companyId: '1',
+  name: 'Acme Corp',
   address: CompanyAddress(
     street: '123 Ave',
     city: 'SF',
@@ -324,7 +334,7 @@ Create entities with nested Zorphy objects:
 # User with nested Address
 zorphy create -n User \
   --field id:String \
-  --field address:Address?
+  --field address:\$Address?
 
 # Create the nested Address entity
 zorphy create -n Address \
@@ -340,9 +350,9 @@ mcp.call_tool("create_entity", {
     "name": "Order",
     "fields": [
         {"name": "orderId", "type": "String"},
-        {"name": "user", "type": "User"},           # Single nested Zorphy object
-        {"name": "items", "type": "List<OrderItem>"},  # List of Zorphy objects
-        {"name": "metadata", "type": "Map<String, PaymentMethod>"}  # Map of Zorphy objects
+        {"name": "user", "type": "$User"},           # Single nested Zorphy object
+        {"name": "items", "type": "List<$OrderItem>"},  # List of Zorphy objects
+        {"name": "metadata", "type": "Map<String, $PaymentMethod>"}  # Map of Zorphy objects
     ],
     "options": {"generateJson": True}
 })
