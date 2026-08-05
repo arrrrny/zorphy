@@ -374,15 +374,19 @@ dart run zorphy:zorphy_cli list -o lib/src/domain/entities
 
 ### Issue: "Type not found" error
 
-**Solution:** Make sure nested entities are created before the entities that reference them.
+**Solution:** The v2 generator handles build ordering automatically. Entities can be created in any order, and the generator will resolve dependencies correctly. If you see type errors, ensure:
+1. You've run `dart run build_runner build` after creating all entities
+2. The referenced entity file exists in the expected location
+3. Import paths are correct
 
 **Example:**
 ```bash
-# Create Address FIRST
+# Order doesn't matter in v2 - you can create in either order
+dart run zorphy:zorphy_cli create -n User --field address:\$Address
 dart run zorphy:zorphy_cli create -n Address --field street:String
 
-# Then create User that references it
-dart run zorphy:zorphy_cli create -n User --field address:\$Address
+# Then build all entities
+dart run build_runner build
 ```
 
 ### Issue: Build errors

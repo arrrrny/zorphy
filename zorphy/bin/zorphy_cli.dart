@@ -91,6 +91,7 @@ class _CreateCommand extends Command<void> {
     final config = EntityConfig(
       name: name,
       outputDir: output,
+      packageName: argResults!['package'] as String?,
       fields: fields,
       generateJson: argResults!['json'] as bool,
       generateCopyWithFn: argResults!['copywith-fn'] as bool,

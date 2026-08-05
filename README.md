@@ -410,19 +410,19 @@ The CLI supports various field types:
 Create a new Zorphy-compatible enum:
 
 ```bash
-zorphy enum -n Status --values active,inactive,pending
+zorphy enum -n Status --value active,inactive,pending
 ```
 
 **Options:**
 
 - `-n, --name` - Enum name (required)
-- `--values` - Comma-separated enum values (required)
+- `--value` - Comma-separated enum values (required)
 - `-o, --output` - Output directory (default: `lib/src/domain/entities`)
 
 **Example:**
 
 ```bash
-zorphy enum -n UserRole --values admin,user,guest
+zorphy enum -n UserRole --value admin,user,guest
 ```
 
 #### `add-field` - Add Field to Existing Entity
@@ -565,10 +565,12 @@ Add a field to an existing Zorphy entity.
 ```json
 {
   "name": "string (required) — entity name",
-  "field": {
-    "name": "string (required)",
-    "type": "string (required)"
-  }
+  "fields": [
+    {
+      "name": "string (required)",
+      "type": "string (required)"
+    }
+  ]
 }
 ```
 
@@ -577,7 +579,7 @@ Add a field to an existing Zorphy entity.
 ```json
 {
   "name": "User",
-  "field": { "name": "avatarUrl", "type": "String?" }
+  "fields": [{ "name": "avatarUrl", "type": "String?" }]
 }
 ```
 
@@ -650,7 +652,7 @@ entities = mcp.call_tool("list_entities", {})
 # Add a field to an existing entity
 mcp.call_tool("add_field", {
     "name": "User",
-    "field": {"name": "avatarUrl", "type": "String?"}
+    "fields": [{"name": "avatarUrl", "type": "String?"}]
 })
 
 # Create an enum
@@ -1272,7 +1274,7 @@ The `@Zorphy` annotation supports these options:
 | Option                     | Type             | Default | Description                                              |
 | -------------------------- | ---------------- | --------- | -------------------------------------------------------- |
 | `preset`                   | `ZorphyPreset?` | `null`    | Preset that controls defaults for multiple options (`lean`, `standard`, `full`). When set, per-flag defaults inherit from the preset |
-| `generateJson`             | `bool?`          | `null`    | Enable JSON serialization (`toJson`/`fromJson`); inherits from preset if `null` |
+| `generateJson`             | `bool`          | `false`    | Enable JSON serialization (`toJson`/`fromJson`) |
 | `generateCopyWith`         | `bool?`          | `null`    | Generate `copyWith` methods; inherits from preset if `null` |
 | `generateCopyWithFn`       | `bool?`          | `null`    | Generate function-based copyWith methods; inherits from preset if `null` |
 | `generatePatch`            | `bool?`          | `null`    | Generate patch classes for partial updates; inherits from preset if `null` |
