@@ -176,6 +176,7 @@ abstract class \$Order {}
       final result = validator.validate();
 
       expect(result.errorCount, equals(0));
+      expect(result.findings, isEmpty);
     });
 
     test('warns when source is newer than generated file', () async {

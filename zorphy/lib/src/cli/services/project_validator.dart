@@ -9,6 +9,8 @@ library;
 
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/dart/ast/ast.dart';
 import '../models/validation_result.dart';
 
 /// Runs all validation checks against a project directory and returns
@@ -24,6 +26,30 @@ class ProjectValidator {
     required this.projectDir,
     List<String>? sourceDirs,
   }) : sourceDirs = sourceDirs ?? const ['lib'];
+
+  /// Check if the file content has actual @Zorphy or @zorphy annotations
+  /// (not in comments or string literals).
+  bool _hasZorphyAnnotation(String content) {
+    try {
+      final parsed = parseString(content: content);
+      final unit = parsed.unit;
+
+      for (final declaration in unit.declarations) {
+        if (declaration is ClassDeclaration) {
+          for (final metadata in declaration.metadata) {
+            final name = metadata.name.name;
+            if (name == 'Zorphy' || name == 'zorphy') {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    } catch (e) {
+      // If parsing fails, fall back to string search to avoid missing files
+      return content.contains('@Zorphy(') || content.contains('@zorphy(');
+    }
+  }
 
   /// Run all validation checks and return the result.
   ValidationResult validate() {
@@ -49,7 +75,7 @@ class ProjectValidator {
 
         filesScanned++;
         final content = file.readAsStringSync();
-        if (content.contains('@Zorphy(') || content.contains('@zorphy(')) {
+        if (_hasZorphyAnnotation(content)) {
           annotatedFiles.add(file.path);
           // Check part directives
           findings.addAll(_checkPartDirectives(file.path, content));
@@ -222,8 +248,32 @@ class ProjectValidator {
     final zorphyPart = "$base.zorphy.dart";
     final gPart = "$base.g.dart";
 
-    if (!content.contains("part '$zorphyPart'") &&
-        !content.contains('part "$zorphyPart"')) {
+    bool hasZorphyPart = false;
+    bool hasGPart = false;
+
+    try {
+      final parsed = parseString(content: content);
+      final unit = parsed.unit;
+
+      for (final directive in unit.directives) {
+        if (directive is PartDirective) {
+          final uri = directive.uri.stringValue;
+          if (uri == zorphyPart) {
+            hasZorphyPart = true;
+          } else if (uri == gPart) {
+            hasGPart = true;
+          }
+        }
+      }
+    } catch (e) {
+      // Fall back to string search if parsing fails
+      hasZorphyPart = content.contains("part '$zorphyPart'") ||
+          content.contains('part "$zorphyPart"');
+      hasGPart = content.contains("part '$gPart'") ||
+          content.contains('part "$gPart"');
+    }
+
+    if (!hasZorphyPart) {
       findings.add(
         ValidationFinding(
           message: "Missing part directive for '$zorphyPart'",
@@ -234,8 +284,7 @@ class ProjectValidator {
       );
     }
 
-    if (!content.contains("part '$gPart'") &&
-        !content.contains('part "$gPart"')) {
+    if (!hasGPart) {
       findings.add(
         ValidationFinding(
           message: "Missing part directive for '$gPart'",

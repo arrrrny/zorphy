@@ -560,7 +560,25 @@ class _ValidateCommand extends Command<void> {
 
     final projectDir = Directory(dir);
     if (!projectDir.existsSync()) {
-      print('Error: Directory not found: $dir');
+      if (asJson) {
+        final errorOutput = {
+          'directory': dir,
+          'filesScanned': 0,
+          'errorCount': 1,
+          'warningCount': 0,
+          'infoCount': 0,
+          'findings': [
+            {
+              'message': 'Directory not found: $dir',
+              'severity': 'error',
+              'filePath': dir,
+            }
+          ],
+        };
+        print(const JsonEncoder.withIndent('  ').convert(errorOutput));
+      } else {
+        print('Error: Directory not found: $dir');
+      }
       exit(1);
     }
 
