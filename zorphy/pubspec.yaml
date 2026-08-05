@@ -1,6 +1,6 @@
 name: zorphy
 description: A powerful code generation package for Dart/Flutter that provides clean class definitions with copyWith, JSON serialization, toString, equality, and inheritance support
-version: 2.1.0
+version: 2.0.0
 homepage: https://github.com/arrrrny/zorphy
 
 environment:
@@ -34,3 +34,4 @@ dev_dependencies:
 
 executables:
   zorphy: zorphy_cli
+  zorphy_mcp_server: zorphy_mcp_server

@@ -13,13 +13,15 @@ Zorphy is a Dart/Flutter code generator that creates immutable data classes with
 - Sealed class support
 - Inheritance and polymorphism
 
+> **Version:** ^2.0.0
+
 ## 🚀 Three Ways to Use Zorphy
 
 ### Method 1: Via MCP Server (Recommended for Agents)
 
 The MCP server provides programmatic access to all Zorphy features.
 
-**Available Tools:**
+**Available Tools (4 total):**
 
 1. **`create_entity`** - Create a new entity class
 ```python
@@ -28,36 +30,36 @@ mcp.call_tool("create_entity", {
     "fields": [
         {"name": "id", "type": "String"},
         {"name": "name", "type": "String"},
-        {"name": "email", "type": "String?", "nullable": true}
+        {"name": "email", "type": "String?"}
     ],
-    "options": {
-        "generateJson": True,
-        "generateCompareTo": True
-    }
+    "generateJson": True,
+    "generateCompareTo": True
 })
 ```
 
-2. **`create_sealed_hierarchy`** - Create sealed class with variants
+2. **`create_enum`** - Create an enum
 ```python
-mcp.call_tool("create_sealed_hierarchy", {
-    "base_name": "Result",
-    "variants": [
-        {
-            "name": "Success",
-            "fields": [{"name": "data", "type": "dynamic"}]
-        },
-        {
-            "name": "Error",
-            "fields": [{"name": "message", "type": "String"}]
-        }
+mcp.call_tool("create_enum", {
+    "name": "Status",
+    "values": ["active", "inactive", "pending"]
+})
+```
+
+3. **`add_field`** - Add field(s) to an existing entity
+```python
+mcp.call_tool("add_field", {
+    "name": "User",
+    "fields": [
+        {"name": "age", "type": "int"},
+        {"name": "role", "type": "String?"}
     ]
 })
 ```
 
-3. **`list_entities`** - List all entities
-4. **`analyze_entity`** - Get entity structure
-5. **`generate_entity_code`** - Preview code without writing
-6. **`build_entities`** - Run code generation
+4. **`list_entities`** - List all entities and enums
+```python
+mcp.call_tool("list_entities", {})
+```
 
 ### Method 2: Via CLI Commands
 
@@ -121,7 +123,7 @@ Then run: `dart run build_runner build`
     "name": "User",
     "fields": [
         {"name": "name", "type": "String"},
-        {"name": "email", "type": "String?", "nullable": True}
+        {"name": "email", "type": "String?"}
     ]
 }
 ```
@@ -154,19 +156,31 @@ Then run: `dart run build_runner build`
 ```python
 {
     "name": "User",
+    "outputDir": "lib/src/domain/entities",
+    "package": "my_app",
     "fields": [
         {"name": "id", "type": "String"},
         {"name": "name", "type": "String"},
-        {"name": "email", "type": "String?", "nullable": True}
+        {"name": "email", "type": "String?"}
     ],
-    "options": {
-        "generateJson": True,
-        "generateCopyWithFn": False,
-        "generateCompareTo": True,
-        "sealed": False,
-        "nonSealed": False
-    }
+    "generateJson": True,
+    "generateCompareTo": True,
+    "sealed": False,
+    "nonSealed": False,
+    "extends": null,
+    "explicitSubTypes": []
 }
+```
+
+### Sealed Class with Subtypes
+```python
+{
+    "name": "Result",
+    "sealed": True,
+    "explicitSubTypes": ["Success", "Error", "Loading"],
+    "fields": []
+}
+# Then create each subtype as a separate entity with extends
 ```
 
 ## 🔧 Common Workflows
@@ -181,56 +195,62 @@ mcp.call_tool("create_entity", {
         {"name": "id", "type": "String"},
         {"name": "name", "type": "String"}
     ],
-    "options": {"generateJson": True}
+    "generateJson": True
 })
 
 # 2. Build code
-mcp.call_tool("build_entities", {})
+# dart run build_runner build
 
 # 3. Use in code
 # final user = User(id: "1", name: "Alice");
 # final json = user.toJson();
 ```
 
-### Workflow 2: Analyze Existing Entity
+### Workflow 2: Create Sealed Hierarchy
 
 ```python
-# Analyze
-analysis = mcp.call_tool("analyze_entity", {
-    "file_path": "lib/entities/user.dart"
+# 1. Create sealed base
+mcp.call_tool("create_entity", {
+    "name": "Result",
+    "sealed": True,
+    "explicitSubTypes": ["Success", "Error", "Loading"],
+    "fields": []
 })
 
-# Returns structure, fields, options
+# 2. Create each subtype
+mcp.call_tool("create_entity", {
+    "name": "Success",
+    "extends": "$Result",
+    "fields": [{"name": "data", "type": "dynamic"}]
+})
+
+mcp.call_tool("create_entity", {
+    "name": "Error",
+    "extends": "$Result",
+    "fields": [{"name": "message", "type": "String"}]
+})
+
+# 3. Build and use with exhaustiveness checking
+# dart run build_runner build
 ```
 
-### Workflow 3: Create Sealed Hierarchy
+### Workflow 3: Add Fields to Existing Entity
 
 ```python
-# Create Result type
-mcp.call_tool("create_sealed_hierarchy", {
-    "base_name": "Result",
-    "variants": [
-        {"name": "Success", "fields": [{"name": "data", "type": "dynamic"}]},
-        {"name": "Error", "fields": [{"name": "message", "type": "String"}]},
-        {"name": "Loading", "fields": []}
+# 1. Check existing entities
+mcp.call_tool("list_entities", {})
+
+# 2. Add fields
+mcp.call_tool("add_field", {
+    "name": "User",
+    "fields": [
+        {"name": "age", "type": "int?"},
+        {"name": "avatarUrl", "type": "String?"}
     ]
 })
 
-# Build and use with exhaustiveness checking
-```
-
-### Workflow 4: Preview Before Creating
-
-```python
-# Preview code
-code = mcp.call_tool("generate_entity_code", {
-    "name": "User",
-    "fields": [{"name": "id", "type": "String"}]
-})
-
-# Review the generated code
-# Then create if satisfied
-mcp.call_tool("create_entity", {...})
+# 3. Rebuild
+# dart run build_runner build
 ```
 
 ## 📊 Field Type Reference
@@ -244,7 +264,7 @@ mcp.call_tool("create_entity", {...})
 - `DateTime` - Date and time
 
 ### Nullable Types
-Add `?` and set `"nullable": true`
+Add `?` to the type
 - `String?`
 - `int?`
 - `DateTime?`
@@ -268,17 +288,34 @@ Add `?` and set `"nullable": true`
 }
 ```
 
-## 🎨 Annotation Options
+## 🎨 create_entity Parameters
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `generateJson` | boolean | false | Enable toJson/fromJson |
-| `generateCopyWithFn` | boolean | false | Function-based copyWith |
-| `generateCompareTo` | boolean | true | Compare methods |
-| `sealed` | boolean | false | Create sealed class |
-| `nonSealed` | boolean | false | Non-sealed abstract |
-| `extends` | string | null | Interface to implement |
-| `explicit_subtypes` | string[] | null | Polymorphic subtypes |
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | string | **yes** | - | Entity name (PascalCase) |
+| `fields` | array of {name, type} | no | `[]` | Field definitions |
+| `outputDir` | string | no | `lib/src/domain/entities` | Output directory |
+| `package` | string | no | - | Package name |
+| `generateJson` | boolean | no | `true` | Enable toJson/fromJson |
+| `generateCompareTo` | boolean | no | `true` | Compare methods |
+| `sealed` | boolean | no | `false` | Create sealed class |
+| `nonSealed` | boolean | no | `false` | Non-sealed abstract |
+| `extends` | string | no | null | Interface to implement |
+| `explicitSubTypes` | string[] | no | `[]` | Polymorphic subtypes |
+
+## 🎨 create_enum Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | string | **yes** | - | Enum name (PascalCase) |
+| `values` | string[] | **yes** | - | Enum values |
+
+## 🎨 add_field Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | string | **yes** | - | Entity name to add fields to |
+| `fields` | array of {name, type} | **yes** | - | Fields to add |
 
 ## 💡 Best Practices for Agents
 
@@ -288,66 +325,56 @@ Add `?` and set `"nullable": true`
 entities = mcp.call_tool("list_entities", {})
 ```
 
-### 2. Preview Before Creating
+### 2. Use Proper Types
 ```python
-# Preview code
-code = mcp.call_tool("generate_entity_code", {...})
-# Review before actual creation
+# Good - nullable indicated by ? in type
+{"type": "String?"}
+
+# Bad - don't use separate nullable flag
+{"type": "String", "nullable": True}
 ```
 
-### 3. Use Proper Types
+### 3. Use Enums for Fixed Value Sets
 ```python
-# Good
-{"type": "String"}
+# Create an enum first
+mcp.call_tool("create_enum", {
+    "name": "UserRole",
+    "values": ["admin", "editor", "viewer"]
+})
 
-# Bad (missing ? for nullable)
-{"type": "String?", "nullable": False}
-```
-
-### 4. Build After Creation
-```python
-# Always build after creating entities
-mcp.call_tool("create_entity", {...})
-mcp.call_tool("build_entities", {})
-```
-
-### 5. Use Sealed Hierarchies for State
-```python
-# State machines
-mcp.call_tool("create_sealed_hierarchy", {
-    "base_name": "UiState",
-    "variants": [
-        {"name": "Loading", "fields": []},
-        {"name": "Success", "fields": [{"name": "data", "type": "dynamic"}]},
-        {"name": "Error", "fields": [{"name": "message", "type": "String"}]}
+# Then reference it in an entity
+mcp.call_tool("create_entity", {
+    "name": "User",
+    "fields": [
+        {"name": "role", "type": "UserRole"}
     ]
 })
 ```
 
+### 4. Use Sealed Hierarchies for State
+```python
+# State machines - create base then subtypes
+mcp.call_tool("create_entity", {
+    "name": "UiState",
+    "sealed": True,
+    "explicitSubTypes": ["Loading", "Success", "Error"],
+    "fields": []
+})
+# Then create each subtype with extends: "$UiState"
+```
+
 ## 🐛 Common Mistakes to Avoid
 
-### 1. Forgetting to Build
+### 1. Incorrect Nullable Syntax
 ```python
-# Wrong
-mcp.call_tool("create_entity", {...})
-# Trying to use the class immediately fails
-
-# Right
-mcp.call_tool("create_entity", {...})
-mcp.call_tool("build_entities", {})
-# Now the class is ready
-```
-
-### 2. Incorrect Nullable Syntax
-```python
-# Wrong
+# Wrong - separate nullable flag (v1 style)
 {"name": "email", "type": "String", "nullable": true}
 
-# Right
-{"name": "email", "type": "String?", "nullable": true}
+# Right - use ? suffix in type (v2 style)
+{"name": "email", "type": "String?"}
 ```
 
-### 3. Missing $ Prefix in Manual Code
+### 2. Missing $ Prefix in Manual Code
 ```python
 # Wrong
 @Zorphy()
@@ -362,10 +389,27 @@ abstract class $User {  # Has $
 }
 ```
 
-### 4. Forgetting Part Directive
+### 3. Forgetting Part Directive
 ```dart
 // Always include this
 part 'user.zorphy.dart';
+```
+
+### 4. Using Nested Options (v1 style)
+```python
+# Wrong (v1 - nested options)
+{
+    "name": "User",
+    "fields": [...],
+    "options": {"generateJson": True}
+}
+
+# Right (v2 - flat params)
+{
+    "name": "User",
+    "fields": [...],
+    "generateJson": True
+}
 ```
 
 ## 📚 Quick Reference
@@ -375,7 +419,7 @@ part 'user.zorphy.dart';
 zorphy create -n EntityName
 ```
 
-### Create with Fields
+### Create with Fields (MCP)
 ```python
 mcp.call_tool("create_entity", {
     "name": "Entity",
@@ -386,21 +430,33 @@ mcp.call_tool("create_entity", {
 })
 ```
 
+### Create Enum (MCP)
+```python
+mcp.call_tool("create_enum", {
+    "name": "Status",
+    "values": ["active", "inactive"]
+})
+```
+
+### Add Field (MCP)
+```python
+mcp.call_tool("add_field", {
+    "name": "User",
+    "fields": [{"name": "age", "type": "int?"}]
+})
+```
+
 ### Build All
 ```bash
 zorphy build
+# or: dart run build_runner build
 ```
 
 ### List Entities
 ```bash
 zorphy list
-```
-
-### Analyze Entity
-```python
-mcp.call_tool("analyze_entity", {
-    "file_path": "lib/entities/entity.dart"
-})
+# or (MCP):
+mcp.call_tool("list_entities", {})
 ```
 
 ## 🎯 Decision Tree
@@ -408,14 +464,20 @@ mcp.call_tool("analyze_entity", {
 **Need a simple data class?**
 → Use `create_entity` with basic types
 
-**Need a state machine?**
-→ Use `create_sealed_hierarchy`
+**Need a state machine / union type?**
+→ Use `create_entity` with `sealed: true` and `explicitSubTypes`, then create each subtype with `extends`
+
+**Need a fixed set of values?**
+→ Use `create_enum`
 
 **Need inheritance?**
 → Use `create_entity` with `extends` parameter
 
 **Need JSON support?**
-→ Set `generateJson: true` in options
+→ Set `generateJson: true`
+
+**Need to add a field later?**
+→ Use `add_field` on the existing entity
 
 **Need immutable updates?**
 → Zorphy generates copyWith automatically
@@ -429,21 +491,21 @@ Before creating an entity:
 - [ ] Name is in PascalCase
 - [ ] Fields have correct types
 - [ ] Nullable fields have `?` suffix
-- [ ] Required options are set
-- [ ] Output directory exists
+- [ ] Parameters are flat (no nested `options`)
 
 After creating:
-- [ ] Run `build_entities`
+- [ ] Run `dart run build_runner build`
 - [ ] Verify generated code
 - [ ] Test instantiation
 
 ## 🚀 Ready to Go!
 
 You now have everything you need to:
-1. Create entities programmatically
-2. Build and use them
-3. Handle complex scenarios
-4. Avoid common pitfalls
+1. Create entities and enums programmatically
+2. Add fields to existing entities
+3. Build and use them
+4. Handle sealed hierarchies and inheritance
+5. Avoid common pitfalls
 
 **Start creating entities now!**
 

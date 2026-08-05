@@ -11,7 +11,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import 'package:zorphy/zorphy_cli.dart';
 
-const String _version = '1.5.0';
+const String _version = '2.0.0';
 
 Future<void> main(List<String> args) async {
   var showVersion = false;
