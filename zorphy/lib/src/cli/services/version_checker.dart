@@ -5,6 +5,7 @@
 library;
 
 import 'dart:io';
+import 'dart:async';
 import 'dart:convert';
 import '../models/update_result.dart';
 
@@ -192,32 +193,56 @@ class VersionChecker {
   /// Extract the latest stable version from the pub.dev API response JSON.
   String? _extractLatestVersion(Map<String, dynamic> json) {
     // Try the 'latest' field first
+    String? latestVersion;
     try {
       final latest = json['latest'] as Map<String, dynamic>?;
       if (latest != null) {
-        return latest['version'] as String?;
+        latestVersion = latest['version'] as String?;
+        if (latestVersion != null && latestVersion.isNotEmpty) {
+          return latestVersion;
+        }
       }
     } catch (_) {}
 
-    // Fallback: scan versions list for latest non-prerelease
+    // Fallback: scan versions list for highest version
     try {
       final versions = json['versions'] as List<dynamic>?;
       if (versions != null && versions.isNotEmpty) {
+        final allVersions = <String>[];
         for (final v in versions) {
           if (v is Map<String, dynamic>) {
             final version = v['version'] as String?;
-            if (version != null &&
-                !version.contains('-') &&
-                !version.contains('+')) {
-              return version;
+            if (version != null && version.isNotEmpty) {
+              allVersions.add(version);
             }
           }
         }
-        // All prerelease — return first
-        if (versions.isNotEmpty) {
-          return (versions.first as Map<String, dynamic>)['version']
-              as String?;
+
+        if (allVersions.isEmpty) return null;
+
+        // Separate stable and prerelease versions
+        final stableVersions = allVersions
+            .where((v) => !v.contains('-') && !v.contains('+'))
+            .toList();
+        final prereleaseVersions = allVersions
+            .where((v) => v.contains('-') || v.contains('+'))
+            .toList();
+
+        // Select highest stable version, or highest prerelease if no stable
+        final candidateVersions = stableVersions.isNotEmpty
+            ? stableVersions
+            : prereleaseVersions;
+
+        if (candidateVersions.isEmpty) return null;
+
+        // Find the highest version using existing comparison
+        String highest = candidateVersions.first;
+        for (final version in candidateVersions.skip(1)) {
+          if (_isNewer(highest, version)) {
+            highest = version;
+          }
         }
+        return highest;
       }
     } catch (_) {}
 
@@ -261,25 +286,32 @@ class VersionChecker {
       return fetchJson!(url, timeout: const Duration(seconds: 10));
     }
 
-    // Default: real HTTP fetch
+    // Default: real HTTP fetch with overall timeout
     final uri = Uri.parse(url);
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10);
     try {
-      final request = await client.getUrl(uri);
-      request.headers.set('User-Agent',
-          'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.0');
-      request.headers.set('Accept', 'application/json');
-      final response = await request.close();
+      return await Future.value(null).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () async {
+          throw TimeoutException('HTTP request timed out after 10 seconds');
+        },
+      ).then((_) async {
+        final request = await client.getUrl(uri);
+        request.headers.set('User-Agent',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.0');
+        request.headers.set('Accept', 'application/json');
+        final response = await request.close();
 
-      if (response.statusCode != 200) {
-        throw HttpException(
-          'pub.dev API returned status ${response.statusCode}',
-          uri: uri,
-        );
-      }
+        if (response.statusCode != 200) {
+          throw HttpException(
+            'pub.dev API returned status ${response.statusCode}',
+            uri: uri,
+          );
+        }
 
-      return await response.transform(utf8.decoder).join();
+        return await response.transform(utf8.decoder).join();
+      });
     } finally {
       client.close(force: true);
     }

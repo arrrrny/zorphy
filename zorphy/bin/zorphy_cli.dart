@@ -653,8 +653,10 @@ class _SelfUpdateCommand extends Command<void> {
 
     final checker = VersionChecker(currentVersion: _version);
 
+    // Reuse a single checkForUpdate result
+    final checkResult = await checker.checkForUpdate();
+
     if (asJson) {
-      final checkResult = await checker.checkForUpdate();
       final output = <String, dynamic>{
         'currentVersion': checkResult.currentVersion,
         'latestVersion': checkResult.latestVersion,
@@ -669,14 +671,25 @@ class _SelfUpdateCommand extends Command<void> {
           if (updateResult.newVersion != null)
             'newVersion': updateResult.newVersion,
         };
+        if (!updateResult.success) {
+          print(const JsonEncoder.withIndent('  ').convert(output));
+          exit(1);
+        }
+      }
+      if (checkResult.latestVersion == null) {
+        print(const JsonEncoder.withIndent('  ').convert(output));
+        exit(1);
       }
       print(const JsonEncoder.withIndent('  ').convert(output));
       return;
     }
 
     // Human-readable output
-    final checkResult = await checker.checkForUpdate();
     print(checkResult);
+
+    if (checkResult.latestVersion == null) {
+      exit(1);
+    }
 
     if (checkOnly || !checkResult.updateAvailable) {
       if (checkOnly && checkResult.updateAvailable) {
@@ -690,5 +703,8 @@ class _SelfUpdateCommand extends Command<void> {
     print('Updating...');
     final updateResult = await checker.performUpdateAndVerify();
     print(updateResult);
+    if (!updateResult.success) {
+      exit(1);
+    }
   }
 }
