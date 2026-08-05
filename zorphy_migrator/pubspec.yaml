@@ -3,7 +3,7 @@ description: >-
   Codemod that migrates freezed model classes to zorphy using resolved AST
   analysis. Converts simple classes, sealed unions, @Default values, and
   @JsonKey annotations; reports anything that needs human attention.
-version: 0.1.0
+version: 2.0.0
 homepage: https://github.com/arrrrny/zorphy
 
 environment:

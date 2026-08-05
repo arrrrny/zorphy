@@ -30,25 +30,31 @@ class PatchGenerator extends ConcreteClassGenerator {
     final fields = metadata.allFields;
     if (fields.isEmpty) {
       // Fieldless class: identity patchWith
-      specs.add(Method((m) {
-        m.name = 'patchWith$classNameTrimmed';
-        m.returns = referType(classNameTrimmed);
-        m.optionalParameters.add(Parameter((p) {
-          p.name = 'patchInput';
-          p.type = referType('${classNameTrimmed}Patch?');
-        }));
-        m.lambda = true;
-        m.body = Code('this');
-      }));
+      specs.add(
+        Method((m) {
+          m.name = 'patchWith$classNameTrimmed';
+          m.returns = referType(classNameTrimmed);
+          m.optionalParameters.add(
+            Parameter((p) {
+              p.name = 'patchInput';
+              p.type = referType('${classNameTrimmed}Patch?');
+            }),
+          );
+          m.lambda = true;
+          m.body = Code('this');
+        }),
+      );
     } else {
-      specs.add(_buildPatchWithMethod(
-        methodName: 'patchWith$classNameTrimmed',
-        patchTypeName: '${classNameTrimmed}Patch',
-        fields: fields,
-        classNameTrimmed: classNameTrimmed,
-        enumName: '${classNameTrimmed}\$',
-        constructorSuffix: config.hidePublicConstructor ? '._' : '',
-      ));
+      specs.add(
+        _buildPatchWithMethod(
+          methodName: 'patchWith$classNameTrimmed',
+          patchTypeName: '${classNameTrimmed}Patch',
+          fields: fields,
+          classNameTrimmed: classNameTrimmed,
+          enumName: '${classNameTrimmed}\$',
+          constructorSuffix: config.hidePublicConstructor ? '._' : '',
+        ),
+      );
     }
 
     // Interface patchWith methods
@@ -63,8 +69,7 @@ class PatchGenerator extends ConcreteClassGenerator {
 
       final seenFields = <String>{};
       final interfaceFields = iface.fields.where((f) {
-        if (classFieldNames.contains(f.name) &&
-            !seenFields.contains(f.name)) {
+        if (classFieldNames.contains(f.name) && !seenFields.contains(f.name)) {
           seenFields.add(f.name);
           return true;
         }
@@ -78,7 +83,8 @@ class PatchGenerator extends ConcreteClassGenerator {
       // Build body with interface fields patched, class fields passed through
       final bodyLines = <String>[];
       bodyLines.add(
-          "final _patcher = patchInput ?? ${interfaceNameTrimmed}Patch();");
+        "final _patcher = patchInput ?? ${interfaceNameTrimmed}Patch();",
+      );
       bodyLines.add('final _patchMap = _patcher.patchMap;');
       final constructorSuffix = config.hidePublicConstructor ? '._' : '';
       bodyLines.add('return $classNameTrimmed$constructorSuffix(');
@@ -86,7 +92,8 @@ class PatchGenerator extends ConcreteClassGenerator {
       for (final f in fields) {
         if (interfaceFieldNames.contains(f.name)) {
           bodyLines.add(
-              "${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name},");
+            "${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name},",
+          );
         } else {
           bodyLines.add('${f.name}: this.${f.name},');
         }
@@ -94,15 +101,19 @@ class PatchGenerator extends ConcreteClassGenerator {
 
       bodyLines.add(');');
 
-      specs.add(Method((m) {
-        m.name = 'patchWith$interfaceNameTrimmed';
-        m.returns = referType(classNameTrimmed);
-        m.optionalParameters.add(Parameter((p) {
-          p.name = 'patchInput';
-          p.type = referType('${interfaceNameTrimmed}Patch?');
-        }));
-        m.body = Code(bodyLines.join('\n'));
-      }));
+      specs.add(
+        Method((m) {
+          m.name = 'patchWith$interfaceNameTrimmed';
+          m.returns = referType(classNameTrimmed);
+          m.optionalParameters.add(
+            Parameter((p) {
+              p.name = 'patchInput';
+              p.type = referType('${interfaceNameTrimmed}Patch?');
+            }),
+          );
+          m.body = Code(bodyLines.join('\n'));
+        }),
+      );
     }
 
     return specs;
@@ -125,7 +136,8 @@ class PatchGenerator extends ConcreteClassGenerator {
       final f = fields[i];
       final comma = i == fields.length - 1 ? '' : ',';
       bodyLines.add(
-          "${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name}$comma");
+        "${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name}$comma",
+      );
     }
 
     bodyLines.add(');');
@@ -133,10 +145,12 @@ class PatchGenerator extends ConcreteClassGenerator {
     return Method((m) {
       m.name = methodName;
       m.returns = referType(classNameTrimmed);
-      m.optionalParameters.add(Parameter((p) {
-        p.name = 'patchInput';
-        p.type = referType('$patchTypeName?');
-      }));
+      m.optionalParameters.add(
+        Parameter((p) {
+          p.name = 'patchInput';
+          p.type = referType('$patchTypeName?');
+        }),
+      );
       m.body = Code(bodyLines.join('\n'));
     });
   }

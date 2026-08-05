@@ -20,7 +20,10 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
     return [_buildCompareToExtension(metadata.cleanName, metadata.allFields)];
   }
 
-  Extension _buildCompareToExtension(String classNameTrimmed, List<dynamic> allFields) {
+  Extension _buildCompareToExtension(
+    String classNameTrimmed,
+    List<dynamic> allFields,
+  ) {
     final body = <String>[];
     body.add('final Map<String, dynamic> diff = {};');
     for (final field in allFields) {
@@ -36,15 +39,19 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
     return Extension((e) {
       e.name = '${classNameTrimmed}CompareE';
       e.on = referType(classNameTrimmed);
-      e.methods.add(Method((m) {
-        m.name = 'compareTo${classNameTrimmed}';
-        m.returns = referType('Map<String, dynamic>');
-        m.requiredParameters.add(Parameter((p) {
-          p.name = 'other';
-          p.type = referType(classNameTrimmed);
-        }));
-        m.body = Code(body.join('\n'));
-      }));
+      e.methods.add(
+        Method((m) {
+          m.name = 'compareTo${classNameTrimmed}';
+          m.returns = referType('Map<String, dynamic>');
+          m.requiredParameters.add(
+            Parameter((p) {
+              p.name = 'other';
+              p.type = referType(classNameTrimmed);
+            }),
+          );
+          m.body = Code(body.join('\n'));
+        }),
+      );
     });
   }
 }
@@ -68,12 +75,14 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
     final knownClasses = metadata.allAnnotatedClasses.keys
         .map((k) => k.replaceAll(r'\$', ''))
         .toList();
-    return [_buildChangeToExtension(
-      sourceFields: metadata.allFields,
-      sourceClassName: metadata.cleanName,
-      explicitSubTypes: metadata.explicitSubtypes,
-      knownClasses: knownClasses,
-    )];
+    return [
+      _buildChangeToExtension(
+        sourceFields: metadata.allFields,
+        sourceClassName: metadata.cleanName,
+        explicitSubTypes: metadata.explicitSubtypes,
+        knownClasses: knownClasses,
+      ),
+    ];
   }
 
   Extension _buildChangeToExtension({
@@ -86,7 +95,10 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
     final methods = <Method>[];
 
     for (final targetInterface in explicitSubTypes) {
-      final targetClassName = targetInterface.interfaceName.replaceAll(r'\$', '');
+      final targetClassName = targetInterface.interfaceName.replaceAll(
+        r'$',
+        '',
+      );
       final targetFields = targetInterface.fields;
       final targetFieldsDistinct = <dynamic>[];
       final targetFieldNames = <String>{};
@@ -100,7 +112,9 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
 
       for (final field in targetFieldsDistinct) {
         final fieldName = field.name;
-        final fieldType = helpers.replaceDollarTypesWithConcrete(field.type ?? '');
+        final fieldType = helpers.replaceDollarTypesWithConcrete(
+          field.type ?? '',
+        );
         final isTargetNullable = fieldType.endsWith('?');
         final existsInSource = sourceFieldMap.containsKey(fieldName);
 
@@ -112,43 +126,53 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
           final isSourceNullable = sourceFieldType.endsWith('?');
 
           if (isSourceNullable && !isTargetNullable) {
-            params.add(Parameter((p) {
-              p.name = fieldName;
-              p.type = referType(fieldType);
-              p.required = true;
-              p.named = true;
-            }));
+            params.add(
+              Parameter((p) {
+                p.name = fieldName;
+                p.type = referType(fieldType);
+                p.required = true;
+                p.named = true;
+              }),
+            );
             setFieldNames[fieldName] = true;
           } else if (isTargetNullable) {
-            params.add(Parameter((p) {
-              p.name = fieldName;
-              p.type = referType(fieldType);
-              p.named = true;
-            }));
+            params.add(
+              Parameter((p) {
+                p.name = fieldName;
+                p.type = referType(fieldType);
+                p.named = true;
+              }),
+            );
             setFieldNames[fieldName] = false;
           } else {
-            params.add(Parameter((p) {
-              p.name = fieldName;
-              p.type = referType('${fieldType}?');
-              p.named = true;
-            }));
+            params.add(
+              Parameter((p) {
+                p.name = fieldName;
+                p.type = referType('${fieldType}?');
+                p.named = true;
+              }),
+            );
             setFieldNames[fieldName] = false;
           }
         } else {
           if (isTargetNullable) {
-            params.add(Parameter((p) {
-              p.name = fieldName;
-              p.type = referType(fieldType);
-              p.named = true;
-            }));
+            params.add(
+              Parameter((p) {
+                p.name = fieldName;
+                p.type = referType(fieldType);
+                p.named = true;
+              }),
+            );
             setFieldNames[fieldName] = false;
           } else {
-            params.add(Parameter((p) {
-              p.name = fieldName;
-              p.type = referType(fieldType);
-              p.required = true;
-              p.named = true;
-            }));
+            params.add(
+              Parameter((p) {
+                p.name = fieldName;
+                p.type = referType(fieldType);
+                p.required = true;
+                p.named = true;
+              }),
+            );
             setFieldNames[fieldName] = true;
           }
         }
@@ -178,12 +202,14 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
       body.add('_json.addAll(_patcher.toJson());');
       body.add('return $targetClassName.fromJson(_json);');
 
-      methods.add(Method((m) {
-        m.name = 'changeTo$targetClassName';
-        m.returns = referType(targetClassName);
-        m.optionalParameters.addAll(params);
-        m.body = Code(body.join('\n'));
-      }));
+      methods.add(
+        Method((m) {
+          m.name = 'changeTo$targetClassName';
+          m.returns = referType(targetClassName);
+          m.optionalParameters.addAll(params);
+          m.body = Code(body.join('\n'));
+        }),
+      );
     }
 
     return Extension((e) {
