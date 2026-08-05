@@ -33,7 +33,8 @@ Future<void> main(List<String> args) async {
         ..addCommand(_BuildCommand())
         ..addCommand(_WatchCommand())
         ..addCommand(_FromJsonCommand())
-        ..addCommand(_ValidateCommand());
+        ..addCommand(_ValidateCommand())
+        ..addCommand(_SelfUpdateCommand());
 
   try {
     if (showVersion) {
@@ -619,5 +620,75 @@ class _ValidateCommand extends Command<void> {
     };
 
     print(const JsonEncoder.withIndent('  ').convert(output));
+  }
+}
+
+
+class _SelfUpdateCommand extends Command<void> {
+  @override
+  String get name => 'self-update';
+
+  @override
+  String get description =>
+      'Check for the latest zorphy version and update the CLI in place';
+
+  _SelfUpdateCommand() {
+    argParser.addFlag(
+      'check',
+      abbr: 'c',
+      negatable: false,
+      help: 'Only check for updates, do not install',
+    );
+    argParser.addFlag(
+      'json',
+      negatable: false,
+      help: 'Output results as JSON',
+    );
+  }
+
+  @override
+  Future<void> run() async {
+    final checkOnly = argResults!['check'] as bool;
+    final asJson = argResults!['json'] as bool;
+
+    final checker = VersionChecker(currentVersion: _version);
+
+    if (asJson) {
+      final checkResult = await checker.checkForUpdate();
+      final output = <String, dynamic>{
+        'currentVersion': checkResult.currentVersion,
+        'latestVersion': checkResult.latestVersion,
+        'updateAvailable': checkResult.updateAvailable,
+        'message': checkResult.message,
+      };
+      if (!checkOnly && checkResult.updateAvailable) {
+        final updateResult = await checker.performUpdateAndVerify();
+        output['update'] = {
+          'success': updateResult.success,
+          'message': updateResult.message,
+          if (updateResult.newVersion != null)
+            'newVersion': updateResult.newVersion,
+        };
+      }
+      print(const JsonEncoder.withIndent('  ').convert(output));
+      return;
+    }
+
+    // Human-readable output
+    final checkResult = await checker.checkForUpdate();
+    print(checkResult);
+
+    if (checkOnly || !checkResult.updateAvailable) {
+      if (checkOnly && checkResult.updateAvailable) {
+        print('');
+        print('Run without --check to perform the update.');
+      }
+      return;
+    }
+
+    print('');
+    print('Updating...');
+    final updateResult = await checker.performUpdateAndVerify();
+    print(updateResult);
   }
 }
