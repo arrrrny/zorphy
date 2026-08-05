@@ -32,7 +32,8 @@ Future<void> main(List<String> args) async {
         ..addCommand(_ListCommand())
         ..addCommand(_BuildCommand())
         ..addCommand(_WatchCommand())
-        ..addCommand(_FromJsonCommand());
+        ..addCommand(_FromJsonCommand())
+        ..addCommand(_ValidateCommand());
 
   try {
     if (showVersion) {
@@ -522,5 +523,101 @@ class _FromJsonCommand extends Command<void> {
     if (s.endsWith('es')) return s.substring(0, s.length - 2);
     if (s.endsWith('s')) return s.substring(0, s.length - 1);
     return s;
+  }
+}
+
+
+class _ValidateCommand extends Command<void> {
+  @override
+  String get name => 'validate';
+
+  @override
+  String get description =>
+      'Validate a Zorphy project for common issues (missing generated files, stale output, missing part directives)';
+
+  _ValidateCommand() {
+    argParser.addOption(
+      'dir',
+      abbr: 'd',
+      help: 'Project directory to validate (default: current directory)',
+    );
+    argParser.addMultiOption(
+      'source',
+      help: 'Additional source directories to scan (default: lib)',
+    );
+    argParser.addFlag(
+      'json',
+      negatable: false,
+      help: 'Output results as JSON',
+    );
+  }
+
+  @override
+  Future<void> run() async {
+    final dir = argResults!['dir'] as String? ?? Directory.current.path;
+    final extraSources = (argResults!['source'] as List<String>?) ?? [];
+    final sourceDirs = ['lib', ...extraSources];
+    final asJson = argResults!['json'] as bool;
+
+    final projectDir = Directory(dir);
+    if (!projectDir.existsSync()) {
+      if (asJson) {
+        final errorOutput = {
+          'directory': dir,
+          'filesScanned': 0,
+          'errorCount': 1,
+          'warningCount': 0,
+          'infoCount': 0,
+          'findings': [
+            {
+              'message': 'Directory not found: $dir',
+              'severity': 'error',
+              'filePath': dir,
+            }
+          ],
+        };
+        print(const JsonEncoder.withIndent('  ').convert(errorOutput));
+      } else {
+        print('Error: Directory not found: $dir');
+      }
+      exit(1);
+    }
+
+    final validator = ProjectValidator(
+      projectDir: dir,
+      sourceDirs: sourceDirs,
+    );
+    final result = validator.validate();
+
+    if (asJson) {
+      _printJsonResult(result);
+    } else {
+      print(result);
+    }
+
+    if (result.hasErrors) {
+      exit(1);
+    }
+  }
+
+  void _printJsonResult(ValidationResult result) {
+    final findingsJson = result.findings.map((f) => {
+      'message': f.message,
+      'severity': f.severity.name,
+      if (f.filePath != null) 'filePath': f.filePath,
+      if (f.lineNumber != null) 'lineNumber': f.lineNumber,
+      if (f.fixSuggestion != null) 'fixSuggestion': f.fixSuggestion,
+    }).toList();
+
+    final output = {
+      'directory': result.validatedDir,
+      'filesScanned': result.filesScanned,
+      'errorCount': result.errorCount,
+      'warningCount': result.warningCount,
+      'infoCount': result.infoCount,
+      'findings': findingsJson,
+    };
+
+    print(const JsonEncoder.withIndent('  ').convert(output));
   }
 }

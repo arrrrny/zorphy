@@ -4,4 +4,6 @@ library zorphy_cli_entry;
 
 export 'src/cli/entity_creator.dart';
 export 'src/cli/models/entity_config.dart';
+export 'src/cli/models/validation_result.dart';
+export 'src/cli/services/project_validator.dart';
 export 'src/cli/utils/naming_utils.dart';
