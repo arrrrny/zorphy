@@ -70,7 +70,12 @@ class FieldNormalizer {
     final entityDir = Directory(p.join(baseOutputDir, entitySnakeName));
     final entityFile = File(p.join(entityDir.path, '$entitySnakeName.dart'));
 
-    if (!entityFile.existsSync()) return '';
+    if (!entityFile.existsSync()) {
+      // Forward reference (created later in the same batch, #308) or the
+      // entity being created itself — assume a Zorphy entity so the builder
+      // can map `$X` to the concrete class once it exists.
+      return '\$';
+    }
 
     try {
       final content = entityFile.readAsStringSync();
