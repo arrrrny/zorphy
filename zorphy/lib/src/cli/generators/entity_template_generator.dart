@@ -98,9 +98,7 @@ class EntityTemplateGenerator {
     }
     buffer.writeln();
 
-    for (final field in config.fields) {
-      buffer.writeln('  ${field.fullType} get ${field.name};');
-    }
+    _writeFields(buffer, config.fields);
 
     buffer.writeln('}');
     buffer.writeln();
@@ -134,9 +132,7 @@ class EntityTemplateGenerator {
 
     if (config.fields.isNotEmpty) {
       buffer.writeln();
-      for (final field in config.fields) {
-        buffer.writeln('  ${field.fullType} get ${field.name};');
-      }
+      _writeFields(buffer, config.fields);
     }
 
     buffer.writeln('}');
@@ -188,14 +184,24 @@ class EntityTemplateGenerator {
 
     if (fields.isNotEmpty) {
       buffer.writeln();
-      for (final field in fields) {
-        buffer.writeln('  ${field.fullType} get ${field.name};');
-      }
+      _writeFields(buffer, fields);
     }
 
     buffer.writeln('}');
     buffer.writeln();
 
     return buffer.toString();
+  }
+
+  /// Writes the getter declarations for [fields], emitting an
+  /// `@JsonKey(name: ...)` annotation above a getter when the field's
+  /// [FieldDefinition.jsonName] differs from its Dart [FieldDefinition.name].
+  static void _writeFields(StringBuffer buffer, List<FieldDefinition> fields) {
+    for (final field in fields) {
+      if (field.jsonName != null) {
+        buffer.writeln("  @JsonKey(name: '${field.jsonName}')");
+      }
+      buffer.writeln('  ${field.fullType} get ${field.name};');
+    }
   }
 }
