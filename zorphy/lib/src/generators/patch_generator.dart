@@ -92,7 +92,7 @@ class PatchGenerator extends ConcreteClassGenerator {
       for (final f in fields) {
         if (interfaceFieldNames.contains(f.name)) {
           bodyLines.add(
-            "${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name},",
+            "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] : this.${f.name},",
           );
         } else {
           bodyLines.add('${f.name}: this.${f.name},');
@@ -136,7 +136,7 @@ class PatchGenerator extends ConcreteClassGenerator {
       final f = fields[i];
       final comma = i == fields.length - 1 ? '' : ',';
       bodyLines.add(
-        "${f.name}: _patchMap.containsKey($enumName.${f.name}) ? (_patchMap[$enumName.${f.name}] is Function) ? _patchMap[$enumName.${f.name}](this.${f.name}) : (_patchMap[$enumName.${f.name}] is Patch) ? _patchMap[$enumName.${f.name}].applyTo(this.${f.name}) : _patchMap[$enumName.${f.name}] : this.${f.name}$comma",
+        "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] : this.${f.name}$comma",
       );
     }
 

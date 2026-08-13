@@ -108,6 +108,17 @@ String replaceDollarTypesWithConcrete(String type) {
   return '${result}${isOuterNullable ? '?' : ''}';
 }
 
+/// Dart enum members that collide with the implicit enum members and cannot be
+/// used as a constant name in an enum declaration (issue #313).
+const Set<String> _reservedEnumMemberNames = {'values', 'index', 'name'};
+
+/// Returns a safe enum member name for [fieldName], escaping names that would
+/// collide with the implicit enum members (`values`, `index`, `name`).
+String enumMemberName(String fieldName) {
+  final base = fieldName.startsWith('_') ? fieldName.substring(1) : fieldName;
+  return _reservedEnumMemberNames.contains(base) ? '${base}_' : base;
+}
+
 /// Generates abstract property declarations and optional copyWith factory.
 
 String getEnumPropertyList(
@@ -124,9 +135,7 @@ String getEnumPropertyList(
   // Generate enum
   lines.add("enum $enumName {");
   lines.add(
-    fields
-        .map((e) => e.name.startsWith("_") ? e.name.substring(1) : e.name)
-        .join(","),
+    fields.map((e) => enumMemberName(e.name)).join(","),
   );
   lines.add("}");
   lines.add('');
@@ -191,7 +200,7 @@ String getPatchClass(
     lines.add(
       "  ${classNameTrimmed}Patch with$capitalizedName($parameterType value) {",
     );
-    lines.add("    patchMap[$enumName.$name] = value;");
+    lines.add("    patchMap[$enumName.${enumMemberName(name)}] = value;");
     lines.add("    return this;");
     lines.add("  }");
     lines.add('');
@@ -248,7 +257,7 @@ String getPatchClass(
               "  ${classNameTrimmed}Patch update${capitalizedName}At(int index, $elementPatchType Function($elementPatchType) patch) {",
             );
             lines.add(
-              "    patchMap[$enumName.$name] = (List<dynamic> list) {",
+              "    patchMap[$enumName.${enumMemberName(name)}] = (List<dynamic> list) {",
             );
             lines.add(
               "      var updatedList = List<$elementTypeWithoutDollars>.from(list);",
@@ -283,7 +292,7 @@ String getPatchClass(
               "  ${classNameTrimmed}Patch update${capitalizedName}Value($keyType key, $valuePatchType Function($valuePatchType) patch) {",
             );
             lines.add(
-              "    patchMap[$enumName.$name] = (Map<dynamic, dynamic> map) {",
+              "    patchMap[$enumName.${enumMemberName(name)}] = (Map<dynamic, dynamic> map) {",
             );
             lines.add("      var updatedMap = Map.from(map);");
             lines.add("      if (updatedMap.containsKey(key)) {");
@@ -313,7 +322,7 @@ String getPatchClass(
         lines.add(
           "  ${classNameTrimmed}Patch with${capitalizedName}Patch($patchType patch) {",
         );
-        lines.add("    patchMap[$enumName.$name] = patch;");
+        lines.add("    patchMap[$enumName.${enumMemberName(name)}] = patch;");
         lines.add("    return this;");
         lines.add("  }");
         lines.add('');
@@ -323,7 +332,7 @@ String getPatchClass(
         lines.add(
           "  ${classNameTrimmed}Patch with${capitalizedName}PatchFunc($funcParamType patch) {",
         );
-        lines.add("    patchMap[$enumName.$name] = (dynamic current) {");
+        lines.add("    patchMap[$enumName.${enumMemberName(name)}] = (dynamic current) {");
         lines.add("      var currentPatch = $patchType();");
         lines.add(
           "      return patch(currentPatch).applyTo(current as ${innerType.replaceAll("?", "")});",

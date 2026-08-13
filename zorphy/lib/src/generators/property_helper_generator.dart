@@ -114,13 +114,13 @@ class PropertyHelperGenerator extends UniversalGenerator {
           m.name = 'has$capitalized';
           m.type = MethodType.getter;
           m.returns = refer('bool');
-          m.body = Code('return $fieldName != null;');
+          m.body = Code('return this.$fieldName != null;');
         }));
         methods.add(Method((m) {
           m.name = 'no$capitalized';
           m.type = MethodType.getter;
           m.returns = refer('bool');
-          m.body = Code('return $fieldName == null;');
+          m.body = Code('return this.$fieldName == null;');
         }));
         final nonNullableType = type.substring(0, type.length - 1);
         methods.add(Method((m) {
@@ -128,7 +128,7 @@ class PropertyHelperGenerator extends UniversalGenerator {
           m.type = MethodType.getter;
           m.returns = refer(nonNullableType);
           m.body = Code(
-            "return $fieldName ?? (throw StateError('$fieldName is required but was null'));",
+            "return this.$fieldName ?? (throw StateError('$fieldName is required but was null'));",
           );
         }));
       } else if (isNullable && isCollection) {
@@ -138,7 +138,7 @@ class PropertyHelperGenerator extends UniversalGenerator {
           m.type = MethodType.getter;
           m.returns = refer(nonNullableType);
           m.body = Code(
-            "return $fieldName ?? (throw StateError('$fieldName is required but was null'));",
+            "return this.$fieldName ?? (throw StateError('$fieldName is required but was null'));",
           );
         }));
       }
@@ -149,13 +149,13 @@ class PropertyHelperGenerator extends UniversalGenerator {
             m.name = 'has$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return $fieldName?.isNotEmpty == true;');
+            m.body = Code('return this.$fieldName?.isNotEmpty == true;');
           }));
           methods.add(Method((m) {
             m.name = 'no$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return $fieldName?.isEmpty ?? true;');
+            m.body = Code('return this.$fieldName?.isEmpty ?? true;');
           }));
           final nonNullableType = type.substring(0, type.length - 1);
           methods.add(Method((m) {
@@ -163,7 +163,7 @@ class PropertyHelperGenerator extends UniversalGenerator {
             m.type = MethodType.getter;
             m.returns = refer(nonNullableType);
             m.body = Code(
-              "return $fieldName ?? (throw StateError('$fieldName is required but was null'));",
+              "return this.$fieldName ?? (throw StateError('$fieldName is required but was null'));",
             );
           }));
         } else {
@@ -171,13 +171,13 @@ class PropertyHelperGenerator extends UniversalGenerator {
             m.name = 'has$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return $fieldName.isNotEmpty;');
+            m.body = Code('return this.$fieldName.isNotEmpty;');
           }));
           methods.add(Method((m) {
             m.name = 'no$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return $fieldName.isEmpty;');
+            m.body = Code('return this.$fieldName.isEmpty;');
           }));
         }
       }
@@ -188,26 +188,26 @@ class PropertyHelperGenerator extends UniversalGenerator {
             m.name = 'has$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return $fieldName.isNotEmpty;');
+            m.body = Code('return this.$fieldName.isNotEmpty;');
           }));
           methods.add(Method((m) {
             m.name = 'no$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return $fieldName.isEmpty;');
+            m.body = Code('return this.$fieldName.isEmpty;');
           }));
         } else {
           methods.add(Method((m) {
             m.name = 'has$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return $fieldName?.isNotEmpty ?? false;');
+            m.body = Code('return this.$fieldName?.isNotEmpty ?? false;');
           }));
           methods.add(Method((m) {
             m.name = 'no$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return $fieldName?.isEmpty ?? true;');
+            m.body = Code('return this.$fieldName?.isEmpty ?? true;');
           }));
         }
       }
@@ -222,7 +222,7 @@ class PropertyHelperGenerator extends UniversalGenerator {
             m.type = MethodType.getter;
             m.returns = refer('bool');
             m.body = Code(
-              'return $fieldName == $baseEnumName.$value;',
+              'return this.$fieldName == $baseEnumName.$value;',
             );
           }));
         }
