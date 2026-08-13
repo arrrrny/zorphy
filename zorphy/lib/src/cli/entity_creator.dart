@@ -324,6 +324,9 @@ class EntityCreator {
     final fieldBuffer = StringBuffer();
     for (final field in fields) {
       fieldBuffer.writeln();
+      if (field.jsonName != null) {
+        fieldBuffer.writeln("  @JsonKey(name: '${field.jsonName}')");
+      }
       fieldBuffer.writeln('  ${field.fullType} get ${field.name};');
     }
 

@@ -99,19 +99,35 @@ class FieldDefinition {
   final String type;
   final bool nullable;
 
+  /// Optional JSON wire name for the field, when it differs from the Dart
+  /// [name]. Needed for GraphQL fields whose wire name is a Dart-reserved
+  /// keyword (`in`, `required`) or that legitimately differ on the wire
+  /// (Vendure's `_and` / `_or` filter operators). When set, the generated
+  /// source getter carries `@JsonKey(name: '<jsonName>')`, which the zorphy
+  /// builder already propagates into the concrete class and json_serializable
+  /// output.
+  final String? jsonName;
+
   const FieldDefinition({
     required this.name,
     required this.type,
     this.nullable = false,
+    this.jsonName,
   });
 
   String get fullType => nullable && !type.endsWith('?') ? '$type?' : type;
 
+  /// Parses a field definition in one of two forms:
+  ///
+  /// - `name:type` (e.g. `id:String`, `note:String?`, `countries:List<Country>`)
+  /// - `name:type:json=<wireName>` (e.g. `in_:String:json=in`,
+  ///   `and:ProductFilterParameter:json=_and`)
   factory FieldDefinition.parse(String definition) {
     final parts = definition.split(':');
-    if (parts.length != 2) {
+    if (parts.length < 2 || parts.length > 3) {
       throw ArgumentError(
-        'Invalid field format: "$definition". Expected "name:type"',
+        'Invalid field format: "$definition". '
+        'Expected "name:type" or "name:type:json=<wireName>"',
       );
     }
     final fieldName = parts[0].trim();
@@ -120,18 +136,41 @@ class FieldDefinition {
     if (isNullable) {
       fieldType = fieldType.substring(0, fieldType.length - 1);
     }
+    String? jsonName;
+    if (parts.length == 3) {
+      final meta = parts[2].trim();
+      const prefix = 'json=';
+      if (!meta.startsWith(prefix)) {
+        throw ArgumentError(
+          'Invalid field meta: "$meta". Expected "json=<wireName>"',
+        );
+      }
+      jsonName = meta.substring(prefix.length).trim();
+      if (jsonName.isEmpty) {
+        throw ArgumentError(
+          'Invalid field meta: "$meta". "json=" requires a wire name',
+        );
+      }
+    }
     return FieldDefinition(
       name: fieldName,
       type: fieldType,
       nullable: isNullable,
+      jsonName: jsonName,
     );
   }
 
-  FieldDefinition copyWith({String? name, String? type, bool? nullable}) {
+  FieldDefinition copyWith({
+    String? name,
+    String? type,
+    bool? nullable,
+    String? jsonName,
+  }) {
     return FieldDefinition(
       name: name ?? this.name,
       type: type ?? this.type,
       nullable: nullable ?? this.nullable,
+      jsonName: jsonName ?? this.jsonName,
     );
   }
 }
