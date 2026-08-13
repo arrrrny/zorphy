@@ -70,14 +70,21 @@ class FieldNormalizer {
     final entityDir = Directory(p.join(baseOutputDir, entitySnakeName));
     final entityFile = File(p.join(entityDir.path, '$entitySnakeName.dart'));
 
-    if (entityFile.existsSync()) {
-      try {
-        final content = entityFile.readAsStringSync();
-        if (content.contains('abstract class \$\$$typeName')) {
-          return '\$\$';
-        }
-      } catch (_) {}
-    }
-    return '\$';
+    if (!entityFile.existsSync()) return '';
+
+    try {
+      final content = entityFile.readAsStringSync();
+      if (RegExp('abstract class \\\$\\\$$typeName\\b').hasMatch(content)) {
+        return '\$\$';
+      }
+      if (RegExp('abstract class \\\$' + typeName + r'\b').hasMatch(content)) {
+        return '\$';
+      }
+    } catch (_) {}
+
+    // The referenced file exists but declares no Zorphy abstract — e.g. a
+    // hand-written plain/sealed class (issue #310). Emit the plain type so
+    // the concrete class and json_serializable resolve it via the import.
+    return '';
   }
 }
