@@ -1,3 +1,4 @@
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../models/entity_config.dart';
 
 /// Generates entity template code
@@ -9,7 +10,11 @@ class EntityTemplateGenerator {
     final buffer = StringBuffer();
 
     _writeHeader(buffer);
-    _writeImports(buffer, imports);
+    _writeImports(
+      buffer,
+      imports,
+      includeUuidImport: config.autoId,
+    );
     _writePartDirectives(buffer, config);
     _writeClassDefinition(buffer, config);
 
@@ -45,10 +50,18 @@ class EntityTemplateGenerator {
     buffer.writeln();
   }
 
-  static void _writeImports(StringBuffer buffer, List<String> imports) {
+  static void _writeImports(
+    StringBuffer buffer,
+    List<String> imports, {
+    bool includeUuidImport = false,
+  }) {
     buffer.writeln(
       "import 'package:zorphy_annotation/zorphy_annotation.dart';",
     );
+
+    if (includeUuidImport) {
+      buffer.writeln("import 'package:uuid/uuid.dart';");
+    }
 
     if (imports.isNotEmpty) {
       final sorted = imports.toList()..sort();
@@ -98,7 +111,11 @@ class EntityTemplateGenerator {
     }
     buffer.writeln();
 
-    _writeFields(buffer, config.fields);
+    _writeFields(
+      buffer,
+      config.fields,
+      prependAutoId: config.autoId,
+    );
 
     buffer.writeln('}');
     buffer.writeln();
@@ -141,6 +158,10 @@ class EntityTemplateGenerator {
 
   static List<String> _buildAnnotationOptions(EntityConfig config) {
     final options = <String>[];
+    if (config.kind != ZorphyKind.entity) {
+      options.add('kind: ZorphyKind.${config.kind.name}');
+    }
+    if (config.autoId) options.add('autoId: true');
     if (config.generateJson) options.add('generateJson: true');
     if (config.generateCopyWithFn) options.add('generateCopyWithFn: true');
     if (config.generateCompareTo) options.add('generateCompareTo: true');
@@ -196,7 +217,19 @@ class EntityTemplateGenerator {
   /// Writes the getter declarations for [fields], emitting an
   /// `@JsonKey(name: ...)` annotation above a getter when the field's
   /// [FieldDefinition.jsonName] differs from its Dart [FieldDefinition.name].
-  static void _writeFields(StringBuffer buffer, List<FieldDefinition> fields) {
+  ///
+  /// When [prependAutoId] is true (and no field is already named `id`), a
+  /// `String get id;` declaration is written first — the `autoId: true`
+  /// annotation makes the concrete constructor default it to `Uuid().v4()`.
+  static void _writeFields(
+    StringBuffer buffer,
+    List<FieldDefinition> fields, {
+    bool prependAutoId = false,
+  }) {
+    final hasIdField = fields.any((f) => f.name == 'id');
+    if (prependAutoId && !hasIdField) {
+      buffer.writeln('  String get id;');
+    }
     for (final field in fields) {
       if (field.jsonName != null) {
         buffer.writeln("  @JsonKey(name: '${field.jsonName}')");

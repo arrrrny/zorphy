@@ -75,6 +75,12 @@ class GenerationConfig {
   /// The preset the flags were resolved against.
   final ZorphyPreset preset;
 
+  /// The semantic kind of the annotated class (entity / valueObject).
+  final ZorphyKind kind;
+
+  /// Whether the class owns an auto-generated uuid `id` field.
+  final bool autoId;
+
   /// Whether to generate JSON serialization methods
   final bool generateJson;
 
@@ -121,6 +127,8 @@ class GenerationConfig {
   const GenerationConfig({
     required this.outputExtension,
     required this.preset,
+    required this.kind,
+    required this.autoId,
     required this.generateJson,
     required this.explicitToJson,
     required this.generateCopyWith,
@@ -159,6 +167,8 @@ class GenerationConfig {
     return GenerationConfig(
       outputExtension: outputExtension,
       preset: preset,
+      kind: options.kind ?? ZorphyKind.entity,
+      autoId: options.autoId ?? false,
       // JSON is opt-in in every preset: never preset-forced.
       generateJson: options.generateJson ?? false,
       explicitToJson: options.explicitToJson ?? true,
@@ -260,6 +270,8 @@ class GenerationConfig {
   const GenerationConfig.test({
     this.outputExtension = '.zorphy.dart',
     this.preset = ZorphyPreset.standard,
+    this.kind = ZorphyKind.entity,
+    this.autoId = false,
     this.generateJson = true,
     this.explicitToJson = true,
     this.generateCopyWith = true,

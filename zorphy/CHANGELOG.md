@@ -1,3 +1,20 @@
+## [2.2.0] - 2026-08-14
+
+### Feat
+
+- `autoId` support: a `@Zorphy(autoId: true)` class whose source declares
+  `String get id;` gets an optional `String? id` constructor parameter
+  defaulting to `const Uuid().v4()` — the generated class is
+  constructible without an explicit identity (zuraffa#307). The
+  `@ZValueObject` / `ZorphyKind.valueObject` kind is parsed and threaded
+  into `GenerationConfig` for framework consumers.
+- `EntityConfig`/template: `autoId` and `kind` options — `zfa entity
+  create --auto-id` emits the `id` getter, the uuid import and the
+  `autoId: true` annotation option; `--kind=value_object` emits
+  `kind: ZorphyKind.valueObject`.
+- `zorphy_annotation` bumped to 2.2.0 (new `ZorphyKind`, `autoId`,
+  `ZValueObject` annotation surface).
+
 ## [2.1.0] - 2026-08-03
 
 ### Feat

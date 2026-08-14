@@ -11,6 +11,8 @@ class AnnotationParser {
   static AnnotationOptions parse(ConstantReader annotation) {
     return AnnotationOptions(
       preset: _readPreset(annotation),
+      kind: _readKind(annotation),
+      autoId: annotation.peek('autoId')?.boolValue,
       generateJson: annotation.peek('generateJson')?.boolValue,
       explicitToJson: annotation.peek('explicitToJson')?.boolValue,
       generateCopyWith: annotation.peek('generateCopyWith')?.boolValue,
@@ -41,6 +43,20 @@ class AnnotationParser {
     }
     return ZorphyPreset.values[index];
   }
+
+  /// Reads the `kind` annotation argument (`@Zorphy(kind: ...)`). Both the
+  /// explicit form and the `@ZValueObject` const alias (a `Zorphy(kind:
+  /// ZorphyKind.valueObject)` instance) resolve to the same enum value via
+  /// the const's `index` field.
+  static ZorphyKind? _readKind(ConstantReader annotation) {
+    final kindObj = annotation.peek('kind');
+    if (kindObj == null || kindObj.isNull) return null;
+    final index = kindObj.objectValue.getField('index')?.toIntValue();
+    if (index == null || index < 0 || index >= ZorphyKind.values.length) {
+      return null;
+    }
+    return ZorphyKind.values[index];
+  }
 }
 
 /// Options extracted from a @Zorphy/@Zorphy2 annotation.
@@ -50,6 +66,8 @@ class AnnotationParser {
 /// `GenerationConfig.fromAnnotationOptions`.
 class AnnotationOptions {
   final ZorphyPreset? preset;
+  final ZorphyKind? kind;
+  final bool? autoId;
   final bool? generateJson;
   final bool? explicitToJson;
   final bool? generateCopyWith;
@@ -66,6 +84,8 @@ class AnnotationOptions {
   /// Creates a typed options object from annotation values.
   const AnnotationOptions({
     this.preset,
+    this.kind,
+    this.autoId,
     this.generateJson,
     this.explicitToJson,
     this.generateCopyWith,

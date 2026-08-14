@@ -1,3 +1,5 @@
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
 /// Configuration for entity creation
 class EntityConfig {
   final String name;
@@ -16,6 +18,16 @@ class EntityConfig {
   final bool dryRun;
   final bool prefixNested;
 
+  /// Whether the entity owns an auto-generated uuid `id` field. When true
+  /// the generated template declares `String get id;`, adds
+  /// `autoId: true` to the annotation and imports
+  /// `package:uuid/uuid.dart`.
+  final bool autoId;
+
+  /// The semantic kind of this class — [ZorphyKind.entity] (default) or
+  /// [ZorphyKind.valueObject].
+  final ZorphyKind kind;
+
   const EntityConfig({
     required this.name,
     this.outputDir,
@@ -32,6 +44,8 @@ class EntityConfig {
     this.generateSubtypes = false,
     this.dryRun = false,
     this.prefixNested = true,
+    this.autoId = false,
+    this.kind = ZorphyKind.entity,
   });
 
   String get defaultOutputDir => 'lib/src/domain/entities';
@@ -72,6 +86,8 @@ class EntityConfig {
     bool? generateSubtypes,
     bool? dryRun,
     bool? prefixNested,
+    bool? autoId,
+    ZorphyKind? kind,
   }) {
     return EntityConfig(
       name: name ?? this.name,
@@ -89,6 +105,8 @@ class EntityConfig {
       generateSubtypes: generateSubtypes ?? this.generateSubtypes,
       dryRun: dryRun ?? this.dryRun,
       prefixNested: prefixNested ?? this.prefixNested,
+      autoId: autoId ?? this.autoId,
+      kind: kind ?? this.kind,
     );
   }
 }

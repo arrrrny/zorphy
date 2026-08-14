@@ -111,7 +111,9 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         ? _parentHasConstConstructor(metadata, parentConcreteClassName)
         : true;
     final shouldGenerateConstConstructor =
-        metadata.hasConstConstructor && (!hasConcreteParent || parentHasConst);
+        metadata.hasConstConstructor &&
+        (!hasConcreteParent || parentHasConst) &&
+        !config.autoId; // autoId injects a runtime uuid default — never const
 
     final parentFields = hasConcreteParent
         ? _getParentFieldsForSuper(metadata, config)
@@ -289,6 +291,22 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     final initializers = <String>[];
 
     for (final f in fields) {
+      // autoId: the `id` field becomes an optional `String?` constructor
+      // param that falls back to a fresh `Uuid().v4()` at construction
+      // time. This is what makes `ChatMessage(role: ..., content: ...)`
+      // valid without callers supplying an identity — see zuraffa#307.
+      if (config.autoId && f.name == 'id') {
+        params.add(
+          Parameter((p) {
+            p.name = f.name;
+            p.type = referType('String?');
+            p.named = true;
+          }),
+        );
+        initializers.add('this.${f.name} = ${f.name} ?? const Uuid().v4()');
+        continue;
+      }
+
       // Skip getter-only without default value
       if (f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null) {
         continue;

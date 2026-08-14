@@ -80,6 +80,8 @@ GenerationConfig _bareConfig() {
   return const GenerationConfig(
     outputExtension: '.zorphy.dart',
     preset: ZorphyPreset.standard,
+    kind: ZorphyKind.entity,
+    autoId: false,
     generateJson: false,
     explicitToJson: true,
     generateCopyWith: false,
