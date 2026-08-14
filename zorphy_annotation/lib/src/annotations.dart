@@ -22,6 +22,18 @@ import 'package:collection/collection.dart';
 /// ```
 enum ZorphyPreset { lean, standard, full }
 
+/// The semantic kind of an annotated class.
+///
+/// - [entity]: an aggregate/event root with its own identity. The
+///   framework expects an id-like field (a literal `id`, a `*Id` field, or
+///   `autoId: true`); `zfa make` generates the CRUD surface
+///   (repository/usecase/controller/presenter) around it.
+/// - [valueObject]: an immutable composition type with no identity of its
+///   own. No id is required and `zfa make` treats it as an embedded type
+///   (no repository/usecase/controller/presenter). Equality, copyWith and
+///   JSON serialization are generated exactly like an entity.
+enum ZorphyKind { entity, valueObject }
+
 /// {@macro ZorphyX}
 const zorphy = Zorphy();
 
@@ -37,6 +49,22 @@ const zorphy = Zorphy();
     'will be removed in a later major release.')
 const zorphy2 = Zorphy2();
 
+/// Annotation alias for a value object: `@ZValueObject` expands to
+/// `@Zorphy(kind: ZorphyKind.valueObject)`.
+///
+/// Value objects are immutable composition types with no identity — they
+/// do not require an id field and the zfa `make` pipeline generates no
+/// repository/usecase/controller/presenter for them.
+///
+/// ```
+/// @ZValueObject
+/// abstract class $ParserConfig {
+///   String get separator;
+///   bool get trimWhitespace;
+/// }
+/// ```
+const ZValueObject = Zorphy(kind: ZorphyKind.valueObject);
+
 class Zorphy implements ZorphyX {
   /// if we want a copyWith (cwX) method for a subtype in this same class
   final List<Type>? explicitSubTypes;
@@ -44,6 +72,19 @@ class Zorphy implements ZorphyX {
   /// How much code to generate. Defaults to [ZorphyPreset.standard],
   /// which reproduces zorphy 1.x output byte-for-byte.
   final ZorphyPreset preset;
+
+  /// The semantic kind of this class — [ZorphyKind.entity] (default) or
+  /// [ZorphyKind.valueObject]. See [ZorphyKind] for the semantics.
+  final ZorphyKind kind;
+
+  /// When true, the annotated class owns an automatically-generated `id`
+  /// field: the concrete constructor's `id` parameter is optional and
+  /// defaults to a fresh `Uuid().v4()` value at construction time.
+  ///
+  /// The annotated class should declare `String get id;` (the `zfa entity
+  /// create --auto-id` workflow does this for you) and the library must
+  /// import `package:uuid/uuid.dart`.
+  final bool autoId;
 
   final bool generateJson;
   final bool explicitToJson;
@@ -161,6 +202,8 @@ class Zorphy implements ZorphyX {
   const Zorphy({
     this.explicitSubTypes = null,
     this.preset = ZorphyPreset.standard,
+    this.kind = ZorphyKind.entity,
+    this.autoId = false,
     this.generateJson = false,
     this.explicitToJson = true,
     this.hidePublicConstructor = false,
@@ -184,6 +227,13 @@ class Zorphy2 implements ZorphyX {
   /// How much code to generate. Defaults to [ZorphyPreset.standard].
   final ZorphyPreset preset;
 
+  /// The semantic kind of this class — see [ZorphyKind].
+  final ZorphyKind kind;
+
+  /// Whether the class owns an auto-generated uuid `id` field — see
+  /// [Zorphy.autoId].
+  final bool autoId;
+
   final bool generateJson;
   final bool explicitToJson;
   final bool hidePublicConstructor;
@@ -201,6 +251,8 @@ class Zorphy2 implements ZorphyX {
   const Zorphy2({
     this.explicitSubTypes = null,
     this.preset = ZorphyPreset.standard,
+    this.kind = ZorphyKind.entity,
+    this.autoId = false,
     this.generateJson = false,
     this.explicitToJson = true,
     this.hidePublicConstructor = false,
@@ -219,6 +271,12 @@ class Zorphy2 implements ZorphyX {
 abstract class ZorphyX {
   /// Returns explicitly declared subtypes for polymorphic generation.
   List<Type>? get explicitSubTypes;
+
+  /// Returns the semantic kind of the annotated class.
+  ZorphyKind get kind;
+
+  /// Returns whether the class owns an auto-generated uuid `id` field.
+  bool get autoId;
 
   /// Returns whether JSON serialization code should be generated.
   bool get generateJson;

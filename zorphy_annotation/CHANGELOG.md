@@ -1,3 +1,19 @@
+## [2.2.0] - 2026-08-14
+
+### Feat
+
+- `@Zorphy(autoId: true)` — auto-generated identity: the generated
+  concrete constructor's `id` parameter is optional and defaults to a
+  fresh `Uuid().v4()` at construction time (zuraffa#307 — entities like
+  `ChatMessage` / `TelemetryEvent` no longer need callers to supply ids).
+  The annotated class declares `String get id;` and the library imports
+  `package:uuid/uuid.dart`.
+- `ZorphyKind` (`entity` / `valueObject`) on `@Zorphy`/`@Zorphy2` plus the
+  `@ZValueObject` const alias — marks a class as an immutable composition
+  type with no identity. Codegen (equality, copyWith, JSON) is unchanged;
+  the kind is consumed by the zfa `make` pipeline to skip root plugins.
+- `ZorphyX` interface extended with `kind` and `autoId` getters.
+
 ## [2.1.0] - 2026-08-03
 
 ### Feat
