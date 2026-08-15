@@ -22,6 +22,9 @@ class ImportResolver {
     bool needsEnumImport = false;
 
     for (final field in fields) {
+      // External types (`!Type` marker) are imported by the user — no
+      // entity/enum import can or should be resolved for them.
+      if (field.isExternal) continue;
       final typeRefs = NamingUtils.extractTypeReferences(field.type);
 
       for (final typeRef in typeRefs) {
@@ -81,6 +84,9 @@ class ImportResolver {
     bool needsEnumImport = false;
 
     for (final field in fields) {
+      // External types (`!Type` marker) are imported by the user — no
+      // entity/enum import can or should be resolved for them.
+      if (field.isExternal) continue;
       final typeRefs = NamingUtils.extractTypeReferences(field.type);
 
       for (final typeRef in typeRefs) {
