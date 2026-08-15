@@ -126,18 +126,31 @@ class FieldDefinition {
   /// output.
   final String? jsonName;
 
+  /// True when the type was written with the `!` prefix (e.g. `url:!WebUri?`),
+  /// marking it as EXTERNAL — a type that lives outside the entity tree
+  /// (plugin wrappers like `WebUri`, SDK classes, ...). External types are
+  /// kept as-is: no `$` prefix is added by `FieldNormalizer`, no entity/enum
+  /// import is resolved by `ImportResolver`, and on-disk validation is
+  /// skipped. The user is responsible for importing the type in the
+  /// generated entity source.
+  final bool isExternal;
+
   const FieldDefinition({
     required this.name,
     required this.type,
     this.nullable = false,
     this.jsonName,
+    this.isExternal = false,
   });
 
   String get fullType => nullable && !type.endsWith('?') ? '$type?' : type;
 
-  /// Parses a field definition in one of two forms:
+  /// Parses a field definition in one of three forms:
   ///
   /// - `name:type` (e.g. `id:String`, `note:String?`, `countries:List<Country>`)
+  /// - `name:!type` (e.g. `url:!WebUri?`) — external (non-entity, non-enum)
+  ///   type, kept as-is with no `$` prefix, no import resolution, no
+  ///   on-disk validation (see [isExternal]).
   /// - `name:type:json=<wireName>` (e.g. `in_:String:json=in`,
   ///   `and:ProductFilterParameter:json=_and`)
   factory FieldDefinition.parse(String definition) {
@@ -150,6 +163,16 @@ class FieldDefinition {
     }
     final fieldName = parts[0].trim();
     var fieldType = parts[1].trim();
+    final isExternal = fieldType.startsWith('!');
+    if (isExternal) {
+      fieldType = fieldType.substring(1);
+      if (fieldType.isEmpty) {
+        throw ArgumentError(
+          'Invalid field format: "$definition". '
+          'The "!" prefix requires a type name after it.',
+        );
+      }
+    }
     final isNullable = fieldType.endsWith('?');
     if (isNullable) {
       fieldType = fieldType.substring(0, fieldType.length - 1);
@@ -175,6 +198,7 @@ class FieldDefinition {
       type: fieldType,
       nullable: isNullable,
       jsonName: jsonName,
+      isExternal: isExternal,
     );
   }
 
@@ -183,12 +207,14 @@ class FieldDefinition {
     String? type,
     bool? nullable,
     String? jsonName,
+    bool? isExternal,
   }) {
     return FieldDefinition(
       name: name ?? this.name,
       type: type ?? this.type,
       nullable: nullable ?? this.nullable,
       jsonName: jsonName ?? this.jsonName,
+      isExternal: isExternal ?? this.isExternal,
     );
   }
 }

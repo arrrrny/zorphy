@@ -11,6 +11,12 @@ class FieldNormalizer {
 
   /// Normalize a field type by adding $ prefix for entity types
   String normalize(String type) {
+    // External types (`!Type` marker) are kept as-is with no `$` prefix —
+    // they live outside the entity tree and are imported by the user.
+    if (type.startsWith('!')) {
+      return type.substring(1);
+    }
+
     final isNullable = type.endsWith('?');
     final cleanType = isNullable ? type.substring(0, type.length - 1) : type;
 
@@ -46,6 +52,12 @@ class FieldNormalizer {
 
   /// Normalize a FieldDefinition
   FieldDefinition normalizeField(FieldDefinition field) {
+    // External types (`!Type` marker) are never entity/enum: the type was
+    // already stripped of the `!` by [FieldDefinition.parse] and must NOT
+    // receive a `$` prefix or nullable-stripping.
+    if (field.isExternal) {
+      return field;
+    }
     final normalizedType = normalize(field.type);
     return field.copyWith(type: normalizedType.replaceAll('?', ''));
   }
