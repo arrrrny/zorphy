@@ -103,8 +103,22 @@ class EntityTemplateGenerator {
         : '\$${config.className}';
 
     if (config.extendsInterface != null) {
+      // Issue #304 fix: normalize the extends interface to use the
+      // `$`-prefixed source abstract class name. The user passes the
+      // public concrete class name (e.g., `AuthenticationResult`), but
+      // the source abstract class that the analyzer can resolve is
+      // `$AuthenticationResult`. Without the `$` prefix, the analyzer
+      // silently drops the implements clause (the concrete class doesn't
+      // exist at source-analysis time), and the generated concrete class
+      // loses the implements clause — breaking `isA<Base>()` checks.
+      //
+      // If the user already passed a `$`-prefixed name (e.g., `$$Shape`
+      // for a sealed class), use it as-is.
+      final extendsInterface = _normalizeExtendsInterface(
+        config.extendsInterface!,
+      );
       buffer.writeln(
-        'abstract class $abstractClassName implements ${config.extendsInterface} {',
+        'abstract class $abstractClassName implements $extendsInterface {',
       );
     } else {
       buffer.writeln('abstract class $abstractClassName {');
@@ -154,6 +168,21 @@ class EntityTemplateGenerator {
 
     buffer.writeln('}');
     buffer.writeln();
+  }
+
+  /// Normalize the extends interface name to use the `$`-prefixed source
+  /// abstract class name.
+  ///
+  /// - `AuthenticationResult` → `\$AuthenticationResult`
+  /// - `\$AuthenticationResult` → `\$AuthenticationResult` (no change)
+  /// - `\$\$Shape` → `\$\$Shape` (no change, sealed class)
+  ///
+  /// This ensures the analyzer can resolve the implements target at
+  /// source-analysis time (the source abstract class exists; the generated
+  /// concrete class does not).
+  static String _normalizeExtendsInterface(String name) {
+    if (name.startsWith(r'$')) return name;
+    return '\$$name';
   }
 
   static List<String> _buildAnnotationOptions(EntityConfig config) {
