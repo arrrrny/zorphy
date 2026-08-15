@@ -318,7 +318,11 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           ? helpers.replaceDollarTypesWithConcrete(f.type!)
           : f.type;
 
-      final isNullable = fieldType != null && fieldType.endsWith('?');
+      final isNullable = fieldType != null &&
+        (fieldType.endsWith('?') ||
+         fieldType == 'dynamic' ||
+         fieldType.startsWith('dynamic<') ||
+         fieldType.startsWith('dynamic '));
 
       final isParentField =
           hasExtends &&
@@ -430,7 +434,13 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         var fieldType = f.type != null
             ? helpers.replaceDollarTypesWithConcrete(f.type!)
             : f.type;
-        var nullableFieldType = fieldType!.endsWith('?')
+        // `dynamic` is already nullable — appending `?` produces
+        // `dynamic?` which is redundant (issue #351 secondary).
+        var alreadyNullable = fieldType!.endsWith('?') ||
+            fieldType == 'dynamic' ||
+            fieldType.startsWith('dynamic<') ||
+            fieldType.startsWith('dynamic ');
+        var nullableFieldType = alreadyNullable
             ? fieldType
             : '$fieldType?';
         copyWithParams.add(

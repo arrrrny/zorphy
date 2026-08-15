@@ -146,7 +146,12 @@ class CopyWithGenerator extends UniversalGenerator {
         f.type ?? 'dynamic',
       );
       final nullableType =
-          fieldType.endsWith('?') ? fieldType : '$fieldType?';
+          (fieldType.endsWith('?') ||
+                   fieldType == 'dynamic' ||
+                   fieldType.startsWith('dynamic<') ||
+                   fieldType.startsWith('dynamic '))
+              ? fieldType
+              : '$fieldType?';
       params.add(Parameter((p) {
         p.name = f.name;
         p.type = refer(nullableType);
@@ -185,7 +190,12 @@ class CopyWithGenerator extends UniversalGenerator {
         f.type ?? 'dynamic',
       );
       final nullableType =
-          fieldType.endsWith('?') ? fieldType : '$fieldType?';
+          (fieldType.endsWith('?') ||
+                   fieldType == 'dynamic' ||
+                   fieldType.startsWith('dynamic<') ||
+                   fieldType.startsWith('dynamic '))
+              ? fieldType
+              : '$fieldType?';
       params.add(Parameter((p) {
         p.name = f.name;
         p.type = refer(nullableType);
