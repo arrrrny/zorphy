@@ -195,7 +195,12 @@ String getPatchClass(
 
     var parameterType = isGenericType
         ? 'dynamic'
-        : (baseType.endsWith('?') ? baseType : "$baseType?");
+        : ((baseType.endsWith('?') ||
+                baseType == 'dynamic' ||
+                baseType.startsWith('dynamic<') ||
+                baseType.startsWith('dynamic '))
+            ? baseType
+            : "$baseType?");
 
     lines.add(
       "  ${classNameTrimmed}Patch with$capitalizedName($parameterType value) {",
