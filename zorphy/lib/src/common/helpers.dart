@@ -873,12 +873,29 @@ String recoverTypeFromSource(Element element, String currentType) {
       final entityName = element.name;
 
       if (containerName != null && entityName != null) {
+        // Issue #88: strip `///` and `//` comment lines from the source
+        // before running the type-recovery regexes below. Without this,
+        // a field whose doc comment uses `///- ` list markers (very
+        // common in the zikzak_inappwebview fork's settings docs, e.g.
+        // `///- Android native WebView` / `///- iOS`) leaks the list
+        // item text into the recovered type. The regex character class
+        // `[\w<>,?\s]` excludes `/`, so the `///` prefix is stripped
+        // by the regex itself — but the remaining text on the comment
+        // line (e.g. `macOS`, `iOS`) is matched as word chars and swept
+        // into the captured group, producing a multi-line "type" like
+        // `macOS\n  Bar?` which code_builder emits verbatim and the
+        // dart_style formatter then mis-parses (the bare token `macOS`
+        // survives as a stray identifier in the generated constructor).
+        final commentFreeSource = source
+            .split('\n')
+            .where((line) => !line.trim().startsWith('//'))
+            .join('\n');
         // Try constructor-parameter pattern first (original behavior —
         // preserves the recovery for method params that was already working).
         final ctorPattern = RegExp(
           '\b' + containerName + r'\b\s*\([\s\S]*?([\w<>,? ]+)\s+\b' + entityName + r'\b',
         );
-        var match = ctorPattern.firstMatch(source);
+        var match = ctorPattern.firstMatch(commentFreeSource);
         if (match != null) {
           var extracted = match.group(1)!;
           if (extracted.contains(',')) {
@@ -908,7 +925,7 @@ String recoverTypeFromSource(Element element, String currentType) {
           r'([\w<>,?\s]+?)\s+\b' + escapedName + r'\b\s*[;=,]',
         );
         for (final pattern in [getterPattern, fieldPattern]) {
-          match = pattern.firstMatch(source);
+          match = pattern.firstMatch(commentFreeSource);
           if (match != null) {
             var candidate = cleanRecoveredType(match.group(1)!.trim());
             // Reject obviously wrong matches: the type must not contain
@@ -975,9 +992,48 @@ String recoverTypeFromSource(Element element, String currentType) {
     }
 
     var rawString = source.substring(typeStart, typeEnd).trim();
+
+    // Issue #88: the backwards scan above does not treat `///` or `//`
+    // comment lines as type-boundary delimiters — only `,`, `(`, `{`,
+    // and `;` are recognized. So when a field/getter is preceded by a
+    // doc-comment block (very common in zikzak_inappwebview settings
+    // docs, e.g. `///- Android native WebView` / `///- iOS`), those
+    // comment lines are swept into `rawString` alongside the actual
+    // type token. The result is a multi-line "type" like:
+    //
+    //   ///Supported on:
+    //   ///- macOS
+    //   Bar?
+    //
+    // which code_builder emits verbatim as a parameter/field type, and
+    // dart_style then mis-parses (the `///` markers vanish as comment
+    // delimiters, but the bare token `macOS` survives and leaks into
+    // the generated constructor as a stray identifier).
+    //
+    // Fix: strip every line whose trimmed form starts with `//` (this
+    // covers both `///` doc comments and `//` line comments) before
+    // passing the candidate to `cleanRecoveredType`. What remains is
+    // just the actual type token (`Bar?` in the example above).
+    final commentStripped = rawString
+        .split('\n')
+        .where((line) => !line.trim().startsWith('//'))
+        .join('\n')
+        .trim();
+    if (commentStripped.isNotEmpty) {
+      rawString = commentStripped;
+    }
+
     var candidate = cleanRecoveredType(rawString);
 
-    if (candidate.isNotEmpty && !candidate.contains('InvalidType')) {
+    // Defense in depth: reject candidates that still contain `//` (the
+    // text-search fallback path already does this; the scan-backwards
+    // path did not, which is why issue #88 only manifested for cross-
+    // entity concrete references that trigger source recovery). A
+    // candidate containing `//` cannot be a valid Dart type token, so
+    // fall through to `return currentType`.
+    if (candidate.isNotEmpty &&
+        !candidate.contains('InvalidType') &&
+        !candidate.contains('//')) {
       return candidate;
     }
 
