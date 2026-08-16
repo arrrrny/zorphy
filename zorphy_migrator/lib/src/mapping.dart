@@ -106,7 +106,7 @@ class ZorphyRenderer {
   void _renderSimple(FreezedClassModel model, StringBuffer sb) {
     final className = '\$${model.name}';
 
-    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment));
+    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
     sb.writeln(_annotationFor(model));
     sb.writeln('abstract class $className${_typeParams(model)} {');
     for (final field in model.fields) {
@@ -150,7 +150,7 @@ class ZorphyRenderer {
       doc.replaceAll('///- ', '///').replaceAll('/// ', '///');
 
   void _renderExchangeableObject(FreezedClassModel model, StringBuffer sb) {
-    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment));
+    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
     sb
       ..writeln('@Zorphy(')
       ..writeln('  kind: ZorphyKind.valueObject,')
@@ -185,7 +185,7 @@ class ZorphyRenderer {
   /// enum. Member names and declaration order (== the old wire order) are
   /// preserved; doc comments are kept on the members.
   void _renderExchangeableEnum(FreezedClassModel model, StringBuffer sb) {
-    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment));
+    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
     sb.writeln('enum ${model.name} {');
     for (var i = 0; i < model.enumMembers.length; i++) {
       final doc = model.enumMemberDocs.length > i
@@ -206,7 +206,7 @@ class ZorphyRenderer {
     // abstract classes (zorphy convention, see README "Sealed Abstract
     // Classes").
     final baseJson = model.hasFromJson || model.hasToJson;
-    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment));
+    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
     sb.writeln(
       _annotationFor(
         model,
