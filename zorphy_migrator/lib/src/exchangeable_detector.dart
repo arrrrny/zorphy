@@ -270,6 +270,11 @@ class ExchangeableDetector {
     final enumMemberDocs = <String?>[];
     final intValues = <int>[];
 
+    // Wire mismatches do NOT block the enum conversion (names/order are
+    // preserved; only the consumer glue needs hand attention), so they are
+    // reported as informational items on the converted model.
+    final informational = <ManualItem>[];
+
     for (final member in members) {
       if (member is! FieldDeclaration) continue;
       for (final variable in member.fields.variables) {
@@ -295,7 +300,7 @@ class ExchangeableDetector {
           // String wire value — keep the member name; a differing wire
           // string needs hand glue in the entity's @JsonKey.
           if (arg != "'$memberName'" && arg != '"$memberName"') {
-            manual.add(
+            informational.add(
               ManualItem(
                 filePath: unit.path,
                 line: lineInfo.getLocation(variable.offset).lineNumber,
@@ -314,7 +319,7 @@ class ExchangeableDetector {
     // exactly 0..n-1 in declaration order.
     if (intValues.isNotEmpty &&
         !_isSequential(intValues)) {
-      manual.add(
+      informational.add(
         ManualItem(
           filePath: unit.path,
           line: lineInfo.getLocation(node.offset).lineNumber,
@@ -337,6 +342,7 @@ class ExchangeableDetector {
       hasToJson: false,
       isUnfreezed: false,
       manualItems: manual,
+      informationalItems: informational,
       spanStart: node.offset,
       spanEnd: node.end,
       docComment: doc,

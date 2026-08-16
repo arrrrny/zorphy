@@ -106,7 +106,7 @@ class ZorphyRenderer {
   void _renderSimple(FreezedClassModel model, StringBuffer sb) {
     final className = '\$${model.name}';
 
-    if (model.docComment != null) sb.writeln(model.docComment);
+    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
     sb.writeln(_annotationFor(model));
     sb.writeln('abstract class $className${_typeParams(model)} {');
     for (final field in model.fields) {
@@ -141,8 +141,16 @@ class ZorphyRenderer {
   /// Renders an `@ExchangeableObject()` value object as a Zorphy value
   /// entity, matching the zikzak_inappwebview conversion convention
   /// (see PROGRESS.md recipe).
+  /// The zorphy generator (issue #88) leaks the content of doc-comment
+  /// lines written as `///- X` (or `/// X`) into the generated constructor —
+  /// the `- ` / space after `///` is consumed and the remaining token is
+  /// emitted as code, breaking the build. Normalize such lines to the
+  /// working `///X` form (content preserved, no space after the markers).
+  String _sanitizeDoc(String doc) =>
+      doc.replaceAll('///- ', '///').replaceAll('/// ', '///');
+
   void _renderExchangeableObject(FreezedClassModel model, StringBuffer sb) {
-    if (model.docComment != null) sb.writeln(model.docComment);
+    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
     sb
       ..writeln('@Zorphy(')
       ..writeln('  kind: ZorphyKind.valueObject,')
@@ -159,7 +167,7 @@ class ZorphyRenderer {
   void _renderExchangeableField(FreezedField field, StringBuffer sb) {
     final fieldDoc = field.docComment;
     if (fieldDoc != null) {
-      for (final line in fieldDoc.split('\n')) {
+      for (final line in _sanitizeDoc(fieldDoc).split('\n')) {
         sb.writeln('  $line');
       }
     }
@@ -177,7 +185,7 @@ class ZorphyRenderer {
   /// enum. Member names and declaration order (== the old wire order) are
   /// preserved; doc comments are kept on the members.
   void _renderExchangeableEnum(FreezedClassModel model, StringBuffer sb) {
-    if (model.docComment != null) sb.writeln(model.docComment);
+    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
     sb.writeln('enum ${model.name} {');
     for (var i = 0; i < model.enumMembers.length; i++) {
       final doc = model.enumMemberDocs.length > i
@@ -198,7 +206,7 @@ class ZorphyRenderer {
     // abstract classes (zorphy convention, see README "Sealed Abstract
     // Classes").
     final baseJson = model.hasFromJson || model.hasToJson;
-    if (model.docComment != null) sb.writeln(model.docComment);
+    if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
     sb.writeln(
       _annotationFor(
         model,
