@@ -293,6 +293,8 @@ void main() {
       //   - String Function(int)
       //   - bool Function(Object)?
       //   - T Function<U>(U)  (generic function type — rare but valid)
+      //   - Function / Function?  (bare supertype — issue #105)
+      //   - List<Function> / Map<String, Function?>  (issue #105)
       // And must NOT match:
       //   - A class named `MyFunction` (no `Function(` or `Function<`)
       //   - `Function` appearing in a doc comment (the type string is
@@ -304,6 +306,12 @@ void main() {
         'bool Function(Object)?': true,
         'T Function<U>(U)': true,
         'void Function(WebUri?, String)?': true,
+        // Issue #105 — bare `Function` forms (produced by the CLI when
+        // the user writes `--field "onLoad:!Function?"`):
+        'Function': true,
+        'Function?': true,
+        'List<Function>': true,
+        'Map<String, Function?>': true,
         // Negative cases — not function types:
         'String': false,
         'int?': false,
@@ -311,6 +319,7 @@ void main() {
         'Map<String, dynamic>': false,
         'MyFunctionClass': false,
         'FunctionRef': false,
+        'FunctionLikeBuilder': false,
       };
       // Access the private static method via reflection-ish trick:
       // invoke it through the public surface by emitting a class with

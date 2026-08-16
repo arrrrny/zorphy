@@ -599,11 +599,12 @@ class ClassDeclarationGenerator extends UniversalGenerator {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // ISSUE #89 HELPERS — function-typed field JSON serialization
+  // ISSUE #89 / #105 HELPERS — function-typed field JSON serialization
   // ═══════════════════════════════════════════════════════════════
 
   /// Returns true when [type] is a function type (e.g.
-  /// `void Function(WebUri? url)?`, `String Function(int)`).
+  /// `void Function(WebUri? url)?`, `String Function(int)`,
+  /// or the bare `Function` / `Function?` supertype).
   ///
   /// Function-typed fields cannot be JSON-serialized by json_serializable
   /// — they need `@JsonKey(includeFromJson: false, includeToJson: false)`.
@@ -612,6 +613,21 @@ class ClassDeclarationGenerator extends UniversalGenerator {
   /// prefix. The check is intentionally permissive: it matches the
   /// existing `type.contains('Function')` heuristic used in
   /// `helpers.getPatchClass` (helpers.dart line 221).
+  ///
+  /// Issue #105: the original #89 implementation only matched
+  /// `Function(` and `Function<`, missing the BARE `Function` /
+  /// `Function?` forms. The bare form is what the CLI produces when the
+  /// user writes a callback field without pinning down a signature:
+  ///
+  ///   zfa entity create -n X --field "onLoad:!Function?"
+  ///
+  /// The CLI strips the `!` (external) marker and the trailing `?`,
+  /// writes `Function? get onLoad;` to the entity file, and the analyzer
+  /// resolves the field type to `Function?`. Without this fix, the
+  /// generator emits `final Function? onLoad;` with no `@JsonKey` →
+  /// json_serializable fails with
+  /// "Could not generate `fromJson` code for `onLoad`." and the `.g.dart`
+  /// is never written, breaking the whole package.
   bool _isFunctionType(String? type) {
     if (type == null || type.isEmpty) return false;
     // A function type always contains `Function(` (possibly with `<typeArgs>`
@@ -621,8 +637,21 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     // string that contains this pattern is a function type for our purposes.
     final cleaned = type.replaceAll(' ', '');
     // Look for `Function(` or `Function<` after stripping spaces. Both forms
-    // indicate a function type.
-    return cleaned.contains('Function(') || cleaned.contains('Function<');
+    // indicate a (parameterized) function type.
+    if (cleaned.contains('Function(') || cleaned.contains('Function<')) {
+      return true;
+    }
+    // Issue #105: bare `Function` / `Function?` — the supertype of all
+    // function types. The user writes this when they want a callback slot
+    // without pinning down a signature (e.g. `--field "onLoad:!Function?"`).
+    // Match `Function` as a complete type token (NOT a substring of a
+    // larger identifier like `MyFunction` or `FunctionRef`) using word
+    // boundaries. The character class `[^A-Za-z0-9_]` matches `?`, `>`,
+    // `,`, `<`, `)`, etc., so `Function?`, `List<Function>`,
+    // `Map<String, Function?>` all hit this branch.
+    return RegExp(
+      r'(?:^|[^A-Za-z0-9_])Function(?:$|[^A-Za-z0-9_])',
+    ).hasMatch(cleaned);
   }
 
   /// Computes the effective [JsonKeyInfo] to emit for [field].
