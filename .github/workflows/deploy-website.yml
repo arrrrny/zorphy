@@ -45,6 +45,11 @@ jobs:
 
   deploy:
     needs: build
+    # GitHub Pages deployments are only valid from the production branch
+    # (master). PR runs and other-branch pushes build the site as CI but
+    # must not attempt a Pages deployment — actions/deploy-pages rejects
+    # non-production refs and reds the job.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

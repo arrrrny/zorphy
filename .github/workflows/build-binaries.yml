@@ -6,6 +6,12 @@ on:
       - "v*"
   workflow_dispatch:
 
+# The release upload (softprops/action-gh-release) creates/updates a GitHub
+# Release and uploads binary assets — requires a write token. The repo
+# default is read-only, so the release job fails with 403 without this.
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build ${{ matrix.platform }}

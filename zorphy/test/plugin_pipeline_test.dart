@@ -7,8 +7,6 @@ import 'package:zorphy/src/factory_method.dart';
 import 'package:zorphy/src/models/class_metadata.dart';
 import 'package:zorphy/src/models/generation_config.dart';
 import 'package:zorphy/src/models/interface_metadata.dart';
-import 'package:zorphy/src/plugins/plugin_context.dart';
-import 'package:zorphy/src/plugins/plugin_registry.dart';
 import 'package:zorphy/zorphy_plugin.dart';
 
 /// A test double plugin that adds a `_telemetry` field.
