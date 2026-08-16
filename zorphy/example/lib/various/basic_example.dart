@@ -46,7 +46,7 @@ void main() {
   final userPatch = UserPatch()
     ..withAge(32)
     ..withEmail('alice@example.com');
-  final patchedUser = user1.patchWithUser(patchInput: userPatch);
+  final patchedUser = user1.patchWithUser(userPatch);
   print('Original: $user1');
   print('Patched: $patchedUser');
   print('');

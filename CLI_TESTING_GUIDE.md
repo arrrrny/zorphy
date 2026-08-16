@@ -35,8 +35,8 @@ dart run zorphy:zorphy_cli create -n Address \
   --field country:String
 
 # Step 3: Verify the generated files
-cat lib/entities/user.dart | grep -A 5 "abstract class"
-cat lib/entities/address.dart | grep -A 5 "abstract class"
+cat lib/src/domain/entities/user.dart | grep -A 5 "abstract class"
+cat lib/src/domain/entities/address.dart | grep -A 5 "abstract class"
 
 # Expected output should show:
 # - User has: $Address get address;
@@ -57,7 +57,7 @@ dart run zorphy:zorphy_cli create -n UserProfile \
   --field address:\$Address?
 
 # Verify nullable syntax
-cat lib/entities/userprofile.dart | grep "get address"
+cat lib/src/domain/entities/userprofile.dart | grep "get address"
 # Expected: $Address? get address;
 ```
 
@@ -83,7 +83,7 @@ dart run zorphy:zorphy_cli create -n OrderItem \
   --field unitPrice:double
 
 # Verify List type
-cat lib/entities/order.dart | grep "get items"
+cat lib/src/domain/entities/order.dart | grep "get items"
 # Expected: List<$OrderItem> get items;
 ```
 
@@ -108,7 +108,7 @@ dart run zorphy:zorphy_cli create -n Product \
   --field inStock:bool
 
 # Verify Map type
-cat lib/entities/productcatalog.dart | grep "get products"
+cat lib/src/domain/entities/productcatalog.dart | grep "get products"
 # Expected: Map<String, $Product> get products;
 ```
 
@@ -139,7 +139,7 @@ dart run zorphy:zorphy_cli create -n Transaction \
   --field paymentMethod:\$\$PaymentMethod
 
 # Verify polymorphic syntax (note the $$ prefix)
-cat lib/entities/transaction.dart | grep "get paymentMethod"
+cat lib/src/domain/entities/transaction.dart | grep "get paymentMethod"
 # Expected: $$PaymentMethod get paymentMethod;
 ```
 
@@ -156,7 +156,7 @@ dart run zorphy:zorphy_cli create -n TransactionWithHistory \
   --field attemptedCount:int
 
 # Verify List of polymorphic type
-cat lib/entities/transactionwithhistory.dart | grep "get history"
+cat lib/src/domain/entities/transactionwithhistory.dart | grep "get history"
 # Expected: List<$$PaymentMethod> get history;
 ```
 
@@ -173,7 +173,7 @@ dart run zorphy:zorphy_cli create -n Wallet \
   --field defaultMethod:String
 
 # Verify Map of polymorphic type
-cat lib/entities/wallet.dart | grep "get paymentMethods"
+cat lib/src/domain/entities/wallet.dart | grep "get paymentMethods"
 # Expected: Map<String, $$PaymentMethod> get paymentMethods;
 ```
 
@@ -186,7 +186,7 @@ cat lib/entities/wallet.dart | grep "get paymentMethods"
 dart run zorphy:zorphy_cli create -n Company \
   --field companyId:String \
   --field name:String \
-  --field headquarters:\<$CompanyAddress \
+  --field headquarters:\$CompanyAddress \
   --field departments:List<\$Department> \
   --field employeeDirectory:Map<String,\$Employee>
 
@@ -226,19 +226,19 @@ dart run zorphy:zorphy_cli create -n ContactInfo \
 
 # Verify deep nesting
 echo "=== Checking Company ==="
-cat lib/entities/company.dart | grep "get headquarters"
-cat lib/entities/company.dart | grep "get departments"
-cat lib/entities/company.dart | grep "get employeeDirectory"
+cat lib/src/domain/entities/company.dart | grep "get headquarters"
+cat lib/src/domain/entities/company.dart | grep "get departments"
+cat lib/src/domain/entities/company.dart | grep "get employeeDirectory"
 
 echo "=== Checking CompanyAddress ==="
-cat lib/entities/companyaddress.dart | grep "get location"
+cat lib/src/domain/entities/companyaddress.dart | grep "get location"
 
 echo "=== Checking Department ==="
-cat lib/entities/department.dart | grep "get manager"
-cat lib/entities/department.dart | grep "get members"
+cat lib/src/domain/entities/department.dart | grep "get manager"
+cat lib/src/domain/entities/department.dart | grep "get members"
 
 echo "=== Checking Employee ==="
-cat lib/entities/employee.dart | grep "get contactInfo"
+cat lib/src/domain/entities/employee.dart | grep "get contactInfo"
 ```
 
 ### Test 9: Real-World E-commerce Scenario
@@ -323,22 +323,22 @@ dart run zorphy:zorphy_cli create -n PaymentStatusFailed
 
 # Verify the complete structure
 echo "=== Checking Order ==="
-cat lib/entities/ecomorder.dart | grep "get user"
-cat lib/entities/ecomorder.dart | grep "get items"
-cat lib/entities/ecomorder.dart | grep "get shippingAddress"
-cat lib/entities/ecomorder.dart | grep "get status"
+cat lib/src/domain/entities/ecomorder.dart | grep "get user"
+cat lib/src/domain/entities/ecomorder.dart | grep "get items"
+cat lib/src/domain/entities/ecomorder.dart | grep "get shippingAddress"
+cat lib/src/domain/entities/ecomorder.dart | grep "get status"
 
 echo "=== Checking OrderLineItem ==="
-cat lib/entities/orderlineitem.dart | grep "get product"
-cat lib/entities/orderlineitem.dart | grep "get variant"
+cat lib/src/domain/entities/orderlineitem.dart | grep "get product"
+cat lib/src/domain/entities/orderlineitem.dart | grep "get variant"
 
 echo "=== Checking Product ==="
-cat lib/entities/ecomproduct.dart | grep "get variants"
+cat lib/src/domain/entities/ecomproduct.dart | grep "get variants"
 
 echo "=== Checking Payment ==="
-cat lib/entities/ecompayment.dart | grep "get order"
-cat lib/entities/ecompayment.dart | grep "get method"
-cat lib/entities/ecompayment.dart | grep "get status"
+cat lib/src/domain/entities/ecompayment.dart | grep "get order"
+cat lib/src/domain/entities/ecompayment.dart | grep "get method"
+cat lib/src/domain/entities/ecompayment.dart | grep "get status"
 ```
 
 ### Test 10: Build and Verify
@@ -350,25 +350,13 @@ cat lib/entities/ecompayment.dart | grep "get status"
 dart run build_runner build --delete-conflicting-outputs
 
 # Step 2: Check for generated files
-ls -la lib/entities/*.zorphy.dart
+ls -la lib/src/domain/entities/*.zorphy.dart
 
 # Step 3: Verify no errors in generated code
-grep -r "error" lib/entities/*.zorphy.dart || echo "No errors found"
+grep -r "error" lib/src/domain/entities/*.zorphy.dart || echo "No errors found"
 
 # Step 4: List all entities created
-dart run zorphy:zorphy_cli list -o lib/entities
-```
-
-## Automated Test Script
-
-Alternatively, run the automated test script:
-
-```bash
-# Make it executable
-chmod +x test_cli_nested_objects.sh
-
-# Run all tests
-./test_cli_nested_objects.sh
+dart run zorphy:zorphy_cli list -o lib/src/domain/entities
 ```
 
 ## Expected Results
@@ -386,15 +374,19 @@ chmod +x test_cli_nested_objects.sh
 
 ### Issue: "Type not found" error
 
-**Solution:** Make sure nested entities are created before the entities that reference them.
+**Solution:** The v2 generator handles build ordering automatically. Entities can be created in any order, and the generator will resolve dependencies correctly. If you see type errors, ensure:
+1. You've run `dart run build_runner build` after creating all entities
+2. The referenced entity file exists in the expected location
+3. Import paths are correct
 
 **Example:**
 ```bash
-# Create Address FIRST
+# Order doesn't matter in v2 - you can create in either order
+dart run zorphy:zorphy_cli create -n User --field address:\$Address
 dart run zorphy:zorphy_cli create -n Address --field street:String
 
-# Then create User that references it
-dart run zorphy:zorphy_cli create -n User --field address:\$Address
+# Then build all entities
+dart run build_runner build
 ```
 
 ### Issue: Build errors

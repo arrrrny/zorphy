@@ -90,16 +90,13 @@ zorphy create -n ContactInfo \
 ## Testing Checklist
 
 ```bash
-# Run tests
-./test_cli_nested_objects.sh
-
-# Or manually test
+# Manually test
 zorphy create -n TestUser --field address:\$Address
 zorphy create -n TestAddress --field street:String
 zorphy build
 
 # Verify
-cat lib/entities/testuser.dart | grep "get address"
+cat lib/src/domain/entities/testuser.dart | grep "get address"
 # Should see: $Address get address;
 ```
 
@@ -136,16 +133,16 @@ dart run build_runner build --delete-conflicting-outputs
 
 ```bash
 # List all entities
-zorphy list -o lib/entities
+zorphy list -o lib/src/domain/entities
 
 # Check specific entity
-cat lib/entities/entityname.dart | grep "get "
+cat lib/src/domain/entities/entityname.dart | grep "get "
 
 # Build all
 zorphy build
 
-# Run tests
-./test_cli_nested_objects.sh
+# Verify output structure
+zorphy list
 ```
 
 ## Real-World Example

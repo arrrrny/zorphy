@@ -69,7 +69,7 @@ void main() {
   final personPatch = PersonPatch()
     ..withAddressPatch(AddressPatch()..withCity('Los Angeles'));
 
-  final updatedPerson = person.patchWithPerson(patchInput: personPatch);
+  final updatedPerson = person.patchWithPerson(personPatch);
 
   print('After nested patching (city changed to Los Angeles):');
   print('$updatedPerson');

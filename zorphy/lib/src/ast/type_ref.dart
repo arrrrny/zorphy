@@ -1,0 +1,92 @@
+/// Escape-free type-reference helpers for code_builder Specs.
+///
+/// These functions produce [TypeReference] objects suitable for use in
+/// [Spec] instances, without relying on string escaping.
+library;
+
+import 'package:code_builder/code_builder.dart';
+
+/// References an arbitrary Dart type by its fully-qualified or simple name.
+///
+/// Works around a code_builder 4.x bug where [TypeReference.isNullable]
+/// is silently ignored when emitting [Field] types, [Parameter] types,
+/// and method return types — the `?` suffix is always dropped.
+///
+/// The workaround: for any nullable type, the full type string
+/// (including `?`) is stored in [TypeReference.symbol] with an empty
+/// `types` list, so code_builder emits it verbatim.
+TypeReference referType(String type) {
+  final isNullable = type.endsWith('?');
+  final cleanType = isNullable ? type.substring(0, type.length - 1) : type;
+  final ltIndex = cleanType.indexOf('<');
+  if (ltIndex != -1) {
+    final rtIndex = cleanType.lastIndexOf('>');
+    final baseName = cleanType.substring(0, ltIndex);
+    final typeArgsStr = cleanType.substring(ltIndex + 1, rtIndex);
+
+    if (isNullable) {
+      // Workaround: code_builder 4.x ignores isNullable when types is
+      // non-empty. Store the full type string (with ?) in symbol
+      // and leave types empty so code_builder emits it verbatim.
+      return TypeReference((t) {
+        t.symbol = type;
+      });
+    }
+
+    final typeArgs = _splitTypeArgs(typeArgsStr).map(referType).toList();
+    return TypeReference((t) {
+      t.symbol = baseName;
+      t.types.addAll(typeArgs);
+    });
+  }
+
+  if (isNullable) {
+    // Workaround: code_builder 4.x ignores isNullable for Field and
+    // Parameter types. Store the full type string (with ?) in symbol
+    // and leave types empty so code_builder emits it verbatim.
+    return TypeReference((t) {
+      t.symbol = type;
+    });
+  }
+
+  return TypeReference((t) {
+    t.symbol = cleanType;
+  });
+}
+
+TypeReference referZorphyClass(String name) => referType(name);
+
+TypeReference referZorphySealedBase(String name) =>
+    referType('\$' + name);
+
+TypeReference referSibling(String name) => referType(name);
+
+TypeReference withLibrary(TypeReference ref, String library) {
+  return TypeReference((t) {
+    t.symbol = ref.symbol;
+    t.isNullable = ref.isNullable;
+    t.types.addAll(ref.types);
+    t.url = library;
+  });
+}
+
+TypeReference referConcreteType(String type) =>
+    referType(type.replaceAll('\$', ''));
+
+List<String> _splitTypeArgs(String args) {
+  if (args.isEmpty) return [];
+  final result = <String>[];
+  var depth = 0;
+  var current = StringBuffer();
+  for (var i = 0; i < args.length; i++) {
+    final ch = args[i];
+    if (ch == '<') { depth++; current.write(ch); }
+    else if (ch == '>') { depth--; current.write(ch); }
+    else if (ch == ',' && depth == 0) {
+      result.add(current.toString().trim()); current = StringBuffer(); }
+    else { current.write(ch); }
+  }
+  final remaining = current.toString().trim();
+  if (remaining.isNotEmpty) result.add(remaining);
+  return result;
+}

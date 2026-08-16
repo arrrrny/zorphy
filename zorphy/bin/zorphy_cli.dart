@@ -11,7 +11,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import 'package:zorphy/zorphy_cli.dart';
 
-const String _version = '1.5.0';
+const String _version = '2.0.0';
 
 Future<void> main(List<String> args) async {
   var showVersion = false;
@@ -32,7 +32,10 @@ Future<void> main(List<String> args) async {
         ..addCommand(_ListCommand())
         ..addCommand(_BuildCommand())
         ..addCommand(_WatchCommand())
-        ..addCommand(_FromJsonCommand());
+        ..addCommand(_FromJsonCommand())
+        ..addCommand(_ValidateCommand())
+        ..addCommand(_SelfUpdateCommand())
+        ..addCommand(_DoctorCommand());
 
   try {
     if (showVersion) {
@@ -91,6 +94,7 @@ class _CreateCommand extends Command<void> {
     final config = EntityConfig(
       name: name,
       outputDir: output,
+      packageName: argResults!['package'] as String?,
       fields: fields,
       generateJson: argResults!['json'] as bool,
       generateCopyWithFn: argResults!['copywith-fn'] as bool,
@@ -108,12 +112,13 @@ class _CreateCommand extends Command<void> {
     final result = await creator.create(config);
 
     if (result.isSuccess) {
-      print('✓ Created entity: ${result.filePath}');
-      print('\n📋 Next steps:');
+      print('Created entity: ${result.filePath}');
+      print('');
+      print('Next steps:');
       print('  1. Run: dart run build_runner build');
       print('  2. Import and use your ${config.className} class');
     } else {
-      print('❌ ${result.error}');
+      print('${result.error}');
       exit(1);
     }
   }
@@ -178,9 +183,9 @@ class _NewCommand extends Command<void> {
     final result = await creator.create(config);
 
     if (result.isSuccess) {
-      print('✓ Created entity: ${result.filePath}');
+      print('Created entity: ${result.filePath}');
     } else {
-      print('❌ ${result.error}');
+      print('${result.error}');
       exit(1);
     }
   }
@@ -215,9 +220,9 @@ class _EnumCommand extends Command<void> {
     final result = await creator.createEnum(config);
 
     if (result.isSuccess) {
-      print('✓ Created enum: ${result.filePath}');
+      print('Created enum: ${result.filePath}');
     } else {
-      print('❌ ${result.error}');
+      print('${result.error}');
       exit(1);
     }
   }
@@ -259,9 +264,9 @@ class _AddFieldCommand extends Command<void> {
     );
 
     if (result.isSuccess) {
-      print('✓ Added ${fields.length} field(s) to ${result.className}');
+      print('Added ${fields.length} field(s) to ${result.className}');
     } else {
-      print('❌ ${result.error}');
+      print('${result.error}');
       exit(1);
     }
   }
@@ -288,7 +293,8 @@ class _ListCommand extends Command<void> {
       return;
     }
 
-    print('📂 Zorphy Entities in $dir:\n');
+    print('Zorphy Entities in $dir:');
+    print('');
 
     await for (final entity in entityDir.list()) {
       if (entity is Directory) {
@@ -296,11 +302,11 @@ class _ListCommand extends Command<void> {
         final dartFile = File(p.join(entity.path, '$entityName.dart'));
         if (await dartFile.exists()) {
           final content = await dartFile.readAsString();
-          print('  📄 $entityName');
+          print('  $entityName');
           if (content.contains('generateJson: true'))
-            print('     ✓ JSON support');
+            print('     - JSON support');
           if (content.contains('abstract class \$\$'))
-            print('     🔒 Sealed class');
+            print('     - Sealed class');
         }
       }
     }
@@ -312,22 +318,54 @@ class _BuildCommand extends Command<void> {
   String get name => 'build';
 
   @override
-  String get description => 'Run code generation';
+  String get description => 'Run code generation (with optional smart merge)';
 
   _BuildCommand() {
     argParser.addFlag('watch', abbr: 'w', help: 'Watch for changes');
     argParser.addFlag('clean', abbr: 'c', help: 'Clean before build');
+    argParser.addFlag(
+      'dry-run',
+      negatable: false,
+      help: 'Preview what would change without writing files',
+    );
+    argParser.addFlag(
+      'force',
+      negatable: false,
+      help: 'Bypass AST merge and regenerate from scratch',
+    );
   }
 
   @override
   Future<void> run() async {
+    final isDryRun = argResults!['dry-run'] as bool;
+    final isForce = argResults!['force'] as bool;
+    final isClean = argResults!['clean'] as bool;
+
+    if (isDryRun) {
+      print('Dry-run mode: previewing changes...');
+    }
+
+    if (isForce) {
+      print('Force mode: regenerating from scratch...');
+    }
+
     final args = [
       'run',
       'build_runner',
       'build',
       '--delete-conflicting-outputs',
     ];
-    if (argResults!['clean'] as bool) args.insert(2, 'clean');
+    if (isClean) args.insert(2, 'clean');
+
+    // Pass dry-run and force flags to the builder via --define
+    if (isDryRun) {
+      args.add('--define');
+      args.add('zorphy:zorphy=dry_run=true');
+    }
+    if (isForce) {
+      args.add('--define');
+      args.add('zorphy:zorphy=force=true');
+    }
 
     final process = await Process.start(
       'dart',
@@ -417,9 +455,9 @@ class _FromJsonCommand extends Command<void> {
     final result = await creator.create(config);
 
     if (result.isSuccess) {
-      print('✓ Created entity: ${result.filePath}');
+      print('Created entity: ${result.filePath}');
     } else {
-      print('❌ ${result.error}');
+      print('${result.error}');
       exit(1);
     }
   }
@@ -489,5 +527,264 @@ class _FromJsonCommand extends Command<void> {
     if (s.endsWith('es')) return s.substring(0, s.length - 2);
     if (s.endsWith('s')) return s.substring(0, s.length - 1);
     return s;
+  }
+}
+
+
+class _ValidateCommand extends Command<void> {
+  @override
+  String get name => 'validate';
+
+  @override
+  String get description =>
+      'Validate a Zorphy project for common issues (missing generated files, stale output, missing part directives)';
+
+  _ValidateCommand() {
+    argParser.addOption(
+      'dir',
+      abbr: 'd',
+      help: 'Project directory to validate (default: current directory)',
+    );
+    argParser.addMultiOption(
+      'source',
+      help: 'Additional source directories to scan (default: lib)',
+    );
+    argParser.addFlag(
+      'json',
+      negatable: false,
+      help: 'Output results as JSON',
+    );
+  }
+
+  @override
+  Future<void> run() async {
+    final dir = argResults!['dir'] as String? ?? Directory.current.path;
+    final extraSources = (argResults!['source'] as List<String>?) ?? [];
+    final sourceDirs = ['lib', ...extraSources.where((s) => s != 'lib')];
+    final asJson = argResults!['json'] as bool;
+
+    final projectDir = Directory(dir);
+    if (!projectDir.existsSync()) {
+      if (asJson) {
+        final errorOutput = {
+          'directory': dir,
+          'filesScanned': 0,
+          'errorCount': 1,
+          'warningCount': 0,
+          'infoCount': 0,
+          'findings': [
+            {
+              'message': 'Directory not found: $dir',
+              'severity': 'error',
+              'filePath': dir,
+            }
+          ],
+        };
+        print(const JsonEncoder.withIndent('  ').convert(errorOutput));
+      } else {
+        print('Error: Directory not found: $dir');
+      }
+      exit(1);
+    }
+
+    final validator = ProjectValidator(
+      projectDir: dir,
+      sourceDirs: sourceDirs,
+    );
+    final result = validator.validate();
+
+    if (asJson) {
+      _printJsonResult(result);
+    } else {
+      print(result);
+    }
+
+    if (result.hasErrors) {
+      exit(1);
+    }
+  }
+
+  void _printJsonResult(ValidationResult result) {
+    final findingsJson = result.findings.map((f) => {
+      'message': f.message,
+      'severity': f.severity.name,
+      if (f.filePath != null) 'filePath': f.filePath,
+      if (f.lineNumber != null) 'lineNumber': f.lineNumber,
+      if (f.fixSuggestion != null) 'fixSuggestion': f.fixSuggestion,
+    }).toList();
+
+    final output = {
+      'directory': result.validatedDir,
+      'filesScanned': result.filesScanned,
+      'errorCount': result.errorCount,
+      'warningCount': result.warningCount,
+      'infoCount': result.infoCount,
+      'findings': findingsJson,
+    };
+
+    print(const JsonEncoder.withIndent('  ').convert(output));
+  }
+}
+
+
+class _SelfUpdateCommand extends Command<void> {
+  @override
+  String get name => 'self-update';
+
+  @override
+  String get description =>
+      'Check for the latest zorphy version and update the CLI in place';
+
+  _SelfUpdateCommand() {
+    argParser.addFlag(
+      'check',
+      abbr: 'c',
+      negatable: false,
+      help: 'Only check for updates, do not install',
+    );
+    argParser.addFlag(
+      'json',
+      negatable: false,
+      help: 'Output results as JSON',
+    );
+  }
+
+  @override
+  Future<void> run() async {
+    final checkOnly = argResults!['check'] as bool;
+    final asJson = argResults!['json'] as bool;
+
+    final checker = VersionChecker(currentVersion: _version);
+
+    // Reuse a single checkForUpdate result
+    final checkResult = await checker.checkForUpdate();
+
+    if (asJson) {
+      final output = <String, dynamic>{
+        'currentVersion': checkResult.currentVersion,
+        'latestVersion': checkResult.latestVersion,
+        'updateAvailable': checkResult.updateAvailable,
+        'message': checkResult.message,
+      };
+      if (!checkOnly && checkResult.updateAvailable) {
+        final updateResult = await checker.performUpdateAndVerify();
+        output['update'] = {
+          'success': updateResult.success,
+          'message': updateResult.message,
+          if (updateResult.newVersion != null)
+            'newVersion': updateResult.newVersion,
+        };
+        if (!updateResult.success) {
+          print(const JsonEncoder.withIndent('  ').convert(output));
+          exit(1);
+        }
+      }
+      if (checkResult.latestVersion == null) {
+        print(const JsonEncoder.withIndent('  ').convert(output));
+        exit(1);
+      }
+      print(const JsonEncoder.withIndent('  ').convert(output));
+      return;
+    }
+
+    // Human-readable output
+    print(checkResult);
+
+    if (checkResult.latestVersion == null) {
+      exit(1);
+    }
+
+    if (checkOnly || !checkResult.updateAvailable) {
+      if (checkOnly && checkResult.updateAvailable) {
+        print('');
+        print('Run without --check to perform the update.');
+      }
+      return;
+    }
+
+    print('');
+    print('Updating...');
+    final updateResult = await checker.performUpdateAndVerify();
+    print(updateResult);
+    if (!updateResult.success) {
+      exit(1);
+    }
+  }
+}
+
+
+class _DoctorCommand extends Command<void> {
+  @override
+  String get name => 'doctor';
+
+  @override
+  String get description =>
+      'Diagnose and fix stale/corrupt generated .zorphy.dart files by deleting them and regenerating cleanly';
+
+  _DoctorCommand() {
+    argParser.addOption(
+      'dir',
+      abbr: 'd',
+      help: 'Project directory (default: current directory)',
+    );
+    argParser.addMultiOption(
+      'source',
+      help: 'Additional source directories to scan (default: lib)',
+    );
+    argParser.addFlag(
+      'dry-run',
+      negatable: false,
+      help: 'Preview files to delete without making changes',
+    );
+    argParser.addFlag(
+      'json',
+      negatable: false,
+      help: 'Output results as JSON',
+    );
+  }
+
+  @override
+  Future<void> run() async {
+    final dir = argResults!['dir'] as String? ?? Directory.current.path;
+    final extraSources = (argResults!['source'] as List<String>?) ?? [];
+    final sourceDirs = ['lib', ...extraSources.where((s) => s != 'lib')];
+    final dryRun = argResults!['dry-run'] as bool;
+    final asJson = argResults!['json'] as bool;
+
+    final projectDir = Directory(dir);
+    if (!projectDir.existsSync()) {
+      if (asJson) {
+        final errorOutput = {
+          'projectDir': dir,
+          'dryRun': dryRun,
+          'deletedCount': 0,
+          'deletedFiles': <String>[],
+          'regeneratedCount': 0,
+          'remainingInvalidTypeFiles': <String>[],
+          'health': 'unhealthy',
+          'error': 'Directory not found: $dir',
+        };
+        print(const JsonEncoder.withIndent('  ').convert(errorOutput));
+      } else {
+        print('Error: Directory not found: $dir');
+      }
+      exit(1);
+    }
+
+    final service = DoctorService(
+      projectDir: dir,
+      sourceDirs: sourceDirs,
+    );
+    final result = await service.run(dryRun: dryRun);
+
+    if (asJson) {
+      print(const JsonEncoder.withIndent('  ').convert(result.toJson()));
+    } else {
+      print(result);
+    }
+
+    if (result.health == DoctorHealth.unhealthy) {
+      exit(1);
+    }
   }
 }

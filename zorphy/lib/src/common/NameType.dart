@@ -117,8 +117,11 @@ class JsonKeyInfo {
     this.converter,
   });
 
-  /// Generates the annotation string representation
-  /// Builds the Dart annotation string for this JsonKey configuration.
+  /// Generates the annotation string representation.
+  ///
+  /// Returns the annotation **without** a leading `@` because
+  /// code_builder's `DartEmitter` automatically prefixes annotations
+  /// with `@` when emitting. Including `@` here would produce `@@`.
   String toAnnotationString({bool includeDefaultValue = true}) {
     final params = <String>[];
 
@@ -137,8 +140,8 @@ class JsonKeyInfo {
     if (fromJson != null) params.add("fromJson: $fromJson");
     if (converter != null) params.add("converter: $converter");
 
-    if (params.isEmpty) return "@JsonKey()";
-    return "@JsonKey(${params.join(", ")})";
+    if (params.isEmpty) return "JsonKey()";
+    return "JsonKey(${params.join(", ")})";
   }
 
   /// Returns true when at least one annotation parameter is set.

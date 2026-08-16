@@ -1,3 +1,5 @@
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
 /// Configuration for entity creation
 class EntityConfig {
   final String name;
@@ -16,6 +18,16 @@ class EntityConfig {
   final bool dryRun;
   final bool prefixNested;
 
+  /// Whether the entity owns an auto-generated uuid `id` field. When true
+  /// the generated template declares `String get id;`, adds
+  /// `autoId: true` to the annotation and imports
+  /// `package:uuid/uuid.dart`.
+  final bool autoId;
+
+  /// The semantic kind of this class — [ZorphyKind.entity] (default) or
+  /// [ZorphyKind.valueObject].
+  final ZorphyKind kind;
+
   const EntityConfig({
     required this.name,
     this.outputDir,
@@ -32,6 +44,8 @@ class EntityConfig {
     this.generateSubtypes = false,
     this.dryRun = false,
     this.prefixNested = true,
+    this.autoId = false,
+    this.kind = ZorphyKind.entity,
   });
 
   String get defaultOutputDir => 'lib/src/domain/entities';
@@ -72,6 +86,8 @@ class EntityConfig {
     bool? generateSubtypes,
     bool? dryRun,
     bool? prefixNested,
+    bool? autoId,
+    ZorphyKind? kind,
   }) {
     return EntityConfig(
       name: name ?? this.name,
@@ -89,6 +105,8 @@ class EntityConfig {
       generateSubtypes: generateSubtypes ?? this.generateSubtypes,
       dryRun: dryRun ?? this.dryRun,
       prefixNested: prefixNested ?? this.prefixNested,
+      autoId: autoId ?? this.autoId,
+      kind: kind ?? this.kind,
     );
   }
 }
@@ -99,39 +117,104 @@ class FieldDefinition {
   final String type;
   final bool nullable;
 
+  /// Optional JSON wire name for the field, when it differs from the Dart
+  /// [name]. Needed for GraphQL fields whose wire name is a Dart-reserved
+  /// keyword (`in`, `required`) or that legitimately differ on the wire
+  /// (Vendure's `_and` / `_or` filter operators). When set, the generated
+  /// source getter carries `@JsonKey(name: '<jsonName>')`, which the zorphy
+  /// builder already propagates into the concrete class and json_serializable
+  /// output.
+  final String? jsonName;
+
+  /// True when the type was written with the `!` prefix (e.g. `url:!WebUri?`),
+  /// marking it as EXTERNAL — a type that lives outside the entity tree
+  /// (plugin wrappers like `WebUri`, SDK classes, ...). External types are
+  /// kept as-is: no `$` prefix is added by `FieldNormalizer`, no entity/enum
+  /// import is resolved by `ImportResolver`, and on-disk validation is
+  /// skipped. The user is responsible for importing the type in the
+  /// generated entity source.
+  final bool isExternal;
+
   const FieldDefinition({
     required this.name,
     required this.type,
     this.nullable = false,
+    this.jsonName,
+    this.isExternal = false,
   });
 
   String get fullType => nullable && !type.endsWith('?') ? '$type?' : type;
 
+  /// Parses a field definition in one of three forms:
+  ///
+  /// - `name:type` (e.g. `id:String`, `note:String?`, `countries:List<Country>`)
+  /// - `name:!type` (e.g. `url:!WebUri?`) — external (non-entity, non-enum)
+  ///   type, kept as-is with no `$` prefix, no import resolution, no
+  ///   on-disk validation (see [isExternal]).
+  /// - `name:type:json=<wireName>` (e.g. `in_:String:json=in`,
+  ///   `and:ProductFilterParameter:json=_and`)
   factory FieldDefinition.parse(String definition) {
     final parts = definition.split(':');
-    if (parts.length != 2) {
+    if (parts.length < 2 || parts.length > 3) {
       throw ArgumentError(
-        'Invalid field format: "$definition". Expected "name:type"',
+        'Invalid field format: "$definition". '
+        'Expected "name:type" or "name:type:json=<wireName>"',
       );
     }
     final fieldName = parts[0].trim();
     var fieldType = parts[1].trim();
+    final isExternal = fieldType.startsWith('!');
+    if (isExternal) {
+      fieldType = fieldType.substring(1);
+      if (fieldType.isEmpty) {
+        throw ArgumentError(
+          'Invalid field format: "$definition". '
+          'The "!" prefix requires a type name after it.',
+        );
+      }
+    }
     final isNullable = fieldType.endsWith('?');
     if (isNullable) {
       fieldType = fieldType.substring(0, fieldType.length - 1);
+    }
+    String? jsonName;
+    if (parts.length == 3) {
+      final meta = parts[2].trim();
+      const prefix = 'json=';
+      if (!meta.startsWith(prefix)) {
+        throw ArgumentError(
+          'Invalid field meta: "$meta". Expected "json=<wireName>"',
+        );
+      }
+      jsonName = meta.substring(prefix.length).trim();
+      if (jsonName.isEmpty) {
+        throw ArgumentError(
+          'Invalid field meta: "$meta". "json=" requires a wire name',
+        );
+      }
     }
     return FieldDefinition(
       name: fieldName,
       type: fieldType,
       nullable: isNullable,
+      jsonName: jsonName,
+      isExternal: isExternal,
     );
   }
 
-  FieldDefinition copyWith({String? name, String? type, bool? nullable}) {
+  FieldDefinition copyWith({
+    String? name,
+    String? type,
+    bool? nullable,
+    String? jsonName,
+    bool? isExternal,
+  }) {
     return FieldDefinition(
       name: name ?? this.name,
       type: type ?? this.type,
       nullable: nullable ?? this.nullable,
+      jsonName: jsonName ?? this.jsonName,
+      isExternal: isExternal ?? this.isExternal,
     );
   }
 }

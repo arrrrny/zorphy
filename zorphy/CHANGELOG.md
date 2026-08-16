@@ -1,3 +1,62 @@
+## [2.0.0] - 2026-08-16
+
+### Feat
+
+- `autoId` support: a `@Zorphy(autoId: true)` class whose source declares
+  `String get id;` gets an optional `String? id` constructor parameter
+  defaulting to `const Uuid().v4()` — the generated class is
+  constructible without an explicit identity (zuraffa#307). The
+  `@ZValueObject` / `ZorphyKind.valueObject` kind is parsed and threaded
+  into `GenerationConfig` for framework consumers.
+- `EntityConfig`/template: `autoId` and `kind` options — `zfa entity
+  create --auto-id` emits the `id` getter, the uuid import and the
+  `autoId: true` annotation option; `--kind=value_object` emits
+  `kind: ZorphyKind.valueObject`.
+- `zorphy_annotation` bumped to 2.2.0 (new `ZorphyKind`, `autoId`,
+  `ZValueObject` annotation surface).
+
+## [2.1.0] - 2026-08-03
+
+### Feat
+
+- AST-based smart regeneration engine — non-destructive merge of
+  generated output with user edits (region markers, structural diff,
+  conflict reporting)
+- Plugin API & registry (`ZorphyPlugin`, `PluginContext`,
+  `PluginRegistry`) — post-spec transform hooks with topological
+  ordering, import injection, and diagnostic accumulation
+- `MergeMode` enum (`smart` / `force`) and `isForce` builder/
+  generator flag to bypass smart merge
+- `ZorphyPlugin` abstract class exported from `zorphy.dart`
+
+### Change
+
+- Version synced with `zorphy_annotation` 2.1.0
+- `zorphy_annotation` dependency bumped to `^2.1.0`
+
+## [2.0.0] - 2026-07-30
+
+### Break
+
+- `analyzer` constraint widened to `>=13.0.0 <15.0.0` — consumers on modern Dart toolchains (analyzer 14.x) now resolve without overrides
+- `build.yaml` consolidated to a single builder: one generation pass per library (roughly 2x faster consumer builds). The second pass (`zorphy2` builder) no longer exists; `@zorphy2`/`@Zorphy2` keep working as deprecated aliases of `@zorphy`
+- Removed process-global static cross-asset state (`_allAnnotatedClasses`) — annotated-class graphs are now built per library, so build_runner caching/invalidation works correctly
+- Fieldless explicit subtypes now emit a minimal patch class and identity `patchWith` — `changeTo` extensions reference them (previously produced undefined-method errors)
+
+### Feat
+
+- `ZorphyPreset` (`lean` / `standard` / `full`) plus per-feature `bool?` flags (`generateCopyWith`, `generatePropertyHelpers`, `generateEqualsToString`, `generateChangeTo`, and existing flags now nullable) — `null` inherits from the preset, explicit values override it
+- `standard` preset reproduces 1.9.0 output semantics — upgrading with no annotation changes keeps full output (see note on `generateFilter` below)
+- `lean` preset emits only class + constructor + copyWith + `==`/hashCode/toString; `full` adds `copyWithFn`
+- All flag resolution is centralized in `GenerationConfig`; generators no longer read annotations directly
+- CI matrix verifies `dart test` against analyzer 13.x and 14.x
+
+### Note
+
+- The deprecated `const zorphy`/`const zorphy2` top-level constants previously carried `generateFilter: false` (while the class default was `true`); in 2.0 both paths resolve consistently to the `standard` preset (`generateFilter: true`). Affected files gain `Fields` filter descriptors on regeneration. Pin `generateFilter: false` explicitly to opt out.
+
+See MIGRATION-v2.md for the upgrade path.
+
 ## [1.9.0] - 2026-07-21
 
 ### Breaking

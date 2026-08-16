@@ -1,3 +1,44 @@
+## [2.0.0] - 2026-08-16
+
+### Feat
+
+- `@Zorphy(autoId: true)` — auto-generated identity: the generated
+  concrete constructor's `id` parameter is optional and defaults to a
+  fresh `Uuid().v4()` at construction time (zuraffa#307 — entities like
+  `ChatMessage` / `TelemetryEvent` no longer need callers to supply ids).
+  The annotated class declares `String get id;` and the library imports
+  `package:uuid/uuid.dart`.
+- `ZorphyKind` (`entity` / `valueObject`) on `@Zorphy`/`@Zorphy2` plus the
+  `@ZValueObject` const alias — marks a class as an immutable composition
+  type with no identity. Codegen (equality, copyWith, JSON) is unchanged;
+  the kind is consumed by the zfa `make` pipeline to skip root plugins.
+- `ZorphyX` interface extended with `kind` and `autoId` getters.
+
+## [2.1.0] - 2026-08-03
+
+### Feat
+
+- Added `MergeMode` enum (`smart` / `force`) for future per-class merge
+  control — re-exported from `zorphy_annotation.dart` for consumer access
+
+### Change
+
+- SDK constraint aligned to `>=3.8.0 <4.0.0` (matches `zorphy` package)
+- Version synced with `zorphy` 2.1.0
+
+## [2.0.0] - 2026-07-30
+
+### Break
+
+- All feature flags on `@Zorphy`/`@Zorphy2` are now `bool?` (default `null` = inherit from preset). Source-compatible for named-argument use; the resolved semantics are unchanged for defaults
+- `ZorphyX.generateFilter` getter type changed `bool` → `bool?`
+
+### Feat
+
+- New `ZorphyPreset` enum (`lean` / `standard` / `full`) and `preset` parameter on both annotations (default `standard`, reproducing 1.9.0 output)
+- New flags: `generateCopyWith`, `generatePropertyHelpers`, `generateEqualsToString`, `generateChangeTo`
+- `@zorphy2`/`Zorphy2` deprecated — the generator is single-pass since 2.0; the alias behaves identically and will be removed in a later major
+
 ## [1.9.0] - 2026-07-21
 
 ### Break

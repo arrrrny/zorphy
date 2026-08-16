@@ -1,3 +1,4 @@
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../models/entity_config.dart';
 
 /// Generates entity template code
@@ -9,7 +10,11 @@ class EntityTemplateGenerator {
     final buffer = StringBuffer();
 
     _writeHeader(buffer);
-    _writeImports(buffer, imports);
+    _writeImports(
+      buffer,
+      imports,
+      includeUuidImport: config.autoId,
+    );
     _writePartDirectives(buffer, config);
     _writeClassDefinition(buffer, config);
 
@@ -45,10 +50,18 @@ class EntityTemplateGenerator {
     buffer.writeln();
   }
 
-  static void _writeImports(StringBuffer buffer, List<String> imports) {
+  static void _writeImports(
+    StringBuffer buffer,
+    List<String> imports, {
+    bool includeUuidImport = false,
+  }) {
     buffer.writeln(
       "import 'package:zorphy_annotation/zorphy_annotation.dart';",
     );
+
+    if (includeUuidImport) {
+      buffer.writeln("import 'package:uuid/uuid.dart';");
+    }
 
     if (imports.isNotEmpty) {
       final sorted = imports.toList()..sort();
@@ -90,17 +103,33 @@ class EntityTemplateGenerator {
         : '\$${config.className}';
 
     if (config.extendsInterface != null) {
+      // Issue #304 fix: normalize the extends interface to use the
+      // `$`-prefixed source abstract class name. The user passes the
+      // public concrete class name (e.g., `AuthenticationResult`), but
+      // the source abstract class that the analyzer can resolve is
+      // `$AuthenticationResult`. Without the `$` prefix, the analyzer
+      // silently drops the implements clause (the concrete class doesn't
+      // exist at source-analysis time), and the generated concrete class
+      // loses the implements clause — breaking `isA<Base>()` checks.
+      //
+      // If the user already passed a `$`-prefixed name (e.g., `$$Shape`
+      // for a sealed class), use it as-is.
+      final extendsInterface = _normalizeExtendsInterface(
+        config.extendsInterface!,
+      );
       buffer.writeln(
-        'abstract class $abstractClassName implements ${config.extendsInterface} {',
+        'abstract class $abstractClassName implements $extendsInterface {',
       );
     } else {
       buffer.writeln('abstract class $abstractClassName {');
     }
     buffer.writeln();
 
-    for (final field in config.fields) {
-      buffer.writeln('  ${field.fullType} get ${field.name};');
-    }
+    _writeFields(
+      buffer,
+      config.fields,
+      prependAutoId: config.autoId,
+    );
 
     buffer.writeln('}');
     buffer.writeln();
@@ -134,17 +163,34 @@ class EntityTemplateGenerator {
 
     if (config.fields.isNotEmpty) {
       buffer.writeln();
-      for (final field in config.fields) {
-        buffer.writeln('  ${field.fullType} get ${field.name};');
-      }
+      _writeFields(buffer, config.fields);
     }
 
     buffer.writeln('}');
     buffer.writeln();
   }
 
+  /// Normalize the extends interface name to use the `$`-prefixed source
+  /// abstract class name.
+  ///
+  /// - `AuthenticationResult` → `\$AuthenticationResult`
+  /// - `\$AuthenticationResult` → `\$AuthenticationResult` (no change)
+  /// - `\$\$Shape` → `\$\$Shape` (no change, sealed class)
+  ///
+  /// This ensures the analyzer can resolve the implements target at
+  /// source-analysis time (the source abstract class exists; the generated
+  /// concrete class does not).
+  static String _normalizeExtendsInterface(String name) {
+    if (name.startsWith(r'$')) return name;
+    return '\$$name';
+  }
+
   static List<String> _buildAnnotationOptions(EntityConfig config) {
     final options = <String>[];
+    if (config.kind != ZorphyKind.entity) {
+      options.add('kind: ZorphyKind.${config.kind.name}');
+    }
+    if (config.autoId) options.add('autoId: true');
     if (config.generateJson) options.add('generateJson: true');
     if (config.generateCopyWithFn) options.add('generateCopyWithFn: true');
     if (config.generateCompareTo) options.add('generateCompareTo: true');
@@ -188,14 +234,36 @@ class EntityTemplateGenerator {
 
     if (fields.isNotEmpty) {
       buffer.writeln();
-      for (final field in fields) {
-        buffer.writeln('  ${field.fullType} get ${field.name};');
-      }
+      _writeFields(buffer, fields);
     }
 
     buffer.writeln('}');
     buffer.writeln();
 
     return buffer.toString();
+  }
+
+  /// Writes the getter declarations for [fields], emitting an
+  /// `@JsonKey(name: ...)` annotation above a getter when the field's
+  /// [FieldDefinition.jsonName] differs from its Dart [FieldDefinition.name].
+  ///
+  /// When [prependAutoId] is true (and no field is already named `id`), a
+  /// `String get id;` declaration is written first — the `autoId: true`
+  /// annotation makes the concrete constructor default it to `Uuid().v4()`.
+  static void _writeFields(
+    StringBuffer buffer,
+    List<FieldDefinition> fields, {
+    bool prependAutoId = false,
+  }) {
+    final hasIdField = fields.any((f) => f.name == 'id');
+    if (prependAutoId && !hasIdField) {
+      buffer.writeln('  String get id;');
+    }
+    for (final field in fields) {
+      if (field.jsonName != null) {
+        buffer.writeln("  @JsonKey(name: '${field.jsonName}')");
+      }
+      buffer.writeln('  ${field.fullType} get ${field.name};');
+    }
   }
 }

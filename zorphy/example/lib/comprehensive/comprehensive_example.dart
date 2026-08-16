@@ -268,7 +268,7 @@ void demonstrateBasicUsage() {
   print('Updated age: ${olderUser.age}');
 
   // Patch
-  final patched = user.patchWithUser(patchInput: UserPatch().withName('Bob'));
+  final patched = user.patchWithUser(UserPatch().withName('Bob'));
   print('Patched name: ${patched.name}');
 }
 
@@ -369,7 +369,7 @@ void demonstrateNestedPatching() {
 
   // Nested patching
   final patched = person.patchWithPersonWithAddress(
-    patchInput: PersonWithAddressPatch()
+    PersonWithAddressPatch()
       ..withName('Jane Doe')
       ..withAddressPatch(
         AddressPatch()
@@ -463,7 +463,7 @@ void demonstrateCompareTo() {
       patch.withVersion(doc2.version);
     }
 
-    final patched = doc1.patchWithDocument(patchInput: patch);
+    final patched = doc1.patchWithDocument(patch);
     print('Patched version: ${patched.version}');
   }
 }

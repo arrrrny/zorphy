@@ -7,8 +7,16 @@ on:
     branches: [ master, main, development ]
 
 jobs:
+  version_sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version sync
+        run: bash scripts/check_version_sync.sh
+
   analyze_and_test:
     runs-on: ubuntu-latest
+    needs: version_sync
 
     steps:
       - uses: actions/checkout@v4
@@ -57,3 +65,99 @@ jobs:
       - name: Analyze (example)
         run: dart analyze
         working-directory: zorphy/example
+
+  analyzer_compat:
+    # Verifies zorphy resolves, analyzes, and tests green against both
+    # analyzer 13.x and 14.x (published constraint: >=13.0.0 <15.0.0).
+    runs-on: ubuntu-latest
+    needs: version_sync
+    strategy:
+      fail-fast: false
+      matrix:
+        analyzer: ["13", "14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Pin analyzer ${{ matrix.analyzer }}.x
+        working-directory: zorphy
+        run: |
+          # TEMPORARY (analyzer 14 leg only): json_serializable <6.15 caps
+          # analyzer <14.0.0; it is a dev-only dependency, so the override
+          # below unblocks CI without touching the published constraint.
+          # Remove once a json_serializable release supports analyzer 14.
+          if [ "${{ matrix.analyzer }}" = "14" ]; then
+            cat >> pubspec_overrides.yaml <<'EOF'
+            analyzer: ^14.0.0
+            json_serializable:
+              git:
+                url: https://github.com/google/json_serializable.dart
+                path: json_serializable
+          EOF
+          else
+            printf '  analyzer: ^13.0.0\n' >> pubspec_overrides.yaml
+          fi
+          cat pubspec_overrides.yaml
+
+      - name: Install dependencies
+        run: dart pub get
+        working-directory: zorphy
+
+      - name: Verify resolved analyzer major
+        working-directory: zorphy
+        run: |
+          resolved=$(dart pub deps --style=compact | grep -m1 -o 'analyzer [0-9.]*' | awk '{print $2}')
+          echo "resolved analyzer: $resolved"
+          case "$resolved" in
+            ${{ matrix.analyzer }}.*) echo "OK" ;;
+            *) echo "expected analyzer ${{ matrix.analyzer }}.x, got $resolved"; exit 1 ;;
+          esac
+
+      - name: Analyze (analyzer ${{ matrix.analyzer }})
+        run: dart analyze lib
+        working-directory: zorphy
+
+      # The generation tests (cross_entity_reference, issue_304_extends,
+      # framework_gaps, preset_generation, zorphy2_alias_compat) require the
+      # pre-generated example/ fixtures — same setup as analyze_and_test.
+      # Without this, every generation test fails in setUpAll with
+      # "Fixture not generated. Run: cd example && dart run build_runner build".
+      - name: Install dependencies (example)
+        run: dart pub get
+        working-directory: zorphy/example
+
+      - name: Run build_runner (example)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: zorphy/example
+
+      - name: Run tests (analyzer ${{ matrix.analyzer }})
+        run: dart test
+        working-directory: zorphy
+
+  migrator:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies (zorphy_migrator)
+        run: dart pub get
+        working-directory: zorphy_migrator
+
+      - name: Analyze (zorphy_migrator)
+        run: dart analyze
+        working-directory: zorphy_migrator
+
+      - name: Run tests (zorphy_migrator)
+        run: dart test
+        working-directory: zorphy_migrator
