@@ -1,5 +1,4 @@
 import 'package:test/test.dart';
-import 'package:zorphy/src/plugins/plugin_registry.dart';
 import 'package:zorphy/zorphy_plugin.dart';
 
 /// A plugin with no ordering constraints.
