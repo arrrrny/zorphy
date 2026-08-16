@@ -115,6 +115,14 @@ class JsonGenerator extends UniversalGenerator {
     GenerationConfig config,
   ) {
     final className = metadata.cleanName;
+    // Effective discriminator key: the base's `typeKey`
+    // (inherited by subtypes via ClassAnalyzer._resolveInheritedTypeKey)
+    // or the historical default `'__typename'`.
+    final typeKey = metadata.typeKey ?? '__typename';
+    // Self-case wire value: a non-sealed base (or a base that is itself
+    // a subtype) must emit/match the same value its own `toJson()`
+    // produces. Falls back to the clean class name.
+    final selfWireValue = metadata.subtypeWireValue ?? className;
     final bodyLines = <String>[];
 
     final hasSelfCase = !metadata.isAbstract &&
@@ -125,7 +133,7 @@ class JsonGenerator extends UniversalGenerator {
 
     if (hasSelfCase) {
       bodyLines.add(
-          "if (json['__typename'] == null || json['__typename'] == '$className') {");
+          "if (json['$typeKey'] == null || json['$typeKey'] == '$selfWireValue') {");
       bodyLines.add('  return _\$${className}FromJson(json);');
       caseIndex++;
     }
@@ -135,6 +143,9 @@ class JsonGenerator extends UniversalGenerator {
       // Strip leading `$` from interface names (e.g. `$CreditCard` → `CreditCard`)
       // so the generated code references valid Dart identifiers.
       final interfaceName = subtype.interfaceName.replaceAll('\$', '');
+      // Per-subtype wire value: `subtypeWireValue` override on the subtype,
+      // else the clean interface name.
+      final wireValue = subtype.wireValue ?? interfaceName;
       final isLast = caseIndex == totalCases - 1;
       final prefix = caseIndex == 0 ? 'if' : '} else if';
 
@@ -142,7 +153,7 @@ class JsonGenerator extends UniversalGenerator {
         final genericTypes =
             subtype.typeParams.map((e) => "'\$\${e.name}\$'").join(',');
         bodyLines.add(
-            "$prefix (json['__typename'] == '$interfaceName') {");
+            "$prefix (json['$typeKey'] == '$wireValue') {");
         bodyLines.add('  var fn_fromJson = getFromJsonToGenericFn(');
         bodyLines.add('    ${interfaceName}_Generics_Sing().fns,');
         bodyLines.add('    json,');
@@ -151,7 +162,7 @@ class JsonGenerator extends UniversalGenerator {
         bodyLines.add('  return fn_fromJson(json);');
       } else {
         bodyLines.add(
-            "$prefix (json['__typename'] == '$interfaceName') {");
+            "$prefix (json['$typeKey'] == '$wireValue') {");
         bodyLines.add('  return $interfaceName.fromJson(json);');
       }
       if (isLast) bodyLines.add('}');
@@ -159,7 +170,7 @@ class JsonGenerator extends UniversalGenerator {
     }
 
     bodyLines.add(
-        "throw UnsupportedError(\"The __typename '\${json['__typename']}' is not supported by the $className.fromJson constructor.\");");
+        "throw UnsupportedError(\"The $typeKey '\${json['$typeKey']}' is not supported by the $className.fromJson constructor.\");");
 
     specs.add(ClassMemberCode.constructor(Constructor((c) {
       c.factory = true;
@@ -179,10 +190,12 @@ class JsonGenerator extends UniversalGenerator {
             metadata.explicitSubtypes[i];
         // Strip leading `$` from interface names.
         final subtypeName = subtype.interfaceName.replaceAll('\$', '');
+        // Per-subtype wire value (subtypeWireValue override or clean name).
+        final wireValue = subtype.wireValue ?? subtypeName;
         final keyword = i == 0 ? 'if' : '} else if';
         toJsonBody.add('  $keyword (this is $subtypeName) {');
         toJsonBody.add('    final json = (this as $subtypeName).toJsonLean();');
-        toJsonBody.add("    json['__typename'] = '$subtypeName';");
+        toJsonBody.add("    json['$typeKey'] = '$wireValue';");
         toJsonBody.add('    return json;');
       }
       if (metadata.explicitSubtypes.isNotEmpty) toJsonBody.add('  }');
@@ -191,7 +204,7 @@ class JsonGenerator extends UniversalGenerator {
             '  throw UnsupportedError("Unknown subtype: \\\$runtimeType");');
       } else {
         toJsonBody.add('  final json = toJsonLean();');
-        toJsonBody.add("  json['__typename'] = '$className';");
+        toJsonBody.add("  json['$typeKey'] = '$selfWireValue';");
         toJsonBody.add('  return json;');
       }
 
@@ -337,6 +350,10 @@ class JsonGenerator extends UniversalGenerator {
     }
 
     // _sanitizeJson method
+    // Strips THIS class's own discriminator key (default `'__typename'`)
+    // from the payload and any nested maps so it doesn't leak into wire
+    // output where the discriminator is only meaningful at the top level.
+    final sanitizeTypeKey = metadata.typeKey ?? '__typename';
     specs.add(Method((m) {
       m.name = '_sanitizeJson';
       m.returns = referType('dynamic');
@@ -345,7 +362,7 @@ class JsonGenerator extends UniversalGenerator {
         p.type = referType('dynamic');
       }));
       m.body = Code('''if (json is Map<String, dynamic>) {
-  json.remove('__typename');
+  json.remove('$sanitizeTypeKey');
   return json..forEach((key, value) {
     json[key] = _sanitizeJson(value);
   });
@@ -361,9 +378,15 @@ return json;''');
   void _addToJsonWithDiscriminator(
       List<Spec> specs, ClassMetadata metadata) {
     final className = metadata.cleanName;
+    // Effective key: inherited from the base (resolved by ClassAnalyzer)
+    // or the default `'__typename'`.
+    final typeKey = metadata.typeKey ?? '__typename';
+    // Effective wire value for THIS subtype: the explicit override or
+    // the clean class name.
+    final wireValue = metadata.subtypeWireValue ?? className;
     final body = <String>[];
     body.add('final json = _\$$className' + 'ToJson(this);');
-    body.add("json['__typename'] = '$className';");
+    body.add("json['$typeKey'] = '$wireValue';");
     body.add('return json;');
     specs.add(ClassMemberCode.method(Method((m) {
       m.name = 'toJson';

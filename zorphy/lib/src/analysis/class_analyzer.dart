@@ -24,6 +24,16 @@ class ClassAnalyzer {
     final isAbstract = className.startsWith(r'$$');
     final nonSealed = annotation.read('nonSealed').boolValue;
     final isSealed = isAbstract && !nonSealed;
+    // typeKey: own value takes precedence; otherwise inherit from the
+    // nearest @Zorphy/@Zorphy2-annotated supertype that declares
+    // explicitSubTypes. Subtypes inherit so the generated subtype
+    // toJson() emits the same discriminator key the base's fromJson
+    // dispatches on.
+    final typeKey = annotation.peek('typeKey')?.stringValue ??
+        _resolveInheritedTypeKey(classElement);
+    // subtypeWireValue: per-subtype override of the wire value the base
+    // emits/matches for this subtype. Null -> clean class name at codegen.
+    final subtypeWireValue = annotation.peek('subtypeWireValue')?.stringValue;
 
     // Validate that class uses implements, not extends
     _validateClassStructure(classElement);
@@ -71,6 +81,8 @@ class ClassAnalyzer {
       isAbstract: isAbstract,
       isSealed: isSealed,
       nonSealed: nonSealed,
+      typeKey: typeKey,
+      subtypeWireValue: subtypeWireValue,
       hasConstConstructor: classElement.constructors.any((e) => e.isConst),
       docComment: classElement.documentationComment ?? '',
       generics: generics,
@@ -211,6 +223,11 @@ class ClassAnalyzer {
           .map((f) => NameType(f.name, f.type ?? ""))
           .toList();
 
+      // Read the subtype's own @Zorphy(subtypeWireValue: ...) so the
+      // base's dispatch can match the wire value the remote API sends.
+      // Defaults to null -> clean class name (resolved at codegen time).
+      final subtypeWireValue =
+          _readSubtypeAnnotation(el)?.peek('subtypeWireValue')?.stringValue;
       return Interface.fromGenerics(
         el.name ?? "",
         el.typeParameters.map((tp) {
@@ -222,6 +239,9 @@ class ClassAnalyzer {
         }).toList(),
         nameTypeFields,
         true,
+        false,
+        false,
+        subtypeWireValue,
       );
     }).toList();
   }
@@ -401,5 +421,52 @@ class ClassAnalyzer {
     Set<String> classesInExplicitSubtypes,
   ) {
     return classesInExplicitSubtypes.contains(className);
+  }
+
+  /// Walks [classElement]'s supertype chain to find the nearest
+  /// `@Zorphy`/`@Zorphy2`-annotated base that declares `explicitSubTypes`,
+  /// and returns that base's `typeKey`. Returns `null` when no such base
+  /// exists or the base didn't customize its `typeKey`.
+  ///
+  /// Subtypes inherit the base's `typeKey` so the generated subtype
+  /// `toJson()` emits the same discriminator key the base's `fromJson`
+  /// dispatches on.
+  static String? _resolveInheritedTypeKey(ClassElement classElement) {
+    final zorphyChecker = const TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/annotations.dart#Zorphy',
+    );
+    final zorphy2Checker = const TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/annotations.dart#Zorphy2',
+    );
+    for (final supertype in classElement.allSupertypes) {
+      final el = supertype.element;
+      if (el is! ClassElement) continue;
+      final annot = zorphyChecker.firstAnnotationOf(el) ??
+          zorphy2Checker.firstAnnotationOf(el);
+      if (annot == null) continue;
+      final reader = ConstantReader(annot);
+      final subs = reader.peek('explicitSubTypes');
+      if (subs == null || subs.isNull) continue;
+      // Found the polymorphic base - return its typeKey (may still be null).
+      return reader.peek('typeKey')?.stringValue;
+    }
+    return null;
+  }
+
+  /// Returns a [ConstantReader] for the first `@Zorphy` or `@Zorphy2`
+  /// annotation on [el], or `null` when the class isn't annotated.
+  ///
+  /// Used by [_extractExplicitSubtypes] to read each subtype's
+  /// `subtypeWireValue` regardless of which annotation flavor it uses.
+  static ConstantReader? _readSubtypeAnnotation(ClassElement el) {
+    final zorphyChecker = const TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/annotations.dart#Zorphy',
+    );
+    final zorphy2Checker = const TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/annotations.dart#Zorphy2',
+    );
+    final annot = zorphyChecker.firstAnnotationOf(el) ??
+        zorphy2Checker.firstAnnotationOf(el);
+    return annot == null ? null : ConstantReader(annot);
   }
 }

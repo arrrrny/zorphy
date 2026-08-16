@@ -117,6 +117,10 @@ class GenerationConfig {
   /// Whether the class is abstract (not sealed) when prefixed with $$
   final bool nonSealed;
 
+  /// Custom JSON key for polymorphic type dispatch.
+  /// When null, `'__typename'` is used.
+  final String? typeKey;
+
   /// Factory methods for the class
   final List<FactoryMethodInfo> factoryMethods;
 
@@ -141,6 +145,7 @@ class GenerationConfig {
     required this.generateEqualsToString,
     required this.generateChangeTo,
     required this.nonSealed,
+    this.typeKey,
     required this.factoryMethods,
     required this.ownFields,
   });
@@ -214,6 +219,7 @@ class GenerationConfig {
       ),
       hidePublicConstructor: options.hidePublicConstructor ?? false,
       nonSealed: options.nonSealed ?? false,
+      typeKey: options.typeKey,
       factoryMethods: factoryMethods,
       ownFields: ownFields,
     );
@@ -284,6 +290,7 @@ class GenerationConfig {
     this.generateEqualsToString = true,
     this.generateChangeTo = true,
     this.nonSealed = false,
+    this.typeKey = null,
     this.factoryMethods = const [],
     this.ownFields = const {},
   });

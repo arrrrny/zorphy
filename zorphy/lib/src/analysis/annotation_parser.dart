@@ -31,6 +31,8 @@ class AnnotationParser {
           .peek('hidePublicConstructor')
           ?.boolValue,
       nonSealed: annotation.peek('nonSealed')?.boolValue,
+      typeKey: annotation.peek('typeKey')?.stringValue,
+      subtypeWireValue: annotation.peek('subtypeWireValue')?.stringValue,
     );
   }
 
@@ -80,6 +82,8 @@ class AnnotationOptions {
   final bool? generateChangeTo;
   final bool? hidePublicConstructor;
   final bool? nonSealed;
+  final String? typeKey;
+  final String? subtypeWireValue;
 
   /// Creates a typed options object from annotation values.
   const AnnotationOptions({
@@ -98,5 +102,7 @@ class AnnotationOptions {
     this.generateChangeTo,
     this.hidePublicConstructor,
     this.nonSealed,
+    this.typeKey,
+    this.subtypeWireValue,
   });
 }

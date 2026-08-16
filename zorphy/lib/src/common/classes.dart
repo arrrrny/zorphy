@@ -14,6 +14,10 @@ class Interface {
   /// If true the interface has hidePublicConstructor: true
   final bool hidePublicConstructor;
 
+  /// Custom wire value for polymorphic JSON dispatch.
+  /// When null, [interfaceName] (stripped of $ prefix) is used.
+  final String? wireValue;
+
   /// Creates an interface descriptor from generic names and bounds.
   Interface(
     this.interfaceName,
@@ -23,6 +27,7 @@ class Interface {
     this.isExplicitSubType = false,
     this.isSealed = false,
     this.hidePublicConstructor = false,
+    this.wireValue,
   ]) : assert(
          genericExtends.length == genericName.length,
          "typeArgs must have same length as typeParams",
@@ -40,6 +45,7 @@ class Interface {
     this.isExplicitSubType = false,
     this.isSealed = false,
     this.hidePublicConstructor = false,
+    this.wireValue,
   ]);
 
   /// Returns a compact string representation of the interface.
