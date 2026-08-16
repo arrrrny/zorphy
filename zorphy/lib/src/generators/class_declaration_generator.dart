@@ -250,11 +250,22 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         }
 
         // JsonKey annotation
-        if (f.jsonKeyInfo != null) {
+        //
+        // Issue #89: function-typed fields (callback fields like
+        // `void Function(WebUri? url)?`) cannot be JSON-serialized by
+        // json_serializable — it errors with "Could not generate `fromJson`
+        // code for `<field>`". When the field type is a function type and
+        // the user has not already opted out via their own @JsonKey, we
+        // auto-emit `@JsonKey(includeFromJson: false, includeToJson: false)`
+        // so json_serializable skips it. This mirrors the migrator's pattern
+        // and preserves the field on the concrete class so the abstract
+        // `$Foo` interface contract is still satisfied.
+        final effectiveJsonKey = _effectiveJsonKeyForField(f);
+        if (effectiveJsonKey != null) {
           fd.annotations.add(
             CodeExpression(
               Code(
-                f.jsonKeyInfo!.toAnnotationString(includeDefaultValue: true),
+                effectiveJsonKey.toAnnotationString(includeDefaultValue: true),
               ),
             ),
           );
@@ -585,5 +596,86 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     );
 
     return resolvedParentFields.map((f) => f.name).toSet();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ISSUE #89 HELPERS — function-typed field JSON serialization
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Returns true when [type] is a function type (e.g.
+  /// `void Function(WebUri? url)?`, `String Function(int)`).
+  ///
+  /// Function-typed fields cannot be JSON-serialized by json_serializable
+  /// — they need `@JsonKey(includeFromJson: false, includeToJson: false)`.
+  /// We detect them by looking for ` Function(` (with a leading space to
+  /// avoid matching a class named `Function`), allowing any return type
+  /// prefix. The check is intentionally permissive: it matches the
+  /// existing `type.contains('Function')` heuristic used in
+  /// `helpers.getPatchClass` (helpers.dart line 221).
+  bool _isFunctionType(String? type) {
+    if (type == null || type.isEmpty) return false;
+    // A function type always contains `Function(` (possibly with `<typeArgs>`
+    // between `Function` and `(`, e.g. `T Function<U>(U)` — rare but valid).
+    // Strip whitespace differences by checking for `Function` followed by
+    // optional `<...>` then `(`. We don't need a full parser — any type
+    // string that contains this pattern is a function type for our purposes.
+    final cleaned = type.replaceAll(' ', '');
+    // Look for `Function(` or `Function<` after stripping spaces. Both forms
+    // indicate a function type.
+    return cleaned.contains('Function(') || cleaned.contains('Function<');
+  }
+
+  /// Computes the effective [JsonKeyInfo] to emit for [field].
+  ///
+  /// - If the user provided no @JsonKey and the field is NOT function-typed,
+  ///   returns null (no annotation emitted — preserves existing behavior).
+  /// - If the user provided no @JsonKey and the field IS function-typed,
+  ///   returns a synthetic `JsonKey(includeFromJson: false, includeToJson: false)`.
+  /// - If the user provided an @JsonKey:
+  ///   - For non-function-typed fields, returns it as-is (existing behavior).
+  ///   - For function-typed fields, returns an augmented copy with
+  ///     `includeFromJson: false` and `includeToJson: false` forced to false
+  ///     UNLESS the user already set them explicitly. This prevents
+  ///     json_serializable from trying to generate a serializer for the
+  ///     function type while still honoring user-provided name/defaultValue/
+  ///     fromJson/toJson settings.
+  JsonKeyInfo? _effectiveJsonKeyForField(NameTypeClassComment field) {
+    final isFn = _isFunctionType(field.type);
+    final user = field.jsonKeyInfo;
+
+    if (user == null) {
+      if (!isFn) return null;
+      // Function-typed field with no user-provided @JsonKey — auto-emit
+      // the skip-serialization JsonKey.
+      return const JsonKeyInfo(
+        includeFromJson: false,
+        includeToJson: false,
+      );
+    }
+
+    if (!isFn) {
+      // Non-function-typed field with user-provided @JsonKey — respect as-is.
+      return user;
+    }
+
+    // Function-typed field WITH user-provided @JsonKey. Augment with
+    // includeFromJson=false / includeToJson=false unless the user already
+    // set them explicitly.
+    if (user.includeFromJson == false && user.includeToJson == false) {
+      return user; // User already opted out — leave alone.
+    }
+    return JsonKeyInfo(
+      name: user.name,
+      ignore: user.ignore,
+      defaultValue: user.defaultValue,
+      required: user.required,
+      includeIfNull: user.includeIfNull,
+      includeFromJson: user.includeFromJson ?? false,
+      includeToJson: user.includeToJson ?? false,
+      disallowNullValue: user.disallowNullValue,
+      toJson: user.toJson,
+      fromJson: user.fromJson,
+      converter: user.converter,
+    );
   }
 }
