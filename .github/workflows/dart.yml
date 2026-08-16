@@ -122,6 +122,19 @@ jobs:
         run: dart analyze lib
         working-directory: zorphy
 
+      # The generation tests (cross_entity_reference, issue_304_extends,
+      # framework_gaps, preset_generation, zorphy2_alias_compat) require the
+      # pre-generated example/ fixtures — same setup as analyze_and_test.
+      # Without this, every generation test fails in setUpAll with
+      # "Fixture not generated. Run: cd example && dart run build_runner build".
+      - name: Install dependencies (example)
+        run: dart pub get
+        working-directory: zorphy/example
+
+      - name: Run build_runner (example)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: zorphy/example
+
       - name: Run tests (analyzer ${{ matrix.analyzer }})
         run: dart test
         working-directory: zorphy

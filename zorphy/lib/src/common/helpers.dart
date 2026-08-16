@@ -400,7 +400,8 @@ List<NameTypeClassComment> getAllFields(
     var fields = elem.children.whereType<FieldElement>().map((f) {
       return NameTypeClassComment(
         f.name ?? "",
-        typeToString(
+        _resolveFieldType(
+          f,
           f.type,
           currentClassName: currentClassName,
           library: library,
@@ -430,7 +431,8 @@ List<NameTypeClassComment> getAllFields(
 
           return NameTypeClassComment(
             a.name ?? "",
-            typeToString(
+            _resolveFieldType(
+              a,
               a.returnType,
               currentClassName: currentClassName,
               library: library,
@@ -749,3 +751,263 @@ String typeToString(
 
   return manual != null ? "$manual$nullMarker" : type.toString();
 }
+
+
+/// Strips Dart keywords and annotations from a recovered raw type string.
+///
+/// Ported verbatim from `ClassAnalyzer._cleanRecoveredType` so that field
+/// recovery uses the same cleaning rules as method/parameter recovery.
+String cleanRecoveredType(String rawString) {
+  var result = rawString;
+  // Basic cleanup of keywords and annotations
+  final keywords = [
+    'static',
+    'required',
+    'final',
+    'const',
+    'var',
+    'covariant',
+    'late',
+    'external',
+    'abstract',
+    'get',
+    'set',
+  ];
+  for (final kw in keywords) {
+    if (result.startsWith(kw + ' ')) {
+      result = result.substring(kw.length).trim();
+    }
+    result = result.replaceAll(RegExp(r'\b' + kw + r'\b'), '').trim();
+  }
+
+  // Remove annotations (anything starting with @ up to whitespace or end)
+  while (result.startsWith('@')) {
+    final endIdx = result.indexOf(' ');
+    if (endIdx != -1) {
+      result = result.substring(endIdx).trim();
+    } else {
+      // Handle @Annotation(...)
+      if (result.startsWith('@') && result.contains(')')) {
+        final closeIdx = result.indexOf(')');
+        result = result.substring(closeIdx + 1).trim();
+      } else {
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+/// Attempts to recover the original type string from source code when the
+/// analyzer returns `InvalidType`.
+///
+/// This handles the cross-entity reference case (issue #351): when a Zorphy
+/// entity has a field whose declared type is the CONCRETE form of another
+/// Zorphy entity (e.g. `ParentThing? get parent` with no `$` prefix), the
+/// analyzer cannot resolve the type during `build_runner` because the
+/// concrete class is generated into a `.zorphy.dart` PART file that is not
+/// yet in the analysis session. `typeToString` then falls back to
+/// `InvalidType`, which breaks `json_serializable`.
+///
+/// The recovery walks the source text backwards from the element's
+/// `nameOffset` (or falls back to a text search) to extract the type token
+/// that appears immediately before the field/getter/parameter name.
+///
+/// Ported verbatim from `ClassAnalyzer._recoverTypeFromSource` so it can be
+/// called from `getAllFields` (which lives in this file) without a circular
+/// import on `class_analyzer.dart`.
+String recoverTypeFromSource(Element element, String currentType) {
+  try {
+    final dynamic dynElem = element;
+
+    // Try to get source from various places dynamically
+    dynamic sourceObj;
+    try {
+      sourceObj = dynElem.source;
+    } catch (_) {}
+
+    if (sourceObj == null) {
+      try {
+        sourceObj = (dynElem.library as dynamic)?.source;
+      } catch (_) {}
+    }
+
+    if (sourceObj == null) {
+      try {
+        sourceObj = (dynElem.enclosingElement as dynamic)?.source;
+      } catch (_) {}
+    }
+
+    String? source;
+    if (sourceObj != null) {
+      try {
+        source = (sourceObj as dynamic).contents.data.toString();
+      } catch (_) {}
+    }
+
+    // Try various offset properties
+    int? nameOffset;
+    try {
+      nameOffset = dynElem.nameOffset as int?;
+    } catch (_) {}
+
+    if (nameOffset == null) {
+      try {
+        nameOffset = dynElem.offset as int?;
+      } catch (_) {}
+    }
+
+    if (source == null) {
+      return currentType;
+    }
+
+    // Treat -1 / 0 as "no offset" — the analyzer returns these for synthetic
+    // or unresolved elements. Fall through to the text-search fallback.
+    final hasValidOffset = nameOffset != null && nameOffset > 0;
+
+    // If nameOffset is missing, try to find the element in the source text
+    if (!hasValidOffset) {
+      // Fallback: Text search
+      final containerName =
+          (dynElem.enclosingElement as dynamic)?.name as String?;
+      final entityName = element.name;
+
+      if (containerName != null && entityName != null) {
+        // Try constructor-parameter pattern first (original behavior —
+        // preserves the recovery for method params that was already working).
+        final ctorPattern = RegExp(
+          '\b' + containerName + r'\b\s*\([\s\S]*?([\w<>,? ]+)\s+\b' + entityName + r'\b',
+        );
+        var match = ctorPattern.firstMatch(source);
+        if (match != null) {
+          var extracted = match.group(1)!;
+          if (extracted.contains(',')) {
+            extracted = extracted.split(',').last;
+          }
+          var candidate = cleanRecoveredType(extracted.trim());
+          if (candidate.isNotEmpty && !candidate.contains('InvalidType')) {
+            return candidate;
+          }
+        }
+
+        // Field/getter pattern (issue #351): matches `Type get name` or
+        // `Type name;` / `Type name =` / `Type name,` inside the class body.
+        // The capture group grabs the type token sequence before the name,
+        // stopping at the class/member delimiter ( `{` `;` `}` or newline
+        // followed by indentation). We use a non-greedy match scoped to the
+        // enclosing class body so we don't accidentally match a same-named
+        // identifier in a sibling class.
+        //
+        // We try the getter form first (`Type get name`), then the plain
+        // field form (`Type name;`).
+        final escapedName = RegExp.escape(entityName);
+        final getterPattern = RegExp(
+          r'([\w<>,?\s]+?)\s+get\s+\b' + escapedName + r'\b',
+        );
+        final fieldPattern = RegExp(
+          r'([\w<>,?\s]+?)\s+\b' + escapedName + r'\b\s*[;=,]',
+        );
+        for (final pattern in [getterPattern, fieldPattern]) {
+          match = pattern.firstMatch(source);
+          if (match != null) {
+            var candidate = cleanRecoveredType(match.group(1)!.trim());
+            // Reject obviously wrong matches: the type must not contain
+            // the entity name itself, must not be empty, and must not be
+            // a comment fragment.
+            if (candidate.isNotEmpty &&
+                !candidate.contains('InvalidType') &&
+                !candidate.contains('//') &&
+                candidate != entityName) {
+              return candidate;
+            }
+          }
+        }
+      }
+
+      return currentType;
+    }
+
+    var i = nameOffset - 1;
+
+    // Skip whitespace backwards from name
+    while (i >= 0 && source.codeUnitAt(i) <= 32) i--;
+
+    if (i < 0) return currentType;
+
+    // If the token immediately before the name is `get` (i.e., this is a
+    // getter declaration `Type get name`), skip past `get` and its leading
+    // whitespace so the type scan doesn't include the `get` keyword.
+    final beforeName = source.substring(i > 3 ? i - 3 : 0, i + 1);
+    if (beforeName.endsWith('get') || beforeName.endsWith('get ')) {
+      // Back up past 'get' (3 chars) and any whitespace.
+      i -= 3;
+      while (i >= 0 && source.codeUnitAt(i) <= 32) i--;
+      if (i < 0) return currentType;
+    }
+
+    final typeEnd = i + 1;
+    int depth = 0; // <> depth
+    int parenDepth = 0; // () depth (for annotations)
+
+    // Scan backwards to find start of type
+    int typeStart = 0;
+
+    while (i >= 0) {
+      final char = source[i];
+
+      if (char == '>')
+        depth++;
+      else if (char == '<')
+        depth--;
+      else if (char == ')')
+        parenDepth++;
+      else if (char == '(')
+        parenDepth--;
+
+      // Stop at delimiters if we are at top level
+      if (depth == 0 && parenDepth == 0) {
+        if (char == ',' || char == '(' || char == '{' || char == ';') {
+          typeStart = i + 1;
+          break;
+        }
+      }
+      i--;
+    }
+
+    var rawString = source.substring(typeStart, typeEnd).trim();
+    var candidate = cleanRecoveredType(rawString);
+
+    if (candidate.isNotEmpty && !candidate.contains('InvalidType')) {
+      return candidate;
+    }
+
+    return currentType;
+  } catch (e) {
+    print('ZORPHY DEBUG: Error recovering type: ' + e.toString());
+    return currentType;
+  }
+}
+
+/// Resolves a field/getter type, falling back to source recovery when the
+/// analyzer returns `InvalidType`. Used by `getAllFields` so that
+/// cross-entity concrete references (issue #351) don't break the build.
+String _resolveFieldType(
+  Element element,
+  DartType type, {
+  String? currentClassName,
+  LibraryElement? library,
+}) {
+  var result = typeToString(
+    type,
+    currentClassName: currentClassName,
+    library: library,
+  );
+  if (result.contains('InvalidType')) {
+    final recovered = recoverTypeFromSource(element, result);
+    if (!recovered.contains('InvalidType')) {
+      return recovered;
+    }
+  }
+  return result;
+}
+
