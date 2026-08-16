@@ -24,3 +24,14 @@ class JsAlertResponseAction_ {
   ///Confirm that the user hit confirm button.
   static const CONFIRM = const JsAlertResponseAction_._internal(0);
 }
+
+@ExchangeableEnum()
+class URLRequestNetworkServiceType_ {
+  // ignore: unused_field
+  final int _value;
+  const URLRequestNetworkServiceType_._internal(this._value);
+
+  static const DEFAULT = const URLRequestNetworkServiceType_._internal(0);
+  static const VIDEO = const URLRequestNetworkServiceType_._internal(2);
+  static const BACKGROUND = const URLRequestNetworkServiceType_._internal(3);
+}

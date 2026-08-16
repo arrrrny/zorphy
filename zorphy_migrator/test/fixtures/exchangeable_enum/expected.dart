@@ -9,3 +9,9 @@ enum JsAlertResponseAction {
   ///Confirm that the user hit confirm button.
   CONFIRM,
 }
+
+enum URLRequestNetworkServiceType {
+  DEFAULT,
+  VIDEO,
+  BACKGROUND,
+}

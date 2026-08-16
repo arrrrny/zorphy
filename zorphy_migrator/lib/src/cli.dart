@@ -100,6 +100,10 @@ class MigratorCli {
 
       final replacements = replacementsFor(fileModels, renderer.render);
       for (final m in fileModels) {
+        // Informational items ride along on converted models too (e.g. an
+        // enum wire that needs consumer glue) — the conversion is safe, the
+        // report still tells the reader what to check by hand.
+        manual.addAll(m.informationalItems);
         if (m.isMigratable) {
           final notes = <String>[];
           if (m.dialect == ModelDialect.freezed &&
