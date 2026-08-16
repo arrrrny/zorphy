@@ -2,6 +2,7 @@
 library;
 
 export 'src/cli.dart';
+export 'src/exchangeable_detector.dart';
 export 'src/freezed_detector.dart';
 export 'src/mapping.dart';
 export 'src/model.dart';
