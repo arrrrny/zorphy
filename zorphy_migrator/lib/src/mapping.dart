@@ -161,7 +161,26 @@ class ZorphyRenderer {
     for (final field in model.fields) {
       _renderExchangeableField(field, sb);
     }
+    for (final method in model.staticMethods) {
+      _renderStaticFactory(method, model.name, sb);
+    }
     sb.writeln('}');
+  }
+
+  /// Emits a preserved static factory on the `$` class, re-pointing the
+  /// codegen `Name_` back to the generated concrete `Name`.
+  void _renderStaticFactory(
+    String methodSource,
+    String name,
+    StringBuffer sb,
+  ) {
+    final oldName = '${name}_';
+    final reindented = methodSource
+        .replaceAll(oldName, name)
+        .split('\n')
+        .map((line) => line.isEmpty ? line : '  $line')
+        .join('\n');
+    sb.writeln(reindented);
   }
 
   void _renderExchangeableField(FreezedField field, StringBuffer sb) {
