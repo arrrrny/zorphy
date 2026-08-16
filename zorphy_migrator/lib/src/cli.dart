@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
+import 'exchangeable_detector.dart';
 import 'freezed_detector.dart';
 import 'mapping.dart';
 import 'model.dart';
@@ -59,10 +60,22 @@ class MigratorCli {
 
     List<FreezedClassModel> models;
     try {
-      models = await FreezedDetector().detect(files);
+      final freezedModels = await FreezedDetector().detect(files);
+      final exchangeableModels = await ExchangeableDetector().detect(files);
+      models = [...freezedModels, ...exchangeableModels];
     } catch (e) {
       stderr.writeln('Analysis error: $e');
       return exitAnalysisError;
+    }
+
+    if (models.isEmpty && files.isNotEmpty) {
+      // A wrong-scope invocation must not look like a clean migration.
+      stderr.writeln(
+        'WARNING: no @freezed or @ExchangeableObject/@ExchangeableEnum '
+        'models found under $target — nothing to migrate. Is this the '
+        'right directory?',
+      );
+      return exitManualItems;
     }
 
     final renderer = ZorphyRenderer(
@@ -89,8 +102,16 @@ class MigratorCli {
       for (final m in fileModels) {
         if (m.isMigratable) {
           final notes = <String>[];
-          if (m.isLeanEligible && !m.isUnion) {
+          if (m.dialect == ModelDialect.freezed &&
+              m.isLeanEligible &&
+              !m.isUnion) {
             notes.add('preset: ZorphyPreset.lean');
+          }
+          if (m.dialect == ModelDialect.exchangeableObject) {
+            notes.add('@ExchangeableObject');
+          }
+          if (m.dialect == ModelDialect.exchangeableEnum) {
+            notes.add('@ExchangeableEnum');
           }
           converted.add(ConvertedClass(m.name, file, notes));
         } else {
@@ -115,6 +136,9 @@ class MigratorCli {
     final report = MigrationReport(
       converted: converted,
       manualItems: manual,
+      hasExchangeable: models.any(
+        (m) => m.dialect != ModelDialect.freezed,
+      ),
     );
     if (reportPath != null) {
       await File(reportPath).writeAsString(report.toMarkdown());

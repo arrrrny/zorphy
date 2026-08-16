@@ -9,12 +9,17 @@ class FreezedField {
   final String? defaultExpression;
   final List<String> jsonKeyAnnotations;
 
+  /// Doc-comment source (with `///` markers) attached to the field /
+  /// parameter, preserved on the generated getter.
+  final String? docComment;
+
   const FreezedField({
     required this.name,
     required this.type,
     required this.isRequired,
     this.defaultExpression,
     this.jsonKeyAnnotations = const [],
+    this.docComment,
   });
 }
 
@@ -50,6 +55,25 @@ class ManualItem {
   });
 }
 
+/// The input dialect a detected model came from. The migrator converts
+/// freezed_annotation classes and, for codegen-heavy fork packages that do
+/// not use Freezed at all (e.g. flutter_inappwebview's
+/// `@ExchangeableObject` / `@ExchangeableEnum`), the equivalent custom
+/// codegen annotations — same destination (Zorphy entities), different
+/// source syntax.
+enum ModelDialect {
+  /// `@freezed` / `@unfreezed` classes from `package:freezed_annotation`.
+  freezed,
+
+  /// `@ExchangeableObject()` value-object classes (custom build_runner
+  /// codegen, e.g. zikzak_inappwebview / flutter_inappwebview forks).
+  exchangeableObject,
+
+  /// `@ExchangeableEnum()` class-based enums (a class with a `_value`
+  /// field and `static const` members).
+  exchangeableEnum,
+}
+
 /// A detected freezed class with everything needed to rewrite it.
 class FreezedClassModel {
   /// Class name without the freezed mixin, e.g. `User`.
@@ -65,6 +89,17 @@ class FreezedClassModel {
   final bool hasToJson;
   final bool isUnfreezed;
   final List<ManualItem> manualItems;
+
+  /// Which source dialect produced this model.
+  final ModelDialect dialect;
+
+  /// For [ModelDialect.exchangeableEnum]: the `static const` member names
+  /// in declaration order. Empty for other dialects.
+  final List<String> enumMembers;
+
+  /// For [ModelDialect.exchangeableEnum]: doc-comment source per member
+  /// (aligned with [enumMembers]), or `null` where the member had none.
+  final List<String?> enumMemberDocs;
 
   /// Character offsets of the full class declaration in the source.
   final int spanStart;
@@ -87,6 +122,9 @@ class FreezedClassModel {
     required this.spanStart,
     required this.spanEnd,
     this.docComment,
+    this.dialect = ModelDialect.freezed,
+    this.enumMembers = const [],
+    this.enumMemberDocs = const [],
   });
 
   bool get isUnion => variants.isNotEmpty;
