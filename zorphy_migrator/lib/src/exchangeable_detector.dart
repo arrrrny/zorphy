@@ -163,17 +163,20 @@ class ExchangeableDetector {
       if (member.factoryKeyword != null) continue; // not a generative ctor
       // `@ExchangeableObjectConstructor` is the fork codegen's standard
       // constructor marker; it only adds custom surface when the body has
-      // statements (e.g. asserts, default computation). An empty body
-      // (`{}` / `;`) means the parameters alone define the field set, so the
-      // constructor is convertible like a plain generative one.
+      // statements (e.g. asserts, default computation) or when the initializer
+      // list contains assertions / field initializers / redirecting
+      // constructors. An empty body AND empty initializers means the
+      // parameters alone define the field set, so the constructor is
+      // convertible like a plain generative one.
       if (_hasCustomMemberAnnotation(member) &&
-          !_isEmptyBody(member.body)) {
+          (!_isEmptyBody(member.body) || member.initializers.isNotEmpty)) {
         manual.add(
           ManualItem(
             filePath: unit.path,
             line: lineInfo.getLocation(member.offset).lineNumber,
             construct: name,
-            reason: 'custom @ExchangeableObjectConstructor — migrate by hand',
+            reason: 'custom @ExchangeableObjectConstructor with non-empty body '
+                'or initializers — migrate by hand',
           ),
         );
         continue;

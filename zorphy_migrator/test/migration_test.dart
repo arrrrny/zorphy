@@ -128,6 +128,37 @@ void main() {
       });
     }
 
+    test('exchangeable_object_ctor_initializers is report-only (untouched, manual item recorded)', () async {
+      final dir = p.join(fixturesDir, 'exchangeable_object_ctor_initializers');
+      final inputFile = File(p.join(dir, 'input.dart'));
+      final source = inputFile.readAsStringSync();
+
+      final models = await ExchangeableDetector().detect([
+        inputFile.absolute.path,
+      ]);
+      expect(models, isNotEmpty, reason: 'no class detected');
+
+      final renderer = ZorphyRenderer(
+        siblingClassNames: models.map((m) => m.name).toSet(),
+      );
+      final rewriter = Rewriter();
+      final revised = rewriter.applySpans(
+        source,
+        replacementsFor(models, renderer.render),
+      );
+
+      // File content unchanged — nothing migratable was rewritten.
+      expect(revised, source);
+      // Every detected class carries at least one manual item.
+      for (final m in models) {
+        expect(
+          m.manualItems,
+          isNotEmpty,
+          reason: '${m.name} should produce a manual item',
+        );
+      }
+    });
+
     test('detector strips the codegen `_` suffix and records dialects', () async {
       final inputFile = File(
         p.join(fixturesDir, 'exchangeable_object', 'input.dart'),
