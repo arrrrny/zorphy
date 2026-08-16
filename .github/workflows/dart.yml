@@ -95,14 +95,7 @@ jobs:
           # `resolution` and `workspace` keys — the pin must be nested under
           # `dependency_overrides:`, not written at the top level.
           if [ "${{ matrix.analyzer }}" = "14" ]; then
-            cat > pubspec_overrides.yaml <<'EOF'
-dependency_overrides:
-  analyzer: ^14.0.0
-  json_serializable:
-    git:
-      url: https://github.com/google/json_serializable.dart
-      path: json_serializable
-EOF
+            printf 'dependency_overrides:\n  analyzer: ^14.0.0\n  json_serializable:\n    git:\n      url: https://github.com/google/json_serializable.dart\n      path: json_serializable\n' > pubspec_overrides.yaml
           else
             printf 'dependency_overrides:\n  analyzer: ^13.0.0\n' > pubspec_overrides.yaml
           fi
