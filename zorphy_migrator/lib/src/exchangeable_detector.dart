@@ -146,6 +146,8 @@ class ExchangeableDetector {
   ) {
     final fields = <FreezedField>[];
     final constructorParamNames = <String>{};
+    final staticMethods = <String>[];
+    final informational = <ManualItem>[];
 
     // Field declarations carry the docs and (for `this.x` params) the type;
     // index them by name for the constructor pass below.
@@ -201,6 +203,23 @@ class ExchangeableDetector {
     for (final member in members) {
       if (member is ConstructorDeclaration) continue;
       if (member is MethodDeclaration) {
+        if (member.isStatic && _returnsOwnType(member, name)) {
+          staticMethods.add(
+            unit.content.substring(member.offset, member.end),
+          );
+          informational.add(
+            ManualItem(
+              filePath: unit.path,
+              line: lineInfo.getLocation(member.offset).lineNumber,
+              construct: '$name.${member.name.lexeme}',
+              reason:
+                  'static factory returning $name — preserved verbatim on '
+                  'the migrated \$ class (zorphy generator re-emits it on '
+                  'the concrete class)',
+            ),
+          );
+          continue;
+        }
         manual.add(
           ManualItem(
             filePath: unit.path,
@@ -259,6 +278,8 @@ class ExchangeableDetector {
       spanEnd: node.end,
       docComment: doc,
       dialect: ModelDialect.exchangeableObject,
+      informationalItems: informational,
+      staticMethods: staticMethods,
     );
   }
 
@@ -417,6 +438,15 @@ class ExchangeableDetector {
           .join('\n');
     }
     return null;
+  }
+
+  /// Whether [member] is a static method whose (unqualified, `_`-stripped)
+  /// return type is the class's own name — i.e. a convenience factory the
+  /// zorphy generator re-emits on the generated concrete class.
+  bool _returnsOwnType(MethodDeclaration member, String name) {
+    final returnType = member.returnType;
+    if (returnType is! NamedType) return false;
+    return _stripSuffix(returnType.name.lexeme) == name;
   }
 
   /// Strips the fork's codegen `_` suffix: `NavigationAction_` →

@@ -97,6 +97,7 @@ void main() {
       'exchangeable_object',
       'exchangeable_enum',
       'exchangeable_object_empty_ctor',
+      'exchangeable_object_static_factory',
     ]) {
       test('$name converts byte-identical to expected.dart', () async {
         final dir = p.join(fixturesDir, name);
