@@ -175,11 +175,12 @@ class ZorphyRenderer {
     StringBuffer sb,
   ) {
     final oldName = '${name}_';
-    final reindented = methodSource
-        .replaceAll(RegExp(r'\b' + RegExp.escape(oldName) + r'\b'), name)
-        .split('\n')
-        .map((line) => line.isEmpty ? line : '  $line')
-        .join('\n');
+    // The source is captured from the start of its line (including the
+    // original indentation), so no re-indent pass is needed here.
+    final reindented = methodSource.replaceAll(
+      RegExp(r'\b' + RegExp.escape(oldName) + r'\b'),
+      name,
+    );
     sb.writeln(reindented);
   }
 

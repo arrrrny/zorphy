@@ -204,8 +204,15 @@ class ExchangeableDetector {
       if (member is ConstructorDeclaration) continue;
       if (member is MethodDeclaration) {
         if (member.isStatic && _returnsOwnType(member, name)) {
+          // Capture verbatim from the start of the member's line (or its doc
+          // comment) so the re-emitted factory keeps its original
+          // indentation and documentation.
+          var start = member.beginToken.precedingComments?.offset ?? member.offset;
+          while (start > 0 && unit.content[start - 1] != '\n') {
+            start--;
+          }
           staticMethods.add(
-            unit.content.substring(member.offset, member.end),
+            unit.content.substring(start, member.end),
           );
           informational.add(
             ManualItem(
@@ -446,7 +453,9 @@ class ExchangeableDetector {
   bool _returnsOwnType(MethodDeclaration member, String name) {
     final returnType = member.returnType;
     if (returnType is! NamedType) return false;
-    return _stripSuffix(returnType.name.lexeme) == name;
+    final typeName = returnType.name;
+    if (typeName is PrefixedIdentifier) return false;
+    return _stripSuffix(typeName.lexeme) == name;
   }
 
   /// Strips the fork's codegen `_` suffix: `NavigationAction_` →
