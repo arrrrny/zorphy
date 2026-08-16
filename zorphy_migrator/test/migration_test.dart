@@ -167,6 +167,19 @@ void main() {
       );
       expect(navigation.manualItems, isEmpty);
       expect(navigation.isMigratable, isTrue);
+
+      // Non-sequential int wire values do NOT block the conversion — the
+      // enum still migrates, but an informational item flags the wire glue.
+      final networkServiceType = models.singleWhere(
+        (m) => m.name == 'URLRequestNetworkServiceType',
+      );
+      expect(networkServiceType.enumMembers, ['DEFAULT', 'VIDEO', 'BACKGROUND']);
+      expect(networkServiceType.isMigratable, isTrue);
+      expect(networkServiceType.informationalItems, isNotEmpty);
+      expect(
+        networkServiceType.informationalItems.single.reason,
+        contains('not sequential 0..n-1'),
+      );
     });
   });
 

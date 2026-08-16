@@ -101,6 +101,13 @@ class FreezedClassModel {
   /// (aligned with [enumMembers]), or `null` where the member had none.
   final List<String?> enumMemberDocs;
 
+  /// Non-blocking items reported alongside a converted model: the model
+  /// still migrates, but the reader is told what needs hand attention
+  /// afterwards (e.g. an enum whose wire values do not map onto a plain
+  /// enum's `.index`/name — the conversion is safe, the consumer glue is
+  /// not). Unlike [manualItems], these do NOT make the model unmigratable.
+  final List<ManualItem> informationalItems;
+
   /// Character offsets of the full class declaration in the source.
   final int spanStart;
   final int spanEnd;
@@ -125,6 +132,7 @@ class FreezedClassModel {
     this.dialect = ModelDialect.freezed,
     this.enumMembers = const [],
     this.enumMemberDocs = const [],
+    this.informationalItems = const [],
   });
 
   bool get isUnion => variants.isNotEmpty;
