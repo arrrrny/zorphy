@@ -93,7 +93,11 @@ void main() {
   });
 
   group('exchangeable fixtures (@ExchangeableObject/@ExchangeableEnum)', () {
-    for (final name in ['exchangeable_object', 'exchangeable_enum']) {
+    for (final name in [
+      'exchangeable_object',
+      'exchangeable_enum',
+      'exchangeable_object_empty_ctor',
+    ]) {
       test('$name converts byte-identical to expected.dart', () async {
         final dir = p.join(fixturesDir, name);
         final inputFile = p.join(dir, 'input.dart');
