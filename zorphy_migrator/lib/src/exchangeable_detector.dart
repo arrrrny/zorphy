@@ -146,6 +146,7 @@ class ExchangeableDetector {
   ) {
     final fields = <FreezedField>[];
     final constructorParamNames = <String>{};
+    final informational = <ManualItem>[];
 
     // Field declarations carry the docs and (for `this.x` params) the type;
     // index them by name for the constructor pass below.
@@ -167,7 +168,8 @@ class ExchangeableDetector {
       // (`{}` / `;`) means the parameters alone define the field set, so the
       // constructor is convertible like a plain generative one.
       if (_hasCustomMemberAnnotation(member) &&
-          !_isEmptyBody(member.body)) {
+          !_isEmptyBody(member.body) &&
+          !_isAssertOnlyBody(member.body)) {
         manual.add(
           ManualItem(
             filePath: unit.path,
@@ -177,6 +179,18 @@ class ExchangeableDetector {
           ),
         );
         continue;
+      }
+      if (_isAssertOnlyBody(member.body)) {
+        informational.add(
+          ManualItem(
+            filePath: unit.path,
+            line: lineInfo.getLocation(member.offset).lineNumber,
+            construct: name,
+            reason:
+                'assert-only constructor body dropped — dev-time invariant '
+                'checks cannot be expressed on the Zorphy entity',
+          ),
+        );
       }
       for (final param in member.parameters.parameters) {
         final paramName = param.name?.lexeme;
@@ -259,6 +273,7 @@ class ExchangeableDetector {
       spanEnd: node.end,
       docComment: doc,
       dialect: ModelDialect.exchangeableObject,
+      informationalItems: informational,
     );
   }
 
@@ -381,6 +396,17 @@ class ExchangeableDetector {
     if (body is EmptyFunctionBody) return true;
     if (body is BlockFunctionBody) return body.block.statements.isEmpty;
     return false;
+  }
+
+  /// Whether [body] contains only `assert(...)` statements — dev-time
+  /// invariant checks the zorphy generator cannot express. Such bodies add
+  /// no serialization surface, so they are dropped (informational) instead
+  /// of blocking the conversion.
+  bool _isAssertOnlyBody(FunctionBody body) {
+    if (body is! BlockFunctionBody) return false;
+    final statements = body.block.statements;
+    if (statements.isEmpty) return false;
+    return statements.every((s) => s is AssertStatement);
   }
 
   /// The declared type of a constructor parameter. For `this.x` params the
