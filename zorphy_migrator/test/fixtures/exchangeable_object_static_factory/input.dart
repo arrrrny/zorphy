@@ -12,6 +12,11 @@ class AndroidResource_ {
   AndroidResource_({required this.name, this.defType, this.defPackage});
 
   static AndroidResource_ id({required String name, String? defPackage}) {
+    final myAndroidResource_ = 'test';
     return AndroidResource_(name: name, defType: "id", defPackage: defPackage);
+  }
+
+  static AndroidResource_ layout({required String name, String? defPackage}) {
+    return AndroidResource_(name: name, defType: "layout", defPackage: defPackage);
   }
 }

@@ -176,7 +176,7 @@ class ZorphyRenderer {
   ) {
     final oldName = '${name}_';
     final reindented = methodSource
-        .replaceAll(oldName, name)
+        .replaceAll(RegExp(r'\b' + RegExp.escape(oldName) + r'\b'), name)
         .split('\n')
         .map((line) => line.isEmpty ? line : '  $line')
         .join('\n');
