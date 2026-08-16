@@ -6,6 +6,19 @@ import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
 import 'base_generator.dart';
 
+/// Escapes a string value for safe interpolation into a Dart string literal.
+/// Handles apostrophes, backslashes, quotes, dollar signs, and line breaks.
+String _escapeDartStringLiteral(String value) {
+  return value
+      .replaceAll('\\', '\\\\')  // backslash must be first
+      .replaceAll("'", "\\'")     // single quote
+      .replaceAll('"', '\\"')     // double quote
+      .replaceAll('\$', '\\\$')   // dollar sign
+      .replaceAll('\n', '\\n')    // newline
+      .replaceAll('\r', '\\r')    // carriage return
+      .replaceAll('\t', '\\t');   // tab
+}
+
 /// Generates JSON serialization members.
 ///
 /// - `fromJson` (factory constructor) is returned as
@@ -83,7 +96,7 @@ class JsonGenerator extends UniversalGenerator {
               manualFromJsonFields.where((m) => m.name == f.name);
           if (manualField.isNotEmpty) {
             final info = manualField.first.jsonKeyInfo!;
-            final jsonFieldName = info.name ?? f.name;
+            final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
             bodyLines.add(
                 "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type} : null,");
           } else {
@@ -118,11 +131,11 @@ class JsonGenerator extends UniversalGenerator {
     // Effective discriminator key: the base's `typeKey`
     // (inherited by subtypes via ClassAnalyzer._resolveInheritedTypeKey)
     // or the historical default `'__typename'`.
-    final typeKey = metadata.typeKey ?? '__typename';
+    final typeKey = _escapeDartStringLiteral(metadata.typeKey ?? '__typename');
     // Self-case wire value: a non-sealed base (or a base that is itself
     // a subtype) must emit/match the same value its own `toJson()`
     // produces. Falls back to the clean class name.
-    final selfWireValue = metadata.subtypeWireValue ?? className;
+    final selfWireValue = _escapeDartStringLiteral(metadata.subtypeWireValue ?? className);
     final bodyLines = <String>[];
 
     final hasSelfCase = !metadata.isAbstract &&
@@ -145,7 +158,7 @@ class JsonGenerator extends UniversalGenerator {
       final interfaceName = subtype.interfaceName.replaceAll('\$', '');
       // Per-subtype wire value: `subtypeWireValue` override on the subtype,
       // else the clean interface name.
-      final wireValue = subtype.wireValue ?? interfaceName;
+      final wireValue = _escapeDartStringLiteral(subtype.wireValue ?? interfaceName);
       final isLast = caseIndex == totalCases - 1;
       final prefix = caseIndex == 0 ? 'if' : '} else if';
 
@@ -191,7 +204,7 @@ class JsonGenerator extends UniversalGenerator {
         // Strip leading `$` from interface names.
         final subtypeName = subtype.interfaceName.replaceAll('\$', '');
         // Per-subtype wire value (subtypeWireValue override or clean name).
-        final wireValue = subtype.wireValue ?? subtypeName;
+        final wireValue = _escapeDartStringLiteral(subtype.wireValue ?? subtypeName);
         final keyword = i == 0 ? 'if' : '} else if';
         toJsonBody.add('  $keyword (this is $subtypeName) {');
         toJsonBody.add('    final json = (this as $subtypeName).toJsonLean();');
@@ -255,7 +268,7 @@ class JsonGenerator extends UniversalGenerator {
             manualFromJsonFields.where((m) => m.name == f.name);
         if (manualField.isNotEmpty) {
           final info = manualField.first.jsonKeyInfo!;
-          final jsonFieldName = info.name ?? f.name;
+          final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
           bodyLines.add(
               "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type} : null,");
         } else {
@@ -311,7 +324,7 @@ class JsonGenerator extends UniversalGenerator {
               'ToJson(this);');
       for (final f in manualToJsonFields) {
         final info = f.jsonKeyInfo!;
-        final jsonFieldName = info.name ?? f.name;
+        final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
         body.add(
             "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
       }
@@ -330,7 +343,7 @@ class JsonGenerator extends UniversalGenerator {
               'ToJson(this, $toJsonArgs);');
       for (final f in manualToJsonFields) {
         final info = f.jsonKeyInfo!;
-        final jsonFieldName = info.name ?? f.name;
+        final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
         body.add(
             "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
       }
@@ -353,7 +366,7 @@ class JsonGenerator extends UniversalGenerator {
     // Strips THIS class's own discriminator key (default `'__typename'`)
     // from the payload and any nested maps so it doesn't leak into wire
     // output where the discriminator is only meaningful at the top level.
-    final sanitizeTypeKey = metadata.typeKey ?? '__typename';
+    final sanitizeTypeKey = _escapeDartStringLiteral(metadata.typeKey ?? '__typename');
     specs.add(Method((m) {
       m.name = '_sanitizeJson';
       m.returns = referType('dynamic');
@@ -380,10 +393,10 @@ return json;''');
     final className = metadata.cleanName;
     // Effective key: inherited from the base (resolved by ClassAnalyzer)
     // or the default `'__typename'`.
-    final typeKey = metadata.typeKey ?? '__typename';
+    final typeKey = _escapeDartStringLiteral(metadata.typeKey ?? '__typename');
     // Effective wire value for THIS subtype: the explicit override or
     // the clean class name.
-    final wireValue = metadata.subtypeWireValue ?? className;
+    final wireValue = _escapeDartStringLiteral(metadata.subtypeWireValue ?? className);
     final body = <String>[];
     body.add('final json = _\$$className' + 'ToJson(this);');
     body.add("json['$typeKey'] = '$wireValue';");
@@ -480,7 +493,7 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
         body.add('final data = _\$$className' + 'ToJson(this);');
         for (final f in manualToJsonFields) {
           final info = f.jsonKeyInfo!;
-          final jsonFieldName = info.name ?? f.name;
+          final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
           body.add(
               "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
         }
@@ -514,7 +527,7 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
             'final data = _\$$className' + 'ToJson(this, $toJsonArgs);');
         for (final f in manualToJsonFields) {
           final info = f.jsonKeyInfo!;
-          final jsonFieldName = info.name ?? f.name;
+          final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
           body.add(
               "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
         }
