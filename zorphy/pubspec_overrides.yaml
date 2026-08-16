@@ -1,6 +1,0 @@
-# Local development override — the monorepo packages share version numbers
-# and are published together, so during development zorphy resolves the
-# local (possibly unpublished) zorphy_annotation.
-dependency_overrides:
-  zorphy_annotation:
-    path: ../zorphy_annotation
