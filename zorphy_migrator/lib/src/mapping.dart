@@ -176,10 +176,18 @@ class ZorphyRenderer {
   ) {
     final oldName = '${name}_';
     // The source is captured from the start of its line (including the
-    // original indentation), so no re-indent pass is needed here.
-    final reindented = methodSource.replaceAll(
-      RegExp(r'\b' + RegExp.escape(oldName) + r'\b'),
-      name,
+    // original indentation), so no re-indent pass is needed here. Re-point
+    // `Name_` ONLY in identifier positions: string literals and comments are
+    // preserved verbatim, so a factory body may still legitimately mention
+    // the old name (a user-facing tag, a doc reference) without corruption.
+    final re = RegExp(
+      r'''(["'])(?:\\.|(?!\1).)*\1|//[^\n]*|/\*[\s\S]*?\*/|\b''' +
+          RegExp.escape(oldName) +
+          r'''\b''',
+    );
+    final reindented = methodSource.replaceAllMapped(
+      re,
+      (m) => m.group(0) == oldName ? name : m.group(0)!,
     );
     sb.writeln(reindented);
   }

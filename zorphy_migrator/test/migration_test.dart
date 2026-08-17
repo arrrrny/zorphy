@@ -100,6 +100,7 @@ void main() {
       'exchangeable_object_assert_body',
       'exchangeable_object_static_factory',
       'exchangeable_object_static_factory_doc',
+      'exchangeable_object_static_factory_preserve',
     ]) {
       test('$name converts byte-identical to expected.dart', () async {
         final dir = p.join(fixturesDir, name);
