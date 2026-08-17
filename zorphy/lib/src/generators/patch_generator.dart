@@ -12,9 +12,10 @@ class PatchGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    if (!context.config.generatePatch || context.metadata.isAbstract) {
-      return false;
-    }
+    if (!context.config.generatePatch) return false;
+    // NonSealed abstract bases need Patch because parent entities
+    // reference them in their own Patch generation (withXxxPatch methods).
+    if (context.metadata.isAbstract && !context.metadata.nonSealed) return false;
     return context.metadata.allFields.isNotEmpty ||
         context.metadata.isInParentExplicitSubtypes;
   }
@@ -164,9 +165,10 @@ class PatchClassGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    if (!context.config.generatePatch || context.metadata.isAbstract) {
-      return false;
-    }
+    if (!context.config.generatePatch) return false;
+    // NonSealed abstract bases need Patch because parent entities
+    // reference them in their own Patch generation (withXxxPatch methods).
+    if (context.metadata.isAbstract && !context.metadata.nonSealed) return false;
     return context.metadata.allFields.isNotEmpty ||
         context.metadata.isInParentExplicitSubtypes;
   }
@@ -198,8 +200,11 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
   @override
   bool shouldGenerate(GenerationContext context) {
     return context.config.generatePatch &&
-        !context.metadata.isAbstract &&
-        context.metadata.allFields.isNotEmpty;
+        (context.metadata.isAbstract && context.metadata.nonSealed
+            ? context.metadata.allFields.isNotEmpty ||
+                context.metadata.isInParentExplicitSubtypes
+            : !context.metadata.isAbstract &&
+                context.metadata.allFields.isNotEmpty);
   }
 
   @override
