@@ -3,7 +3,10 @@ class AndroidResource_ {
   ///Android resource name.
   String name;
 
-  AndroidResource_({required this.name});
+  ///Optional default resource type.
+  String? defType;
+
+  AndroidResource_({required this.name, this.defType});
 
   /// Creates an AndroidResource_ preserving the old name in this comment.
   static AndroidResource_ id({required String name}) {
