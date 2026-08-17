@@ -30,8 +30,12 @@ class PatchGenerator extends ConcreteClassGenerator {
     // Main patchWith method — skip for nonSealed abstract bases (can't instantiate).
     final fields = metadata.allFields;
     if (metadata.isAbstract && metadata.nonSealed) {
-      // Abstract nonSealed base: no patchWith or applyTo needed.
-    } else if (fields.isEmpty) {
+      // Abstract nonSealed base: no patchWith or applyTo needed. Interface
+      // patchWith methods would construct this class, which is impossible —
+      // return before the interface loop.
+      return specs;
+    }
+    if (fields.isEmpty) {
       // Fieldless class: identity patchWith
       specs.add(
         Method((m) {
@@ -187,8 +191,33 @@ class PatchClassGenerator extends ConcreteClassGenerator {
     // only, no applyTo). The full Patch with applyTo is for concrete classes.
     if (metadata.isAbstract && metadata.nonSealed) {
       final cleanName = metadata.cleanName.replaceAll(r'$', '');
-      return [Code('abstract class ${metadata.cleanName}Patch '
-          'extends PatchBase<$cleanName, ${metadata.cleanName}\$> {}')];
+      // Preserve the entity's generic parameters on the stub and use the
+      // parameterized entity type in PatchBase (e.g. BasePatch<T, U extends
+      // num> extends PatchBase<Base<T, U>, Base$>). The field enum stays
+      // unparameterized.
+      final genericParams = metadata.generics
+          .map((g) => g.toString())
+          .toList();
+      final genericDecl = genericParams.isEmpty
+          ? ''
+          : '<${genericParams.join(', ')}>';
+      final genericArgs = genericParams.isEmpty
+          ? ''
+          : '<${metadata.generics.map((g) => g.name).join(', ')}>';
+      final stub = Code('abstract class ${metadata.cleanName}Patch'
+          '$genericDecl extends PatchBase<$cleanName$genericArgs, '
+          '${metadata.cleanName}\$> {}');
+      if (metadata.allFields.isEmpty) {
+        // Fieldless subtype: the stub references ${cleanName}$ but
+        // getEnumPropertyList emits nothing for empty fields — emit the
+        // same placeholder enum getPatchClass uses for fieldless classes.
+        return [
+          stub,
+          Code('/// Placeholder field enum for fieldless [$cleanName].\n'
+              'enum ${metadata.cleanName}\$ { none }'),
+        ];
+      }
+      return [stub];
     }
 
     final code = helpers.getPatchClass(

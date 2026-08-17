@@ -5,6 +5,38 @@ import '../models/entity_config.dart';
 class EntityTemplateGenerator {
   const EntityTemplateGenerator._();
 
+  /// Escapes a string value for safe interpolation into a Dart string
+  /// literal. Handles apostrophes, backslashes, quotes, dollar signs, and
+  /// line breaks. Mirrors `_escapeDartStringLiteral` in json_generator.dart.
+  static String _escapeDartStringLiteral(String value) {
+    return value
+        .replaceAll('\\', '\\\\') // backslash must be first
+        .replaceAll("'", "\\'") // single quote
+        .replaceAll('"', '\\"') // double quote
+        .replaceAll('\$', '\\\$') // dollar sign
+        .replaceAll('\n', '\\n') // newline
+        .replaceAll('\r', '\\r') // carriage return
+        .replaceAll('\t', '\\t'); // tab
+  }
+
+  /// Normalizes a subtype name the same way [EntityCreator._formatClassName]
+  /// does, so annotation references match the generated subtype classes
+  /// (e.g. `default_display_mode:DEFAULT_MODE` → `DefaultDisplayMode`).
+  static String _formatSubtypeClassName(String subtype) {
+    final name = subtype
+        .split(':')
+        .first
+        .replaceAll(r'$', '')
+        .trim();
+    final parts = name.split(RegExp(r'[_\s\-]+'));
+    return parts
+        .map((part) {
+          if (part.isEmpty) return '';
+          return part[0].toUpperCase() + part.substring(1);
+        })
+        .join('');
+  }
+
   /// Generate entity file content
   static String generate(EntityConfig config, List<String> imports) {
     final buffer = StringBuffer();
@@ -149,7 +181,9 @@ class EntityTemplateGenerator {
       annotationOptions.add('generateCompareTo: true');
     if (config.generateFilter) annotationOptions.add('generateFilter: true');
     if (config.subtypeWireValue != null) {
-      annotationOptions.add("subtypeWireValue: '${config.subtypeWireValue}'");
+      annotationOptions.add(
+        "subtypeWireValue: '${_escapeDartStringLiteral(config.subtypeWireValue!)}'",
+      );
     }
 
     buffer.writeln(
@@ -199,15 +233,21 @@ class EntityTemplateGenerator {
     if (config.generateCompareTo) options.add('generateCompareTo: true');
     if (config.isNonSealed) options.add('nonSealed: true');
     if (config.generateFilter) options.add('generateFilter: true');
-    if (config.typeKey != null) options.add("typeKey: '${config.typeKey}'");
+    if (config.typeKey != null) {
+      options.add("typeKey: '${_escapeDartStringLiteral(config.typeKey!)}'");
+    }
     if (config.subtypeWireValue != null) {
-      options.add("subtypeWireValue: '${config.subtypeWireValue}'");
+      options.add(
+        "subtypeWireValue: '${_escapeDartStringLiteral(config.subtypeWireValue!)}'",
+      );
     }
 
     if (config.explicitSubtypes.isNotEmpty) {
-      // Strip optional :wireValue suffix from subtype names for the annotation
+      // Strip optional :wireValue suffix from subtype names and normalize
+      // them with the same class-name rules EntityCreator uses, so the
+      // annotation references match the generated subtype classes.
       final subtypes = config.explicitSubtypes
-          .map((s) => '\$${s.split(':').first}')
+          .map((s) => '\$${_formatSubtypeClassName(s)}')
           .join(', ');
       options.add("explicitSubTypes: [$subtypes]");
     }
