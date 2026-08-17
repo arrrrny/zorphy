@@ -161,7 +161,35 @@ class ZorphyRenderer {
     for (final field in model.fields) {
       _renderExchangeableField(field, sb);
     }
+    for (final method in model.staticMethods) {
+      _renderStaticFactory(method, model.name, sb);
+    }
     sb.writeln('}');
+  }
+
+  /// Emits a preserved static factory on the `$` class, re-pointing the
+  /// codegen `Name_` back to the generated concrete `Name`.
+  void _renderStaticFactory(
+    String methodSource,
+    String name,
+    StringBuffer sb,
+  ) {
+    final oldName = '${name}_';
+    // The source is captured from the start of its line (including the
+    // original indentation), so no re-indent pass is needed here. Re-point
+    // `Name_` ONLY in identifier positions: string literals and comments are
+    // preserved verbatim, so a factory body may still legitimately mention
+    // the old name (a user-facing tag, a doc reference) without corruption.
+    final re = RegExp(
+      r'''(["'])(?:\\.|(?!\1).)*\1|//[^\n]*|/\*[\s\S]*?\*/|\b''' +
+          RegExp.escape(oldName) +
+          r'''\b''',
+    );
+    final reindented = methodSource.replaceAllMapped(
+      re,
+      (m) => m.group(0) == oldName ? name : m.group(0)!,
+    );
+    sb.writeln(reindented);
   }
 
   void _renderExchangeableField(FreezedField field, StringBuffer sb) {

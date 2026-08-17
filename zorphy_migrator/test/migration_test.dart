@@ -98,6 +98,9 @@ void main() {
       'exchangeable_enum',
       'exchangeable_object_empty_ctor',
       'exchangeable_object_assert_body',
+      'exchangeable_object_static_factory',
+      'exchangeable_object_static_factory_doc',
+      'exchangeable_object_static_factory_preserve',
     ]) {
       test('$name converts byte-identical to expected.dart', () async {
         final dir = p.join(fixturesDir, name);
@@ -126,6 +129,49 @@ void main() {
         );
 
         expect(revised.trimRight(), expected.trimRight());
+      });
+    }
+
+    // Focused assertions for static-factory fixtures: manualItems must be
+    // empty and informationalItems must record the preserved-factory reason.
+    for (final name in [
+      'exchangeable_object_static_factory',
+      'exchangeable_object_static_factory_doc',
+    ]) {
+      test('$name has no manual items and records preserved-factory info',
+          () async {
+        final dir = p.join(fixturesDir, name);
+        final inputFile = p.join(dir, 'input.dart');
+
+        final models = await ExchangeableDetector().detect([
+          File(inputFile).absolute.path,
+        ]);
+        expect(
+          models.where((m) => m.isMigratable),
+          isNotEmpty,
+          reason: 'no migratable model detected in $name',
+        );
+
+        for (final m in models) {
+          expect(
+            m.manualItems,
+            isEmpty,
+            reason: '${m.name} must have no manual items',
+          );
+          expect(
+            m.informationalItems,
+            isNotEmpty,
+            reason: '${m.name} must record a preserved-factory info item',
+          );
+          expect(
+            m.informationalItems.every(
+              (item) => item.reason.contains('preserved verbatim'),
+            ),
+            isTrue,
+            reason:
+                '${m.name} informational items should mention preserved factory',
+          );
+        }
       });
     }
 

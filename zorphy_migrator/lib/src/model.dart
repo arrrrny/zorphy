@@ -108,6 +108,13 @@ class FreezedClassModel {
   /// not). Unlike [manualItems], these do NOT make the model unmigratable.
   final List<ManualItem> informationalItems;
 
+  /// For [ModelDialect.exchangeableObject]: source snippets of static
+  /// methods returning the class's own type (e.g. `static Foo_ bar(...)`
+  /// convenience factories). The zorphy generator carries these onto the
+  /// generated concrete class, so they are preserved on the migrated `$`
+  /// class instead of being dropped. Empty for other dialects.
+  final List<String> staticMethods;
+
   /// Character offsets of the full class declaration in the source.
   final int spanStart;
   final int spanEnd;
@@ -133,6 +140,7 @@ class FreezedClassModel {
     this.enumMembers = const [],
     this.enumMemberDocs = const [],
     this.informationalItems = const [],
+    this.staticMethods = const [],
   });
 
   bool get isUnion => variants.isNotEmpty;

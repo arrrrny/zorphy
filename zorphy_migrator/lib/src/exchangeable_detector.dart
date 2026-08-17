@@ -146,6 +146,7 @@ class ExchangeableDetector {
   ) {
     final fields = <FreezedField>[];
     final constructorParamNames = <String>{};
+    final staticMethods = <String>[];
     final informational = <ManualItem>[];
 
     // Field declarations carry the docs and (for `this.x` params) the type;
@@ -215,6 +216,30 @@ class ExchangeableDetector {
     for (final member in members) {
       if (member is ConstructorDeclaration) continue;
       if (member is MethodDeclaration) {
+        if (member.isStatic && _returnsOwnType(member, name)) {
+          // Capture verbatim from the start of the member's line (or its doc
+          // comment) so the re-emitted factory keeps its original
+          // indentation and documentation.
+          var start = member.beginToken.precedingComments?.offset ?? member.offset;
+          while (start > 0 && unit.content[start - 1] != '\n') {
+            start--;
+          }
+          staticMethods.add(
+            unit.content.substring(start, member.end),
+          );
+          informational.add(
+            ManualItem(
+              filePath: unit.path,
+              line: lineInfo.getLocation(member.offset).lineNumber,
+              construct: '$name.${member.name.lexeme}',
+              reason:
+                  'static factory returning $name — preserved verbatim on '
+                  'the migrated \$ class (zorphy generator re-emits it on '
+                  'the concrete class)',
+            ),
+          );
+          continue;
+        }
         manual.add(
           ManualItem(
             filePath: unit.path,
@@ -274,6 +299,7 @@ class ExchangeableDetector {
       docComment: doc,
       dialect: ModelDialect.exchangeableObject,
       informationalItems: informational,
+      staticMethods: staticMethods,
     );
   }
 
@@ -443,6 +469,17 @@ class ExchangeableDetector {
           .join('\n');
     }
     return null;
+  }
+
+  /// Whether [member] is a static method whose (unqualified, `_`-stripped)
+  /// return type is the class's own name — i.e. a convenience factory the
+  /// zorphy generator re-emits on the generated concrete class.
+  bool _returnsOwnType(MethodDeclaration member, String name) {
+    final returnType = member.returnType;
+    if (returnType is! NamedType) return false;
+    final typeName = returnType.name;
+    if (typeName is PrefixedIdentifier) return false;
+    return _stripSuffix(typeName.lexeme) == name;
   }
 
   /// Strips the fork's codegen `_` suffix: `NavigationAction_` →
