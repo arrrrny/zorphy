@@ -243,10 +243,13 @@ class EntityCreator {
     final resolver = ImportResolver(baseOutputDir: effectiveOutputDir);
 
     for (final subtype in parentConfig.explicitSubtypes) {
-      final subtypeName = subtype.replaceAll('\$', '');
-      final className = _formatClassName(subtypeName);
+      // Support name:wireValue format (e.g. "DefaultDisplayMode:DEFAULT_MODE")
+      final parts = subtype.split(':');
+      final rawName = parts[0].replaceAll('\$', '');
+      final wireValue = parts.length > 1 ? parts[1].trim() : null;
+      final className = _formatClassName(rawName);
       final snakeName = _toSnakeCase(className);
-      final fields = subtypeFields[subtype] ?? [];
+      final fields = subtypeFields[subtype] ?? subtypeFields[rawName] ?? [];
 
       final subtypeConfig = EntityConfig(
         name: className,
@@ -257,6 +260,7 @@ class EntityCreator {
         generateCompareTo: parentConfig.generateCompareTo,
         generateFilter: parentConfig.generateFilter,
         dryRun: parentConfig.dryRun,
+        subtypeWireValue: wireValue,
       );
 
       final imports = resolver.resolveSubtypeImports(
