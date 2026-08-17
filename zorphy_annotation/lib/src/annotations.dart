@@ -124,6 +124,20 @@ class Zorphy implements ZorphyX {
   /// subtypes (null = inherit from [preset])
   final bool? generateChangeTo;
 
+  /// Custom JSON key used for polymorphic type dispatch in `fromJson`
+  /// and `toJson`. When null, defaults to `'__typename'`.
+  ///
+  /// Only meaningful on the **base** class (the one that declares
+  /// `explicitSubTypes`). Subtypes inherit the base's value.
+  final String? typeKey;
+
+  /// Custom wire value for this subtype in the base class's polymorphic
+  /// JSON dispatch. When null, the clean class name is used.
+  ///
+  /// Only meaningful on **subtype** classes (those listed in a parent's
+  /// `explicitSubTypes`). The value must match what the remote API sends.
+  final String? subtypeWireValue;
+
   /// {@template ZorphyX}
   /// ### normal class; prepend class with a single dollar & make abstract
   /// ```
@@ -216,6 +230,8 @@ class Zorphy implements ZorphyX {
     this.generatePropertyHelpers = null,
     this.generateEqualsToString = null,
     this.generateChangeTo = null,
+    this.typeKey,
+    this.subtypeWireValue,
   });
 }
 
@@ -247,6 +263,12 @@ class Zorphy2 implements ZorphyX {
   final bool? generateEqualsToString;
   final bool? generateChangeTo;
 
+  /// Custom JSON key for polymorphic dispatch - see [Zorphy.typeKey].
+  final String? typeKey;
+
+  /// Custom wire value for this subtype - see [Zorphy.subtypeWireValue].
+  final String? subtypeWireValue;
+
   /// Creates a Zorphy2 annotation with configurable generation options.
   const Zorphy2({
     this.explicitSubTypes = null,
@@ -265,6 +287,8 @@ class Zorphy2 implements ZorphyX {
     this.generatePropertyHelpers = null,
     this.generateEqualsToString = null,
     this.generateChangeTo = null,
+    this.typeKey,
+    this.subtypeWireValue,
   });
 }
 
@@ -287,6 +311,12 @@ abstract class ZorphyX {
   /// Returns whether filter descriptors should be generated
   /// (null = inherit from preset).
   bool? get generateFilter;
+
+  /// Custom JSON key for polymorphic type dispatch.
+  String? get typeKey;
+
+  /// Custom wire value for this subtype in polymorphic JSON.
+  String? get subtypeWireValue;
 }
 
 /// Resolves a generic toJson function for the provided [type].

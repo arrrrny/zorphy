@@ -21,6 +21,17 @@ class ClassMetadata {
   /// Whether nonSealed: true was set in annotation
   final bool nonSealed;
 
+  /// Custom JSON key for polymorphic type dispatch.
+  /// When null, `'__typename'` is used.
+  final String? typeKey;
+
+  /// Custom wire value for this subtype in the base class's polymorphic
+  /// JSON dispatch. When null, the clean class name is used.
+  ///
+  /// Only meaningful on **subtype** classes (those listed in a parent's
+  /// `explicitSubTypes`). The value must match what the remote API sends.
+  final String? subtypeWireValue;
+
   /// Whether the class has a const constructor
   final bool hasConstConstructor;
 
@@ -68,6 +79,8 @@ class ClassMetadata {
     required this.isAbstract,
     required this.isSealed,
     required this.nonSealed,
+    this.typeKey,
+    this.subtypeWireValue,
     required this.hasConstConstructor,
     required this.docComment,
     required this.generics,
