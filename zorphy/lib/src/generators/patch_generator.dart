@@ -12,12 +12,7 @@ class PatchGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    if (!context.config.generatePatch) {
-      return false;
-    }
-    // NonSealed abstract bases need a Patch class because parent entities
-    // reference it in their own Patch generation (e.g. withXxxPatch methods).
-    if (context.metadata.isAbstract && !context.metadata.nonSealed) {
+    if (!context.config.generatePatch || context.metadata.isAbstract) {
       return false;
     }
     return context.metadata.allFields.isNotEmpty ||
@@ -169,12 +164,7 @@ class PatchClassGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    if (!context.config.generatePatch) {
-      return false;
-    }
-    // NonSealed abstract bases need a Patch class because parent entities
-    // reference it in their own Patch generation (e.g. withXxxPatch methods).
-    if (context.metadata.isAbstract && !context.metadata.nonSealed) {
+    if (!context.config.generatePatch || context.metadata.isAbstract) {
       return false;
     }
     return context.metadata.allFields.isNotEmpty ||
