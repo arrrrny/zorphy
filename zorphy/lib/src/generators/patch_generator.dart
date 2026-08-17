@@ -27,9 +27,11 @@ class PatchGenerator extends ConcreteClassGenerator {
     final classNameTrimmed = metadata.cleanName.replaceAll(r'$', '');
     final specs = <Spec>[];
 
-    // Main patchWith method
+    // Main patchWith method — skip for nonSealed abstract bases (can't instantiate).
     final fields = metadata.allFields;
-    if (fields.isEmpty) {
+    if (metadata.isAbstract && metadata.nonSealed) {
+      // Abstract nonSealed base: no patchWith or applyTo needed.
+    } else if (fields.isEmpty) {
       // Fieldless class: identity patchWith
       specs.add(
         Method((m) {
@@ -180,6 +182,15 @@ class PatchClassGenerator extends ConcreteClassGenerator {
         .map((k) => k.replaceAll(r'$', ''))
         .toList();
     final genericTypeNames = metadata.generics.map((g) => g.name).toList();
+
+    // Abstract nonSealed bases: emit minimal abstract Patch stub (data holder
+    // only, no applyTo). The full Patch with applyTo is for concrete classes.
+    if (metadata.isAbstract && metadata.nonSealed) {
+      final cleanName = metadata.cleanName.replaceAll(r'$', '');
+      return [Code('abstract class ${metadata.cleanName}Patch '
+          'extends PatchBase<$cleanName, ${metadata.cleanName}\$> {}')];
+    }
+
     final code = helpers.getPatchClass(
       metadata.allFields,
       metadata.cleanName,
