@@ -28,6 +28,16 @@ class EntityConfig {
   /// [ZorphyKind.valueObject].
   final ZorphyKind kind;
 
+  /// Custom JSON key used for polymorphic type dispatch in `fromJson`
+  /// and `toJson`. When null, defaults to `'__typename'`.
+  /// Only meaningful on the **base** class.
+  final String? typeKey;
+
+  /// Custom wire value for this subtype in the base class's polymorphic
+  /// JSON dispatch. When null, the clean class name is used.
+  /// Only meaningful on **subtype** classes.
+  final String? subtypeWireValue;
+
   const EntityConfig({
     required this.name,
     this.outputDir,
@@ -46,6 +56,8 @@ class EntityConfig {
     this.prefixNested = true,
     this.autoId = false,
     this.kind = ZorphyKind.entity,
+    this.typeKey,
+    this.subtypeWireValue,
   });
 
   String get defaultOutputDir => 'lib/src/domain/entities';
@@ -88,6 +100,8 @@ class EntityConfig {
     bool? prefixNested,
     bool? autoId,
     ZorphyKind? kind,
+    String? typeKey,
+    String? subtypeWireValue,
   }) {
     return EntityConfig(
       name: name ?? this.name,
@@ -107,6 +121,8 @@ class EntityConfig {
       prefixNested: prefixNested ?? this.prefixNested,
       autoId: autoId ?? this.autoId,
       kind: kind ?? this.kind,
+      typeKey: typeKey ?? this.typeKey,
+      subtypeWireValue: subtypeWireValue ?? this.subtypeWireValue,
     );
   }
 }

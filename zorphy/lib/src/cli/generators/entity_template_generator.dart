@@ -148,6 +148,9 @@ class EntityTemplateGenerator {
     if (config.generateCompareTo)
       annotationOptions.add('generateCompareTo: true');
     if (config.generateFilter) annotationOptions.add('generateFilter: true');
+    if (config.subtypeWireValue != null) {
+      annotationOptions.add("subtypeWireValue: '${config.subtypeWireValue}'");
+    }
 
     buffer.writeln(
       '/// ${config.className} entity (subtype of $parentClassName)',
@@ -196,9 +199,16 @@ class EntityTemplateGenerator {
     if (config.generateCompareTo) options.add('generateCompareTo: true');
     if (config.isNonSealed) options.add('nonSealed: true');
     if (config.generateFilter) options.add('generateFilter: true');
+    if (config.typeKey != null) options.add("typeKey: '${config.typeKey}'");
+    if (config.subtypeWireValue != null) {
+      options.add("subtypeWireValue: '${config.subtypeWireValue}'");
+    }
 
     if (config.explicitSubtypes.isNotEmpty) {
-      final subtypes = config.explicitSubtypes.map((s) => '\$$s').join(', ');
+      // Strip optional :wireValue suffix from subtype names for the annotation
+      final subtypes = config.explicitSubtypes
+          .map((s) => '\$${s.split(':').first}')
+          .join(', ');
       options.add("explicitSubTypes: [$subtypes]");
     }
 
