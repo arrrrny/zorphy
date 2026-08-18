@@ -38,6 +38,10 @@ class EntityConfig {
   /// Only meaningful on **subtype** classes.
   final String? subtypeWireValue;
 
+  /// Static class members in "name:type:value" format.
+  /// Emitted as `static final TYPE NAME = VALUE;` in the generated class.
+  final List<String> staticMembers;
+
   const EntityConfig({
     required this.name,
     this.outputDir,
@@ -58,6 +62,7 @@ class EntityConfig {
     this.kind = ZorphyKind.entity,
     this.typeKey,
     this.subtypeWireValue,
+    this.staticMembers = const [],
   });
 
   String get defaultOutputDir => 'lib/src/domain/entities';
@@ -102,6 +107,7 @@ class EntityConfig {
     ZorphyKind? kind,
     String? typeKey,
     String? subtypeWireValue,
+    List<String>? staticMembers,
   }) {
     return EntityConfig(
       name: name ?? this.name,
@@ -123,6 +129,7 @@ class EntityConfig {
       kind: kind ?? this.kind,
       typeKey: typeKey ?? this.typeKey,
       subtypeWireValue: subtypeWireValue ?? this.subtypeWireValue,
+      staticMembers: staticMembers ?? this.staticMembers,
     );
   }
 }

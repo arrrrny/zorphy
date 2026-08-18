@@ -131,6 +131,8 @@ class EntityTemplateGenerator {
       prependAutoId: config.autoId,
     );
 
+    _writeStatics(buffer, config.staticMembers);
+
     buffer.writeln('}');
     buffer.writeln();
   }
@@ -258,6 +260,20 @@ class EntityTemplateGenerator {
   /// [FieldDefinition.jsonName] differs from its Dart [FieldDefinition.name].
   ///
   /// When [prependAutoId] is true (and no field is already named `id`), a
+  /// Emits static final class members in "name:type:value" format.
+  static void _writeStatics(StringBuffer buffer, List<String> staticMembers) {
+    for (final entry in staticMembers) {
+      final firstColon = entry.indexOf(':');
+      final secondColon = entry.indexOf(':', firstColon + 1);
+      if (firstColon < 0 || secondColon < 0) continue;
+      final name = entry.substring(0, firstColon).trim();
+      final type = entry.substring(firstColon + 1, secondColon).trim();
+      final value = entry.substring(secondColon + 1).trim();
+      buffer.writeln('  static final $type $name = $value;');
+    }
+    if (staticMembers.isNotEmpty) buffer.writeln();
+  }
+
   /// `String get id;` declaration is written first — the `autoId: true`
   /// annotation makes the concrete constructor default it to `Uuid().v4()`.
   static void _writeFields(

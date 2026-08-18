@@ -12,9 +12,10 @@ class PatchGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    if (!context.config.generatePatch || context.metadata.isAbstract) {
-      return false;
-    }
+    if (!context.config.generatePatch) return false;
+    // NonSealed abstract bases need Patch because parent entities
+    // reference them in their own Patch generation (withXxxPatch methods).
+    if (context.metadata.isAbstract && !context.metadata.nonSealed) return false;
     return context.metadata.allFields.isNotEmpty ||
         context.metadata.isInParentExplicitSubtypes;
   }
@@ -26,9 +27,11 @@ class PatchGenerator extends ConcreteClassGenerator {
     final classNameTrimmed = metadata.cleanName.replaceAll(r'$', '');
     final specs = <Spec>[];
 
-    // Main patchWith method
+    // Main patchWith method — skip for nonSealed abstract bases (can't instantiate).
     final fields = metadata.allFields;
-    if (fields.isEmpty) {
+    if (metadata.isAbstract && metadata.nonSealed) {
+      // Abstract nonSealed base: no patchWith or applyTo needed.
+    } else if (fields.isEmpty) {
       // Fieldless class: identity patchWith
       specs.add(
         Method((m) {
@@ -164,9 +167,10 @@ class PatchClassGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    if (!context.config.generatePatch || context.metadata.isAbstract) {
-      return false;
-    }
+    if (!context.config.generatePatch) return false;
+    // NonSealed abstract bases need Patch because parent entities
+    // reference them in their own Patch generation (withXxxPatch methods).
+    if (context.metadata.isAbstract && !context.metadata.nonSealed) return false;
     return context.metadata.allFields.isNotEmpty ||
         context.metadata.isInParentExplicitSubtypes;
   }
@@ -178,6 +182,15 @@ class PatchClassGenerator extends ConcreteClassGenerator {
         .map((k) => k.replaceAll(r'$', ''))
         .toList();
     final genericTypeNames = metadata.generics.map((g) => g.name).toList();
+
+    // Abstract nonSealed bases: emit minimal abstract Patch stub (data holder
+    // only, no applyTo). The full Patch with applyTo is for concrete classes.
+    if (metadata.isAbstract && metadata.nonSealed) {
+      final cleanName = metadata.cleanName.replaceAll(r'$', '');
+      return [Code('abstract class ${metadata.cleanName}Patch '
+          'extends PatchBase<$cleanName, ${metadata.cleanName}\$> {}')];
+    }
+
     final code = helpers.getPatchClass(
       metadata.allFields,
       metadata.cleanName,
@@ -198,8 +211,11 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
   @override
   bool shouldGenerate(GenerationContext context) {
     return context.config.generatePatch &&
-        !context.metadata.isAbstract &&
-        context.metadata.allFields.isNotEmpty;
+        (context.metadata.isAbstract && context.metadata.nonSealed
+            ? context.metadata.allFields.isNotEmpty ||
+                context.metadata.isInParentExplicitSubtypes
+            : !context.metadata.isAbstract &&
+                context.metadata.allFields.isNotEmpty);
   }
 
   @override
