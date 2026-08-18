@@ -94,7 +94,7 @@ class PatchGenerator extends ConcreteClassGenerator {
         final comma = i == fields.length - 1 ? '' : ',';
         if (interfaceFieldNames.contains(f.name)) {
           bodyLines.add(
-            "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? (${f.type})( (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] ) : this.${f.name}$comma",
+            "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? ( (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] ) as ${f.type} : this.${f.name}$comma",
           );
         } else {
           bodyLines.add('${f.name}: this.${f.name},');
@@ -138,7 +138,7 @@ class PatchGenerator extends ConcreteClassGenerator {
       final f = fields[i];
       final comma = i == fields.length - 1 ? '' : ',';
       bodyLines.add(
-        "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? (${f.type})( (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] ) : this.${f.name}$comma",
+        "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? ( (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] ) as ${f.type} : this.${f.name}$comma",
       );
     }
 
