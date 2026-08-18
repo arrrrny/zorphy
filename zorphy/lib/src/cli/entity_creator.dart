@@ -243,10 +243,18 @@ class EntityCreator {
     final resolver = ImportResolver(baseOutputDir: effectiveOutputDir);
 
     for (final subtype in parentConfig.explicitSubtypes) {
-      // Support name:wireValue format (e.g. "DefaultDisplayMode:DEFAULT_MODE")
-      final parts = subtype.split(':');
-      final rawName = parts[0].replaceAll('\$', '');
-      final wireValue = parts.length > 1 ? parts[1].trim() : null;
+      // Support name:wireValue format (e.g. "DefaultDisplayMode:DEFAULT_MODE").
+      // Split at the FIRST colon only — the wire value itself may contain
+      // colons (e.g. "Product:urn:product" → name "Product", value
+      // "urn:product").
+      final separator = subtype.indexOf(':');
+      final rawName = (separator < 0
+              ? subtype
+              : subtype.substring(0, separator))
+          .trim()
+          .replaceAll(RegExp(r'^\$+'), '');
+      final wireValue =
+          separator < 0 ? null : subtype.substring(separator + 1).trim();
       final className = _formatClassName(rawName);
       final snakeName = _toSnakeCase(className);
       final fields = subtypeFields[subtype] ?? subtypeFields[rawName] ?? [];
