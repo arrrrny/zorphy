@@ -302,7 +302,8 @@ class JsonGenerator extends UniversalGenerator {
         body.add(
             "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
       }
-      body.add('return _sanitizeJson(data);');
+      body.add('_sanitizeJson(data);');
+      body.add('return data;');
       specs.add(Method((m) {
         m.name = 'toJsonLean';
         m.returns = referType('Map<String, dynamic>');
@@ -321,7 +322,8 @@ class JsonGenerator extends UniversalGenerator {
         body.add(
             "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
       }
-      body.add('return _sanitizeJson(data);');
+      body.add('_sanitizeJson(data);');
+      body.add('return data;');
       specs.add(Method((m) {
         m.name = 'toJsonLean';
         m.returns = referType('Map<String, dynamic>');
