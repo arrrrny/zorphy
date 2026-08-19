@@ -1,3 +1,19 @@
+## [2.0.1] - 2026-08-19
+
+### Fix
+
+- Generators: typed `patchWith` — the generated `_patchMap` ternary chains
+  collapse to `dynamic`; patched values are now cast with postfix `as T`
+  (valid for nullable types too) instead of invalid prefix `(T)?` casts.
+- Generators: `toJsonLean` sanitizes the map in place and returns the typed
+  `Map<String, dynamic>` instead of returning the `dynamic` sanitizer result.
+- CLI: `ImportResolver` emits relative sibling-entity imports for `!Type`
+  (external) fields when the referenced entity exists on disk — cross-entity
+  references now generate resolvable code (fixes json_serializable
+  `InvalidType` failures).
+
+Generated code from both fixes passes `dart analyze` with zero findings.
+
 ## [2.0.0] - 2026-08-16
 
 ### Feat
