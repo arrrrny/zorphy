@@ -1,3 +1,21 @@
+## [Unreleased]
+
+### Fix
+
+- Generators: cross-entity `patchWith` cast now uses the concrete entity
+  type — when a Zorphy entity declared a field whose type was the ABSTRACT
+  form of another Zorphy entity (e.g. `$ArtifactRef get ref;` — the canonical
+  CLI-generated shape, since `FieldNormalizer` prepends the `$` prefix to
+  entity references), the generated `patchWith` body emitted a cast against
+  the ABSTRACT form (`as $ArtifactRef`), which is the supertype of the field's
+  declared CONCRETE form (`ArtifactRef`). The analyzer rejected this as
+  `argument_type_not_assignable` (reported as `Object` because the concrete
+  type was unresolved during build_runner analysis — issue #351 background).
+  The cast target is now passed through
+  `helpers.replaceDollarTypesWithConcrete(f.type)`, matching the field's
+  declared type and resolving cleanly. The same fix is applied to the manual
+  `fromJson` cast path in `json_generator.dart`. Fixes #117.
+
 ## [2.0.1] - 2026-08-19
 
 ### Fix

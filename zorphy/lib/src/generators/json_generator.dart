@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart';
 
 import '../ast/ast.dart';
 import '../common/NameType.dart';
+import '../helpers.dart' as helpers;
 import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
 import 'base_generator.dart';
@@ -85,7 +86,7 @@ class JsonGenerator extends UniversalGenerator {
             final info = manualField.first.jsonKeyInfo!;
             final jsonFieldName = info.name ?? f.name;
             bodyLines.add(
-                "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type} : null,");
+                "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${helpers.replaceDollarTypesWithConcrete(f.type ?? 'dynamic')} : null,");
           } else {
             bodyLines.add('      ${f.name}: instance.${f.name},');
           }
@@ -244,7 +245,7 @@ class JsonGenerator extends UniversalGenerator {
           final info = manualField.first.jsonKeyInfo!;
           final jsonFieldName = info.name ?? f.name;
           bodyLines.add(
-              "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type} : null,");
+              "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${helpers.replaceDollarTypesWithConcrete(f.type ?? 'dynamic')} : null,");
         } else {
           bodyLines.add('      ${f.name}: instance.${f.name},');
         }
