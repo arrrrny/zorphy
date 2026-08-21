@@ -123,11 +123,6 @@ class CrossEntityImportDetector {
     r'(?:final\s+)?\$[A-Z][a-zA-Z0-9_]*',
   );
 
-  /// Regex for `import 'uri';` / `import "uri";` statements.
-  static final _importUriRegex = RegExp(
-    r"""import\s+['"]([^'"]+)['"]""",
-  );
-
   /// Detects missing cross-entity imports in [source].
   ///
   /// Pass [importUris] to bypass the regex scan of `import` statements
@@ -235,117 +230,86 @@ class CrossEntityImportDetector {
 
   static Set<String> _scanImportUris(String source) {
     final uris = <String>{};
-    // Strip comments and string literals before scanning for imports.
-    // This prevents false matches from:
-    //   - line comments: `// import 'example.dart';`
-    //   - block comments: `/* import 'example.dart'; */`
-    //   - string literals: `String x = "import 'example.dart';";`
-    final stripped = _stripCommentsAndStrings(source);
-    for (final match in _importUriRegex.allMatches(stripped)) {
-      final uri = match.group(1);
-      if (uri != null && uri.isNotEmpty) {
-        uris.add(uri);
+    var i = 0;
+    while (i < source.length) {
+      final c = source[i];
+
+      // Skip line comments (`// ...`).
+      if (c == '/' && i + 1 < source.length && source[i + 1] == '/') {
+        final nl = source.indexOf('\n', i);
+        i = nl == -1 ? source.length : nl + 1;
+        continue;
       }
+
+      // Skip block comments (`/* ... */`).
+      if (c == '/' && i + 1 < source.length && source[i + 1] == '*') {
+        final end = source.indexOf('*/', i + 2);
+        i = end == -1 ? source.length : end + 2;
+        continue;
+      }
+
+      // Skip string literals entirely so imports written inside a string
+      // (e.g. `String x = "import 'fake.dart';";`) are not collected.
+      if (c == "'" || c == '"') {
+        final quote = c;
+        i++;
+        while (i < source.length) {
+          if (source[i] == '\\' && i + 1 < source.length) {
+            i += 2;
+          } else if (source[i] == quote) {
+            i++;
+            break;
+          } else {
+            i++;
+          }
+        }
+        continue;
+      }
+
+      // Detect a real `import` statement (not a longer identifier) and
+      // collect its quoted URI.
+      if (c == 'i' &&
+          source.startsWith('import', i) &&
+          (i + 6 >= source.length || !_isWordChar(source[i + 6]))) {
+        final before = i == 0 ? ' ' : source[i - 1];
+        final isBoundary = before == ' ' ||
+            before == '\n' ||
+            before == '\t' ||
+            before == ';' ||
+            before == '{' ||
+            before == '}' ||
+            before == '(';
+        if (isBoundary) {
+          var j = i + 6;
+          while (j < source.length && (source[j] == ' ' || source[j] == '\t')) {
+            j++;
+          }
+          if (j < source.length && (source[j] == "'" || source[j] == '"')) {
+            final quote = source[j];
+            j++;
+            final start = j;
+            while (j < source.length && source[j] != quote) {
+              j++;
+            }
+            final uri = source.substring(start, j);
+            if (uri.isNotEmpty) uris.add(uri);
+            i = j + 1;
+            continue;
+          }
+        }
+      }
+
+      i++;
     }
     return uris;
   }
 
-  /// Strips line comments, block comments, and string literals from [source].
-  ///
-  /// This is a best-effort implementation that handles common cases:
-  /// - Line comments (`// ...`)
-  /// - Block comments (`/* ... */`)
-  /// - Single-quoted strings (`'...'`)
-  /// - Double-quoted strings (`"..."`)
-  ///
-  /// It does NOT handle raw strings, multiline strings, or nested comments
-  /// (which Dart doesn't support anyway), because the detector only needs
-  /// to avoid obvious false positives in import scanning.
-  static String _stripCommentsAndStrings(String source) {
-    final result = StringBuffer();
-    var i = 0;
-    while (i < source.length) {
-      // Line comment: `//` to end of line
-      if (i < source.length - 1 && source[i] == '/' && source[i + 1] == '/') {
-        final newlineIndex = source.indexOf('\n', i);
-        if (newlineIndex == -1) {
-          // Comment extends to end of file
-          break;
-        }
-        // Skip to the newline (preserve it so line numbers stay consistent)
-        result.write('\n');
-        i = newlineIndex + 1;
-        continue;
-      }
-
-      // Block comment: `/* ... */`
-      if (i < source.length - 1 && source[i] == '/' && source[i + 1] == '*') {
-        final endIndex = source.indexOf('*/', i + 2);
-        if (endIndex == -1) {
-          // Unterminated block comment — skip to end
-          break;
-        }
-        // Replace comment content with spaces (preserve newlines for line consistency)
-        for (var j = i; j < endIndex + 2; j++) {
-          if (source[j] == '\n') {
-            result.write('\n');
-          } else {
-            result.write(' ');
-          }
-        }
-        i = endIndex + 2;
-        continue;
-      }
-
-      // Single-quoted string: `'...'`
-      if (source[i] == "'") {
-        result.write(' '); // Replace opening quote with space
-        i++;
-        while (i < source.length) {
-          if (source[i] == '\\' && i + 1 < source.length) {
-            // Escaped character — skip both backslash and next char
-            result.write('  ');
-            i += 2;
-          } else if (source[i] == "'") {
-            // Closing quote
-            result.write(' ');
-            i++;
-            break;
-          } else {
-            result.write(source[i] == '\n' ? '\n' : ' ');
-            i++;
-          }
-        }
-        continue;
-      }
-
-      // Double-quoted string: `"..."`
-      if (source[i] == '"') {
-        result.write(' '); // Replace opening quote with space
-        i++;
-        while (i < source.length) {
-          if (source[i] == '\\' && i + 1 < source.length) {
-            // Escaped character — skip both backslash and next char
-            result.write('  ');
-            i += 2;
-          } else if (source[i] == '"') {
-            // Closing quote
-            result.write(' ');
-            i++;
-            break;
-          } else {
-            result.write(source[i] == '\n' ? '\n' : ' ');
-            i++;
-          }
-        }
-        continue;
-      }
-
-      // Regular character — preserve it
-      result.write(source[i]);
-      i++;
-    }
-    return result.toString();
+  static bool _isWordChar(String ch) {
+    return ch.compareTo('a') >= 0 && ch.compareTo('z') <= 0 ||
+        ch.compareTo('A') >= 0 && ch.compareTo('Z') <= 0 ||
+        ch.compareTo('0') >= 0 && ch.compareTo('9') <= 0 ||
+        ch == '_' ||
+        ch == r'$';
   }
 
   /// Converts a PascalCase / camelCase name to snake_case.
