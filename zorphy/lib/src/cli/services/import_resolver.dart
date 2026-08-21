@@ -22,9 +22,12 @@ class ImportResolver {
     bool needsEnumImport = false;
 
     for (final field in fields) {
-      // External types (`!Type` marker) are imported by the user — no
-      // entity/enum import can or should be resolved for them.
-      if (field.isExternal) continue;
+      // External types (`!Type` marker): the import is normally provided by
+      // the user. BUT if the referenced type is a sibling Zorphy entity on
+      // disk, resolve the relative import automatically — otherwise the
+      // generated file references an unresolved identifier (analyzer error,
+      // json_serializable InvalidType). Cross-entity references are the
+      // primary use of `!Type`, and the sibling almost always exists.
       final typeRefs = NamingUtils.extractTypeReferences(field.type);
 
       for (final typeRef in typeRefs) {
@@ -36,10 +39,15 @@ class ImportResolver {
         final typeSnakeName = NamingUtils.toSnakeCase(cleanTypeRef);
         final potentialEntityPath = p.join(baseOutputDir, typeSnakeName);
 
-        if (typeRef.startsWith(r'$') ||
-            Directory(potentialEntityPath).existsSync()) {
+        if (!field.isExternal &&
+            (typeRef.startsWith(r'$') ||
+                Directory(potentialEntityPath).existsSync())) {
           imports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
-        } else {
+        } else if (field.isExternal &&
+            Directory(potentialEntityPath).existsSync()) {
+          // External type that IS a local sibling entity: import it.
+          imports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
+        } else if (!field.isExternal) {
           needsEnumImport = true;
         }
       }
@@ -84,9 +92,8 @@ class ImportResolver {
     bool needsEnumImport = false;
 
     for (final field in fields) {
-      // External types (`!Type` marker) are imported by the user — no
-      // entity/enum import can or should be resolved for them.
-      if (field.isExternal) continue;
+      // External types: import sibling entities on disk (cross-entity refs);
+      // truly external types remain user-imported.
       final typeRefs = NamingUtils.extractTypeReferences(field.type);
 
       for (final typeRef in typeRefs) {
@@ -98,10 +105,15 @@ class ImportResolver {
         final typeSnakeName = NamingUtils.toSnakeCase(cleanTypeRef);
         final potentialEntityPath = p.join(baseOutputDir, typeSnakeName);
 
-        if (typeRef.startsWith(r'\$') ||
-            Directory(potentialEntityPath).existsSync()) {
+        if (!field.isExternal &&
+            (typeRef.startsWith(r'\$') ||
+                Directory(potentialEntityPath).existsSync())) {
           imports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
-        } else {
+        } else if (field.isExternal &&
+            Directory(potentialEntityPath).existsSync()) {
+          // External type that IS a local sibling entity: import it.
+          imports.add("import '../$typeSnakeName/$typeSnakeName.dart';");
+        } else if (!field.isExternal) {
           needsEnumImport = true;
         }
       }

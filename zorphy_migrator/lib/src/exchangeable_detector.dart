@@ -146,6 +146,8 @@ class ExchangeableDetector {
   ) {
     final fields = <FreezedField>[];
     final constructorParamNames = <String>{};
+    final staticMethods = <String>[];
+    final informational = <ManualItem>[];
 
     // Field declarations carry the docs and (for `this.x` params) the type;
     // index them by name for the constructor pass below.
@@ -169,7 +171,8 @@ class ExchangeableDetector {
       // parameters alone define the field set, so the constructor is
       // convertible like a plain generative one.
       if (_hasCustomMemberAnnotation(member) &&
-          (!_isEmptyBody(member.body) || member.initializers.isNotEmpty)) {
+          (!_isEmptyBody(member.body) || member.initializers.isNotEmpty) &&
+          !_isAssertOnlyBody(member.body)) {
         manual.add(
           ManualItem(
             filePath: unit.path,
@@ -180,6 +183,18 @@ class ExchangeableDetector {
           ),
         );
         continue;
+      }
+      if (_isAssertOnlyBody(member.body)) {
+        informational.add(
+          ManualItem(
+            filePath: unit.path,
+            line: lineInfo.getLocation(member.offset).lineNumber,
+            construct: name,
+            reason:
+                'assert-only constructor body dropped — dev-time invariant '
+                'checks cannot be expressed on the Zorphy entity',
+          ),
+        );
       }
       for (final param in member.parameters.parameters) {
         final paramName = param.name?.lexeme;
@@ -204,6 +219,30 @@ class ExchangeableDetector {
     for (final member in members) {
       if (member is ConstructorDeclaration) continue;
       if (member is MethodDeclaration) {
+        if (member.isStatic && _returnsOwnType(member, name)) {
+          // Capture verbatim from the start of the member's line (or its doc
+          // comment) so the re-emitted factory keeps its original
+          // indentation and documentation.
+          var start = member.beginToken.precedingComments?.offset ?? member.offset;
+          while (start > 0 && unit.content[start - 1] != '\n') {
+            start--;
+          }
+          staticMethods.add(
+            unit.content.substring(start, member.end),
+          );
+          informational.add(
+            ManualItem(
+              filePath: unit.path,
+              line: lineInfo.getLocation(member.offset).lineNumber,
+              construct: '$name.${member.name.lexeme}',
+              reason:
+                  'static factory returning $name — preserved verbatim on '
+                  'the migrated \$ class (zorphy generator re-emits it on '
+                  'the concrete class)',
+            ),
+          );
+          continue;
+        }
         manual.add(
           ManualItem(
             filePath: unit.path,
@@ -262,6 +301,8 @@ class ExchangeableDetector {
       spanEnd: node.end,
       docComment: doc,
       dialect: ModelDialect.exchangeableObject,
+      informationalItems: informational,
+      staticMethods: staticMethods,
     );
   }
 
@@ -386,6 +427,18 @@ class ExchangeableDetector {
     return false;
   }
 
+  /// Whether [body] contains only `assert(...)` statements — dev-time
+  /// invariant checks the zorphy generator cannot express. Such bodies add
+  /// no serialization surface, so they are dropped (informational) instead
+  /// of blocking the conversion.
+  bool _isAssertOnlyBody(FunctionBody body) {
+    if (body is! BlockFunctionBody) return false;
+    final statements = body.block.statements;
+    if (statements.isEmpty) return false;
+    return statements.every((s) => s is AssertStatement);
+  }
+
+
   /// The declared type of a constructor parameter. For `this.x` params the
   /// param node carries no type, so fall back to the matching field
   /// declaration in the class body.
@@ -420,6 +473,17 @@ class ExchangeableDetector {
           .join('\n');
     }
     return null;
+  }
+
+  /// Whether [member] is a static method whose (unqualified, `_`-stripped)
+  /// return type is the class's own name — i.e. a convenience factory the
+  /// zorphy generator re-emits on the generated concrete class.
+  bool _returnsOwnType(MethodDeclaration member, String name) {
+    final returnType = member.returnType;
+    if (returnType is! NamedType) return false;
+    final typeName = returnType.name;
+    if (typeName is PrefixedIdentifier) return false;
+    return _stripSuffix(typeName.lexeme) == name;
   }
 
   /// Strips the fork's codegen `_` suffix: `NavigationAction_` →

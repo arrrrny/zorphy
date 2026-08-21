@@ -20,3 +20,22 @@ pallet read -w N              # capture the window's output
 
 See `~/Developer/forklift/scripts/pallet/README.md` for the full workflow
 and CLI reference.
+
+## ⚠️ ZORPHY CODE GENERATION — STRICT HANDLING
+
+### Never modify generated zorphy code files.
+
+**Rationale:** Zorphy code generator produces code that must not be manually edited. Any modifications to generated `.zorphy.dart` files will cause:
+- Unpredictable behavior in code generation  
+- Build failures due to inconsistent state
+- Inability to reproduce results with `zorphy` CLI tools
+
+**If you spot an issue in generated code:**
+1. **DO NOT** edit the `.zorphy.dart` file directly
+2. **IMMEDIATELY** drop the current task  
+3. **Open a GitHub issue** on the `zorphy` repository
+5. **Create a new task** with proper tracking once the upstream issue is resolved
+
+This rule ensures code generation integrity and reproducible builds.
+
+-- auto-added by assistant for zorphy code generation integrity

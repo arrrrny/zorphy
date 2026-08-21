@@ -196,9 +196,23 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
         }
       }
 
-      body.add(
-        "final _json = Map<String, dynamic>.from((this as dynamic).toJson());",
-      );
+      // Generate switch expression to call correct toJson() for each sealed subtype
+      final subtypeCases = <String>[];
+      for (final st in explicitSubTypes) {
+        final stName = st.interfaceName.replaceAll(r'$', '');
+        // Use a named variable (lowercase first char) instead of discard pattern
+        final varName = stName[0].toLowerCase() + stName.substring(1);
+        subtypeCases.add('$stName $varName => $varName.toJson()');
+      }
+      // Also handle the base class case if it's not abstract/sealed
+      // But for sealed hierarchies, we only need the subtypes
+      body.add('final _json = Map<String, dynamic>.from(');
+      body.add('  switch (this) {');
+      for (final caseStr in subtypeCases) {
+        body.add('    $caseStr,');
+      }
+      body.add('  },');
+      body.add(');');
       body.add('_json.addAll(_patcher.toJson());');
       body.add('return $targetClassName.fromJson(_json);');
 
