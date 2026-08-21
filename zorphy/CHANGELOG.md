@@ -1,3 +1,20 @@
+## [2.1.0] - 2026-08-21
+
+### Feat
+
+- Polymorphic dispatch: `EntityConfig` gains `typeKey` (default `__typename`)
+  and `subtypeWireValue` for custom polymorphic JSON keys/values, and the
+  generated `ChangeTo` extension now serializes sealed subtypes via a
+  `switch (this)` that calls the correct `toJson()` per subtype (fixes
+  malformed polymorphic payloads for explicit-subtype hierarchies).
+
+### Fix
+
+- Generators: strip the leading `$` from `patchWith`/`fromJson` cast types for
+  explicit-subtype fields — the generated `as $Credentials?` cast (undefined
+  in the consuming file) now resolves to `as Credentials?`
+  (fixes arrrrny/zorphy#119).
+
 ## [2.0.1] - 2026-08-19
 
 ### Fix
