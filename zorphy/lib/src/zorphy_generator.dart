@@ -29,12 +29,13 @@ import 'package:zorphy/src/plugins/plugin_registry.dart';
 /// import the sibling entity file, the type does not resolve and the
 /// analyzer reports `argument_type_not_assignable` / `InvalidType`.
 ///
-/// This generator scans each `@Zorphy` class for cross-entity field
-/// references and checks whether the parent library imports the
-/// sibling. If any are missing, it emits a guidance comment at the top
-/// of the `.zorphy.dart` part file listing the required imports. The
-/// comment is purely informational — the user must add the imports to
-/// the parent `<name>.dart` file (parts cannot have their own imports).
+/// This generator delegates to [CrossEntityImportDetector] to scan
+/// each `@Zorphy` library for cross-entity field references and check
+/// whether the parent library imports the sibling. If any are missing,
+/// it emits a guidance comment at the top of the `.zorphy.dart` part
+/// file listing the required imports. The comment is purely
+/// informational — the user must add the imports to the parent
+/// `<name>.dart` file (parts cannot have their own imports).
 class ZorphyGenerator extends Generator {
   /// Creates the unified generator.
   ///
@@ -120,7 +121,12 @@ class ZorphyGenerator extends Generator {
     // comment at the top of the generated output. The comment is only
     // emitted when there are actually missing imports — when all
     // cross-entity references are properly imported, the output is clean.
-    final guidance = await _detectMissingImportGuidance(library, buildStep);
+    //
+    // The detection is delegated to [CrossEntityImportDetector], which
+    // is a pure function over the source text (no I/O, no analyzer
+    // dependency) so it can be unit-tested directly.
+    final source = await buildStep.readAsString(buildStep.inputId);
+    final guidance = CrossEntityImportDetector.detect(source).toGuidanceComment();
     if (guidance != null) {
       values.insert(0, guidance);
     }
@@ -172,148 +178,6 @@ class ZorphyGenerator extends Generator {
       graph.classesInExplicitSubtypes,
       pluginRegistry: pluginRegistry,
     );
-  }
-
-  /// Detects cross-entity field references in `@Zorphy` / `@Zorphy2`
-  /// classes and checks whether the parent library imports the
-  /// corresponding sibling entity files.
-  ///
-  /// Returns a guidance comment string if any imports are missing,
-  /// or `null` if all cross-entity references are properly imported
-  /// (or there are no cross-entity references at all).
-  ///
-  /// The guidance comment is emitted at the top of the `.zorphy.dart`
-  /// part file. It does NOT modify the source file — part files cannot
-  /// carry imports, and builders cannot overwrite their input. The user
-  /// must add the listed imports to the parent `<name>.dart` library.
-  ///
-  /// Implementation note: this uses a regex-based scan of the source
-  /// text rather than the analyzer AST, because the AST API differs
-  /// between analyzer 13.x (`ClassDeclaration.body.members`,
-  /// `ClassDeclaration.namePart`) and 14.x (`ClassDeclaration.members`,
-  /// `ClassDeclaration.name`). The regex approach is compatible with
-  /// both versions and is sufficient for detecting `$Type` references
-  /// in field declarations.
-  Future<String?> _detectMissingImportGuidance(
-    LibraryReader library,
-    BuildStep buildStep,
-  ) async {
-    // Read the source file to extract field type names as written in
-    // source (handles unresolved types — the resolved `FieldElement.type`
-    // returns `InvalidType` / `dynamic` when the import is missing).
-    final source = await buildStep.readAsString(buildStep.inputId);
-
-    // Cheap pre-filter: only scan files that mention `@Zorphy`.
-    if (!source.contains('@Zorphy')) return null;
-
-    // Collect the set of @Zorphy / @Zorphy2 class names declared in
-    // this file (so we can skip self-references).
-    final zorphyClassNames = <String>{};
-    final classDeclRegex = RegExp(
-      r'@(?:Zorphy2?)\b[^{]*\bclass\s+(\$+\w+)',
-    );
-    for (final match in classDeclRegex.allMatches(source)) {
-      final name = match.group(1);
-      if (name != null && name.isNotEmpty) {
-        zorphyClassNames.add(name);
-        zorphyClassNames.add(name.replaceAll(RegExp(r'^\$+'), ''));
-      }
-    }
-
-    // Scan for cross-entity field references. A cross-entity reference
-    // is a field (or getter) whose declared type starts with `$` —
-    // the canonical shape emitted by the CLI `FieldNormalizer`.
-    //
-    // Examples matched:
-    //   $ArtifactRef get ref;
-    //   $ArtifactRef? get ref;
-    //   final $ArtifactRef ref;
-    //   List<$ArtifactRef> get refs;
-    final crossEntityTypes = <String>{};
-    final fieldRegex = RegExp(
-      r'(?:final\s+)?\$[A-Z][a-zA-Z0-9_]*',
-    );
-    for (final match in fieldRegex.allMatches(source)) {
-      final typeName = match.group(0);
-      if (typeName == null) continue;
-      // Strip leading `final ` if present.
-      final cleanName = typeName.replaceFirst(RegExp(r'^final\s+'), '');
-      if (cleanName.isNotEmpty && cleanName.startsWith(r'$')) {
-        crossEntityTypes.add(cleanName);
-      }
-    }
-
-    if (crossEntityTypes.isEmpty) return null;
-
-    // Collect the set of import URIs declared in the source file.
-    //
-    // We scan the source text directly (rather than `library.element
-    // .libraryImports` / `.imports`) because the `LibraryElement` API
-    // differs between analyzer 13.x (`libraryImports` returning
-    // `List<LibraryImport>` with `DirectiveUri` subtypes) and 14.x
-    // (`imports` returning `List<ImportElement>` with `ImportElement.uri`
-    // as a `String?`). The regex approach is version-independent and
-    // sufficient for our needs here.
-    final importUriRegex = RegExp(
-      r"""import\s+['"]([^'"]+)['"]""",
-    );
-    final importUris = <String>{};
-    for (final match in importUriRegex.allMatches(source)) {
-      final uri = match.group(1);
-      if (uri != null && uri.isNotEmpty) {
-        importUris.add(uri);
-      }
-    }
-
-    final missingImports = <String>[];
-    for (final typeName in crossEntityTypes) {
-      // Strip leading `$`s to get the concrete name.
-      final concreteName = typeName.replaceAll(RegExp(r'^\$+'), '');
-      if (concreteName.isEmpty) continue;
-
-      // Skip the class itself (self-reference).
-      if (zorphyClassNames.contains(concreteName)) continue;
-      if (zorphyClassNames.contains(typeName)) continue;
-
-      final snakeName = _toSnakeCase(concreteName);
-
-      // Check if the source library imports a file matching this type.
-      // Matches both relative (`../snake/snake.dart`) and package
-      // (`package:pkg/snake/snake.dart`) import forms.
-      final importRegex = RegExp(
-        r"(?:[/:])" + RegExp.escape(snakeName) + r"\.dart$",
-      );
-
-      final isImported = importUris.any((uri) => importRegex.hasMatch(uri));
-
-      if (!isImported) {
-        missingImports.add(
-          '//   $typeName -> import \'../$snakeName/$snakeName.dart\';',
-        );
-      }
-    }
-
-    if (missingImports.isEmpty) return null;
-
-    return '// Cross-entity references detected. The parent <name>.dart '
-        'library is missing\n'
-        '// imports for the following entity types. Part files inherit '
-        'imports from their\n'
-        '// parent library, so add these imports to <name>.dart to make '
-        'the types resolve:\n'
-        '${missingImports.join('\n')}';
-  }
-
-  /// Converts a PascalCase / camelCase name to snake_case.
-  ///
-  /// Mirrors the CLI `NamingUtils.toSnakeCase` for the common cases:
-  /// `ArtifactRef` -> `artifact_ref`, `Issue117Ref` -> `issue117_ref`.
-  String _toSnakeCase(String name) {
-    final withSeparators = name.replaceAllMapped(
-      RegExp(r'(?<=[a-z0-9])(?=[A-Z])'),
-      (m) => '_',
-    );
-    return withSeparators.toLowerCase();
   }
 }
 

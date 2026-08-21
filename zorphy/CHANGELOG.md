@@ -1,5 +1,27 @@
 ## [Unreleased]
 
+### Refactor
+
+- Generators: extract the cross-entity import guidance detector (issue
+  #117) into a public, testable helper — `CrossEntityImportDetector`
+  at `package:zorphy/src/analysis/cross_entity_import_detector.dart`.
+  The detector is a pure function over the source text (no I/O, no
+  analyzer dependency) and returns a structured
+  `CrossEntityImportDetectorResult` exposing:
+    - `detectedTypes` — the set of cross-entity `$Type` references
+      found in the source (self-references filtered out), useful for
+      diagnostics and downstream tools.
+    - `missingImports` — the list of `// $Type -> import '...';`
+      guidance lines for siblings NOT imported by the parent library.
+    - `toGuidanceComment()` — renders the full structured comment, or
+      `null` when there are no missing imports.
+
+  The `ZorphyGenerator` now delegates to this helper. Behavior on the
+  existing `issue117_*` fixtures is unchanged: when the parent
+  `<name>.dart` library imports the sibling entity file, no guidance
+  comment is emitted; when the import is missing, the comment lists
+  every missing sibling in a copy-paste-ready form.
+
 ### Fix
 
 - Generators: cross-entity import guidance (issue #117). When a
@@ -22,7 +44,12 @@
   `example/lib/various/issue117_ref/` and `example/lib/various/issue117_repro/`
   with a test at `test/generation/issue_117_cross_entity_import_test.dart`
   verifying the generated code passes `dart analyze` with zero errors
-  when the cross-entity import is present.
+  when the cross-entity import is present. Added unit tests for the
+  `CrossEntityImportDetector` helper at
+  `test/analysis/cross_entity_import_detector_test.dart` covering the
+  pre-filter, self-reference skip, missing-import detection, generic
+  type argument detection, snake_case conversion, and guidance comment
+  format.
 
 ## [2.0.1] - 2026-08-19
 
