@@ -241,6 +241,45 @@ abstract class \$ArtifactStore {
         );
         expect(result.hasMissing, isFalse);
       });
+
+      test('flags \$Ref even when ../other/artifact_ref.dart is imported (regression for finding #2)',
+          () {
+        // The canonical pattern `ref/ref.dart` should NOT match
+        // `../other/artifact_ref.dart` even though it ends with `ref.dart`.
+        final result = CrossEntityImportDetector.detect('''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+import '../other/artifact_ref.dart';
+part 'holder.zorphy.dart';
+
+@Zorphy()
+abstract class \$Holder {
+  \$Ref get ref;
+}
+''');
+        expect(result.detectedTypes, {'\$Ref'});
+        expect(result.hasMissing, isTrue,
+            reason: 'artifact_ref.dart does not match the canonical ref/ref.dart pattern');
+        final comment = result.toGuidanceComment()!;
+        expect(comment, contains("import '../ref/ref.dart';"));
+      });
+
+      test('does NOT flag when the canonical snake/snake.dart import is present (regression for finding #2)',
+          () {
+        // Verify that the canonical `ref/ref.dart` pattern DOES match correctly.
+        final result = CrossEntityImportDetector.detect('''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+import '../ref/ref.dart';
+part 'holder.zorphy.dart';
+
+@Zorphy()
+abstract class \$Holder {
+  \$Ref get ref;
+}
+''');
+        expect(result.detectedTypes, {'\$Ref'});
+        expect(result.hasMissing, isFalse,
+            reason: 'The canonical ref/ref.dart import is present');
+      });
     });
 
     group('snake_case conversion', () {
@@ -251,20 +290,20 @@ abstract class \$ArtifactStore {
             'issue117_ref');
       });
 
-      test('converts acronym-style names (best-effort)', () {
-        // The detector uses a simple `(?<=[a-z0-9])(?=[A-Z])` split —
-        // it only inserts `_` between a lowercase/digit and an uppercase
-        // letter. Consecutive uppercase letters (acronyms like `HTTP`)
-        // are kept together, so `HTTPServer` -> `http_server` (the
-        // split happens at `P` -> `S`). For a pure-acronym name like
-        // `HTTPServer` with no lowercase boundary before `Server`, the
-        // split happens between `HTTP` and `Server` (because `P` is
-        // uppercase but the regex requires a lowercase/digit before the
-        // uppercase). Verify the actual behavior.
+      test('converts acronym-style names matching NamingUtils behavior (regression for finding #3)',
+          () {
+        // The toSnakeCase implementation now matches NamingUtils.toSnakeCase
+        // from the CLI, which inserts `_` before EVERY uppercase letter
+        // (except the first). This means `HTTPServer` -> `h_t_t_p_server`,
+        // not `httpserver` or `http_server`.
         expect(CrossEntityImportDetector.toSnakeCase('HTTPServer'),
-            'httpserver');
+            'h_t_t_p_server',
+            reason: 'Should match NamingUtils behavior for acronyms');
         expect(CrossEntityImportDetector.toSnakeCase('ArtifactRef'),
             'artifact_ref');
+        expect(CrossEntityImportDetector.toSnakeCase('XMLParser'),
+            'x_m_l_parser',
+            reason: 'Each uppercase letter gets its own underscore');
       });
 
       test('handles single-word names', () {
@@ -289,19 +328,46 @@ import '../baz/baz.dart';
         expect(uris, contains('../baz/baz.dart'));
       });
 
-      test('ignores malformed import lines', () {
+      test('excludes imports in line comments (regression for finding #1)', () {
         final uris = CrossEntityImportDetector.scanImportUris('''
 // import 'commented_out.dart';
 import 'real.dart';
-String x = "import 'not_a_real_import.dart';";
+// Another commented import: import "also_commented.dart";
 ''');
-        // The regex is `import\s+['"]([^'"]+)['"]` — the `// ` comment
-        // prefix doesn't matter because the regex matches `import ...`
-        // anywhere. The string literal case is also matched because the
-        // regex doesn't track context. This is acceptable — false
-        // positives only make the detector MORE conservative (fewer
-        // missing imports reported), which is safe.
         expect(uris, contains('real.dart'));
+        expect(uris, isNot(contains('commented_out.dart')),
+            reason: 'Line-commented imports should be excluded');
+        expect(uris, isNot(contains('also_commented.dart')),
+            reason: 'Line-commented imports should be excluded');
+      });
+
+      test('excludes imports in block comments (regression for finding #1)', () {
+        final uris = CrossEntityImportDetector.scanImportUris('''
+/* import 'block_commented.dart'; */
+import 'real.dart';
+/*
+  Multi-line block comment:
+  import "multi_line_commented.dart";
+*/
+''');
+        expect(uris, contains('real.dart'));
+        expect(uris, isNot(contains('block_commented.dart')),
+            reason: 'Block-commented imports should be excluded');
+        expect(uris, isNot(contains('multi_line_commented.dart')),
+            reason: 'Block-commented imports should be excluded');
+      });
+
+      test('excludes imports in string literals (regression for finding #1)', () {
+        final uris = CrossEntityImportDetector.scanImportUris('''
+String example = "import 'not_a_real_import.dart';";
+import 'real.dart';
+final doc = 'Usage: import "fake_import.dart";';
+''');
+        expect(uris, contains('real.dart'));
+        expect(uris, isNot(contains('not_a_real_import.dart')),
+            reason: 'Imports in string literals should be excluded');
+        expect(uris, isNot(contains('fake_import.dart')),
+            reason: 'Imports in string literals should be excluded');
       });
     });
 
