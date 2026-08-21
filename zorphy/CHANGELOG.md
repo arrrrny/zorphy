@@ -1,3 +1,14 @@
+## [2.1.1] - 2026-08-21
+
+### Feat
+
+- CLI: `--static` flag emits static class members on generated entities
+  (closes #107).
+- Generators: `Patch` + `FieldEnum` generation for nonSealed abstract base
+  classes (closes #111).
+- Generators: bare `Function`/`Function?` callback fields on value-object
+  entities no longer break json_serializable (closes #105).
+
 ## [2.1.0] - 2026-08-21
 
 ### Feat

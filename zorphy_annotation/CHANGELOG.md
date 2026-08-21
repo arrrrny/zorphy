@@ -1,3 +1,22 @@
+## [2.1.1] - 2026-08-21
+
+### Change
+
+- Version synced with `zorphy` 2.1.1 (no annotation API changes in this
+  release).
+
+## [2.1.0] - 2026-08-03
+
+### Feat
+
+- Added `MergeMode` enum (`smart` / `force`) for future per-class merge
+  control — re-exported from `zorphy_annotation.dart` for consumer access
+
+### Change
+
+- SDK constraint aligned to `>=3.8.0 <4.0.0` (matches `zorphy` package)
+- Version synced with `zorphy` 2.1.0
+
 ## [2.0.0] - 2026-08-16
 
 ### Feat
