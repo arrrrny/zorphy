@@ -1,3 +1,22 @@
+## [2.2.0] - 2026-08-21
+
+### Refactor
+
+- Generators: extract the cross-entity import guidance detector (issue #117)
+  into a public, testable, analyzer-free helper — `CrossEntityImportDetector`
+  at `package:zorphy/src/analysis/cross_entity_import_detector.dart`. The
+  `ZorphyGenerator` still emits the same guidance comment; the detector is now
+  unit-tested directly.
+
+### Test
+
+- Add regression tests for issue #117 (cross-entity `patchWith`/`fromJson` cast
+  targets the concrete entity type) and issue #119 (subtype `patchWith` cast
+  strips the leading `$`), with `example/lib/various` fixtures.
+- Add unit tests for `CrossEntityImportDetector` (pre-filter, self-reference
+  skip, missing-import detection, generic type arguments, snake_case
+  conversion, and comment/string-literal-safe import scanning).
+
 ## [2.1.1] - 2026-08-21
 
 ### Feat
