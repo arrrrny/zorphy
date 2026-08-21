@@ -85,7 +85,7 @@ class JsonGenerator extends UniversalGenerator {
             final info = manualField.first.jsonKeyInfo!;
             final jsonFieldName = info.name ?? f.name;
             bodyLines.add(
-                "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type} : null,");
+                "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type!.replaceAll(r'$', '')} : null,");
           } else {
             bodyLines.add('      ${f.name}: instance.${f.name},');
           }
@@ -244,7 +244,7 @@ class JsonGenerator extends UniversalGenerator {
           final info = manualField.first.jsonKeyInfo!;
           final jsonFieldName = info.name ?? f.name;
           bodyLines.add(
-              "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type} : null,");
+              "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type!.replaceAll(r'$', '')} : null,");
         } else {
           bodyLines.add('      ${f.name}: instance.${f.name},');
         }
