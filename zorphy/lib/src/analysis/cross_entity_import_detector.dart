@@ -202,10 +202,12 @@ class CrossEntityImportDetector {
 
       final snakeName = toSnakeCase(concreteName);
 
-      // Match either relative (`../snake/snake.dart`) or package
-      // (`package:pkg/snake/snake.dart`) import forms.
+      // Match the canonical `<snakeName>/<snakeName>.dart` suffix only.
+      // This prevents false matches like `../other/artifact_ref.dart`
+      // matching when snakeName is `ref` (which would match via the
+      // old `(?:[/:])ref\.dart$` pattern).
       final importRegex = RegExp(
-        r'(?:[/:])' + RegExp.escape(snakeName) + r'\.dart$',
+        RegExp.escape(snakeName) + r'/' + RegExp.escape(snakeName) + r'\.dart$',
       );
 
       final isImported = uris.any((uri) => importRegex.hasMatch(uri));
@@ -233,7 +235,13 @@ class CrossEntityImportDetector {
 
   static Set<String> _scanImportUris(String source) {
     final uris = <String>{};
-    for (final match in _importUriRegex.allMatches(source)) {
+    // Strip comments and string literals before scanning for imports.
+    // This prevents false matches from:
+    //   - line comments: `// import 'example.dart';`
+    //   - block comments: `/* import 'example.dart'; */`
+    //   - string literals: `String x = "import 'example.dart';";`
+    final stripped = _stripCommentsAndStrings(source);
+    for (final match in _importUriRegex.allMatches(stripped)) {
       final uri = match.group(1);
       if (uri != null && uri.isNotEmpty) {
         uris.add(uri);
@@ -242,20 +250,119 @@ class CrossEntityImportDetector {
     return uris;
   }
 
+  /// Strips line comments, block comments, and string literals from [source].
+  ///
+  /// This is a best-effort implementation that handles common cases:
+  /// - Line comments (`// ...`)
+  /// - Block comments (`/* ... */`)
+  /// - Single-quoted strings (`'...'`)
+  /// - Double-quoted strings (`"..."`)
+  ///
+  /// It does NOT handle raw strings, multiline strings, or nested comments
+  /// (which Dart doesn't support anyway), because the detector only needs
+  /// to avoid obvious false positives in import scanning.
+  static String _stripCommentsAndStrings(String source) {
+    final result = StringBuffer();
+    var i = 0;
+    while (i < source.length) {
+      // Line comment: `//` to end of line
+      if (i < source.length - 1 && source[i] == '/' && source[i + 1] == '/') {
+        final newlineIndex = source.indexOf('\n', i);
+        if (newlineIndex == -1) {
+          // Comment extends to end of file
+          break;
+        }
+        // Skip to the newline (preserve it so line numbers stay consistent)
+        result.write('\n');
+        i = newlineIndex + 1;
+        continue;
+      }
+
+      // Block comment: `/* ... */`
+      if (i < source.length - 1 && source[i] == '/' && source[i + 1] == '*') {
+        final endIndex = source.indexOf('*/', i + 2);
+        if (endIndex == -1) {
+          // Unterminated block comment — skip to end
+          break;
+        }
+        // Replace comment content with spaces (preserve newlines for line consistency)
+        for (var j = i; j < endIndex + 2; j++) {
+          if (source[j] == '\n') {
+            result.write('\n');
+          } else {
+            result.write(' ');
+          }
+        }
+        i = endIndex + 2;
+        continue;
+      }
+
+      // Single-quoted string: `'...'`
+      if (source[i] == "'") {
+        result.write(' '); // Replace opening quote with space
+        i++;
+        while (i < source.length) {
+          if (source[i] == '\\' && i + 1 < source.length) {
+            // Escaped character — skip both backslash and next char
+            result.write('  ');
+            i += 2;
+          } else if (source[i] == "'") {
+            // Closing quote
+            result.write(' ');
+            i++;
+            break;
+          } else {
+            result.write(source[i] == '\n' ? '\n' : ' ');
+            i++;
+          }
+        }
+        continue;
+      }
+
+      // Double-quoted string: `"..."`
+      if (source[i] == '"') {
+        result.write(' '); // Replace opening quote with space
+        i++;
+        while (i < source.length) {
+          if (source[i] == '\\' && i + 1 < source.length) {
+            // Escaped character — skip both backslash and next char
+            result.write('  ');
+            i += 2;
+          } else if (source[i] == '"') {
+            // Closing quote
+            result.write(' ');
+            i++;
+            break;
+          } else {
+            result.write(source[i] == '\n' ? '\n' : ' ');
+            i++;
+          }
+        }
+        continue;
+      }
+
+      // Regular character — preserve it
+      result.write(source[i]);
+      i++;
+    }
+    return result.toString();
+  }
+
   /// Converts a PascalCase / camelCase name to snake_case.
   ///
-  /// Mirrors the CLI `NamingUtils.toSnakeCase` for the common cases:
-  /// `ArtifactRef` -> `artifact_ref`, `Issue117Ref` -> `issue117_ref`.
+  /// Mirrors the behavior of `NamingUtils.toSnakeCase` from the CLI
+  /// (zorphy/lib/src/cli/utils/naming_utils.dart). The NamingUtils
+  /// implementation inserts `_` before EVERY uppercase letter (except
+  /// the first character), so acronym boundaries are handled consistently:
+  /// `HTTPServer` -> `h_t_t_p_server`, `ArtifactRef` -> `artifact_ref`.
   ///
-  /// Edge cases (acronyms like `HTTPServer`, leading underscores, etc.)
-  /// are NOT specifically handled because the CLI FieldNormalizer
-  /// already restricts the input character set to PascalCase entity
-  /// names — the input here is already well-formed.
+  /// This implementation matches that behavior by replacing each uppercase
+  /// letter with `_<lowercase>` (except when it's the first character).
   static String toSnakeCase(String name) {
-    final withSeparators = name.replaceAllMapped(
-      RegExp(r'(?<=[a-z0-9])(?=[A-Z])'),
-      (m) => '_',
-    );
-    return withSeparators.toLowerCase();
+    return name.replaceAllMapped(RegExp(r'[A-Z]'), (match) {
+      final char = match.group(0)!;
+      final index = match.start;
+      return (index == 0) ? char.toLowerCase() : '_${char.toLowerCase()}';
+    });
   }
 }
