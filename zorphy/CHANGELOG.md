@@ -1,3 +1,29 @@
+## [Unreleased]
+
+### Fix
+
+- Generators: cross-entity import guidance (issue #117). When a
+  `@Zorphy` entity references another entity as a field type (e.g.
+  `$ArtifactRef get ref;`), the generated `.zorphy.dart` part file
+  inherits its imports from the parent `<name>.dart` library. Part files
+  cannot carry their own `import` directives (Dart language constraint),
+  so if the parent library forgets to import the sibling entity file,
+  the type does not resolve and the analyzer reports
+  `argument_type_not_assignable` / `InvalidType`.
+
+  The `ZorphyGenerator` now scans each `@Zorphy` class for cross-entity
+  field references (types starting with `$`) and checks whether the
+  parent library imports the sibling. If any are missing, it emits a
+  guidance comment at the top of the `.zorphy.dart` part file listing
+  the required imports. The comment is purely informational — the user
+  must add the listed imports to the parent `<name>.dart` file.
+
+  Added regression fixture pair at
+  `example/lib/various/issue117_ref/` and `example/lib/various/issue117_repro/`
+  with a test at `test/generation/issue_117_cross_entity_import_test.dart`
+  verifying the generated code passes `dart analyze` with zero errors
+  when the cross-entity import is present.
+
 ## [2.0.1] - 2026-08-19
 
 ### Fix
