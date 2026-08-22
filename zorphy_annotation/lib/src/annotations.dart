@@ -162,6 +162,22 @@ class Zorphy implements ZorphyX {
   ///  String get z;
   /// ```
   /// ---
+  /// ### to inherit from a base class use [extends] (issue #109)
+  /// ```
+  /// @Zorphy(kind: ZorphyKind.valueObject)
+  /// abstract class $Base { String get x; }
+  ///
+  /// @Zorphy(kind: ZorphyKind.valueObject)
+  /// abstract class $Sub extends $Base {
+  ///   String get y;
+  /// }
+  /// ```
+  /// The generated concrete class will `extends Base` — proper Dart
+  /// inheritance. The subclass inherits the base's fields, copyWith,
+  /// equality, JSON, etc., and only redeclares its own fields. Use this
+  /// when the abstract subclass should *be a* base (isA<Base>() holds
+  /// at runtime), not merely satisfy its interface.
+  /// ---
   /// ### ensure the generic names are the same between inherited classes
   /// ```
   /// class $A<T1> { ...
