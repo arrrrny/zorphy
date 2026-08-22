@@ -861,6 +861,7 @@ String recoverTypeFromSource(Element element, String currentType) {
       return currentType;
     }
 
+
     // Treat -1 / 0 as "no offset" — the analyzer returns these for synthetic
     // or unresolved elements. Fall through to the text-search fallback.
     final hasValidOffset = nameOffset != null && nameOffset > 0;
@@ -937,6 +938,31 @@ String recoverTypeFromSource(Element element, String currentType) {
                 candidate != entityName) {
               return candidate;
             }
+          }
+        }
+
+        // Method (incl. static factory) return-type pattern.
+        //
+        // A static `create` factory often returns the class's CONCRETE
+        // generated type (e.g. `AppConfig`), which the analyzer cannot
+        // resolve during `build_runner` — so `getDisplayString()` yields
+        // `InvalidType`. The getter/field patterns above don't match a
+        // `Type name(` method signature, so a static factory whose return
+        // type is a generated class was silently dropped. This pattern
+        // captures the return type that precedes `name(`.
+        final methodPattern = RegExp(
+          r'(?:\b(?:static|final|const|factory|external|covariant|abstract|late)\s+)*([\w<>,?.\s]+?)\s+\b' +
+              escapedName +
+              r'\b\s*\(',
+        );
+        match = methodPattern.firstMatch(commentFreeSource);
+        if (match != null) {
+          final candidate = cleanRecoveredType(match.group(1)!.trim());
+          if (candidate.isNotEmpty &&
+              !candidate.contains('InvalidType') &&
+              !candidate.contains('//') &&
+              candidate != entityName) {
+            return candidate;
           }
         }
       }

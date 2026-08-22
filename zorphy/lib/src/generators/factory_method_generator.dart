@@ -18,19 +18,29 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
   List<Spec> generateSpec(GenerationContext context) {
     final metadata = context.metadata;
     final classNameTrimmed = metadata.cleanName;
+    final result = <Spec>[];
 
     for (final factory in metadata.factoryMethods) {
       final factoryClass = factory.className;
       final isTrulyRecursive = factoryClass == classNameTrimmed;
       if (isTrulyRecursive) continue;
 
+      // Skip factories whose parameter types could not be resolved
+      // (e.g. a static factory whose parameter is another generated
+      // entity). Emitting `InvalidType` would produce uncompilable code,
+      // and these factories were never generated before the source-
+      // recovery path existed, so skipping preserves prior behavior.
+      if (factory.parameters.any((p) => p.type.contains('InvalidType'))) {
+        continue;
+      }
+
       final spec = _buildFactoryConstructor(factory, classNameTrimmed);
       if (spec != null) {
-        return [ClassMemberCode.constructor(spec)];
+        result.add(ClassMemberCode.constructor(spec));
       }
     }
 
-    return [];
+    return result;
   }
 
   @override
@@ -41,9 +51,12 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
     if (metadata.isAbstract) return false;
 
     return metadata.factoryMethods.any((f) {
-      var factoryClass = f.className;
-      var isTrulyRecursive = factoryClass == className;
-      return !isTrulyRecursive;
+      final isTrulyRecursive = f.className == className;
+      if (isTrulyRecursive) return false;
+      if (f.parameters.any((p) => p.type.contains('InvalidType'))) {
+        return false;
+      }
+      return true;
     });
   }
 
