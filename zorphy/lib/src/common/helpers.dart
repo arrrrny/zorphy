@@ -891,17 +891,29 @@ String recoverTypeFromSource(Element element, String currentType) {
       // recover the wrong type. We instead match the parameter as `Type name`
       // inside the enclosing executable's parameter list, anchored to that
       // executable when it has a name (methods, named constructors).
-      if (element is ParameterElement && entityName != null) {
+      // Detect a parameter element without depending on the concrete
+      // ParameterElement type (not always in scope here). ParameterElements
+      // report an ElementKind of PARAMETER.
+      final dynamic _elKind = (element as dynamic).kind;
+      final bool isParameter =
+          _elKind != null && _elKind.toString().contains('PARAMETER');
+
+      if (isParameter && entityName != null) {
         final exec = element.enclosingElement;
-        final execName = (exec?.name as String?) ?? '';
+        final execName = exec?.name ?? '';
+        // Anchor to the enclosing executable's parameter list. The type is
+        // captured non-greedily so a `required Type name` / generic
+        // `Type<X, Y> name` param is recovered whole (the original greedy
+        // capture overmatched `required Type name`). No trailing `,`/`)`/`}`
+        // is required because named parameters close with `}` (e.g.
+        // `fromUrlSpark({required UrlSpark spark})`). Anchoring to the
+        // executable name also prevents matching a same-named class member
+        // (getter/field) such as `Spark? get spark`.
         final anchor = execName.isNotEmpty
-            ? r'\b' + RegExp.escape(execName) + r'\b\s*\([^)]*?'
-            : '';
+            ? r'\b' + RegExp.escape(execName) + r'\b\s*\([\s\S]*?'
+            : r'[\s\S]*?';
         final paramPattern = RegExp(
-          anchor +
-              r'([\w<>,?.\s]+?)\s+\b' +
-              RegExp.escape(entityName) +
-              r'\b\s*[,)]',
+          anchor + r'([\w<>,?.\s]+?)\s+\b' + RegExp.escape(entityName) + r'\b',
         );
         final pm = paramPattern.firstMatch(commentFreeSource);
         if (pm != null) {
