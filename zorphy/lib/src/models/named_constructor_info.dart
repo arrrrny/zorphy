@@ -11,6 +11,15 @@ class NamedConstructorInfo {
   /// Dart statements for the constructor body.
   final String body;
 
+  /// When `true`, emit a `factory` constructor whose [body] constructs and
+  /// returns the instance. When `false`, emit a normal constructor with
+  /// field-formal parameters, an initializer list, and the [body].
+  final bool factory;
+
   /// Creates a named constructor descriptor.
-  const NamedConstructorInfo({required this.name, required this.body});
+  const NamedConstructorInfo({
+    required this.name,
+    required this.body,
+    this.factory = false,
+  });
 }

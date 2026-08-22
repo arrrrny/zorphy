@@ -96,16 +96,32 @@ const ZValueObject = Zorphy(kind: ZorphyKind.valueObject);
 /// ```
 class ZorphyNamedConstructor {
   /// The constructor name (e.g. `world` produces `ContentWorld.world(...)`).
+  ///
+  /// Must be a valid Dart identifier and must not collide with a generated
+  /// constructor name (`copyWith`, `_`, or the class name itself).
   final String name;
 
   /// Dart statements executed in the constructor body.
   ///
   /// Can contain `assert`, `precondition` checks, or any other logic.
   /// The body has access to all constructor parameters.
+  ///
+  /// When [factory] is `true`, [body] must construct and return an instance
+  /// of the concrete class.
   final String body;
 
+  /// When `true`, emit a `factory` constructor (see [body] for the contract).
+  ///
+  /// Defaults to `false`, which emits a normal (non-factory) constructor with
+  /// field-formal parameters, an initializer list, and the [body].
+  final bool factory;
+
   /// Creates a named constructor descriptor.
-  const ZorphyNamedConstructor({required this.name, required this.body});
+  const ZorphyNamedConstructor({
+    required this.name,
+    required this.body,
+    this.factory = false,
+  });
 }
 class Zorphy implements ZorphyX {
   /// if we want a copyWith (cwX) method for a subtype in this same class

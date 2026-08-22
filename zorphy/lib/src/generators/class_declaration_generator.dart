@@ -429,10 +429,14 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         initParts.add('super()');
       } else if (hasExtends && !extendsAbstractClass) {
         initParts.addAll(initializers);
-        // Super call with parent fields
+        // Super call with parent fields. Skip getter-only parent fields:
+        // they are satisfied by the parent's own default value, are not
+        // emitted as parameters here, and referencing them would produce an
+        // undefined-parameter compile error in the generated super(...) call.
         final superArgs = <String>[];
         for (final f in fields) {
-          if (parentFields.contains(f.name)) {
+          if (parentFields.contains(f.name) &&
+              !(f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null)) {
             superArgs.add('${f.name}: ${f.name}');
           }
         }
@@ -518,12 +522,37 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     Set<String> ownFields,
   ) {
     for (final nc in metadata.namedConstructors) {
+      // Factory constructors cannot use field-formal parameters or an
+      // initializer list, so the body is responsible for constructing and
+      // returning the instance. Non-factory constructors use field formals
+      // and the normal initializer list.
       final params = <Parameter>[];
       final initializers = <String>[];
 
       for (final f in fields) {
         // Skip getter-only without default value
         if (f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null) {
+          continue;
+        }
+
+        // Factory constructors: plain named parameters, no initializers.
+        if (nc.factory) {
+          var fieldType = f.type != null
+              ? helpers.replaceDollarTypesWithConcrete(f.type!)
+              : f.type;
+          final isNullable = fieldType != null &&
+            (fieldType.endsWith('?') ||
+             fieldType == 'dynamic' ||
+             fieldType.startsWith('dynamic<') ||
+             fieldType.startsWith('dynamic '));
+          params.add(
+            Parameter((p) {
+              p.name = f.name;
+              p.type = referType(fieldType ?? 'dynamic');
+              p.named = true;
+              p.required = !isNullable;
+            }),
+          );
           continue;
         }
 
@@ -595,7 +624,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
             if (defaultValueString.startsWith('[') ||
                 defaultValueString.startsWith('{') ||
                 RegExp(
-                  r'^[a-zA-Z_\$][a-zA-Z0-9_\$]*(\.[a-zA-Z_\$][a-zA-Z0-9_\$]*)?(\s*<[^>]+>)?\s*\(',
+                  r'^[a-zA-Z_\$][a-zA-Z0-9_\$]*(\.[a-zA-Z0-9_\$]*)?(\s*<[^>]+>)?\s*\(',
                 ).hasMatch(defaultValueString)) {
               defaultValueString = 'const $defaultValueString';
             }
@@ -614,25 +643,35 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         }
       }
 
-      // Build initializers
+      // Build initializers (factory constructors have none)
       final initParts = <String>[];
-      if (hasExtendsParam && extendsAbstractClass) {
-        initParts.addAll(initializers);
-        initParts.add('super()');
-      } else if (hasExtendsParam && !extendsAbstractClass) {
-        initParts.addAll(initializers);
-        final superArgs = <String>[];
-        for (final f in fields) {
-          if (parentFields.contains(f.name)) {
-            superArgs.add('${f.name}: ${f.name}');
+      if (!nc.factory) {
+        if (hasExtendsParam && extendsAbstractClass) {
+          initParts.addAll(initializers);
+          initParts.add('super()');
+        } else if (hasExtendsParam && !extendsAbstractClass) {
+          initParts.addAll(initializers);
+          // Super call with parent fields. Skip getter-only parent fields:
+          // they are satisfied by the parent's own default value, are not
+          // emitted as parameters here, and referencing them would produce an
+          // undefined-parameter compile error in the generated super(...) call.
+          final superArgs = <String>[];
+          for (final f in fields) {
+            if (parentFields.contains(f.name) &&
+                !(f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null)) {
+              superArgs.add('${f.name}: ${f.name}');
+            }
           }
+          initParts.add('super(${superArgs.join(', ')})');
+        } else {
+          initParts.addAll(initializers);
         }
-        initParts.add('super(${superArgs.join(', ')})');
-      } else {
-        initParts.addAll(initializers);
       }
 
       final constructor = Constructor((con) {
+        if (nc.factory) {
+          con.factory = true;
+        }
         con.name = nc.name;
         con.optionalParameters.addAll(params);
         for (final init in initParts) {

@@ -573,7 +573,18 @@ class ClassAnalyzer {
       paramDescriptions: paramDescriptions,
       hasAgentAnnotations: hasAny,
     );
+  }
+
   /// Extract @ZorphyNamedConstructor annotations from the class element.
+  ///
+  /// Validates each declared constructor name so build failures surface a
+  /// clear message instead of a cryptic `dart` compile error in generated
+  /// code. Rejects:
+  ///  - names that are not valid Dart identifiers,
+  ///  - names that collide with generated constructors (`copyWith`, `_`),
+  ///  - names equal to the concrete class name (would shadow the default
+  ///    constructor), and
+  ///  - duplicate names declared on the same class.
   static List<NamedConstructorInfo> _extractNamedConstructors(
     ClassElement classElement,
   ) {
@@ -583,13 +594,72 @@ class ClassAnalyzer {
     final annotations = checker.annotationsOf(classElement);
     if (annotations.isEmpty) return const [];
 
+    final className = classElement.name?.startsWith(r'$') ?? false
+        ? classElement.name!.substring(1)
+        : classElement.name ?? '';
+    final seenNames = <String>{};
+
     return annotations.map((anno) {
       final reader = ConstantReader(anno);
       final name = reader.read('name').stringValue;
       final body = reader.read('body').stringValue;
-      return NamedConstructorInfo(name: name, body: body);
+      final factory = reader.read('factory').boolValue;
+
+      validateNamedConstructorName(
+        name: name,
+        className: className,
+        seenNames: seenNames,
+        classElement: classElement,
+      );
+
+      return NamedConstructorInfo(name: name, body: body, factory: factory);
     }).toList();
   }
+
+  /// Validates a single `@ZorphyNamedConstructor` name; throws [ArgumentError]
+  /// with a helpful message when it is invalid.
+  /// Validates a single `@ZorphyNamedConstructor` name; throws [ArgumentError]
+  /// with a helpful message when it is invalid.
+  ///
+  /// Exposed (non-private) so the generator's unit tests can exercise the
+  /// rules directly without building a full [ClassElement].
+  static void validateNamedConstructorName({
+    required String name,
+    required String className,
+    required Set<String> seenNames,
+    required ClassElement classElement,
+  }) {
+    // Valid Dart identifier: must start with a letter/`_`/`$`, then letters,
+    // digits, `_`, or `$`.
+    if (!RegExp(r'^[a-zA-Z_$][a-zA-Z0-9_$]*$').hasMatch(name)) {
+      throw ArgumentError(
+        'Invalid @ZorphyNamedConstructor name "$name" on $className: '
+        'constructor names must be valid Dart identifiers.',
+      );
+    }
+
+    // Reserved / generated constructor names.
+    if (name == 'copyWith' || name == '_') {
+      throw ArgumentError(
+        'Invalid @ZorphyNamedConstructor name "$name" on $className: '
+        '"$name" collides with a generated constructor.',
+      );
+    }
+
+    // Would shadow the default generated constructor.
+    if (name == className) {
+      throw ArgumentError(
+        'Invalid @ZorphyNamedConstructor name "$name" on $className: '
+        'a named constructor cannot share the class name.',
+      );
+    }
+
+    if (!seenNames.add(name)) {
+      throw ArgumentError(
+        'Duplicate @ZorphyNamedConstructor name "$name" on $className: '
+        'each named constructor must have a unique name.',
+      );
+    }
   }
 
 }

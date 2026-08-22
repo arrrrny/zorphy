@@ -5,6 +5,7 @@ import 'package:code_builder/code_builder.dart';
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/analysis/class_analyzer.dart';
 import 'package:zorphy/src/generators/base_generator.dart';
 import 'package:zorphy/src/generators/class_declaration_generator.dart';
 import 'package:zorphy/src/models/class_metadata.dart';
@@ -154,6 +155,81 @@ void main() {
       expect(code, contains('Simple({'));
       // No extra dot-names constructor (except Simple() itself)
       expect(code, isNot(contains('Simple.secure')));
+    });
+
+    test('factory named constructor emits a factory with plain params', () {
+      final meta = _concreteMeta(
+        name: 'ContentWorld',
+        fields: [
+          NameTypeClassComment('name', 'String', 'ContentWorld'),
+        ],
+        namedConstructors: [
+          const NamedConstructorInfo(
+            name: 'world',
+            body: r'return ContentWorld(name: name);',
+            factory: true,
+          ),
+        ],
+      );
+      final context = GenerationContext(metadata: meta, config: _bareConfig());
+      final specs = ClassDeclarationGenerator().generateSpec(context);
+      final code = _emitClass(specs.first as Class);
+      // Factory keyword present; the factory ctor uses a plain `name` param
+      // (no field formal `this.name`), and the body constructs the instance.
+      expect(code, contains('factory ContentWorld.world({required String name})'));
+      expect(code, isNot(contains('ContentWorld.world({required String this.name})')));
+      expect(code, contains('return ContentWorld(name: name)'));
+    });
+
+    test('name validation rejects invalid / reserved / duplicate names', () {
+      final seen = <String>{};
+      // Valid name registers without throwing.
+      ClassAnalyzer.validateNamedConstructorName(
+        name: 'world',
+        className: 'Content',
+        seenNames: seen,
+        classElement: _StubClassElement('Content'),
+      );
+      // Duplicate name is rejected.
+      expect(
+        () => ClassAnalyzer.validateNamedConstructorName(
+          name: 'world',
+          className: 'Content',
+          seenNames: seen,
+          classElement: _StubClassElement('Content'),
+        ),
+        throwsArgumentError,
+      );
+      // Non-identifier name is rejected.
+      expect(
+        () => ClassAnalyzer.validateNamedConstructorName(
+          name: '1bad',
+          className: 'Content',
+          seenNames: <String>{},
+          classElement: _StubClassElement('Content'),
+        ),
+        throwsArgumentError,
+      );
+      // Reserved generated constructor name is rejected.
+      expect(
+        () => ClassAnalyzer.validateNamedConstructorName(
+          name: 'copyWith',
+          className: 'Content',
+          seenNames: <String>{},
+          classElement: _StubClassElement('Content'),
+        ),
+        throwsArgumentError,
+      );
+      // Class-name shadowing is rejected.
+      expect(
+        () => ClassAnalyzer.validateNamedConstructorName(
+          name: 'Content',
+          className: 'Content',
+          seenNames: <String>{},
+          classElement: _StubClassElement('Content'),
+        ),
+        throwsArgumentError,
+      );
     });
   });
 }
