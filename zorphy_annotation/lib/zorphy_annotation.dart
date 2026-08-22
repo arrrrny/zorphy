@@ -24,3 +24,4 @@ library zorphy_annotation;
 export 'zorphy.dart';
 export 'src/merge_mode.dart';
 export 'src/patch_base.dart';
+export 'src/agent_annotations.dart';

@@ -1,4 +1,5 @@
 import 'package:analyzer/dart/element/element.dart';
+import 'agent_directive_info.dart';
 import '../factory_method.dart';
 import 'field_metadata.dart';
 import 'interface_metadata.dart';
@@ -66,6 +67,9 @@ class ClassMetadata {
   /// The original ClassElement from Dart analyzer
   final ClassElement classElement;
 
+  /// Parsed agent annotation data (from @AgentTool, @AgentRisk, etc.).
+  final AgentDirectiveInfo agentDirectiveInfo;
+
   /// All annotated classes discovered so far (for polymorphic JSON)
   final Map<String, ClassElement> allAnnotatedClasses;
 
@@ -93,6 +97,7 @@ class ClassMetadata {
     required this.isInParentExplicitSubtypes,
     required this.classElement,
     required this.allAnnotatedClasses,
+    this.agentDirectiveInfo = const AgentDirectiveInfo(),
     this.polymorphicSubtypes = const [],
   });
 

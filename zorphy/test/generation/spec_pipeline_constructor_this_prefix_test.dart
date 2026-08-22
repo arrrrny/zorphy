@@ -23,6 +23,7 @@ import 'package:zorphy/src/common/NameType.dart';
 import 'package:zorphy/src/generators/base_generator.dart';
 import 'package:zorphy/src/generators/class_declaration_generator.dart';
 import 'package:zorphy/src/models/class_metadata.dart';
+import 'package:zorphy/src/models/agent_directive_info.dart';
 import 'package:zorphy/src/models/generation_config.dart';
 
 // ────────────────────────────────────────────────────────────────────
@@ -68,7 +69,8 @@ ClassMetadata _concreteMeta({
     explicitSubtypes: const [],
     isInParentExplicitSubtypes: false,
     classElement: _StubClassElement(name),
-    allAnnotatedClasses: const {},
+    agentDirectiveInfo: const AgentDirectiveInfo(),
+      allAnnotatedClasses: const {},
   );
 }
 

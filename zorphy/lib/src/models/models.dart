@@ -4,3 +4,4 @@ export 'field_metadata.dart';
 export 'generation_config.dart';
 export 'interface_metadata.dart';
 export '../factory_method.dart' show FactoryMethodInfo;
+export 'agent_directive_info.dart';

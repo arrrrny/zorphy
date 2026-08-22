@@ -5,6 +5,7 @@ import '../common/NameType.dart';
 import '../common/helpers.dart' as common_helpers;
 import '../helpers.dart' as codegen_helpers;
 import '../factory_method.dart';
+import '../models/agent_directive_info.dart';
 import '../models/class_metadata.dart';
 import '../models/interface_metadata.dart';
 import 'interface_collector.dart';
@@ -96,6 +97,7 @@ class ClassAnalyzer {
         className,
         classesInExplicitSubtypes,
       ),
+      agentDirectiveInfo: _extractAgentDirectiveInfo(classElement),
       classElement: classElement,
       allAnnotatedClasses: allAnnotatedClasses,
       polymorphicSubtypes: _extractPolymorphicSubtypes(
@@ -469,4 +471,98 @@ class ClassAnalyzer {
         zorphy2Checker.firstAnnotationOf(el);
     return annot == null ? null : ConstantReader(annot);
   }
+
+  /// Extract agent annotations (@AgentTool, @AgentRisk, @AgentInternal,
+  /// @AgentExclude, @AgentToolParam) from the class and its fields.
+  static AgentDirectiveInfo _extractAgentDirectiveInfo(
+    ClassElement classElement,
+  ) {
+    String? toolName, toolNamespace, toolDescription;
+    String risk = 'safe';
+    bool exclude = false;
+    bool internal = false;
+    final paramDescriptions = <String, String>{};
+    bool hasAny = false;
+
+    // --- Class-level annotations ---
+
+    // @AgentTool
+    final toolChecker = TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/agent_annotations.dart#AgentTool',
+    );
+    final toolAnnos = toolChecker.annotationsOf(classElement);
+    if (toolAnnos.isNotEmpty) {
+      hasAny = true;
+      final reader = ConstantReader(toolAnnos.first);
+      toolName = reader.peek('name')?.stringValue;
+      toolNamespace = reader.peek('namespace')?.stringValue;
+      toolDescription = reader.peek('description')?.stringValue;
+    }
+
+    // @AgentRisk
+    final riskChecker = TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/agent_annotations.dart#AgentRisk',
+    );
+    final riskAnnos = riskChecker.annotationsOf(classElement);
+    if (riskAnnos.isNotEmpty) {
+      hasAny = true;
+      final reader = ConstantReader(riskAnnos.first);
+      final value = reader.read('value');
+      final index = value.objectValue.getField('index')?.toIntValue();
+      if (index != null && index >= 0 && index < 3) {
+        risk = ['safe', 'confirm', 'admin'][index];
+      }
+    }
+
+    // @AgentInternal
+    final internalChecker = TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/agent_annotations.dart#AgentInternal',
+    );
+    if (internalChecker.hasAnnotationOf(classElement)) {
+      hasAny = true;
+      internal = true;
+      risk = 'admin'; // AgentInternal implies admin risk
+    }
+
+    // @AgentExclude
+    final excludeChecker = TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/agent_annotations.dart#AgentExclude',
+    );
+    if (excludeChecker.hasAnnotationOf(classElement)) {
+      hasAny = true;
+      exclude = true;
+    }
+
+    // --- Field-level @AgentToolParam ---
+    final paramChecker = TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/agent_annotations.dart#AgentToolParam',
+    );
+    for (final field in classElement.fields) {
+      final fieldName = field.name;
+      if (fieldName == null || fieldName == 'hashCode' || fieldName == 'runtimeType') continue;
+      final paramAnnos = paramChecker.annotationsOf(field);
+      if (paramAnnos.isNotEmpty) {
+        hasAny = true;
+        final reader = ConstantReader(paramAnnos.first);
+        final desc = reader.peek('description')?.stringValue;
+        if (desc != null) {
+          paramDescriptions[fieldName] = desc;
+        }
+      }
+    }
+
+
+
+    return AgentDirectiveInfo(
+      toolName: toolName,
+      toolNamespace: toolNamespace,
+      toolDescription: toolDescription,
+      risk: risk,
+      exclude: exclude,
+      internal: internal,
+      paramDescriptions: paramDescriptions,
+      hasAgentAnnotations: hasAny,
+    );
+  }
+
 }

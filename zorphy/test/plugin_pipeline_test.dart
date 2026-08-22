@@ -5,6 +5,7 @@ import 'package:zorphy/src/common/NameType.dart';
 import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/factory_method.dart';
 import 'package:zorphy/src/models/class_metadata.dart';
+import 'package:zorphy/src/models/agent_directive_info.dart';
 import 'package:zorphy/src/models/generation_config.dart';
 import 'package:zorphy/src/models/interface_metadata.dart';
 import 'package:zorphy/zorphy_plugin.dart';
@@ -143,7 +144,8 @@ class _FakeClassMetadata extends ClassMetadata {
           explicitSubtypes: <Interface>[],
           isInParentExplicitSubtypes: false,
           classElement: _FakeClassElement(),
-          allAnnotatedClasses: <String, ClassElement>{},
+          agentDirectiveInfo: const AgentDirectiveInfo(),
+      allAnnotatedClasses: <String, ClassElement>{},
         );
 }
 
