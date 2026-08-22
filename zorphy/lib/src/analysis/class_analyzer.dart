@@ -143,11 +143,19 @@ class ClassAnalyzer {
     return const [];
   }
 
-  /// Validate that class uses implements, not extends
+  /// Validate class structure.
+  ///
+  /// Issue #109: previously rejected any `extends` clause on the
+  /// abstract class — only `implements` was allowed. We now permit
+  /// `extends` so value-object / entity hierarchies can be expressed
+  /// with proper Dart inheritance. The supertype is propagated to the
+  /// generated concrete class via the standard `allSupertypes` ->
+  /// `interfaces` -> `_getExtendedParentName` pipeline (see
+  /// `interface_collector.dart` and `class_declaration_generator.dart`).
   static void _validateClassStructure(ClassElement classElement) {
-    if (classElement.supertype?.element.name != "Object") {
-      throw Exception("you must use implements, not extends");
-    }
+    // Intentionally a no-op. The concrete-class generator already routes
+    // the first `$`-prefixed supertype to `c.extend` and the rest to
+    // `c.implements`, so both keywords are now first-class.
   }
 
   /// Convert InterfaceWithComment list to Interface list

@@ -109,9 +109,11 @@ class ZorphyGenerator extends Generator {
     ClassGraph graph, {
     required String outputExtension,
   }) {
-    if (classElement.supertype?.element.name != "Object") {
-      throw Exception("you must use implements, not extends");
-    }
+    // Issue #109: `extends` is now permitted on the abstract class
+    // (previously rejected here). The supertype flows through
+    // `classElement.allSupertypes` -> `InterfaceCollector.collect` ->
+    // `metadata.interfaces` and is routed to `c.extend` by
+    // `ClassDeclarationGenerator._getExtendedParentName`.
 
     // Collect factory methods using the unified analyzer
     final metadata = ClassAnalyzer.analyze(
