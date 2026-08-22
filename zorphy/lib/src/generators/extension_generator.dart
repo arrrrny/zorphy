@@ -81,6 +81,7 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
         sourceClassName: metadata.cleanName,
         explicitSubTypes: metadata.explicitSubtypes,
         knownClasses: knownClasses,
+        isSealed: metadata.isSealed,
       ),
     ];
   }
@@ -90,6 +91,7 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
     required String sourceClassName,
     required List<dynamic> explicitSubTypes,
     required List<String> knownClasses,
+    required bool isSealed,
   }) {
     final sourceClassNameTrimmed = sourceClassName.replaceAll(r'\$', '');
     final methods = <Method>[];
@@ -204,8 +206,13 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
         final varName = stName[0].toLowerCase() + stName.substring(1);
         subtypeCases.add('$stName $varName => $varName.toJson()');
       }
-      // Also handle the base class case if it's not abstract/sealed
-      // But for sealed hierarchies, we only need the subtypes
+      // For non-sealed polymorphic bases the base class itself is
+      // instantiable, so `switch (this)` over the base type must also cover
+      // the base case — otherwise the switch is non-exhaustive ("doesn't
+      // match 'X()'"). A wildcard default keeps it exhaustive.
+      if (!isSealed) {
+        subtypeCases.add('_ => this.toJson()');
+      }
       body.add('final _json = Map<String, dynamic>.from(');
       body.add('  switch (this) {');
       for (final caseStr in subtypeCases) {
