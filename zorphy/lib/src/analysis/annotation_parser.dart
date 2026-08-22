@@ -13,6 +13,7 @@ class AnnotationParser {
       preset: _readPreset(annotation),
       kind: _readKind(annotation),
       autoId: annotation.peek('autoId')?.boolValue,
+      equalityExcludes: _readStringList(annotation, 'equalityExcludes'),
       generateJson: annotation.peek('generateJson')?.boolValue,
       explicitToJson: annotation.peek('explicitToJson')?.boolValue,
       generateCopyWith: annotation.peek('generateCopyWith')?.boolValue,
@@ -59,6 +60,25 @@ class AnnotationParser {
     }
     return ZorphyKind.values[index];
   }
+
+  /// Reads a `List<String>` annotation argument. Returns an empty list
+  /// when the field is unset or null (so callers never have to deal with
+  /// null at the resolution layer). Strings are read via `toStringValue()`;
+  /// non-string entries are skipped defensively.
+  static List<String> _readStringList(
+    ConstantReader annotation,
+    String fieldName,
+  ) {
+    final listReader = annotation.peek(fieldName);
+    if (listReader == null || listReader.isNull) return const [];
+    if (!listReader.isList) return const [];
+    final out = <String>[];
+    for (final item in listReader.listValue) {
+      final s = item.toStringValue();
+      if (s != null) out.add(s);
+    }
+    return out;
+  }
 }
 
 /// Options extracted from a @Zorphy/@Zorphy2 annotation.
@@ -70,6 +90,7 @@ class AnnotationOptions {
   final ZorphyPreset? preset;
   final ZorphyKind? kind;
   final bool? autoId;
+  final List<String> equalityExcludes;
   final bool? generateJson;
   final bool? explicitToJson;
   final bool? generateCopyWith;
@@ -90,6 +111,7 @@ class AnnotationOptions {
     this.preset,
     this.kind,
     this.autoId,
+    this.equalityExcludes = const [],
     this.generateJson,
     this.explicitToJson,
     this.generateCopyWith,

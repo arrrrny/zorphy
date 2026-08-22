@@ -121,6 +121,15 @@ class GenerationConfig {
   /// When null, `'__typename'` is used.
   final String? typeKey;
 
+  /// Field names to exclude from `operator ==`, `hashCode`,
+  /// `toJsonLean()` and `compareToX()` (issue #127). Empty by default —
+  /// preserves the v1.x byte-for-byte output. `toJson()` and `toString()`
+  /// are NOT affected: they keep every field.
+  ///
+  /// The autoId entity's minted uuid is the canonical use case — see
+  /// [Zorphy.equalityExcludes] and [Zorphy.autoId].
+  final List<String> equalityExcludes;
+
   /// Factory methods for the class
   final List<FactoryMethodInfo> factoryMethods;
 
@@ -146,6 +155,7 @@ class GenerationConfig {
     required this.generateChangeTo,
     required this.nonSealed,
     this.typeKey,
+    this.equalityExcludes = const [],
     required this.factoryMethods,
     required this.ownFields,
   });
@@ -220,6 +230,7 @@ class GenerationConfig {
       hidePublicConstructor: options.hidePublicConstructor ?? false,
       nonSealed: options.nonSealed ?? false,
       typeKey: options.typeKey,
+      equalityExcludes: options.equalityExcludes,
       factoryMethods: factoryMethods,
       ownFields: ownFields,
     );
@@ -291,6 +302,7 @@ class GenerationConfig {
     this.generateChangeTo = true,
     this.nonSealed = false,
     this.typeKey = null,
+    this.equalityExcludes = const [],
     this.factoryMethods = const [],
     this.ownFields = const {},
   });

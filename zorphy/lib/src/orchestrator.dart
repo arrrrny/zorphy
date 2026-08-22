@@ -40,6 +40,11 @@ class Orchestrator {
     // Equals, hashCode, toString (concrete only)
     EqualsToStringGenerator(),
 
+    // Value equality surface (autoId entities only — issue #127).
+    // Emits valueEquals(other) and toJsonValue() that omit the
+    // autoId field. Identity equality (==/hashCode) stays default.
+    ValueEqualityGenerator(),
+
     // JSON serialization (conditional)
     JsonGenerator(),
 

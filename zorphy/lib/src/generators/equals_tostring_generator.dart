@@ -6,6 +6,12 @@ import 'base_generator.dart';
 /// Generates equals, hashCode, and toString methods.
 ///
 /// Produces native [Method] specs.
+///
+/// Honors `GenerationConfig.equalityExcludes` (issue #127): fields whose
+/// Dart name is listed in `equalityExcludes` are dropped from `operator
+/// ==` and `hashCode`. `toString()` is NEVER filtered — debug output
+/// keeps every field for diagnostics. `equalityExcludes` does not affect
+/// `toString()` because debug output is not a comparison surface.
 class EqualsToStringGenerator extends ConcreteClassGenerator {
   /// Creates a generator for equality and toString members.
   EqualsToStringGenerator();
@@ -13,13 +19,16 @@ class EqualsToStringGenerator extends ConcreteClassGenerator {
   @override
   List<Spec> generateSpec(GenerationContext context) {
     final metadata = context.metadata;
-    final fields = metadata.allFields;
+    final allFields = metadata.allFields;
     final className = metadata.cleanName;
+    // Fields used by == / hashCode drop the excluded names; toString
+    // keeps every field so debug output is unchanged.
+    final equalityFields = _filterExcluded(allFields, context);
 
     return [
-      _buildEqualsOperator(fields, className),
-      _buildHashCodeGetter(fields),
-      _buildToStringMethod(fields, className),
+      _buildEqualsOperator(equalityFields, className),
+      _buildHashCodeGetter(equalityFields),
+      _buildToStringMethod(allFields, className),
     ];
   }
 
@@ -27,6 +36,19 @@ class EqualsToStringGenerator extends ConcreteClassGenerator {
   bool shouldGenerate(GenerationContext context) {
     return !context.metadata.isAbstract &&
         context.config.generateEqualsToString;
+  }
+
+  /// Returns the subset of [fields] whose Dart name is NOT in
+  /// `config.equalityExcludes`. The comparison is case-sensitive and
+  /// matches the field's Dart name (NOT a `@JsonKey(name: ...)` alias).
+  static List<NameTypeClassComment> _filterExcluded(
+    List<NameTypeClassComment> fields,
+    GenerationContext context,
+  ) {
+    final excludes = context.config.equalityExcludes;
+    if (excludes.isEmpty) return fields;
+    final set = excludes.toSet();
+    return fields.where((f) => !set.contains(f.name)).toList();
   }
 
   // ── equals operator ─────────────────────────────────────────────

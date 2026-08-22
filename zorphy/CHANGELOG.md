@@ -1,3 +1,68 @@
+## [Unreleased]
+
+### Feat
+
+- Generators: value-comparison surface for `autoId` entities (issue
+  #127, proposal #2). Every `@Zorphy(autoId: true)` concrete class now
+  gets two NEW methods on the generated class:
+    - `bool valueEquals(Object other)` — `true` iff `other` is the same
+      concrete type AND every field EXCEPT the autoId field (`id`) is
+      equal to this instance's. Identity equality (the default
+      `==`/`hashCode`) is preserved; `valueEquals` is an additive
+      surface for consumers that need value comparison.
+    - `Map<String, dynamic> toJsonValue()` — the full `toJson()`
+      output with the autoId field (`id`) key removed. Stable across
+      two instances with the same field values; use a canonical
+      serialized representation (e.g., `toJsonValue().toString()`) or
+      an explicit value-key type for deduplication. Emitted only when
+      `generateJson: true` (it calls `_$XToJson(this)`).
+  Both methods also drop any field listed in `equalityExcludes` (see
+  below). The autoId `id` is always dropped by these methods.
+- Annotation: field-level equality exclusion via
+  `@Zorphy(equalityExcludes: ['id'])` (issue #127, proposal #1).
+  Fields listed in `equalityExcludes` are dropped from four generated
+  surfaces: `operator ==`, `hashCode`, `toJsonLean()` and
+  `compareToX()`. `toJson()` and `toString()` keep every field — the
+  entity still round-trips through JSON for persistence and the id
+  stays in debug output. Defaults to an empty list (the v2.2.0
+  byte-for-byte output is preserved for non-autoId entities and for
+  autoId entities that already existed — those now gain the NEW
+  `valueEquals()`/`toJsonValue()` methods while their existing
+  `==`/`hashCode`/`toJsonLean()`/`compareToX()` behavior is unchanged).
+  Field names are matched against the Dart field name (NOT a
+  `@JsonKey(name: ...)` alias).
+- `zorphy_annotation` bumped to 2.3.0 (new `equalityExcludes` field on
+  `@Zorphy` / `@Zorphy2` / `ZorphyX`; backward-compatible — defaults to
+  `const []`). `zorphy` depends on `^2.3.0` and uses a
+  `dependency_overrides` path to `../zorphy_annotation` for in-tree
+  development (matches the `zorphy_migrator` pattern).
+
+### Docs
+
+- Annotation: `Zorphy.autoId` now documents the value-semantics caveat
+  (the minted uuid is identity noise — two instances with the same
+  field values compare unequal by default) and points to the two
+  opt-outs (`equalityExcludes` for full field-level exclusion,
+  `valueEquals`/`toJsonValue` for additive value comparison without
+  changing identity equality).
+
+### Test
+
+- Add regression test `test/regression/issue_127_value_equality_test.dart`
+  (21 assertions) exercising three fixtures in
+  `example/lib/various/issue127_value_equality_example.dart`:
+    1. `$AutoIdDefault` — back-compat default: `==`/`hashCode`/
+       `toJsonLean()`/`compareToX()` still include `id`, and the NEW
+       `valueEquals`/`toJsonValue` methods drop it.
+    2. `$AutoIdExcludesId` — opt-out: `==`/`hashCode`/`toJsonLean()`/
+       `compareToX()` drop `id`; `toJson()` keeps it; `valueEquals`/
+       `toJsonValue` also drop it.
+    3. `$NonAutoIdExcludesCreatedAt` — non-autoId opt-out: `createdAt`
+       is dropped from the four surfaces; no `valueEquals`/`toJsonValue`
+       methods (autoId-only surface).
+  All assertions pass; full test suite (253 tests) passes; `dart
+  analyze` is clean on `zorphy`, `zorphy_annotation`, and `example`.
+
 ## [2.2.0] - 2026-08-21
 
 ### Refactor

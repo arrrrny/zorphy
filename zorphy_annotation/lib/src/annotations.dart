@@ -84,7 +84,69 @@ class Zorphy implements ZorphyX {
   /// The annotated class should declare `String get id;` (the `zfa entity
   /// create --auto-id` workflow does this for you) and the library must
   /// import `package:uuid/uuid.dart`.
+  ///
+  /// ### Value-semantics caveat (issue #127)
+  /// The minted uuid is **identity noise** — it is NOT a meaningful value
+  /// for equality. By default, zorphy still includes `id` in `operator
+  /// ==`, `hashCode`, `toJson()`, `toJsonLean()` and `compareToX()`, so
+  /// two instances with the same field values but separately-minted ids
+  /// compare unequal, hash differently, and produce different JSON maps.
+  /// That is the correct semantics for an entity with identity, but it is
+  /// a silent trap for any code that uses the entity as a `Set` member,
+  /// `Map` key, deduplication key or repetition detector.
+  ///
+  /// Two opt-outs:
+  ///
+  /// 1. **Field-level exclusion** — set [equalityExcludes] to drop `id`
+  ///    (or any other field) from `==`, `hashCode`, `toJsonLean()` and
+  ///    `compareToX()`:
+  ///    ```dart
+  ///    @Zorphy(autoId: true, generateJson: true, equalityExcludes: ['id'])
+  ///    abstract class $ToolCallSignature {
+  ///      String get id;
+  ///      String get toolName;
+  ///    }
+  ///    ```
+  ///    `toJson()` and `toString()` keep all fields — the id round-trips
+  ///    through `toJson()` for persistence and stays in `toString()` for
+  ///    debug output.
+  ///
+  /// 2. **Value-comparison surface (auto-generated)** — for every
+  ///    `autoId: true` entity zorphy emits `valueEquals(other)` on the
+  ///    concrete class; when `generateJson: true` is also set, it emits
+  ///    `toJsonValue()` as well. They compare/serialize every field EXCEPT
+  ///    the autoId field, so identity equality (the default `==`/`hashCode`)
+  ///    is preserved while value comparison becomes possible without
+  ///    hand-rolling string keys:
+  ///    ```dart
+  ///    if (a.valueEquals(b)) { /* semantic match — ignores id */ }
+  ///    final key = a.toJsonValue().toString(); // stable across instances
+  ///    ```
   final bool autoId;
+
+  /// Field names to exclude from `operator ==`, `hashCode`,
+  /// `toJsonLean()` and `compareToX()`. Defaults to an empty list (no
+  /// fields excluded — preserves the v1.x byte-for-byte output).
+  ///
+  /// `toJson()` and `toString()` are NOT affected — they keep every
+  /// field so the entity still round-trips through JSON for persistence
+  /// and includes the autoId in debug output.
+  ///
+  /// This is the field-level opt-out for issue #127: when an entity is
+  /// `autoId: true` the minted uuid is identity noise that should NOT
+  /// participate in value comparison. Pass `equalityExcludes: ['id']` to
+  /// make two logically-identical instances compare equal, hash equal,
+  /// produce the same `toJsonLean()` output, and produce the same
+  /// `compareToX()` diff map.
+  ///
+  /// Works for any field, not just `id` — useful for any kind of
+  /// generated/metadata field that should not participate in value
+  /// equality (e.g. `createdAt`, `updatedAt`, `__typename`).
+  ///
+  /// Field names are matched against the field's Dart name (NOT a JSON
+  /// key alias): if a field is declared as `String get id;` the entry is
+  /// `'id'` even if the JSON key is renamed via `@JsonKey(name: 'uuid')`.
+  final List<String> equalityExcludes;
 
   final bool generateJson;
   final bool explicitToJson;
@@ -248,6 +310,7 @@ class Zorphy implements ZorphyX {
     this.generateChangeTo = null,
     this.typeKey,
     this.subtypeWireValue,
+    this.equalityExcludes = const [],
   });
 }
 
@@ -263,8 +326,14 @@ class Zorphy2 implements ZorphyX {
   final ZorphyKind kind;
 
   /// Whether the class owns an auto-generated uuid `id` field — see
-  /// [Zorphy.autoId].
+  /// [Zorphy.autoId] for the value-semantics caveat and the
+  /// [Zorphy.equalityExcludes] opt-out.
   final bool autoId;
+
+  /// Field names to exclude from `==`, `hashCode`, `toJsonLean()` and
+  /// `compareToX()` — see [Zorphy.equalityExcludes] for the full
+  /// semantics. Defaults to an empty list.
+  final List<String> equalityExcludes;
 
   final bool generateJson;
   final bool explicitToJson;
@@ -305,6 +374,7 @@ class Zorphy2 implements ZorphyX {
     this.generateChangeTo = null,
     this.typeKey,
     this.subtypeWireValue,
+    this.equalityExcludes = const [],
   });
 }
 
@@ -317,6 +387,10 @@ abstract class ZorphyX {
 
   /// Returns whether the class owns an auto-generated uuid `id` field.
   bool get autoId;
+
+  /// Returns field names to exclude from `==`, `hashCode`,
+  /// `toJsonLean()` and `compareToX()` (see [Zorphy.equalityExcludes]).
+  List<String> get equalityExcludes;
 
   /// Returns whether JSON serialization code should be generated.
   bool get generateJson;

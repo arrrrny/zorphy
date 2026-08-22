@@ -314,7 +314,10 @@ class JsonGenerator extends UniversalGenerator {
     }
 
     final className = metadata.cleanName;
-    final manualToJsonFields = _getManualToJsonFields(metadata);
+    final manualToJsonFields = _getManualToJsonFields(metadata)
+        .where((f) => !config.equalityExcludes.contains(f.name))
+        .toList();
+    final excludedJsonKeys = _excludedJsonKeys(metadata, config);
 
     // toJsonLean method
     if (metadata.generics.isEmpty) {
@@ -327,6 +330,10 @@ class JsonGenerator extends UniversalGenerator {
         final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
         body.add(
             "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
+      }
+      for (final key in excludedJsonKeys) {
+        final escaped = _escapeDartStringLiteral(key);
+        body.add("data.remove('$escaped');");
       }
       body.add('_sanitizeJson(data);');
       body.add('return data;');
@@ -347,6 +354,10 @@ class JsonGenerator extends UniversalGenerator {
         final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
         body.add(
             "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
+      }
+      for (final key in excludedJsonKeys) {
+        final escaped = _escapeDartStringLiteral(key);
+        body.add("data.remove('$escaped');");
       }
       body.add('_sanitizeJson(data);');
       body.add('return data;');
@@ -435,6 +446,32 @@ return json;''');
           info.includeToJson == false &&
           info.toJson != null;
     }).toList();
+  }
+
+  /// Returns the JSON keys (NOT Dart field names) for every field
+  /// listed in `config.equalityExcludes`. The JSON key is read from
+  /// the field's `@JsonKey(name: ...)` annotation, falling back to
+  /// the Dart field name when no alias is set (matching
+  /// json_serializable's default behavior). Used by `toJsonLean()`
+  /// to drop excluded fields from the output map (issue #127).
+  ///
+  /// Unknown names in `equalityExcludes` are silently ignored — they
+  /// do not match any field on the class and would never appear in
+  /// the map anyway. This makes the feature safe to use on
+  /// hierarchies where the exclusion is only meaningful on a subtype.
+  Set<String> _excludedJsonKeys(
+    ClassMetadata metadata,
+    GenerationConfig config,
+  ) {
+    final excludes = config.equalityExcludes.toSet();
+    if (excludes.isEmpty) return const {};
+    final out = <String>{};
+    for (final f in metadata.allFields) {
+      if (!excludes.contains(f.name)) continue;
+      final jsonKey = f.jsonKeyInfo?.name ?? f.name;
+      out.add(jsonKey);
+    }
+    return out;
   }
 }
 

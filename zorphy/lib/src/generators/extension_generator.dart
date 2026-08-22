@@ -7,6 +7,12 @@ import 'base_generator.dart';
 /// Generates compareTo extension method.
 ///
 /// Produces a native [Extension] spec.
+///
+/// Honors `GenerationConfig.equalityExcludes` (issue #127): fields whose
+/// Dart name is listed in `equalityExcludes` are skipped — they do NOT
+/// appear as entries in the returned `diff` map. Without this filter, an
+/// `autoId` entity would always report a spurious `id` diff for two
+/// freshly-constructed instances with identical field values.
 class CompareToExtensionGenerator extends ConcreteClassGenerator {
   CompareToExtensionGenerator();
 
@@ -17,7 +23,11 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
   @override
   List<Spec> generateSpec(GenerationContext context) {
     final metadata = context.metadata;
-    return [_buildCompareToExtension(metadata.cleanName, metadata.allFields)];
+    final excludes = context.config.equalityExcludes.toSet();
+    final fields = excludes.isEmpty
+        ? metadata.allFields
+        : metadata.allFields.where((f) => !excludes.contains(f.name)).toList();
+    return [_buildCompareToExtension(metadata.cleanName, fields)];
   }
 
   Extension _buildCompareToExtension(
