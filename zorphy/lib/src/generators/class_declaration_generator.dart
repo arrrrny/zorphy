@@ -196,6 +196,20 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         parentFields,
         metadata.ownFieldNames,
       );
+
+      // Named constructors (from @ZorphyNamedConstructor)
+      if (!metadata.isAbstract) {
+        _addNamedConstructors(
+          c,
+          metadata.allFields,
+          metadata,
+          config,
+          hasExtendsParam,
+          extendsAbstractClass,
+          parentFields,
+          metadata.ownFieldNames,
+        );
+      }
     });
   }
 
@@ -415,10 +429,14 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         initParts.add('super()');
       } else if (hasExtends && !extendsAbstractClass) {
         initParts.addAll(initializers);
-        // Super call with parent fields
+        // Super call with parent fields. Skip getter-only parent fields:
+        // they are satisfied by the parent's own default value, are not
+        // emitted as parameters here, and referencing them would produce an
+        // undefined-parameter compile error in the generated super(...) call.
         final superArgs = <String>[];
         for (final f in fields) {
-          if (parentFields.contains(f.name)) {
+          if (parentFields.contains(f.name) &&
+              !(f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null)) {
             superArgs.add('${f.name}: ${f.name}');
           }
         }
@@ -484,6 +502,185 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           }
         }),
       );
+    }
+  }
+
+
+  /// Adds user-declared named constructors (from @ZorphyNamedConstructor)
+  /// to the concrete class spec.
+  ///
+  /// Each named constructor gets the same parameters as the default
+  /// constructor, plus the custom body declared in the annotation.
+  void _addNamedConstructors(
+    ClassBuilder c,
+    List<NameTypeClassComment> fields,
+    ClassMetadata metadata,
+    GenerationConfig config,
+    bool hasExtendsParam,
+    bool extendsAbstractClass,
+    Set<String> parentFields,
+    Set<String> ownFields,
+  ) {
+    for (final nc in metadata.namedConstructors) {
+      // Factory constructors cannot use field-formal parameters or an
+      // initializer list, so the body is responsible for constructing and
+      // returning the instance. Non-factory constructors use field formals
+      // and the normal initializer list.
+      final params = <Parameter>[];
+      final initializers = <String>[];
+
+      for (final f in fields) {
+        // Skip getter-only without default value
+        if (f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null) {
+          continue;
+        }
+
+        // Factory constructors: plain named parameters, no initializers.
+        if (nc.factory) {
+          var fieldType = f.type != null
+              ? helpers.replaceDollarTypesWithConcrete(f.type!)
+              : f.type;
+          final isNullable = fieldType != null &&
+            (fieldType.endsWith('?') ||
+             fieldType == 'dynamic' ||
+             fieldType.startsWith('dynamic<') ||
+             fieldType.startsWith('dynamic '));
+          params.add(
+            Parameter((p) {
+              p.name = f.name;
+              p.type = referType(fieldType ?? 'dynamic');
+              p.named = true;
+              p.required = !isNullable;
+            }),
+          );
+          continue;
+        }
+
+        // autoId: same logic as default constructor
+        if (config.autoId && f.name == 'id') {
+          params.add(
+            Parameter((p) {
+              p.name = f.name;
+              p.type = referType('String?');
+              p.named = true;
+            }),
+          );
+          initializers.add('this.${f.name} = ${f.name} ?? const Uuid().v4()');
+          continue;
+        }
+
+        final defaultValue = f.jsonKeyInfo?.defaultValue;
+        final hasDefaultValue = defaultValue != null;
+        var fieldType = f.type != null
+            ? helpers.replaceDollarTypesWithConcrete(f.type!)
+            : f.type;
+
+        final isNullable = fieldType != null &&
+          (fieldType.endsWith('?') ||
+           fieldType == 'dynamic' ||
+           fieldType.startsWith('dynamic<') ||
+           fieldType.startsWith('dynamic '));
+
+        final isParentField =
+            hasExtendsParam &&
+            !extendsAbstractClass &&
+            parentFields.contains(f.name) &&
+            !ownFields.contains(f.name);
+
+        if (isParentField) {
+          var safeFieldType = fieldType ?? 'dynamic';
+          var isNull = safeFieldType.endsWith('?');
+          var paramType = (isNull || hasDefaultValue)
+              ? (safeFieldType.endsWith('?') ? safeFieldType : '$safeFieldType?')
+              : safeFieldType;
+          params.add(
+            Parameter((p) {
+              p.name = f.name;
+              p.type = referType(paramType);
+              p.named = true;
+              p.required = !(isNull || hasDefaultValue);
+            }),
+          );
+        } else if (hasDefaultValue) {
+          var safeFieldType = fieldType ?? 'dynamic';
+          var isNull = safeFieldType.endsWith('?');
+          var paramType = isNull ? safeFieldType : '$safeFieldType?';
+          params.add(
+            Parameter((p) {
+              p.name = f.name;
+              p.type = referType(paramType);
+              p.named = true;
+            }),
+          );
+
+          var defaultValueString = defaultValue.toString();
+          if (!defaultValueString.startsWith('const ') &&
+              !defaultValueString.startsWith("'") &&
+              !defaultValueString.startsWith('"') &&
+              !RegExp(r'^-?\d').hasMatch(defaultValueString) &&
+              defaultValueString != 'true' &&
+              defaultValueString != 'false' &&
+              defaultValueString != 'null') {
+            if (defaultValueString.startsWith('[') ||
+                defaultValueString.startsWith('{') ||
+                RegExp(
+                  r'^[a-zA-Z_\$][a-zA-Z0-9_\$]*(\.[a-zA-Z0-9_\$]*)?(\s*<[^>]+>)?\s*\(',
+                ).hasMatch(defaultValueString)) {
+              defaultValueString = 'const $defaultValueString';
+            }
+          }
+
+          initializers.add('this.${f.name} = ${f.name} ?? $defaultValueString');
+        } else {
+          var safeFieldType = fieldType ?? 'dynamic';
+          params.add(Parameter((p) {
+            p.name = f.name;
+            p.type = referType(safeFieldType);
+            p.named = true;
+            p.required = !isNullable;
+            p.toThis = true;
+          }));
+        }
+      }
+
+      // Build initializers (factory constructors have none)
+      final initParts = <String>[];
+      if (!nc.factory) {
+        if (hasExtendsParam && extendsAbstractClass) {
+          initParts.addAll(initializers);
+          initParts.add('super()');
+        } else if (hasExtendsParam && !extendsAbstractClass) {
+          initParts.addAll(initializers);
+          // Super call with parent fields. Skip getter-only parent fields:
+          // they are satisfied by the parent's own default value, are not
+          // emitted as parameters here, and referencing them would produce an
+          // undefined-parameter compile error in the generated super(...) call.
+          final superArgs = <String>[];
+          for (final f in fields) {
+            if (parentFields.contains(f.name) &&
+                !(f.isGetterOnly && f.jsonKeyInfo?.defaultValue == null)) {
+              superArgs.add('${f.name}: ${f.name}');
+            }
+          }
+          initParts.add('super(${superArgs.join(', ')})');
+        } else {
+          initParts.addAll(initializers);
+        }
+      }
+
+      final constructor = Constructor((con) {
+        if (nc.factory) {
+          con.factory = true;
+        }
+        con.name = nc.name;
+        con.optionalParameters.addAll(params);
+        for (final init in initParts) {
+          con.initializers.add(Code(init));
+        }
+        con.body = Code(nc.body);
+      });
+
+      c.constructors.add(constructor);
     }
   }
 

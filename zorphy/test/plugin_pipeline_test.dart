@@ -145,6 +145,7 @@ class _FakeClassMetadata extends ClassMetadata {
           isInParentExplicitSubtypes: false,
           classElement: _FakeClassElement(),
           agentDirectiveInfo: const AgentDirectiveInfo(),
+          namedConstructors: const [],
       allAnnotatedClasses: <String, ClassElement>{},
         );
 }

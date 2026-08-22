@@ -65,6 +65,64 @@ const zorphy2 = Zorphy2();
 /// ```
 const ZValueObject = Zorphy(kind: ZorphyKind.valueObject);
 
+
+
+/// Annotation to declare a named constructor with a custom body on the
+/// generated concrete class.
+///
+/// Place one or more `@ZorphyNamedConstructor` annotations on the
+/// abstract class. The generated concrete class will have additional
+/// named constructors with the same parameters as the default
+/// constructor, plus the custom [body] code.
+///
+/// Example:
+/// ```dart
+/// @ZValueObject
+/// @ZorphyNamedConstructor(name: 'world', body: r'assert(!name.startsWith("WINDOW-ID-"));')
+/// abstract class $ContentWorld {
+///   String get name;
+/// }
+/// ```
+///
+/// This generates:
+/// ```dart
+/// class ContentWorld {
+///   final String name;
+///   ContentWorld({required this.name});
+///   ContentWorld.world({required this.name}) {
+///     assert(!name.startsWith("WINDOW-ID-"));
+///   }
+/// }
+/// ```
+class ZorphyNamedConstructor {
+  /// The constructor name (e.g. `world` produces `ContentWorld.world(...)`).
+  ///
+  /// Must be a valid Dart identifier and must not collide with a generated
+  /// constructor name (`copyWith`, `_`, or the class name itself).
+  final String name;
+
+  /// Dart statements executed in the constructor body.
+  ///
+  /// Can contain `assert`, `precondition` checks, or any other logic.
+  /// The body has access to all constructor parameters.
+  ///
+  /// When [factory] is `true`, [body] must construct and return an instance
+  /// of the concrete class.
+  final String body;
+
+  /// When `true`, emit a `factory` constructor (see [body] for the contract).
+  ///
+  /// Defaults to `false`, which emits a normal (non-factory) constructor with
+  /// field-formal parameters, an initializer list, and the [body].
+  final bool factory;
+
+  /// Creates a named constructor descriptor.
+  const ZorphyNamedConstructor({
+    required this.name,
+    required this.body,
+    this.factory = false,
+  });
+}
 class Zorphy implements ZorphyX {
   /// if we want a copyWith (cwX) method for a subtype in this same class
   final List<Type>? explicitSubTypes;
