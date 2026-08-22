@@ -873,24 +873,53 @@ String recoverTypeFromSource(Element element, String currentType) {
           (dynElem.enclosingElement as dynamic)?.name as String?;
       final entityName = element.name;
 
+      // Strip `///` and `//` comment lines so comment text isn't swept into
+      // a recovered type (issue #88). Done up front because the parameter
+      // recovery below also needs the comment-free source.
+      final commentFreeSource = source
+          .split('\n')
+          .where((line) => !line.trim().startsWith('//'))
+          .join('\n');
+
+      // Parameters must be recovered from their enclosing executable's
+      // signature, never from a same-named class member (getter/field).
+      // A polymorphic static factory such as
+      // `fromUrlSpark({required UrlSpark spark})` has a parameter `spark`
+      // whose analyzer type is `InvalidType` (the subtype `UrlSpark` isn't
+      // resolved yet during generation); the getter/field patterns below
+      // would otherwise match the class getter `Spark? get spark` and
+      // recover the wrong type. We instead match the parameter as `Type name`
+      // inside the enclosing executable's parameter list, anchored to that
+      // executable when it has a name (methods, named constructors).
+      if (element is ParameterElement && entityName != null) {
+        final exec = element.enclosingElement;
+        final execName = (exec?.name as String?) ?? '';
+        final anchor = execName.isNotEmpty
+            ? r'\b' + RegExp.escape(execName) + r'\b\s*\([^)]*?'
+            : '';
+        final paramPattern = RegExp(
+          anchor +
+              r'([\w<>,?.\s]+?)\s+\b' +
+              RegExp.escape(entityName) +
+              r'\b\s*[,)]',
+        );
+        final pm = paramPattern.firstMatch(commentFreeSource);
+        if (pm != null) {
+          final candidate = cleanRecoveredType(pm.group(1)!.trim());
+          if (candidate.isNotEmpty &&
+              !candidate.contains('InvalidType') &&
+              !candidate.contains('//')) {
+            return candidate;
+          }
+        }
+        // No executable-anchored parameter match — do NOT fall through to the
+        // getter/field patterns (they would recover a wrong same-named member
+        // type). Keep the analyzer's (possibly InvalidType) result so the
+        // caller can skip the factory instead of emitting broken code.
+        return currentType;
+      }
+
       if (containerName != null && entityName != null) {
-        // Issue #88: strip `///` and `//` comment lines from the source
-        // before running the type-recovery regexes below. Without this,
-        // a field whose doc comment uses `///- ` list markers (very
-        // common in the zikzak_inappwebview fork's settings docs, e.g.
-        // `///- Android native WebView` / `///- iOS`) leaks the list
-        // item text into the recovered type. The regex character class
-        // `[\w<>,?\s]` excludes `/`, so the `///` prefix is stripped
-        // by the regex itself — but the remaining text on the comment
-        // line (e.g. `macOS`, `iOS`) is matched as word chars and swept
-        // into the captured group, producing a multi-line "type" like
-        // `macOS\n  Bar?` which code_builder emits verbatim and the
-        // dart_style formatter then mis-parses (the bare token `macOS`
-        // survives as a stray identifier in the generated constructor).
-        final commentFreeSource = source
-            .split('\n')
-            .where((line) => !line.trim().startsWith('//'))
-            .join('\n');
         // Try constructor-parameter pattern first (original behavior —
         // preserves the recovery for method params that was already working).
         final ctorPattern = RegExp(
