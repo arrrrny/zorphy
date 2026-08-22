@@ -9,3 +9,4 @@ export 'json_generator.dart';
 export 'extension_generator.dart';
 export 'fields_class_generator.dart';
 export 'property_helper_generator.dart';
+export 'agent_directive_generator.dart';

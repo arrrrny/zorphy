@@ -23,6 +23,7 @@ import 'package:zorphy/src/common/classes.dart';
 import 'package:zorphy/src/generators/base_generator.dart';
 import 'package:zorphy/src/generators/json_generator.dart';
 import 'package:zorphy/src/models/class_metadata.dart';
+import 'package:zorphy/src/models/agent_directive_info.dart';
 import 'package:zorphy/src/models/generation_config.dart';
 
 class _StubClassElement implements ClassElement {
@@ -59,7 +60,8 @@ ClassMetadata _baseMeta({
     explicitSubtypes: subtypes,
     isInParentExplicitSubtypes: false,
     classElement: _StubClassElement(name),
-    allAnnotatedClasses: const {},
+    agentDirectiveInfo: const AgentDirectiveInfo(),
+      allAnnotatedClasses: const {},
   );
 }
 
@@ -88,7 +90,8 @@ ClassMetadata _subtypeMeta({
     explicitSubtypes: const [],
     isInParentExplicitSubtypes: true,
     classElement: _StubClassElement(name),
-    allAnnotatedClasses: const {},
+    agentDirectiveInfo: const AgentDirectiveInfo(),
+      allAnnotatedClasses: const {},
   );
 }
 

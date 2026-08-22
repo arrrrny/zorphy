@@ -5,6 +5,7 @@ import 'package:zorphy/src/analysis/analysis.dart';
 import 'package:zorphy/src/ast/ast.dart';
 import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/generators/generators.dart';
+import 'package:zorphy/src/generators/agent_directive_generator.dart';
 import 'package:zorphy/src/models/models.dart';
 import 'package:zorphy/src/plugins/plugin_context.dart';
 import 'package:zorphy/src/plugins/plugin_registry.dart';
@@ -56,6 +57,9 @@ class Orchestrator {
 
     // CompareTo extension (conditional, concrete only)
     CompareToExtensionGenerator(),
+
+    // Agent directive (conditional, has agent annotations)
+    AgentDirectiveGenerator(),
 
     // ChangeTo extension (conditional, has explicit subtypes)
     ChangeToExtensionGenerator(),

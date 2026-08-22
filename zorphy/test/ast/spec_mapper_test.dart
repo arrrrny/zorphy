@@ -4,6 +4,7 @@ import 'package:test/test.dart';
 import 'package:zorphy/src/ast/spec_mapper.dart';
 import 'package:zorphy/src/common/NameType.dart';
 import 'package:zorphy/src/models/class_metadata.dart';
+import 'package:zorphy/src/models/agent_directive_info.dart';
 import 'package:zorphy/src/models/interface_metadata.dart';
 
 // ────────────────────────────────────────────────────────────────────
@@ -55,7 +56,8 @@ ClassMetadata _testMeta({
     explicitSubtypes: const [],
     isInParentExplicitSubtypes: false,
     classElement: _StubClassElement(cleanName),
-    allAnnotatedClasses: const {},
+    agentDirectiveInfo: const AgentDirectiveInfo(),
+      allAnnotatedClasses: const {},
   );
 }
 
