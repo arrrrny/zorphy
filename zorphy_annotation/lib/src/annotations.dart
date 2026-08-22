@@ -112,11 +112,12 @@ class Zorphy implements ZorphyX {
   ///    debug output.
   ///
   /// 2. **Value-comparison surface (auto-generated)** — for every
-  ///    `autoId: true` entity zorphy also emits `valueEquals(other)` and
-  ///    `toJsonValue()` on the concrete class. They compare/serialize every
-  ///    field EXCEPT the autoId field, so identity equality (the default
-  ///    `==`/`hashCode`) is preserved while value comparison becomes
-  ///    possible without hand-rolling string keys:
+  ///    `autoId: true` entity zorphy emits `valueEquals(other)` on the
+  ///    concrete class; when `generateJson: true` is also set, it emits
+  ///    `toJsonValue()` as well. They compare/serialize every field EXCEPT
+  ///    the autoId field, so identity equality (the default `==`/`hashCode`)
+  ///    is preserved while value comparison becomes possible without
+  ///    hand-rolling string keys:
   ///    ```dart
   ///    if (a.valueEquals(b)) { /* semantic match — ignores id */ }
   ///    final key = a.toJsonValue().toString(); // stable across instances

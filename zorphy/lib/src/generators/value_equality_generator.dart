@@ -21,9 +21,10 @@ import 'base_generator.dart';
 ///     `autoId: true` entities.
 ///   * `Map<String, dynamic> toJsonValue()` — the full `toJson()`
 ///     output with the autoId field (`id`) key removed. Stable across
-///     two instances with the same field values, so it can be used as
-///     a deduplication / Set / Map key. Emitted only when
-///     `generateJson: true` (since it calls `_$XToJson(this)`).
+///     two instances with the same field values; use a canonical
+///     serialized representation (e.g., `toJsonValue().toString()`)
+///     or an explicit value-key type for deduplication. Emitted only
+///     when `generateJson: true` (since it calls `_$XToJson(this)`).
 ///
 /// The autoId field is identified by the literal Dart name `id` — the
 /// same convention used by the constructor parameter the
@@ -155,9 +156,10 @@ class ValueEqualityGenerator extends ConcreteClassGenerator {
       m.returns = refer('Map<String, dynamic>');
       m.docs.add('/// The full `toJson()` output with the auto-generated');
       m.docs.add('/// `id` field (and any other field listed in');
-      m.docs.add('/// `@Zorphy(equalityExcludes: ...)` ) removed. Use this');
-      m.docs.add('/// as a stable dedup / Set / Map key for `autoId`');
-      m.docs.add('/// entities. See issue #127.');
+      m.docs.add('/// `@Zorphy(equalityExcludes: ...)` ) removed. Use a');
+      m.docs.add('/// canonical serialized representation (e.g.,');
+      m.docs.add('/// `toJsonValue().toString()`) or an explicit value-key');
+      m.docs.add('/// type for deduplication. See issue #127.');
       if (metadata.generics.isNotEmpty) {
         for (final g in metadata.generics) {
           m.requiredParameters.add(Parameter((p) {

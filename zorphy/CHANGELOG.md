@@ -12,22 +12,23 @@
       surface for consumers that need value comparison.
     - `Map<String, dynamic> toJsonValue()` — the full `toJson()`
       output with the autoId field (`id`) key removed. Stable across
-      two instances with the same field values, so it can be used as a
-      deduplication / `Set` / `Map` key. Emitted only when
+      two instances with the same field values; use a canonical
+      serialized representation (e.g., `toJsonValue().toString()`) or
+      an explicit value-key type for deduplication. Emitted only when
       `generateJson: true` (it calls `_$XToJson(this)`).
   Both methods also drop any field listed in `equalityExcludes` (see
   below). The autoId `id` is always dropped by these methods.
-
-### Feat
-
 - Annotation: field-level equality exclusion via
   `@Zorphy(equalityExcludes: ['id'])` (issue #127, proposal #1).
   Fields listed in `equalityExcludes` are dropped from four generated
   surfaces: `operator ==`, `hashCode`, `toJsonLean()` and
   `compareToX()`. `toJson()` and `toString()` keep every field — the
   entity still round-trips through JSON for persistence and the id
-  stays in debug output. Defaults to an empty list (no behavior change
-  for existing code — the v2.2.0 byte-for-byte output is preserved).
+  stays in debug output. Defaults to an empty list (the v2.2.0
+  byte-for-byte output is preserved for non-autoId entities and for
+  autoId entities that already existed — those now gain the NEW
+  `valueEquals()`/`toJsonValue()` methods while their existing
+  `==`/`hashCode`/`toJsonLean()`/`compareToX()` behavior is unchanged).
   Field names are matched against the Dart field name (NOT a
   `@JsonKey(name: ...)` alias).
 - `zorphy_annotation` bumped to 2.3.0 (new `equalityExcludes` field on
