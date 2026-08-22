@@ -20,7 +20,7 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
     final classNameTrimmed = metadata.cleanName;
     final result = <Spec>[];
 
-    for (final factory in metadata.factoryMethods) {
+    for (final factory in _deduplicateFactories(metadata.factoryMethods)) {
       final factoryClass = factory.className;
       final isTrulyRecursive = factoryClass == classNameTrimmed;
       if (isTrulyRecursive) continue;
@@ -50,7 +50,7 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
 
     if (metadata.isAbstract) return false;
 
-    return metadata.factoryMethods.any((f) {
+    return _deduplicateFactories(metadata.factoryMethods).any((f) {
       final isTrulyRecursive = f.className == className;
       if (isTrulyRecursive) return false;
       if (f.parameters.any((p) => p.type.contains('InvalidType'))) {
@@ -60,19 +60,71 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
     });
   }
 
+  static List<FactoryMethodInfo> _deduplicateFactories(
+    List<FactoryMethodInfo> factories,
+  ) {
+    final merged = <String, FactoryMethodInfo>{};
+    for (final factory in factories) {
+      final existing = merged[factory.name];
+      if (existing == null) {
+        merged[factory.name] = factory;
+        continue;
+      }
+      merged[factory.name] = FactoryMethodInfo(
+        name: existing.name,
+        parameters: _deduplicateParameters([
+          ...existing.parameters,
+          ...factory.parameters,
+        ]),
+        bodyCode: existing.bodyCode.isNotEmpty
+            ? existing.bodyCode
+            : factory.bodyCode,
+        className: existing.className,
+      );
+    }
+    return merged.values.toList();
+  }
+
+  static List<FactoryParameterInfo> _deduplicateParameters(
+    List<FactoryParameterInfo> parameters,
+  ) {
+    final merged = <String, FactoryParameterInfo>{};
+    for (final parameter in parameters) {
+      final existing = merged[parameter.name];
+      if (existing == null) {
+        merged[parameter.name] = parameter;
+        continue;
+      }
+      merged[parameter.name] = FactoryParameterInfo(
+        name: existing.name,
+        type: existing.type,
+        isRequired: existing.isRequired || parameter.isRequired,
+        isNamed: existing.isNamed || parameter.isNamed,
+        hasDefaultValue: existing.hasDefaultValue || parameter.hasDefaultValue,
+        defaultValue: existing.defaultValue ?? parameter.defaultValue,
+      );
+    }
+    return merged.values.toList();
+  }
+
   /// Builds a [Constructor] directly from structured [FactoryMethodInfo],
   /// avoiding a string round-trip that previously dropped parameters.
   static Constructor? _buildFactoryConstructor(
     FactoryMethodInfo factory,
     String classNameTrimmed,
   ) {
+    // Analyzer metadata may contain repeated parameters when a static factory
+    // is recovered through more than one element path. Dart does not allow
+    // duplicate parameter names, so merge them before emitting the constructor.
+    final parameters = _deduplicateParameters(factory.parameters);
+
     // Determine body
     final useAbstractFactoryCall = factory.bodyCode.trim().isEmpty;
     String bodyCode;
 
     if (useAbstractFactoryCall) {
       // Static method delegated to abstract class
-      final callArgs = factory.parameters
+      final callArgs = parameters
           .map((p) => p.isNamed ? '${p.name}: ${p.name}' : p.name)
           .join(', ');
       bodyCode = '${factory.className}.${factory.name}($callArgs)';
@@ -98,7 +150,7 @@ class FactoryMethodGenerator extends ConcreteClassGenerator {
     final requiredParams = <Parameter>[];
     final namedParams = <Parameter>[];
 
-    for (final p in factory.parameters) {
+    for (final p in parameters) {
       final cleanType = helpers.replaceDollarTypesWithConcrete(p.type);
       final param = Parameter((param) {
         param.name = p.name;
