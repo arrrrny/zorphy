@@ -35,7 +35,7 @@ Future<String> _recoverForParam(String methodName, String paramName) async {
   final ctx = collection.contextFor(f.path);
   final result =
       await ctx.currentSession.getResolvedUnit(f.path) as ResolvedUnitResult;
-  final lib = result.libraryElement as LibraryElement;
+  final lib = result.libraryElement;
   final el = lib.getClass('\$Base')!;
   for (final m in (el as dynamic).methods) {
     if ((m as dynamic).name == methodName) {
