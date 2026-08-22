@@ -61,6 +61,7 @@ ClassMetadata _concreteMeta({
     isInParentExplicitSubtypes: false,
     classElement: _StubClassElement(name),
     agentDirectiveInfo: const AgentDirectiveInfo(),
+    namedConstructors: const [],
       allAnnotatedClasses: const {},
   );
 }

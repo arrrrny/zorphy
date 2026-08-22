@@ -1,5 +1,6 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'agent_directive_info.dart';
+import 'named_constructor_info.dart';
 import '../factory_method.dart';
 import 'field_metadata.dart';
 import 'interface_metadata.dart';
@@ -70,6 +71,11 @@ class ClassMetadata {
   /// Parsed agent annotation data (from @AgentTool, @AgentRisk, etc.).
   final AgentDirectiveInfo agentDirectiveInfo;
 
+  /// User-declared named constructors (from @ZorphyNamedConstructor).
+  /// These are generated on the concrete class with the same parameters
+  /// as the default constructor, plus the declared body.
+  final List<NamedConstructorInfo> namedConstructors;
+
   /// All annotated classes discovered so far (for polymorphic JSON)
   final Map<String, ClassElement> allAnnotatedClasses;
 
@@ -98,6 +104,7 @@ class ClassMetadata {
     required this.classElement,
     required this.allAnnotatedClasses,
     this.agentDirectiveInfo = const AgentDirectiveInfo(),
+    this.namedConstructors = const [],
     this.polymorphicSubtypes = const [],
   });
 

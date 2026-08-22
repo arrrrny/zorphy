@@ -7,6 +7,7 @@ import '../helpers.dart' as codegen_helpers;
 import '../factory_method.dart';
 import '../models/agent_directive_info.dart';
 import '../models/class_metadata.dart';
+import '../models/named_constructor_info.dart';
 import '../models/interface_metadata.dart';
 import 'interface_collector.dart';
 import 'field_resolver.dart';
@@ -98,6 +99,7 @@ class ClassAnalyzer {
         classesInExplicitSubtypes,
       ),
       agentDirectiveInfo: _extractAgentDirectiveInfo(classElement),
+      namedConstructors: _extractNamedConstructors(classElement),
       classElement: classElement,
       allAnnotatedClasses: allAnnotatedClasses,
       polymorphicSubtypes: _extractPolymorphicSubtypes(
@@ -571,6 +573,23 @@ class ClassAnalyzer {
       paramDescriptions: paramDescriptions,
       hasAgentAnnotations: hasAny,
     );
+  /// Extract @ZorphyNamedConstructor annotations from the class element.
+  static List<NamedConstructorInfo> _extractNamedConstructors(
+    ClassElement classElement,
+  ) {
+    final checker = const TypeChecker.fromUrl(
+      'package:zorphy_annotation/src/annotations.dart#ZorphyNamedConstructor',
+    );
+    final annotations = checker.annotationsOf(classElement);
+    if (annotations.isEmpty) return const [];
+
+    return annotations.map((anno) {
+      final reader = ConstantReader(anno);
+      final name = reader.read('name').stringValue;
+      final body = reader.read('body').stringValue;
+      return NamedConstructorInfo(name: name, body: body);
+    }).toList();
+  }
   }
 
 }
