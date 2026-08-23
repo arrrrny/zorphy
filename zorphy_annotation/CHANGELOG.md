@@ -1,3 +1,11 @@
+## [2.3.0] - 2026-08-23
+
+### Feat
+
+- Added `equalityExcludes` to `@Zorphy`, `@Zorphy2`, and `ZorphyX` for excluding selected fields from generated equality, lean JSON, and comparison surfaces.
+- Added agent annotations: `@AgentTool`, `@AgentRisk`, `@AgentInternal`, `@AgentExclude`, and `@AgentToolParam`.
+- Added `@ZorphyNamedConstructor` support for custom constructor bodies.
+
 ## [2.2.0] - 2026-08-21
 
 ### Change
