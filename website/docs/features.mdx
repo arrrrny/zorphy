@@ -9,6 +9,7 @@ Zorphy keeps the source declarations tiny and pushes the heavy lifting into gene
 
 - Immutable concrete classes generated from `$`-prefixed abstract definitions.
 - `copyWith` helpers for partial updates.
+- `copyWithField(Field<E, T> field, T value)` for single-field updates driven by a typed field selector; passing `null` to a nullable field preserves the current value.
 - Structural equality, `hashCode`, and `toString`.
 - Optional `compareTo` helpers for diffing two instances.
 - Optional patch APIs for controlled updates.

@@ -85,6 +85,16 @@ class CopyWithGenerator extends UniversalGenerator {
       ),
     ));
 
+    // Field-selector copyWithField (issue #131): replaces a single
+    // field picked by a typed `Field<E, T>` selector.
+    specs.add(
+      _buildCopyWithFieldMethod(
+        activeFields,
+        classNameTrimmed,
+        metadata.generics.map((g) => g.name).toList(),
+      ),
+    );
+
     // 2. Alias: copyWith{ClassName}
     specs.add(_buildCopyWithAliasMethod(
       activeFields,
@@ -109,6 +119,15 @@ class CopyWithGenerator extends UniversalGenerator {
         fields,
         metadata.allValueTInterfaces,
       ),
+    ));
+
+    // 4b. Interface-scoped copyWithField methods
+    specs.addAll(_buildInterfaceCopyWithFieldMethods(
+      metadata.allValueTInterfaces,
+      metadata.allFields,
+      metadata.cleanName,
+      classNameTrimmed,
+      metadata.generics.map((g) => g.name).toList(),
     ));
 
     // 5. Interface-scoped copyWithFn methods
@@ -174,6 +193,99 @@ class CopyWithGenerator extends UniversalGenerator {
       m.name = 'copyWith';
       m.returns = refer(classNameTrimmed);
       m.optionalParameters.addAll(params);
+      m.body = Code(body.join('\n'));
+    });
+  }
+
+  // ── Field-selector copyWithField (issue #131) ──────────────────────────────
+
+  /// Picks a name for the value type parameter of `copyWithField` that
+  /// does not shadow any of the entity's own generic type parameters
+  /// (a class like `Result<T>` must keep its `T` visible inside the
+  /// `Field<Result<T>, ...>` parameter type).
+  String _valueTypeParameterName(List<String> genericNames) {
+    final taken = genericNames.toSet();
+    var candidate = 'T';
+    if (!taken.contains(candidate)) return candidate;
+    candidate = 'TValue';
+    var index = 2;
+    while (taken.contains(candidate)) {
+      candidate = 'TValue$index';
+      index++;
+    }
+    return candidate;
+  }
+
+  /// Builds `E copyWithField<T>(Field<E, T> field, T value)` - a
+  /// single-field copy driven by a typed field selector.
+  ///
+  /// The method delegates to the generated `copyWith`, so it inherits
+  /// its construction rules (private constructors, custom constructor
+  /// bodies) and its `??` semantics: a null [value] keeps the current
+  /// value of a nullable field. Selectors for unknown or getter-only
+  /// fields throw an [ArgumentError] instead of silently returning
+  /// `this`.
+  Method _buildCopyWithFieldMethod(
+    List<NameTypeClassComment> fields,
+    String classNameTrimmed,
+    List<String> genericNames,
+  ) {
+    final hasGenerics = genericNames.isNotEmpty;
+    // The entity type as seen from inside the class body: parameterized
+    // for generic entities so `{ClassName}Fields<T>` selectors assign
+    // directly to the parameter.
+    final entityType = hasGenerics
+        ? '$classNameTrimmed<${genericNames.join(', ')}>'
+        : classNameTrimmed;
+    final valueTypeParam = _valueTypeParameterName(genericNames);
+
+    final body = <String>[];
+    if (fields.isEmpty) {
+      body.add(
+        "throw ArgumentError.value(field.name, 'field', "
+        "'$classNameTrimmed has no settable fields');",
+      );
+    } else {
+      body.add('switch (field.name) {');
+      for (final f in fields) {
+        final fieldType = helpers.replaceDollarTypesWithConcrete(
+          f.type ?? 'dynamic',
+        );
+        body.add("  case '${f.name}':");
+        body.add('    return copyWith(${f.name}: value as $fieldType);');
+      }
+      body.add('  default:');
+      body.add(
+        "    throw ArgumentError.value(field.name, 'field', "
+        "'$classNameTrimmed has no settable field with this name');",
+      );
+      body.add('}');
+    }
+
+    return Method((m) {
+      m.docs.add(
+        '/// Returns a copy of this entity with [field] set to [value].',
+      );
+      m.docs.add('///');
+      m.docs.add(
+        '/// Delegates to [copyWith]: the receiver is never mutated and a',
+      );
+      m.docs.add('/// null [value] keeps the current field value.');
+      m.name = 'copyWithField';
+      // Raw return type mirrors the existing copyWith emission: for
+      // generic entities the copyWith constructor inference produces
+      // the raw instantiation at runtime, so a parameterized return
+      // type would require an unsafe cast.
+      m.returns = refer(classNameTrimmed);
+      m.types.add(refer(valueTypeParam));
+      m.requiredParameters.add(Parameter((p) {
+        p.name = 'field';
+        p.type = refer('Field<$entityType, $valueTypeParam>');
+      }));
+      m.requiredParameters.add(Parameter((p) {
+        p.name = 'value';
+        p.type = refer(valueTypeParam);
+      }));
       m.body = Code(body.join('\n'));
     });
   }
@@ -321,6 +433,94 @@ class CopyWithGenerator extends UniversalGenerator {
         m.name = 'copyWith$interfaceNameTrimmed';
         m.returns = refer(classNameTrimmed);
         m.optionalParameters.addAll(params);
+        m.body = Code(body.join('\n'));
+      }));
+    }
+
+    return methods;
+  }
+
+  // ── Interface-scoped copyWithField ─────────────────────────────
+
+  List<Method> _buildInterfaceCopyWithFieldMethods(
+    List<Interface> interfaces,
+    List<NameTypeClassComment> classFields,
+    String className,
+    String classNameTrimmed,
+    List<String> genericNames,
+  ) {
+    final classFieldNames = classFields.map((f) => f.name).toSet();
+    final methods = <Method>[];
+    final hasGenerics = genericNames.isNotEmpty;
+    final entityType = hasGenerics
+        ? '$classNameTrimmed<${genericNames.join(', ')}>'
+        : classNameTrimmed;
+    final valueTypeParam = _valueTypeParameterName(genericNames);
+
+    for (var i in interfaces) {
+      var interfaceName = i.interfaceName;
+      if (!interfaceName.startsWith("\$") ||
+          interfaceName.startsWith("\$\$")) {
+        continue;
+      }
+      var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
+      if (interfaceNameTrimmed == classNameTrimmed) continue;
+
+      var seenFields = <String>{};
+      var interfaceFields = i.fields.where((f) {
+        if (classFieldNames.contains(f.name) &&
+            !seenFields.contains(f.name)) {
+          seenFields.add(f.name);
+          return true;
+        }
+        return false;
+      }).toList();
+      if (interfaceFields.isEmpty) continue;
+
+      final body = <String>[];
+      body.add('switch (field.name) {');
+      for (final f in interfaceFields) {
+        var classField = classFields.firstWhere(
+          (cf) => cf.name == f.name,
+          orElse: () => NameTypeClassComment(f.name, f.type, ''),
+        );
+        final fieldType = helpers.replaceDollarTypesWithConcrete(
+          classField.type ?? f.type ?? 'dynamic',
+        );
+        body.add("  case '${f.name}':");
+        body.add('    return copyWith(${f.name}: value as $fieldType);');
+      }
+      body.add('  default:');
+      body.add(
+        "    throw ArgumentError.value(field.name, 'field', "
+        "'$interfaceNameTrimmed interface has no settable field with this name');",
+      );
+      body.add('}');
+
+      methods.add(Method((m) {
+        m.docs.add(
+          '/// Returns a copy of this entity with the $interfaceNameTrimmed [field] set to [value].',
+        );
+        m.docs.add('///');
+        m.docs.add(
+          '/// Delegates to [copyWith]: the receiver is never mutated and a',
+        );
+        m.docs.add('/// null [value] keeps the current field value.');
+        m.docs.add('///');
+        m.docs.add(
+          '/// Only fields exposed by the $interfaceNameTrimmed interface are accepted.',
+        );
+        m.name = 'copyWith${interfaceNameTrimmed}Field';
+        m.returns = refer(classNameTrimmed);
+        m.types.add(refer(valueTypeParam));
+        m.requiredParameters.add(Parameter((p) {
+          p.name = 'field';
+          p.type = refer('Field<$entityType, $valueTypeParam>');
+        }));
+        m.requiredParameters.add(Parameter((p) {
+          p.name = 'value';
+          p.type = refer(valueTypeParam);
+        }));
         m.body = Code(body.join('\n'));
       }));
     }
