@@ -23,6 +23,7 @@ You can also find the package on **[pub.dev](https://pub.dev/packages/zorphy)**.
 
 - 📋 **Immutable Data Classes** - Clean, immutable class definitions with minimal boilerplate
 - 🔄 **CopyWith Methods** - Generate `copyWith` methods for creating modified copies
+- 🏷️ **Field-Selector CopyWith** - `copyWithField(Field<E, T> field, T value)` replaces a single field via the typed `Field` selector
 - 🎯 **Function-based CopyWith** - Optional function-based copyWith for computed updates
 - 🔧 **Patch System** - Advanced patching mechanism for partial updates with nested support
 - 📦 **JSON Serialization** - Full `toJson`/`fromJson` support with polymorphic type handling
