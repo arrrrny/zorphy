@@ -7,8 +7,8 @@ class EntityTemplateGenerator {
 
   /// Escapes a string value for safe interpolation into a Dart string
   /// literal. Handles apostrophes, backslashes, quotes, dollar signs, and
-  /// line breaks. Mirrors `_escapeDartStringLiteral` in json_generator.dart.
-  static String _escapeDartStringLiteral(String value) {
+  /// line breaks. Mirrors `escapeDartStringLiteral` in json_generator.dart.
+  static String escapeDartStringLiteral(String value) {
     return value
         .replaceAll('\\', '\\\\') // backslash must be first
         .replaceAll("'", "\\'") // single quote
@@ -184,7 +184,7 @@ class EntityTemplateGenerator {
     if (config.generateFilter) annotationOptions.add('generateFilter: true');
     if (config.subtypeWireValue != null) {
       annotationOptions.add(
-        "subtypeWireValue: '${_escapeDartStringLiteral(config.subtypeWireValue!)}'",
+        "subtypeWireValue: '${escapeDartStringLiteral(config.subtypeWireValue!)}'",
       );
     }
 
@@ -236,11 +236,11 @@ class EntityTemplateGenerator {
     if (config.isNonSealed) options.add('nonSealed: true');
     if (config.generateFilter) options.add('generateFilter: true');
     if (config.typeKey != null) {
-      options.add("typeKey: '${_escapeDartStringLiteral(config.typeKey!)}'");
+      options.add("typeKey: '${escapeDartStringLiteral(config.typeKey!)}'");
     }
     if (config.subtypeWireValue != null) {
       options.add(
-        "subtypeWireValue: '${_escapeDartStringLiteral(config.subtypeWireValue!)}'",
+        "subtypeWireValue: '${escapeDartStringLiteral(config.subtypeWireValue!)}'",
       );
     }
 
@@ -327,7 +327,9 @@ class EntityTemplateGenerator {
     }
     for (final field in fields) {
       if (field.jsonName != null) {
-        buffer.writeln("  @JsonKey(name: '${field.jsonName}')");
+        buffer.writeln(
+          "  @JsonKey(name: '${escapeDartStringLiteral(field.jsonName!)}')",
+        );
       }
       buffer.writeln('  ${field.fullType} get ${field.name};');
     }
