@@ -52,20 +52,24 @@ class PropertyHelperGenerator extends UniversalGenerator {
     for (final subtype in metadata.explicitSubtypes) {
       final subtypeName = subtype.interfaceName.replaceAll(r'$', '');
       if (metadata.cleanName != subtypeName) {
-        methods.add(Method((m) {
-          m.name = 'is$subtypeName';
-          m.type = MethodType.getter;
-          m.returns = refer('bool');
-          m.body = Code('return this is $subtypeName;');
-        }));
-        methods.add(Method((m) {
-          m.name = 'as$subtypeName';
-          m.type = MethodType.getter;
-          m.returns = refer('${subtypeName}?');
-          m.body = Code(
-            'return this is $subtypeName ? this as $subtypeName : null;',
-          );
-        }));
+        methods.add(
+          Method((m) {
+            m.name = 'is$subtypeName';
+            m.type = MethodType.getter;
+            m.returns = refer('bool');
+            m.body = Code('return this is $subtypeName;');
+          }),
+        );
+        methods.add(
+          Method((m) {
+            m.name = 'as$subtypeName';
+            m.type = MethodType.getter;
+            m.returns = refer('${subtypeName}?');
+            m.body = Code(
+              'return this is $subtypeName ? this as $subtypeName : null;',
+            );
+          }),
+        );
       }
     }
 
@@ -102,129 +106,154 @@ class PropertyHelperGenerator extends UniversalGenerator {
           type.startsWith('Map<') ||
           type.startsWith('Set<');
 
-      final baseName =
-          fieldName.startsWith('_') ? fieldName.substring(1) : fieldName;
-      final capitalized =
-          baseName[0].toUpperCase() + baseName.substring(1);
+      final baseName = fieldName.startsWith('_')
+          ? fieldName.substring(1)
+          : fieldName;
+      final capitalized = baseName[0].toUpperCase() + baseName.substring(1);
 
       final isString = type.replaceAll('?', '') == 'String';
 
       if (isNullable && !isCollection && !isString) {
-        methods.add(Method((m) {
-          m.name = 'has$capitalized';
-          m.type = MethodType.getter;
-          m.returns = refer('bool');
-          m.body = Code('return this.$fieldName != null;');
-        }));
-        methods.add(Method((m) {
-          m.name = 'no$capitalized';
-          m.type = MethodType.getter;
-          m.returns = refer('bool');
-          m.body = Code('return this.$fieldName == null;');
-        }));
-        final nonNullableType = type.substring(0, type.length - 1);
-        methods.add(Method((m) {
-          m.name = '${baseName}Required';
-          m.type = MethodType.getter;
-          m.returns = refer(nonNullableType);
-          m.body = Code(
-            "return this.$fieldName ?? (throw StateError('$fieldName is required but was null'));",
-          );
-        }));
-      } else if (isNullable && isCollection) {
-        final nonNullableType = type.substring(0, type.length - 1);
-        methods.add(Method((m) {
-          m.name = '${baseName}Required';
-          m.type = MethodType.getter;
-          m.returns = refer(nonNullableType);
-          m.body = Code(
-            "return this.$fieldName ?? (throw StateError('$fieldName is required but was null'));",
-          );
-        }));
-      }
-
-      if (isString) {
-        if (isNullable) {
-          methods.add(Method((m) {
+        methods.add(
+          Method((m) {
             m.name = 'has$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return this.$fieldName?.isNotEmpty == true;');
-          }));
-          methods.add(Method((m) {
+            m.body = Code('return this.$fieldName != null;');
+          }),
+        );
+        methods.add(
+          Method((m) {
             m.name = 'no$capitalized';
             m.type = MethodType.getter;
             m.returns = refer('bool');
-            m.body = Code('return this.$fieldName?.isEmpty ?? true;');
-          }));
-          final nonNullableType = type.substring(0, type.length - 1);
-          methods.add(Method((m) {
+            m.body = Code('return this.$fieldName == null;');
+          }),
+        );
+        final nonNullableType = type.substring(0, type.length - 1);
+        methods.add(
+          Method((m) {
             m.name = '${baseName}Required';
             m.type = MethodType.getter;
             m.returns = refer(nonNullableType);
             m.body = Code(
               "return this.$fieldName ?? (throw StateError('$fieldName is required but was null'));",
             );
-          }));
+          }),
+        );
+      } else if (isNullable && isCollection) {
+        final nonNullableType = type.substring(0, type.length - 1);
+        methods.add(
+          Method((m) {
+            m.name = '${baseName}Required';
+            m.type = MethodType.getter;
+            m.returns = refer(nonNullableType);
+            m.body = Code(
+              "return this.$fieldName ?? (throw StateError('$fieldName is required but was null'));",
+            );
+          }),
+        );
+      }
+
+      if (isString) {
+        if (isNullable) {
+          methods.add(
+            Method((m) {
+              m.name = 'has$capitalized';
+              m.type = MethodType.getter;
+              m.returns = refer('bool');
+              m.body = Code('return this.$fieldName?.isNotEmpty == true;');
+            }),
+          );
+          methods.add(
+            Method((m) {
+              m.name = 'no$capitalized';
+              m.type = MethodType.getter;
+              m.returns = refer('bool');
+              m.body = Code('return this.$fieldName?.isEmpty ?? true;');
+            }),
+          );
+          final nonNullableType = type.substring(0, type.length - 1);
+          methods.add(
+            Method((m) {
+              m.name = '${baseName}Required';
+              m.type = MethodType.getter;
+              m.returns = refer(nonNullableType);
+              m.body = Code(
+                "return this.$fieldName ?? (throw StateError('$fieldName is required but was null'));",
+              );
+            }),
+          );
         } else {
-          methods.add(Method((m) {
-            m.name = 'has$capitalized';
-            m.type = MethodType.getter;
-            m.returns = refer('bool');
-            m.body = Code('return this.$fieldName.isNotEmpty;');
-          }));
-          methods.add(Method((m) {
-            m.name = 'no$capitalized';
-            m.type = MethodType.getter;
-            m.returns = refer('bool');
-            m.body = Code('return this.$fieldName.isEmpty;');
-          }));
+          methods.add(
+            Method((m) {
+              m.name = 'has$capitalized';
+              m.type = MethodType.getter;
+              m.returns = refer('bool');
+              m.body = Code('return this.$fieldName.isNotEmpty;');
+            }),
+          );
+          methods.add(
+            Method((m) {
+              m.name = 'no$capitalized';
+              m.type = MethodType.getter;
+              m.returns = refer('bool');
+              m.body = Code('return this.$fieldName.isEmpty;');
+            }),
+          );
         }
       }
 
       if (isCollection) {
         if (!isNullable) {
-          methods.add(Method((m) {
-            m.name = 'has$capitalized';
-            m.type = MethodType.getter;
-            m.returns = refer('bool');
-            m.body = Code('return this.$fieldName.isNotEmpty;');
-          }));
-          methods.add(Method((m) {
-            m.name = 'no$capitalized';
-            m.type = MethodType.getter;
-            m.returns = refer('bool');
-            m.body = Code('return this.$fieldName.isEmpty;');
-          }));
+          methods.add(
+            Method((m) {
+              m.name = 'has$capitalized';
+              m.type = MethodType.getter;
+              m.returns = refer('bool');
+              m.body = Code('return this.$fieldName.isNotEmpty;');
+            }),
+          );
+          methods.add(
+            Method((m) {
+              m.name = 'no$capitalized';
+              m.type = MethodType.getter;
+              m.returns = refer('bool');
+              m.body = Code('return this.$fieldName.isEmpty;');
+            }),
+          );
         } else {
-          methods.add(Method((m) {
-            m.name = 'has$capitalized';
-            m.type = MethodType.getter;
-            m.returns = refer('bool');
-            m.body = Code('return this.$fieldName?.isNotEmpty ?? false;');
-          }));
-          methods.add(Method((m) {
-            m.name = 'no$capitalized';
-            m.type = MethodType.getter;
-            m.returns = refer('bool');
-            m.body = Code('return this.$fieldName?.isEmpty ?? true;');
-          }));
+          methods.add(
+            Method((m) {
+              m.name = 'has$capitalized';
+              m.type = MethodType.getter;
+              m.returns = refer('bool');
+              m.body = Code('return this.$fieldName?.isNotEmpty ?? false;');
+            }),
+          );
+          methods.add(
+            Method((m) {
+              m.name = 'no$capitalized';
+              m.type = MethodType.getter;
+              m.returns = refer('bool');
+              m.body = Code('return this.$fieldName?.isEmpty ?? true;');
+            }),
+          );
         }
       }
 
       if (field.isEnum && field.enumValues.isNotEmpty) {
         final baseEnumName = type.replaceAll('?', '');
         for (final value in field.enumValues) {
-          final capitalizedValue =
-              value[0].toUpperCase() + value.substring(1);
-          methods.add(Method((m) {
-            m.name = 'is$capitalized$capitalizedValue';
-            m.type = MethodType.getter;
-            m.returns = refer('bool');
-            m.body = Code(
-              'return this.$fieldName == $baseEnumName.$value;',
-            );
-          }));
+          final capitalizedValue = value[0].toUpperCase() + value.substring(1);
+          methods.add(
+            Method((m) {
+              m.name = 'is$capitalized$capitalizedValue';
+              m.type = MethodType.getter;
+              m.returns = refer('bool');
+              m.body = Code('return this.$fieldName == $baseEnumName.$value;');
+            }),
+          );
         }
       }
     }

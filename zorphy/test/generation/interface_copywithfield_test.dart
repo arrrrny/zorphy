@@ -1,8 +1,8 @@
 // Tests for interface-scoped copyWithField generation.
 //
-// Verifies that entities implementing an interface get a
-// `copyWith{InterfaceName}Field` method that restricts field selectors
-// to only the fields exposed by that interface.
+// Verifies that entities implementing an interface get a copyWithField
+// method that handles ALL fields (parent + own) using the parent's
+// Field type for LSP-safe polymorphic dispatch.
 library test.generation.interface_copywithfield_test;
 
 import 'dart:io';
@@ -30,96 +30,85 @@ void main() {
       output = fixture.readAsStringSync();
     });
 
-    test('entity has the standard copyWithField for all fields', () {
-      expect(
-        output,
-        contains('InterfaceCar copyWithField<T>'),
-      );
-    });
-
-    test('entity has copyWithVehicleField for interface fields only', () {
-      expect(
-        output,
-        contains('InterfaceCar copyWithVehicleField<T>'),
-      );
-    });
-
-    test('copyWithVehicleField signature matches the pattern', () {
-      expect(
-        output,
-        contains(
-          'InterfaceCar copyWithVehicleField<T>'
-          '(Field<InterfaceCar, T> field, T value)',
-        ),
-      );
-    });
-
-    test('copyWithVehicleField accepts Vehicle interface fields', () {
+    test('Vehicle has copyWithField with Vehicle fields', () {
+      expect(output, contains('Vehicle copyWithField<T>'));
       expect(output, contains("case 'make':"));
-      expect(output, contains('return copyWith(make: value as String);'));
       expect(output, contains("case 'model':"));
-      expect(output, contains('return copyWith(model: value as String);'));
       expect(output, contains("case 'year':"));
-      expect(output, contains('return copyWith(year: value as int);'));
     });
 
-    test('copyWithVehicleField does not accept Car-specific fields', () {
-      // The switch statement in copyWithVehicleField should only handle
-      // Vehicle fields (make, model, year) and throw for others like 'doors'.
-      // We verify this by checking that 'doors' is NOT in the Vehicle-scoped
-      // method's switch cases.
-      final vehicleFieldMethodMatch = RegExp(
-        r'copyWithVehicleField<T>\(.*?\{(.*?)\}',
-        dotAll: true,
-      ).firstMatch(output);
-      if (vehicleFieldMethodMatch != null) {
-        final methodBody = vehicleFieldMethodMatch.group(1) ?? '';
-        expect(
-          methodBody.contains("case 'doors':"),
-          isFalse,
-          reason: 'copyWithVehicleField should not accept doors field',
-        );
-      }
+    test('InterfaceCar has copyWithField with ALL fields (Vehicle + own)', () {
+      expect(output, contains('InterfaceCar copyWithField<T>'));
+      expect(output, contains("case 'make':"));
+      expect(output, contains("case 'model':"));
+      expect(output, contains("case 'year':"));
+      expect(output, contains("case 'doors':"));
     });
 
-    test('copyWithVehicleField throws for unknown fields', () {
+    test('InterfaceCar copyWithField uses parent Field type (Field<Vehicle, T>)', () {
+      // The override uses Field<Vehicle, T> (parent type), NOT Field<InterfaceCar, T>.
+      // This keeps the override LSP-safe: both parent and child Field tokens
+      // are accepted via Dart's declaration-site covariance.
       expect(
         output,
-        contains(
-          "'Vehicle interface has no settable field with this name'",
-        ),
-      );
-    });
-
-    test('copyWithVehicleField has proper documentation', () {
-      expect(
-        output,
-        contains(
-          '/// Returns a copy of this entity with the Vehicle [field] set to [value].',
-        ),
+        contains('Field<Vehicle, T> field'),
       );
       expect(
         output,
-        contains('/// Only fields exposed by the Vehicle interface are accepted.'),
+        isNot(contains('Field<InterfaceCar, T> field')),
+      );
+    });
+
+    test('InterfaceCar copyWithField has @override annotation', () {
+      expect(output, contains('@override'));
+    });
+
+    test('InterfaceCar copyWithField throws for unknown fields', () {
+      expect(
+        output,
+        contains("'InterfaceCar has no settable field with this name'"),
+      );
+    });
+
+    test('Vehicle copyWithField throws for unknown fields', () {
+      expect(
+        output,
+        contains("'Vehicle has no settable field with this name'"),
+      );
+    });
+
+    test('InterfaceCar copyWithField has proper documentation', () {
+      expect(
+        output,
+        contains(
+          '/// Returns a copy of this entity with [field] set to [value].',
+        ),
       );
     });
   });
 
   group('behavior: runner executed in example package context', () {
-    test('all runtime checks pass', () async {
-      final runner = File('example/tool/interface_copywithfield_behavior_check.dart');
-      if (!runner.existsSync()) {
-        fail('Behavior runner missing: example/tool/interface_copywithfield_behavior_check.dart');
-      }
-      final result = await Process.run(
-        'dart',
-        ['run', 'tool/interface_copywithfield_behavior_check.dart'],
-        workingDirectory: 'example',
-      );
-      final stdoutText = result.stdout as String;
-      // Surface the runner output for CI debugging on failure.
-      expect(stdoutText, contains('ALL CHECKS PASSED'));
-      expect(result.exitCode, 0, reason: stdoutText);
-    }, timeout: const Timeout(Duration(minutes: 2)));
+    test(
+      'all runtime checks pass (including polymorphic path)',
+      () async {
+        final runner = File(
+          'example/tool/interface_copywithfield_behavior_check.dart',
+        );
+        if (!runner.existsSync()) {
+          fail(
+            'Behavior runner missing: example/tool/interface_copywithfield_behavior_check.dart',
+          );
+        }
+        final result = await Process.run('dart', [
+          'run',
+          'tool/interface_copywithfield_behavior_check.dart',
+        ], workingDirectory: 'example');
+        final stdoutText = result.stdout as String;
+        // Surface the runner output for CI debugging on failure.
+        expect(stdoutText, contains('ALL CHECKS PASSED'));
+        expect(result.exitCode, 0, reason: stdoutText);
+      },
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
   });
 }

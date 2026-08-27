@@ -23,11 +23,7 @@ class EntityTemplateGenerator {
   /// does, so annotation references match the generated subtype classes
   /// (e.g. `default_display_mode:DEFAULT_MODE` → `DefaultDisplayMode`).
   static String _formatSubtypeClassName(String subtype) {
-    final name = subtype
-        .split(':')
-        .first
-        .replaceAll(r'$', '')
-        .trim();
+    final name = subtype.split(':').first.replaceAll(r'$', '').trim();
     final parts = name.split(RegExp(r'[_\s\-]+'));
     return parts
         .map((part) {
@@ -42,11 +38,7 @@ class EntityTemplateGenerator {
     final buffer = StringBuffer();
 
     _writeHeader(buffer);
-    _writeImports(
-      buffer,
-      imports,
-      includeUuidImport: config.autoId,
-    );
+    _writeImports(buffer, imports, includeUuidImport: config.autoId);
     _writePartDirectives(buffer, config);
     _writeClassDefinition(buffer, config);
 
@@ -157,11 +149,7 @@ class EntityTemplateGenerator {
     }
     buffer.writeln();
 
-    _writeFields(
-      buffer,
-      config.fields,
-      prependAutoId: config.autoId,
-    );
+    _writeFields(buffer, config.fields, prependAutoId: config.autoId);
 
     _writeStatics(buffer, config.staticMembers);
 

@@ -112,7 +112,9 @@ class ValidationResult {
         buf.write(f);
       }
       buf.writeln('');
-      buf.writeln('Summary: $errorCount error(s), $warningCount warning(s), $infoCount info');
+      buf.writeln(
+        'Summary: $errorCount error(s), $warningCount warning(s), $infoCount info',
+      );
     }
     return buf.toString();
   }

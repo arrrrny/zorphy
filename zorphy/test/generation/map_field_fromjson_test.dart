@@ -43,9 +43,7 @@ void main() {
 
     // Map with nested entity values: Tag.fromJson on each value
     expect(
-      g.contains(
-        'MapEntry(k, Tag.fromJson(e as Map<String, dynamic>))',
-      ),
+      g.contains('MapEntry(k, Tag.fromJson(e as Map<String, dynamic>))'),
       isTrue,
       reason: 'Map<String, Tag> must call Tag.fromJson on each value',
     );

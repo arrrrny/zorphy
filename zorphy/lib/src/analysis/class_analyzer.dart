@@ -31,7 +31,8 @@ class ClassAnalyzer {
     // explicitSubTypes. Subtypes inherit so the generated subtype
     // toJson() emits the same discriminator key the base's fromJson
     // dispatches on.
-    final typeKey = annotation.peek('typeKey')?.stringValue ??
+    final typeKey =
+        annotation.peek('typeKey')?.stringValue ??
         _resolveInheritedTypeKey(classElement);
     // subtypeWireValue: per-subtype override of the wire value the base
     // emits/matches for this subtype. Null -> clean class name at codegen.
@@ -238,8 +239,9 @@ class ClassAnalyzer {
       // Read the subtype's own @Zorphy(subtypeWireValue: ...) so the
       // base's dispatch can match the wire value the remote API sends.
       // Defaults to null -> clean class name (resolved at codegen time).
-      final subtypeWireValue =
-          _readSubtypeAnnotation(el)?.peek('subtypeWireValue')?.stringValue;
+      final subtypeWireValue = _readSubtypeAnnotation(
+        el,
+      )?.peek('subtypeWireValue')?.stringValue;
       return Interface.fromGenerics(
         el.name ?? "",
         el.typeParameters.map((tp) {
@@ -426,7 +428,6 @@ class ClassAnalyzer {
     return common_helpers.recoverTypeFromSource(element, currentType);
   }
 
-
   /// Check if this class is listed in any parent's explicitSubTypes
   static bool _isInParentExplicitSubtypes(
     String className,
@@ -453,7 +454,8 @@ class ClassAnalyzer {
     for (final supertype in classElement.allSupertypes) {
       final el = supertype.element;
       if (el is! ClassElement) continue;
-      final annot = zorphyChecker.firstAnnotationOf(el) ??
+      final annot =
+          zorphyChecker.firstAnnotationOf(el) ??
           zorphy2Checker.firstAnnotationOf(el);
       if (annot == null) continue;
       final reader = ConstantReader(annot);
@@ -477,7 +479,8 @@ class ClassAnalyzer {
     final zorphy2Checker = const TypeChecker.fromUrl(
       'package:zorphy_annotation/src/annotations.dart#Zorphy2',
     );
-    final annot = zorphyChecker.firstAnnotationOf(el) ??
+    final annot =
+        zorphyChecker.firstAnnotationOf(el) ??
         zorphy2Checker.firstAnnotationOf(el);
     return annot == null ? null : ConstantReader(annot);
   }
@@ -549,7 +552,10 @@ class ClassAnalyzer {
     );
     for (final field in classElement.fields) {
       final fieldName = field.name;
-      if (fieldName == null || fieldName == 'hashCode' || fieldName == 'runtimeType') continue;
+      if (fieldName == null ||
+          fieldName == 'hashCode' ||
+          fieldName == 'runtimeType')
+        continue;
       final paramAnnos = paramChecker.annotationsOf(field);
       if (paramAnnos.isNotEmpty) {
         hasAny = true;
@@ -560,8 +566,6 @@ class ClassAnalyzer {
         }
       }
     }
-
-
 
     return AgentDirectiveInfo(
       toolName: toolName,
@@ -661,5 +665,4 @@ class ClassAnalyzer {
       );
     }
   }
-
 }

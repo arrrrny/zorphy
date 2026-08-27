@@ -83,17 +83,20 @@ class DoctorResult {
 
     if (dryRun) {
       buf.writeln(
-          'Would run: dart run build_runner build --delete-conflicting-outputs');
+        'Would run: dart run build_runner build --delete-conflicting-outputs',
+      );
     } else {
       buf.writeln(
-          'Build runner exited with code ${buildExitCode ?? "not run"}');
+        'Build runner exited with code ${buildExitCode ?? "not run"}',
+      );
       buf.writeln('Regenerated $regeneratedCount .zorphy.dart file(s)');
     }
     buf.writeln('');
 
     if (hasInvalidType) {
       buf.writeln(
-          'WARNING: InvalidType still found in ${remainingInvalidTypeFiles.length} file(s):');
+        'WARNING: InvalidType still found in ${remainingInvalidTypeFiles.length} file(s):',
+      );
       for (final f in remainingInvalidTypeFiles) {
         buf.writeln('  - $f');
       }

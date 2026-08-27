@@ -38,7 +38,6 @@ List<NameTypeClassComment> getDistinctFields(
   return allFieldsDistinct;
 }
 
-
 String replaceDollarTypesWithConcrete(String type) {
   // Handle outer nullability
   final isOuterNullable = type.endsWith('?');
@@ -134,9 +133,7 @@ String getEnumPropertyList(
 
   // Generate enum
   lines.add("enum $enumName {");
-  lines.add(
-    fields.map((e) => enumMemberName(e.name)).join(","),
-  );
+  lines.add(fields.map((e) => enumMemberName(e.name)).join(","));
   lines.add("}");
   lines.add('');
   return lines.join('\n');
@@ -196,11 +193,11 @@ String getPatchClass(
     var parameterType = isGenericType
         ? 'dynamic'
         : ((baseType.endsWith('?') ||
-                baseType == 'dynamic' ||
-                baseType.startsWith('dynamic<') ||
-                baseType.startsWith('dynamic '))
-            ? baseType
-            : "$baseType?");
+                  baseType == 'dynamic' ||
+                  baseType.startsWith('dynamic<') ||
+                  baseType.startsWith('dynamic '))
+              ? baseType
+              : "$baseType?");
 
     lines.add(
       "  ${classNameTrimmed}Patch with$capitalizedName($parameterType value) {",
@@ -235,12 +232,14 @@ String getPatchClass(
         (innerType.startsWith("List<") &&
             (() {
               final match = RegExp(r'^List<(.+)>$').firstMatch(innerType);
-              return match != null && isKnownClassType(match.group(1) ?? "", false);
+              return match != null &&
+                  isKnownClassType(match.group(1) ?? "", false);
             })()) ||
         (innerType.startsWith("Map<") &&
             (() {
               final match = RegExp(r'^Map<(.+), (.+)>$').firstMatch(innerType);
-              return match != null && isKnownClassType(match.group(2) ?? "", false);
+              return match != null &&
+                  isKnownClassType(match.group(2) ?? "", false);
             })());
 
     if (isZorphyType && !isGenericType) {
@@ -273,8 +272,7 @@ String getPatchClass(
             );
             lines.add("      }");
             lines.add("      return updatedList;");
-            lines.add("    };"
-            );
+            lines.add("    };");
             lines.add("    return this;");
             lines.add("  }");
             lines.add('');
@@ -306,8 +304,7 @@ String getPatchClass(
             );
             lines.add("      }");
             lines.add("      return updatedMap;");
-            lines.add("    };"
-            );
+            lines.add("    };");
             lines.add("    return this;");
             lines.add("  }");
             lines.add('');
@@ -337,13 +334,14 @@ String getPatchClass(
         lines.add(
           "  ${classNameTrimmed}Patch with${capitalizedName}PatchFunc($funcParamType patch) {",
         );
-        lines.add("    patchMap[$enumName.${enumMemberName(name)}] = (dynamic current) {");
+        lines.add(
+          "    patchMap[$enumName.${enumMemberName(name)}] = (dynamic current) {",
+        );
         lines.add("      var currentPatch = $patchType();");
         lines.add(
           "      return patch(currentPatch).applyTo(current as ${innerType.replaceAll("?", "")});",
         );
-        lines.add("    };"
-        );
+        lines.add("    };");
         lines.add("    return this;");
         lines.add("  }");
         lines.add('');

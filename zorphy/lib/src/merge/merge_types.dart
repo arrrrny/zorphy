@@ -80,11 +80,11 @@ class MergeResult {
 
   /// A no-op merge result.
   factory MergeResult.unchanged(String content) => MergeResult(
-        content: content,
-        hasChanges: false,
-        diffSummary: '',
-        conflicts: const [],
-      );
+    content: content,
+    hasChanges: false,
+    diffSummary: '',
+    conflicts: const [],
+  );
 
   /// Whether the merge is fully clean (no conflicts).
   bool get isClean => conflicts.isEmpty;

@@ -43,7 +43,10 @@ Future<String> _recoverForParam(String methodName, String paramName) async {
         if ((p as dynamic).name == paramName) {
           // InvalidType simulates the analyzer failing to resolve the subtype
           // during generation — exactly when source recovery kicks in.
-          return common_helpers.recoverTypeFromSource(p as Element, 'InvalidType');
+          return common_helpers.recoverTypeFromSource(
+            p as Element,
+            'InvalidType',
+          );
         }
       }
     }

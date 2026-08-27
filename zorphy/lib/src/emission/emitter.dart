@@ -21,19 +21,19 @@ class ZorphyEmitter {
 
   /// Creates a new emitter with the default page width (80).
   ZorphyEmitter()
-      : pageWidth = defaultPageWidth,
-        _formatter = DartFormatter(
-          languageVersion: DartFormatter.latestLanguageVersion,
-          pageWidth: defaultPageWidth,
-        );
+    : pageWidth = defaultPageWidth,
+      _formatter = DartFormatter(
+        languageVersion: DartFormatter.latestLanguageVersion,
+        pageWidth: defaultPageWidth,
+      );
 
   /// Creates a new emitter with a custom page width.
   ZorphyEmitter.withPageWidth(int width)
-      : pageWidth = width,
-        _formatter = DartFormatter(
-          languageVersion: DartFormatter.latestLanguageVersion,
-          pageWidth: width,
-        );
+    : pageWidth = width,
+      _formatter = DartFormatter(
+        languageVersion: DartFormatter.latestLanguageVersion,
+        pageWidth: width,
+      );
 
   /// Emits the given [library] spec to a formatted Dart source string.
   ///

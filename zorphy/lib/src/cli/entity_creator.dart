@@ -113,10 +113,11 @@ class EntityCreator {
         pairs.add((member, wire));
       }
 
-      final needsJsonValue =
-          pairs.any((p) => p.$1 != p.$2) && pairs.isNotEmpty;
+      final needsJsonValue = pairs.any((p) => p.$1 != p.$2) && pairs.isNotEmpty;
       if (needsJsonValue) {
-        buffer.writeln("import 'package:json_annotation/json_annotation.dart';");
+        buffer.writeln(
+          "import 'package:json_annotation/json_annotation.dart';",
+        );
         buffer.writeln();
       }
       buffer.writeln('enum ${config.className} {');
@@ -248,13 +249,13 @@ class EntityCreator {
       // colons (e.g. "Product:urn:product" → name "Product", value
       // "urn:product").
       final separator = subtype.indexOf(':');
-      final rawName = (separator < 0
-              ? subtype
-              : subtype.substring(0, separator))
-          .trim()
-          .replaceAll(RegExp(r'^\$+'), '');
-      final wireValue =
-          separator < 0 ? null : subtype.substring(separator + 1).trim();
+      final rawName =
+          (separator < 0 ? subtype : subtype.substring(0, separator))
+              .trim()
+              .replaceAll(RegExp(r'^\$+'), '');
+      final wireValue = separator < 0
+          ? null
+          : subtype.substring(separator + 1).trim();
       final className = _formatClassName(rawName);
       final snakeName = _toSnakeCase(className);
       final fields = subtypeFields[subtype] ?? subtypeFields[rawName] ?? [];

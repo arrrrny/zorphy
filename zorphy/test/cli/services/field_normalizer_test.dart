@@ -50,11 +50,7 @@ void main() {
       // `fullType` getter re-adds the `?` based on `nullable`.
       final field = FieldDefinition.parse('ref:$refType');
       final result = await creator.create(
-        EntityConfig(
-          name: name,
-          outputDir: tmp.path,
-          fields: [field],
-        ),
+        EntityConfig(name: name, outputDir: tmp.path, fields: [field]),
       );
       expect(result.isSuccess, isTrue, reason: result.error);
       return File(result.filePath).readAsString();
@@ -67,7 +63,10 @@ sealed class SearchResultPrice {
 }
 ''');
 
-      final src = await createEntityReferencing('SearchResult', 'SearchResultPrice?');
+      final src = await createEntityReferencing(
+        'SearchResult',
+        'SearchResultPrice?',
+      );
 
       // The field declaration must be the PLAIN type (no `\$` prefix).
       expect(
@@ -78,7 +77,8 @@ sealed class SearchResultPrice {
       expect(
         src,
         isNot(contains(r'$SearchResultPrice? get ref;')),
-        reason: 'A `\$` prefix here is the #310 bug — the analyzer cannot '
+        reason:
+            'A `\$` prefix here is the #310 bug — the analyzer cannot '
             'resolve `\$SearchResultPrice` for a hand-written class.',
       );
     });
@@ -91,17 +91,14 @@ sealed class SearchResultPrice {
         // matching on (`abstract class $SearchResultPrice`). Before the
         // comment-stripping fix this falsely matched and emitted the `$`
         // prefix, reproducing the InvalidType symptom.
-        await writeHandWrittenClass(
-          'SearchResultPrice',
-          '''
+        await writeHandWrittenClass('SearchResultPrice', '''
 /// Hand-written (non-Zorphy) sealed union dispatcher, like Vendure's
 /// SearchResultPrice. This is a plain class — NO `abstract class \$SearchResultPrice`
 /// declaration here, by design (kept as SDK glue).
 sealed class SearchResultPrice {
   const SearchResultPrice();
 }
-''',
-        );
+''');
 
         final src = await createEntityReferencing(
           'SearchResult',
@@ -112,13 +109,15 @@ sealed class SearchResultPrice {
         expect(
           src,
           contains('SearchResultPrice? get ref;'),
-          reason: 'Comment-safety: a doc comment mentioning the pattern '
+          reason:
+              'Comment-safety: a doc comment mentioning the pattern '
               'must NOT trigger a false-positive `\$` prefix.',
         );
         expect(
           src,
           isNot(contains(r'$SearchResultPrice? get ref;')),
-          reason: 'The `\$` prefix here means the comment was NOT stripped '
+          reason:
+              'The `\$` prefix here means the comment was NOT stripped '
               'before the regex — that is the #310 comment-matching bug.',
         );
       },
@@ -126,24 +125,22 @@ sealed class SearchResultPrice {
 
     test('hand-written plain class with block comment -> plain type', () async {
       // Block comment variant — also must be stripped.
-      await writeHandWrittenClass(
-        'Money',
-        '''
+      await writeHandWrittenClass('Money', '''
 /* Plain value object — does NOT declare `abstract class \$Money`.
    Kept hand-written because it carries a custom fromJson dispatcher. */
 class Money {
   final int amount;
   const Money(this.amount);
 }
-''',
-      );
+''');
 
       final src = await createEntityReferencing('Invoice', 'Money?');
 
       expect(
         src,
         contains('Money? get ref;'),
-        reason: 'Block-comment mention of the pattern must NOT trigger a '
+        reason:
+            'Block-comment mention of the pattern must NOT trigger a '
             'false-positive `\$` prefix.',
       );
       expect(
@@ -153,14 +150,14 @@ class Money {
       );
     });
 
-    test('Zorphy entity (`abstract class \$X`) -> `\$` prefix preserved', () async {
-      // Sanity check: when the target IS a Zorphy entity (declares
-      // `abstract class $X`), the `$` prefix is still emitted. This guards
-      // against an over-eager comment-stripping regression that would
-      // strip the actual class declaration.
-      await writeHandWrittenClass(
-        'Country',
-        '''
+    test(
+      'Zorphy entity (`abstract class \$X`) -> `\$` prefix preserved',
+      () async {
+        // Sanity check: when the target IS a Zorphy entity (declares
+        // `abstract class $X`), the `$` prefix is still emitted. This guards
+        // against an over-eager comment-stripping regression that would
+        // strip the actual class declaration.
+        await writeHandWrittenClass('Country', '''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'country.zorphy.dart';
 
@@ -168,24 +165,25 @@ part 'country.zorphy.dart';
 abstract class \$Country {
   String get code;
 }
-''',
-      );
+''');
 
-      final src = await createEntityReferencing('Address', 'Country?');
+        final src = await createEntityReferencing('Address', 'Country?');
 
-      expect(
-        src,
-        contains(r'$Country? get ref;'),
-        reason: 'A real Zorphy entity (declares `abstract class \$Country`) '
-            'must still get the `\$` prefix — the comment-stripping must NOT '
-            'remove the actual class declaration line.',
-      );
-    });
+        expect(
+          src,
+          contains(r'$Country? get ref;'),
+          reason:
+              'A real Zorphy entity (declares `abstract class \$Country`) '
+              'must still get the `\$` prefix — the comment-stripping must NOT '
+              'remove the actual class declaration line.',
+        );
+      },
+    );
 
-    test('Zorphy second-order entity (`abstract class \$\$X`) -> `\$\$` prefix', () async {
-      await writeHandWrittenClass(
-        'BaseEntity',
-        '''
+    test(
+      'Zorphy second-order entity (`abstract class \$\$X`) -> `\$\$` prefix',
+      () async {
+        await writeHandWrittenClass('BaseEntity', '''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'base_entity.zorphy.dart';
 
@@ -193,18 +191,19 @@ part 'base_entity.zorphy.dart';
 abstract class \$\$BaseEntity {
   String get id;
 }
-''',
-      );
+''');
 
-      final src = await createEntityReferencing('Concrete', 'BaseEntity?');
+        final src = await createEntityReferencing('Concrete', 'BaseEntity?');
 
-      expect(
-        src,
-        contains(r'$$BaseEntity? get ref;'),
-        reason: 'A real second-order Zorphy entity must still get the `\$\$` '
-            'prefix.',
-      );
-    });
+        expect(
+          src,
+          contains(r'$$BaseEntity? get ref;'),
+          reason:
+              'A real second-order Zorphy entity must still get the `\$\$` '
+              'prefix.',
+        );
+      },
+    );
 
     test('forward reference (file does not exist) -> `\$` prefix', () async {
       // #315 regression guard: when the referenced file does NOT exist yet
@@ -215,7 +214,8 @@ abstract class \$\$BaseEntity {
       expect(
         src,
         contains(r'$Customer? get ref;'),
-        reason: 'Forward references (file not on disk yet) must still get '
+        reason:
+            'Forward references (file not on disk yet) must still get '
             'the `\$` prefix — that is the #315 fix.',
       );
     });

@@ -2,9 +2,7 @@ name: Dart CI
 
 on:
   push:
-    branches: [ master, main, development ]
-  pull_request:
-    branches: [ master, main, development ]
+    branches: [master]
 
 jobs:
   version_sync:

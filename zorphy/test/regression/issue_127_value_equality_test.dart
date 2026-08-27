@@ -38,8 +38,9 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 void main() {
-  final fixture =
-      File('example/lib/various/issue127_value_equality_example.zorphy.dart');
+  final fixture = File(
+    'example/lib/various/issue127_value_equality_example.zorphy.dart',
+  );
   late String output;
 
   setUpAll(() {
@@ -60,8 +61,10 @@ void main() {
       // relies on identity equality keeps working.
       expect(
         output,
-        contains('id == other.id &&\n        toolName == other.toolName &&\n'
-            '        normalizedArgs == other.normalizedArgs;'),
+        contains(
+          'id == other.id &&\n        toolName == other.toolName &&\n'
+          '        normalizedArgs == other.normalizedArgs;',
+        ),
       );
     });
 
@@ -81,13 +84,13 @@ void main() {
       expect(
         toJsonLeanBlock,
         isNot(contains("data.remove('id')")),
-        reason: 'Back-compat: toJsonLean keeps id when equalityExcludes is '
+        reason:
+            'Back-compat: toJsonLean keeps id when equalityExcludes is '
             'not set, so existing lean-output round-trips continue to work.',
       );
     });
 
-    test('compareToAutoIdDefault() still reports id diffs (back-compat)',
-        () {
+    test('compareToAutoIdDefault() still reports id diffs (back-compat)', () {
       final compareToBlock = _extractExtensionMethodBlock(
         output,
         'AutoIdDefaultCompareE',
@@ -106,7 +109,10 @@ void main() {
       // valueEquals compares every field EXCEPT the autoId field `id`.
       expect(valueEqualsBlock, isNot(contains('id == other.id')));
       expect(valueEqualsBlock, contains('toolName == other.toolName'));
-      expect(valueEqualsBlock, contains('normalizedArgs == other.normalizedArgs'));
+      expect(
+        valueEqualsBlock,
+        contains('normalizedArgs == other.normalizedArgs'),
+      );
     });
 
     test('NEW: toJsonValue() exists and removes id from the data map', () {
@@ -138,14 +144,18 @@ void main() {
       expect(equalsBlock, contains('normalizedArgs == other.normalizedArgs'));
     });
 
-    test('hashCode drops id (Object.hash(this.toolName, this.normalizedArgs))',
-        () {
-      final block = _extractClassBlock(output, 'AutoIdExcludesId');
-      final hashCodeBlock = _extractMethodBlock(block, 'hashCode');
-      expect(hashCodeBlock,
-          contains('Object.hash(this.toolName, this.normalizedArgs)'));
-      expect(hashCodeBlock, isNot(contains('this.id')));
-    });
+    test(
+      'hashCode drops id (Object.hash(this.toolName, this.normalizedArgs))',
+      () {
+        final block = _extractClassBlock(output, 'AutoIdExcludesId');
+        final hashCodeBlock = _extractMethodBlock(block, 'hashCode');
+        expect(
+          hashCodeBlock,
+          contains('Object.hash(this.toolName, this.normalizedArgs)'),
+        );
+        expect(hashCodeBlock, isNot(contains('this.id')));
+      },
+    );
 
     test('toJsonLean() removes id from the data map', () {
       final block = _extractClassBlock(output, 'AutoIdExcludesId');
@@ -177,7 +187,10 @@ void main() {
       final valueEqualsBlock = _extractMethodBlock(block, 'valueEquals');
       expect(valueEqualsBlock, isNot(contains('id == other.id')));
       expect(valueEqualsBlock, contains('toolName == other.toolName'));
-      expect(valueEqualsBlock, contains('normalizedArgs == other.normalizedArgs'));
+      expect(
+        valueEqualsBlock,
+        contains('normalizedArgs == other.normalizedArgs'),
+      );
     });
 
     test('toJsonValue() exists and removes id from the data map', () {
@@ -186,8 +199,7 @@ void main() {
       expect(toJsonValueBlock, contains("data.remove('id');"));
     });
 
-    test('toJson() still keeps id (persistence round-trip — NOT filtered)',
-        () {
+    test('toJson() still keeps id (persistence round-trip — NOT filtered)', () {
       expect(
         output,
         contains('AutoIdExcludesIdSerialization on AutoIdExcludesId'),
@@ -197,10 +209,7 @@ void main() {
       // We assert the call site exists; the full json_serializable output
       // is asserted by `dart analyze` (which would fail if id were dropped
       // from the toJson signature).
-      expect(
-        output,
-        contains('_\$AutoIdExcludesIdToJson(this)'),
-      );
+      expect(output, contains('_\$AutoIdExcludesIdToJson(this)'));
     });
   });
 
@@ -216,8 +225,7 @@ void main() {
       expect(equalsBlock, contains('score == other.score'));
     });
 
-    test('hashCode drops createdAt (Object.hash(this.name, this.score))',
-        () {
+    test('hashCode drops createdAt (Object.hash(this.name, this.score))', () {
       final block = _extractClassBlock(output, 'NonAutoIdExcludesCreatedAt');
       final hashCodeBlock = _extractMethodBlock(block, 'hashCode');
       expect(hashCodeBlock, contains('Object.hash(this.name, this.score)'));

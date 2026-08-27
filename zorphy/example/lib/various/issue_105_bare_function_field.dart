@@ -27,10 +27,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'issue_105_bare_function_field.zorphy.dart';
 part 'issue_105_bare_function_field.g.dart';
 
-@Zorphy(
-  kind: ZorphyKind.valueObject,
-  generateJson: true,
-)
+@Zorphy(kind: ZorphyKind.valueObject, generateJson: true)
 abstract class $ScriptHtmlTagAttributes {
   String get type;
   String? get id;

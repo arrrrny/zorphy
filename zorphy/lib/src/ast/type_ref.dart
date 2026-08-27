@@ -56,8 +56,7 @@ TypeReference referType(String type) {
 
 TypeReference referZorphyClass(String name) => referType(name);
 
-TypeReference referZorphySealedBase(String name) =>
-    referType('\$' + name);
+TypeReference referZorphySealedBase(String name) => referType('\$' + name);
 
 TypeReference referSibling(String name) => referType(name);
 
@@ -80,11 +79,18 @@ List<String> _splitTypeArgs(String args) {
   var current = StringBuffer();
   for (var i = 0; i < args.length; i++) {
     final ch = args[i];
-    if (ch == '<') { depth++; current.write(ch); }
-    else if (ch == '>') { depth--; current.write(ch); }
-    else if (ch == ',' && depth == 0) {
-      result.add(current.toString().trim()); current = StringBuffer(); }
-    else { current.write(ch); }
+    if (ch == '<') {
+      depth++;
+      current.write(ch);
+    } else if (ch == '>') {
+      depth--;
+      current.write(ch);
+    } else if (ch == ',' && depth == 0) {
+      result.add(current.toString().trim());
+      current = StringBuffer();
+    } else {
+      current.write(ch);
+    }
   }
   final remaining = current.toString().trim();
   if (remaining.isNotEmpty) result.add(remaining);

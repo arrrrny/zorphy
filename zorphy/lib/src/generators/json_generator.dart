@@ -10,13 +10,13 @@ import 'base_generator.dart';
 /// Handles apostrophes, backslashes, quotes, dollar signs, and line breaks.
 String _escapeDartStringLiteral(String value) {
   return value
-      .replaceAll('\\', '\\\\')  // backslash must be first
-      .replaceAll("'", "\\'")     // single quote
-      .replaceAll('"', '\\"')     // double quote
-      .replaceAll('\$', '\\\$')   // dollar sign
-      .replaceAll('\n', '\\n')    // newline
-      .replaceAll('\r', '\\r')    // carriage return
-      .replaceAll('\t', '\\t');   // tab
+      .replaceAll('\\', '\\\\') // backslash must be first
+      .replaceAll("'", "\\'") // single quote
+      .replaceAll('"', '\\"') // double quote
+      .replaceAll('\$', '\\\$') // dollar sign
+      .replaceAll('\n', '\\n') // newline
+      .replaceAll('\r', '\\r') // carriage return
+      .replaceAll('\t', '\\t'); // tab
 }
 
 /// Generates JSON serialization members.
@@ -32,8 +32,7 @@ class JsonGenerator extends UniversalGenerator {
   JsonGenerator();
 
   @override
-  bool shouldGenerate(GenerationContext context) =>
-      context.config.generateJson;
+  bool shouldGenerate(GenerationContext context) => context.config.generateJson;
 
   @override
   List<Spec> generateSpec(GenerationContext context) {
@@ -44,8 +43,7 @@ class JsonGenerator extends UniversalGenerator {
     final specs = <Spec>[];
     final shouldGenerateJson =
         !metadata.isAbstract && metadata.explicitSubtypes.isEmpty;
-    final shouldGeneratePolymorphicJson =
-        metadata.explicitSubtypes.isNotEmpty;
+    final shouldGeneratePolymorphicJson = metadata.explicitSubtypes.isNotEmpty;
 
     if (shouldGenerateJson || shouldGeneratePolymorphicJson) {
       // fromJson as Constructor
@@ -76,44 +74,58 @@ class JsonGenerator extends UniversalGenerator {
     if (metadata.explicitSubtypes.isEmpty && metadata.generics.isEmpty) {
       final manualFromJsonFields = _getManualFromJsonFields(metadata);
       if (manualFromJsonFields.isEmpty) {
-        specs.add(ClassMemberCode.constructor(Constructor((c) {
-          c.factory = true;
-          c.name = 'fromJson';
-          c.requiredParameters.add(Parameter((p) {
-            p.name = 'json';
-            p.type = referType('Map<String, dynamic>');
-          }));
-          c.lambda = true;
-          c.body = Code('_\$$className' + 'FromJson(json)');
-        })));
+        specs.add(
+          ClassMemberCode.constructor(
+            Constructor((c) {
+              c.factory = true;
+              c.name = 'fromJson';
+              c.requiredParameters.add(
+                Parameter((p) {
+                  p.name = 'json';
+                  p.type = referType('Map<String, dynamic>');
+                }),
+              );
+              c.lambda = true;
+              c.body = Code('_\$$className' + 'FromJson(json)');
+            }),
+          ),
+        );
       } else {
         final bodyLines = <String>[
           'final instance = _\$$className' + 'FromJson(json);',
           'return $className(',
         ];
         for (final f in metadata.allFields) {
-          final manualField =
-              manualFromJsonFields.where((m) => m.name == f.name);
+          final manualField = manualFromJsonFields.where(
+            (m) => m.name == f.name,
+          );
           if (manualField.isNotEmpty) {
             final info = manualField.first.jsonKeyInfo!;
             final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
             bodyLines.add(
-                "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type!.replaceAll(r'$', '')} : null,");
+              "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type!.replaceAll(r'$', '')} : null,",
+            );
           } else {
             bodyLines.add('      ${f.name}: instance.${f.name},');
           }
         }
         bodyLines.add('    );');
 
-        specs.add(ClassMemberCode.constructor(Constructor((c) {
-          c.factory = true;
-          c.name = 'fromJson';
-          c.requiredParameters.add(Parameter((p) {
-            p.name = 'json';
-            p.type = referType('Map<String, dynamic>');
-          }));
-          c.body = Code(bodyLines.join('\n'));
-        })));
+        specs.add(
+          ClassMemberCode.constructor(
+            Constructor((c) {
+              c.factory = true;
+              c.name = 'fromJson';
+              c.requiredParameters.add(
+                Parameter((p) {
+                  p.name = 'json';
+                  p.type = referType('Map<String, dynamic>');
+                }),
+              );
+              c.body = Code(bodyLines.join('\n'));
+            }),
+          ),
+        );
       }
     } else if (metadata.explicitSubtypes.isNotEmpty) {
       _addPolymorphicFromJson(specs, metadata, config);
@@ -135,18 +147,21 @@ class JsonGenerator extends UniversalGenerator {
     // Self-case wire value: a non-sealed base (or a base that is itself
     // a subtype) must emit/match the same value its own `toJson()`
     // produces. Falls back to the clean class name.
-    final selfWireValue = _escapeDartStringLiteral(metadata.subtypeWireValue ?? className);
+    final selfWireValue = _escapeDartStringLiteral(
+      metadata.subtypeWireValue ?? className,
+    );
     final bodyLines = <String>[];
 
-    final hasSelfCase = !metadata.isAbstract &&
+    final hasSelfCase =
+        !metadata.isAbstract &&
         (metadata.isInParentExplicitSubtypes || metadata.nonSealed);
-    final totalCases =
-        metadata.explicitSubtypes.length + (hasSelfCase ? 1 : 0);
+    final totalCases = metadata.explicitSubtypes.length + (hasSelfCase ? 1 : 0);
     var caseIndex = 0;
 
     if (hasSelfCase) {
       bodyLines.add(
-          "if (json['$typeKey'] == null || json['$typeKey'] == '$selfWireValue') {");
+        "if (json['$typeKey'] == null || json['$typeKey'] == '$selfWireValue') {",
+      );
       bodyLines.add('  return _\$${className}FromJson(json);');
       caseIndex++;
     }
@@ -158,15 +173,17 @@ class JsonGenerator extends UniversalGenerator {
       final interfaceName = subtype.interfaceName.replaceAll('\$', '');
       // Per-subtype wire value: `subtypeWireValue` override on the subtype,
       // else the clean interface name.
-      final wireValue = _escapeDartStringLiteral(subtype.wireValue ?? interfaceName);
+      final wireValue = _escapeDartStringLiteral(
+        subtype.wireValue ?? interfaceName,
+      );
       final isLast = caseIndex == totalCases - 1;
       final prefix = caseIndex == 0 ? 'if' : '} else if';
 
       if (subtype.typeParams.isNotEmpty) {
-        final genericTypes =
-            subtype.typeParams.map((e) => "'\$\${e.name}\$'").join(',');
-        bodyLines.add(
-            "$prefix (json['$typeKey'] == '$wireValue') {");
+        final genericTypes = subtype.typeParams
+            .map((e) => "'\$\${e.name}\$'")
+            .join(',');
+        bodyLines.add("$prefix (json['$typeKey'] == '$wireValue') {");
         bodyLines.add('  var fn_fromJson = getFromJsonToGenericFn(');
         bodyLines.add('    ${interfaceName}_Generics_Sing().fns,');
         bodyLines.add('    json,');
@@ -174,8 +191,7 @@ class JsonGenerator extends UniversalGenerator {
         bodyLines.add('  );');
         bodyLines.add('  return fn_fromJson(json);');
       } else {
-        bodyLines.add(
-            "$prefix (json['$typeKey'] == '$wireValue') {");
+        bodyLines.add("$prefix (json['$typeKey'] == '$wireValue') {");
         bodyLines.add('  return $interfaceName.fromJson(json);');
       }
       if (isLast) bodyLines.add('}');
@@ -183,28 +199,36 @@ class JsonGenerator extends UniversalGenerator {
     }
 
     bodyLines.add(
-        "throw UnsupportedError(\"The $typeKey '\${json['$typeKey']}' is not supported by the $className.fromJson constructor.\");");
+      "throw UnsupportedError(\"The $typeKey '\${json['$typeKey']}' is not supported by the $className.fromJson constructor.\");",
+    );
 
-    specs.add(ClassMemberCode.constructor(Constructor((c) {
-      c.factory = true;
-      c.name = 'fromJson';
-      c.requiredParameters.add(Parameter((p) {
-        p.name = 'json';
-        p.type = referType('Map<String, dynamic>');
-      }));
-      c.body = Code(bodyLines.join('\n'));
-    })));
+    specs.add(
+      ClassMemberCode.constructor(
+        Constructor((c) {
+          c.factory = true;
+          c.name = 'fromJson';
+          c.requiredParameters.add(
+            Parameter((p) {
+              p.name = 'json';
+              p.type = referType('Map<String, dynamic>');
+            }),
+          );
+          c.body = Code(bodyLines.join('\n'));
+        }),
+      ),
+    );
 
     if (metadata.nonSealed) {
       // toJson method for non-sealed polymorphic
       final toJsonBody = <String>[];
       for (var i = 0; i < metadata.explicitSubtypes.length; i++) {
-        final subtype =
-            metadata.explicitSubtypes[i];
+        final subtype = metadata.explicitSubtypes[i];
         // Strip leading `$` from interface names.
         final subtypeName = subtype.interfaceName.replaceAll('\$', '');
         // Per-subtype wire value (subtypeWireValue override or clean name).
-        final wireValue = _escapeDartStringLiteral(subtype.wireValue ?? subtypeName);
+        final wireValue = _escapeDartStringLiteral(
+          subtype.wireValue ?? subtypeName,
+        );
         final keyword = i == 0 ? 'if' : '} else if';
         toJsonBody.add('  $keyword (this is $subtypeName) {');
         toJsonBody.add('    final json = (this as $subtypeName).toJsonLean();');
@@ -214,18 +238,23 @@ class JsonGenerator extends UniversalGenerator {
       if (metadata.explicitSubtypes.isNotEmpty) toJsonBody.add('  }');
       if (metadata.isAbstract) {
         toJsonBody.add(
-            '  throw UnsupportedError("Unknown subtype: \\\$runtimeType");');
+          '  throw UnsupportedError("Unknown subtype: \\\$runtimeType");',
+        );
       } else {
         toJsonBody.add('  final json = toJsonLean();');
         toJsonBody.add("  json['$typeKey'] = '$selfWireValue';");
         toJsonBody.add('  return json;');
       }
 
-      specs.add(ClassMemberCode.method(Method((m) {
-        m.name = 'toJson';
-        m.returns = referType('Map<String, dynamic>');
-        m.body = Code(toJsonBody.join('\n'));
-      })));
+      specs.add(
+        ClassMemberCode.method(
+          Method((m) {
+            m.name = 'toJson';
+            m.returns = referType('Map<String, dynamic>');
+            m.body = Code(toJsonBody.join('\n'));
+          }),
+        ),
+      );
     }
   }
 
@@ -235,64 +264,78 @@ class JsonGenerator extends UniversalGenerator {
     GenerationConfig config,
   ) {
     final className = metadata.cleanName;
-    final fromJsonArgs =
-        metadata.generics.map((g) => 'fromJson${g.name}').join(', ');
+    final fromJsonArgs = metadata.generics
+        .map((g) => 'fromJson${g.name}')
+        .join(', ');
     final manualFromJsonFields = _getManualFromJsonFields(metadata);
 
     if (manualFromJsonFields.isEmpty) {
-      specs.add(ClassMemberCode.constructor(Constructor((c) {
-        c.factory = true;
-        c.name = 'fromJson';
-        c.requiredParameters.add(Parameter((p) {
-          p.name = 'json';
-          p.type = referType('Map<String, dynamic>');
-        }));
-        for (final g in metadata.generics) {
-          c.requiredParameters.add(Parameter((p) {
-            p.name = 'fromJson${g.name}';
-            p.type =
-                referType('${g.name} Function(Object? json)');
-          }));
-        }
-        c.lambda = true;
-        c.body = Code('_\$$className' + 'FromJson(json, $fromJsonArgs)');
-      })));
+      specs.add(
+        ClassMemberCode.constructor(
+          Constructor((c) {
+            c.factory = true;
+            c.name = 'fromJson';
+            c.requiredParameters.add(
+              Parameter((p) {
+                p.name = 'json';
+                p.type = referType('Map<String, dynamic>');
+              }),
+            );
+            for (final g in metadata.generics) {
+              c.requiredParameters.add(
+                Parameter((p) {
+                  p.name = 'fromJson${g.name}';
+                  p.type = referType('${g.name} Function(Object? json)');
+                }),
+              );
+            }
+            c.lambda = true;
+            c.body = Code('_\$$className' + 'FromJson(json, $fromJsonArgs)');
+          }),
+        ),
+      );
     } else {
       final bodyLines = <String>[
-        '  final instance = _\$$className' +
-            'FromJson(json, $fromJsonArgs);',
+        '  final instance = _\$$className' + 'FromJson(json, $fromJsonArgs);',
         '  return $className(',
       ];
       for (final f in metadata.allFields) {
-        final manualField =
-            manualFromJsonFields.where((m) => m.name == f.name);
+        final manualField = manualFromJsonFields.where((m) => m.name == f.name);
         if (manualField.isNotEmpty) {
           final info = manualField.first.jsonKeyInfo!;
           final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
           bodyLines.add(
-              "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type!.replaceAll(r'$', '')} : null,");
+            "      ${f.name}: json['$jsonFieldName'] != null ? ${info.fromJson}(json['$jsonFieldName'] as Map<String, dynamic>) as ${f.type!.replaceAll(r'$', '')} : null,",
+          );
         } else {
           bodyLines.add('      ${f.name}: instance.${f.name},');
         }
       }
       bodyLines.add('    );');
 
-      specs.add(ClassMemberCode.constructor(Constructor((c) {
-        c.factory = true;
-        c.name = 'fromJson';
-        c.requiredParameters.add(Parameter((p) {
-          p.name = 'json';
-          p.type = referType('Map<String, dynamic>');
-        }));
-        for (final g in metadata.generics) {
-          c.requiredParameters.add(Parameter((p) {
-            p.name = 'fromJson${g.name}';
-            p.type =
-                referType('${g.name} Function(Object? json)');
-          }));
-        }
-        c.body = Code(bodyLines.join('\n'));
-      })));
+      specs.add(
+        ClassMemberCode.constructor(
+          Constructor((c) {
+            c.factory = true;
+            c.name = 'fromJson';
+            c.requiredParameters.add(
+              Parameter((p) {
+                p.name = 'json';
+                p.type = referType('Map<String, dynamic>');
+              }),
+            );
+            for (final g in metadata.generics) {
+              c.requiredParameters.add(
+                Parameter((p) {
+                  p.name = 'fromJson${g.name}';
+                  p.type = referType('${g.name} Function(Object? json)');
+                }),
+              );
+            }
+            c.body = Code(bodyLines.join('\n'));
+          }),
+        ),
+      );
     }
   }
 
@@ -308,28 +351,28 @@ class JsonGenerator extends UniversalGenerator {
         !metadata.nonSealed) {
       return;
     }
-    if (metadata.generics.isNotEmpty &&
-        _hasNonGenericJsonParent(metadata)) {
+    if (metadata.generics.isNotEmpty && _hasNonGenericJsonParent(metadata)) {
       return;
     }
 
     final className = metadata.cleanName;
-    final manualToJsonFields = _getManualToJsonFields(metadata)
-        .where((f) => !config.equalityExcludes.contains(f.name))
-        .toList();
+    final manualToJsonFields = _getManualToJsonFields(
+      metadata,
+    ).where((f) => !config.equalityExcludes.contains(f.name)).toList();
     final excludedJsonKeys = _excludedJsonKeys(metadata, config);
 
     // toJsonLean method
     if (metadata.generics.isEmpty) {
       final body = <String>[];
       body.add(
-          'final Map<String, dynamic> data = _\$$className' +
-              'ToJson(this);');
+        'final Map<String, dynamic> data = _\$$className' + 'ToJson(this);',
+      );
       for (final f in manualToJsonFields) {
         final info = f.jsonKeyInfo!;
         final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
         body.add(
-            "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
+          "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);",
+        );
       }
       for (final key in excludedJsonKeys) {
         final escaped = _escapeDartStringLiteral(key);
@@ -337,23 +380,28 @@ class JsonGenerator extends UniversalGenerator {
       }
       body.add('_sanitizeJson(data);');
       body.add('return data;');
-      specs.add(Method((m) {
-        m.name = 'toJsonLean';
-        m.returns = referType('Map<String, dynamic>');
-        m.body = Code(body.join('\n'));
-      }));
+      specs.add(
+        Method((m) {
+          m.name = 'toJsonLean';
+          m.returns = referType('Map<String, dynamic>');
+          m.body = Code(body.join('\n'));
+        }),
+      );
     } else {
-      final toJsonArgs =
-          metadata.generics.map((g) => 'toJson${g.name}').join(', ');
+      final toJsonArgs = metadata.generics
+          .map((g) => 'toJson${g.name}')
+          .join(', ');
       final body = <String>[];
       body.add(
-          'final Map<String, dynamic> data = _\$$className' +
-              'ToJson(this, $toJsonArgs);');
+        'final Map<String, dynamic> data = _\$$className' +
+            'ToJson(this, $toJsonArgs);',
+      );
       for (final f in manualToJsonFields) {
         final info = f.jsonKeyInfo!;
         final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
         body.add(
-            "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
+          "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);",
+        );
       }
       for (final key in excludedJsonKeys) {
         final escaped = _escapeDartStringLiteral(key);
@@ -361,33 +409,41 @@ class JsonGenerator extends UniversalGenerator {
       }
       body.add('_sanitizeJson(data);');
       body.add('return data;');
-      specs.add(Method((m) {
-        m.name = 'toJsonLean';
-        m.returns = referType('Map<String, dynamic>');
-        for (final g in metadata.generics) {
-          m.requiredParameters.add(Parameter((p) {
-            p.name = 'toJson${g.name}';
-            p.type =
-                referType('Object? Function(${g.name} value)');
-          }));
-        }
-        m.body = Code(body.join('\n'));
-      }));
+      specs.add(
+        Method((m) {
+          m.name = 'toJsonLean';
+          m.returns = referType('Map<String, dynamic>');
+          for (final g in metadata.generics) {
+            m.requiredParameters.add(
+              Parameter((p) {
+                p.name = 'toJson${g.name}';
+                p.type = referType('Object? Function(${g.name} value)');
+              }),
+            );
+          }
+          m.body = Code(body.join('\n'));
+        }),
+      );
     }
 
     // _sanitizeJson method
     // Strips THIS class's own discriminator key (default `'__typename'`)
     // from the payload and any nested maps so it doesn't leak into wire
     // output where the discriminator is only meaningful at the top level.
-    final sanitizeTypeKey = _escapeDartStringLiteral(metadata.typeKey ?? '__typename');
-    specs.add(Method((m) {
-      m.name = '_sanitizeJson';
-      m.returns = referType('dynamic');
-      m.requiredParameters.add(Parameter((p) {
-        p.name = 'json';
-        p.type = referType('dynamic');
-      }));
-      m.body = Code('''if (json is Map<String, dynamic>) {
+    final sanitizeTypeKey = _escapeDartStringLiteral(
+      metadata.typeKey ?? '__typename',
+    );
+    specs.add(
+      Method((m) {
+        m.name = '_sanitizeJson';
+        m.returns = referType('dynamic');
+        m.requiredParameters.add(
+          Parameter((p) {
+            p.name = 'json';
+            p.type = referType('dynamic');
+          }),
+        );
+        m.body = Code('''if (json is Map<String, dynamic>) {
   json.remove('$sanitizeTypeKey');
   return json..forEach((key, value) {
     json[key] = _sanitizeJson(value);
@@ -396,29 +452,35 @@ class JsonGenerator extends UniversalGenerator {
   return json.map((e) => _sanitizeJson(e)).toList();
 }
 return json;''');
-    }));
+      }),
+    );
   }
 
   // ── toJson with discriminator ────────────────────────────────
 
-  void _addToJsonWithDiscriminator(
-      List<Spec> specs, ClassMetadata metadata) {
+  void _addToJsonWithDiscriminator(List<Spec> specs, ClassMetadata metadata) {
     final className = metadata.cleanName;
     // Effective key: inherited from the base (resolved by ClassAnalyzer)
     // or the default `'__typename'`.
     final typeKey = _escapeDartStringLiteral(metadata.typeKey ?? '__typename');
     // Effective wire value for THIS subtype: the explicit override or
     // the clean class name.
-    final wireValue = _escapeDartStringLiteral(metadata.subtypeWireValue ?? className);
+    final wireValue = _escapeDartStringLiteral(
+      metadata.subtypeWireValue ?? className,
+    );
     final body = <String>[];
     body.add('final json = _\$$className' + 'ToJson(this);');
     body.add("json['$typeKey'] = '$wireValue';");
     body.add('return json;');
-    specs.add(ClassMemberCode.method(Method((m) {
-      m.name = 'toJson';
-      m.returns = referType('Map<String, dynamic>');
-      m.body = Code(body.join('\n'));
-    })));
+    specs.add(
+      ClassMemberCode.method(
+        Method((m) {
+          m.name = 'toJson';
+          m.returns = referType('Map<String, dynamic>');
+          m.body = Code(body.join('\n'));
+        }),
+      ),
+    );
   }
 
   bool _hasNonGenericJsonParent(ClassMetadata metadata) {
@@ -428,8 +490,7 @@ return json;''');
     return false;
   }
 
-  List<NameTypeClassComment> _getManualFromJsonFields(
-      ClassMetadata metadata) {
+  List<NameTypeClassComment> _getManualFromJsonFields(ClassMetadata metadata) {
     return metadata.allFields.where((f) {
       final info = f.jsonKeyInfo;
       return info != null &&
@@ -438,13 +499,10 @@ return json;''');
     }).toList();
   }
 
-  List<NameTypeClassComment> _getManualToJsonFields(
-      ClassMetadata metadata) {
+  List<NameTypeClassComment> _getManualToJsonFields(ClassMetadata metadata) {
     return metadata.allFields.where((f) {
       final info = f.jsonKeyInfo;
-      return info != null &&
-          info.includeToJson == false &&
-          info.toJson != null;
+      return info != null && info.includeToJson == false && info.toJson != null;
     }).toList();
   }
 
@@ -495,13 +553,10 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
     return '<${metadata.generics.map((g) => g.toString()).join(', ')}>';
   }
 
-  List<NameTypeClassComment> _getManualToJsonFields(
-      ClassMetadata metadata) {
+  List<NameTypeClassComment> _getManualToJsonFields(ClassMetadata metadata) {
     return metadata.allFields.where((f) {
       final info = f.jsonKeyInfo;
-      return info != null &&
-          info.includeToJson == false &&
-          info.toJson != null;
+      return info != null && info.includeToJson == false && info.toJson != null;
     }).toList();
   }
 
@@ -522,11 +577,13 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
     // generated inside the class by JsonGenerator.
     if (metadata.generics.isEmpty) {
       if (manualToJsonFields.isEmpty) {
-        methods.add(Method((m) {
-          m.name = 'toJson';
-          m.returns = referType('Map<String, dynamic>');
-          m.body = Code('return _\$$className' + 'ToJson(this);');
-        }));
+        methods.add(
+          Method((m) {
+            m.name = 'toJson';
+            m.returns = referType('Map<String, dynamic>');
+            m.body = Code('return _\$$className' + 'ToJson(this);');
+          }),
+        );
       } else {
         final body = <String>[];
         body.add('final data = _\$$className' + 'ToJson(this);');
@@ -534,55 +591,65 @@ class JsonExtensionGenerator extends ConcreteClassGenerator {
           final info = f.jsonKeyInfo!;
           final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
           body.add(
-              "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
+            "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);",
+          );
         }
         body.add('return data;');
-        methods.add(Method((m) {
-          m.name = 'toJson';
-          m.returns = referType('Map<String, dynamic>');
-          m.body = Code(body.join('\n'));
-        }));
+        methods.add(
+          Method((m) {
+            m.name = 'toJson';
+            m.returns = referType('Map<String, dynamic>');
+            m.body = Code(body.join('\n'));
+          }),
+        );
       }
     } else {
-      final toJsonArgs =
-          metadata.generics.map((g) => 'toJson${g.name}').join(', ');
+      final toJsonArgs = metadata.generics
+          .map((g) => 'toJson${g.name}')
+          .join(', ');
       if (manualToJsonFields.isEmpty) {
-        methods.add(Method((m) {
-          m.name = 'toJson';
-          m.returns = referType('Map<String, dynamic>');
-          for (final g in metadata.generics) {
-            m.requiredParameters.add(Parameter((p) {
-              p.name = 'toJson${g.name}';
-              p.type =
-                  referType('Object? Function(${g.name} value)');
-            }));
-          }
-          m.lambda = true;
-          m.body = Code('_\$$className' + 'ToJson(this, $toJsonArgs)');
-        }));
+        methods.add(
+          Method((m) {
+            m.name = 'toJson';
+            m.returns = referType('Map<String, dynamic>');
+            for (final g in metadata.generics) {
+              m.requiredParameters.add(
+                Parameter((p) {
+                  p.name = 'toJson${g.name}';
+                  p.type = referType('Object? Function(${g.name} value)');
+                }),
+              );
+            }
+            m.lambda = true;
+            m.body = Code('_\$$className' + 'ToJson(this, $toJsonArgs)');
+          }),
+        );
       } else {
         final body = <String>[];
-        body.add(
-            'final data = _\$$className' + 'ToJson(this, $toJsonArgs);');
+        body.add('final data = _\$$className' + 'ToJson(this, $toJsonArgs);');
         for (final f in manualToJsonFields) {
           final info = f.jsonKeyInfo!;
           final jsonFieldName = _escapeDartStringLiteral(info.name ?? f.name);
           body.add(
-              "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);");
+            "if (${f.name} != null) data['$jsonFieldName'] = ${info.toJson}(${f.name}!);",
+          );
         }
         body.add('return data;');
-        methods.add(Method((m) {
-          m.name = 'toJson';
-          m.returns = referType('Map<String, dynamic>');
-          for (final g in metadata.generics) {
-            m.requiredParameters.add(Parameter((p) {
-              p.name = 'toJson${g.name}';
-              p.type =
-                  referType('Object? Function(${g.name} value)');
-            }));
-          }
-          m.body = Code(body.join('\n'));
-        }));
+        methods.add(
+          Method((m) {
+            m.name = 'toJson';
+            m.returns = referType('Map<String, dynamic>');
+            for (final g in metadata.generics) {
+              m.requiredParameters.add(
+                Parameter((p) {
+                  p.name = 'toJson${g.name}';
+                  p.type = referType('Object? Function(${g.name} value)');
+                }),
+              );
+            }
+            m.body = Code(body.join('\n'));
+          }),
+        );
       }
     }
 

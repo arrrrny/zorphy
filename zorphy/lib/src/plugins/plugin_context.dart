@@ -22,10 +22,7 @@ class PluginContext {
   final List<PluginDiagnostic> _diagnostics = [];
 
   /// Creates a plugin context for the given class generation.
-  PluginContext({
-    required this.metadata,
-    required this.config,
-  });
+  PluginContext({required this.metadata, required this.config});
 
   /// Adds an import directive to the output library.
   ///
@@ -63,8 +60,7 @@ class PluginContext {
   List<Directive> get imports => List.unmodifiable(_imports);
 
   /// The accumulated diagnostics (read by the orchestrator).
-  List<PluginDiagnostic> get diagnostics =>
-      List.unmodifiable(_diagnostics);
+  List<PluginDiagnostic> get diagnostics => List.unmodifiable(_diagnostics);
 }
 
 /// Severity level for a plugin diagnostic.
@@ -88,8 +84,5 @@ class PluginDiagnostic {
   final PluginDiagnosticLevel level;
 
   /// Creates a diagnostic with the given [message] and [level].
-  const PluginDiagnostic({
-    required this.message,
-    required this.level,
-  });
+  const PluginDiagnostic({required this.message, required this.level});
 }

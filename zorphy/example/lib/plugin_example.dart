@@ -65,14 +65,16 @@ class TimestampPlugin extends ZorphyPlugin {
     if (spec is! Class) return spec;
 
     // Rebuild the class with an additional field.
-    return spec.rebuild((c) => c
-      ..fields.add(
-        Field((f) {
-          f.name = 'generatedAt';
-          f.type = refer('DateTime');
-          f.modifier = FieldModifier.final$;
-        }),
-      ));
+    return spec.rebuild(
+      (c) => c
+        ..fields.add(
+          Field((f) {
+            f.name = 'generatedAt';
+            f.type = refer('DateTime');
+            f.modifier = FieldModifier.final$;
+          }),
+        ),
+    );
   }
 
   @override

@@ -52,9 +52,8 @@ void main() {
   );
   check(
     'string field flip equals copyWith',
-    retitled.title == 'Write the docs' && retitled == step.copyWith(
-      title: 'Write the docs',
-    ),
+    retitled.title == 'Write the docs' &&
+        retitled == step.copyWith(title: 'Write the docs'),
   );
 
   final repositioned = step.copyWithField(WalkthroughStepFields.position, 7);
@@ -125,10 +124,7 @@ void main() {
     relabeled.label == 'renamed' && relabeled.value == 42,
   );
 
-  final revalued = box.copyWithField(
-    ProgressBoxFields.value<int>(),
-    7,
-  );
+  final revalued = box.copyWithField(ProgressBoxFields.value<int>(), 7);
   check('generic entity: typed parameter flip', revalued.value == 7);
   check(
     'generic entity: equals copyWith(value: 7)',

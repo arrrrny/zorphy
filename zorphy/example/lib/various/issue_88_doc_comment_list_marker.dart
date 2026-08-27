@@ -11,8 +11,8 @@
 //  which leaked into the generated constructor as a
 // stray identifier.
 //
-// Expected after the fix: 
-// contains a clean constructor 
+// Expected after the fix:
+// contains a clean constructor
 // with NO stray  /  tokens, and the build succeeds.
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 

@@ -24,7 +24,9 @@ void main() {
 
       expect(result.hasErrors, isTrue);
       expect(
-        result.findings.any((f) => f.message.contains('pubspec.yaml not found')),
+        result.findings.any(
+          (f) => f.message.contains('pubspec.yaml not found'),
+        ),
         isTrue,
       );
     });
@@ -141,8 +143,10 @@ abstract class \$Product {}
       );
     });
 
-    test('no findings when project is valid with all generated files', () async {
-      await File('$tempPath/pubspec.yaml').writeAsString('''
+    test(
+      'no findings when project is valid with all generated files',
+      () async {
+        await File('$tempPath/pubspec.yaml').writeAsString('''
 name: test_project
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -153,10 +157,10 @@ dev_dependencies:
   build_runner: ^2.0.0
 ''');
 
-      final libDir = Directory('$tempPath/lib')..createSync(recursive: true);
-      final libPath = libDir.path;
+        final libDir = Directory('$tempPath/lib')..createSync(recursive: true);
+        final libPath = libDir.path;
 
-      final source = '''
+        final source = '''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'order.zorphy.dart';
@@ -165,19 +169,20 @@ part 'order.g.dart';
 @Zorphy()
 abstract class \$Order {}
 ''';
-      File('$libPath/order.dart')
-        ..createSync()
-        ..writeAsStringSync(source);
+        File('$libPath/order.dart')
+          ..createSync()
+          ..writeAsStringSync(source);
 
-      File('$libPath/order.zorphy.dart').createSync();
-      File('$libPath/order.g.dart').createSync();
+        File('$libPath/order.zorphy.dart').createSync();
+        File('$libPath/order.g.dart').createSync();
 
-      final validator = ProjectValidator(projectDir: tempPath);
-      final result = validator.validate();
+        final validator = ProjectValidator(projectDir: tempPath);
+        final result = validator.validate();
 
-      expect(result.errorCount, equals(0));
-      expect(result.findings, isEmpty);
-    });
+        expect(result.errorCount, equals(0));
+        expect(result.findings, isEmpty);
+      },
+    );
 
     test('warns when source is newer than generated file', () async {
       await File('$tempPath/pubspec.yaml').writeAsString('''

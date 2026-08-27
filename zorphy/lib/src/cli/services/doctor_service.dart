@@ -15,10 +15,8 @@ import '../models/doctor_result.dart';
 
 /// Functional type for listing .zorphy.dart files recursively.
 /// Returns absolute paths of all matching files.
-typedef FindGeneratedFilesFunction = List<String> Function(
-  String projectDir, {
-  List<String> sourceDirs,
-});
+typedef FindGeneratedFilesFunction =
+    List<String> Function(String projectDir, {List<String> sourceDirs});
 
 /// Functional type for deleting a single file.
 /// Returns true if the file was successfully deleted.
@@ -26,11 +24,12 @@ typedef DeleteFileFunction = bool Function(String path);
 
 /// Functional type for running a subprocess (named differently to
 /// avoid export collision with version_checker's RunProcessFunction).
-typedef DoctorProcessRunner = Future<ProcessResult> Function(
-  String executable,
-  List<String> args, {
-  String? workingDirectory,
-});
+typedef DoctorProcessRunner =
+    Future<ProcessResult> Function(
+      String executable,
+      List<String> args, {
+      String? workingDirectory,
+    });
 
 /// Functional type for reading a file's content.
 typedef ReadFileFunction = String Function(String path);
@@ -75,8 +74,7 @@ class DoctorService {
     final dirs = sourceDirs;
 
     // Step 1: Find all .zorphy.dart files
-    final generatedFiles =
-        _doFindFiles(projectDir, sourceDirs: dirs);
+    final generatedFiles = _doFindFiles(projectDir, sourceDirs: dirs);
 
     // Step 2: Delete files (unless dry-run)
     final deletedFiles = <String>[];
@@ -94,11 +92,12 @@ class DoctorService {
     var buildOutput = '';
     int? buildExitCode;
     if (!dryRun) {
-      final result = await _doRunProcess(
-        'dart',
-        ['run', 'build_runner', 'build', '--delete-conflicting-outputs'],
-        workingDirectory: projectDir,
-      );
+      final result = await _doRunProcess('dart', [
+        'run',
+        'build_runner',
+        'build',
+        '--delete-conflicting-outputs',
+      ], workingDirectory: projectDir);
       buildOutput = '${result.stdout}\n${result.stderr}';
       buildExitCode = result.exitCode;
     }
@@ -107,8 +106,7 @@ class DoctorService {
     int regeneratedCount = 0;
     final remainingInvalidTypeFiles = <String>[];
 
-    final filesAfterBuild =
-        _doFindFiles(projectDir, sourceDirs: dirs);
+    final filesAfterBuild = _doFindFiles(projectDir, sourceDirs: dirs);
 
     if (!dryRun) {
       // Count files that exist now but weren't in the original set
@@ -154,8 +152,10 @@ class DoctorService {
       final dirEntity = Directory(absDir);
       if (!dirEntity.existsSync()) continue;
 
-      for (final entity
-          in dirEntity.listSync(recursive: true, followLinks: false)) {
+      for (final entity in dirEntity.listSync(
+        recursive: true,
+        followLinks: false,
+      )) {
         if (entity is File && entity.path.endsWith('.zorphy.dart')) {
           results.add(entity.path);
         }
@@ -188,8 +188,11 @@ class DoctorService {
     String? workingDirectory,
   }) async {
     if (processRunner != null) {
-      return processRunner!(executable, args,
-          workingDirectory: workingDirectory);
+      return processRunner!(
+        executable,
+        args,
+        workingDirectory: workingDirectory,
+      );
     }
 
     return Process.run(

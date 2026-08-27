@@ -119,35 +119,32 @@ void main() {
 /// Minimal test-only context with faked metadata.
 class _TestPluginContext extends PluginContext {
   _TestPluginContext()
-      : super(
-          metadata: _FakeClassMetadata(),
-          config: _FakeConfig(),
-        );
+    : super(metadata: _FakeClassMetadata(), config: _FakeConfig());
 }
 
 class _FakeClassMetadata extends ClassMetadata {
   _FakeClassMetadata()
-      : super(
-          originalName: '\$User',
-          cleanName: 'User',
-          isAbstract: false,
-          isSealed: false,
-          nonSealed: false,
-          hasConstConstructor: false,
-          docComment: '',
-          generics: <GenericParameterMetadata>[],
-          interfaces: <InterfaceMetadata>[],
-          allValueTInterfaces: <Interface>[],
-          allFields: <NameTypeClassComment>[],
-          ownFieldNames: <String>{},
-          factoryMethods: <FactoryMethodInfo>[],
-          explicitSubtypes: <Interface>[],
-          isInParentExplicitSubtypes: false,
-          classElement: _FakeClassElement(),
-          agentDirectiveInfo: const AgentDirectiveInfo(),
-          namedConstructors: const [],
-      allAnnotatedClasses: <String, ClassElement>{},
-        );
+    : super(
+        originalName: '\$User',
+        cleanName: 'User',
+        isAbstract: false,
+        isSealed: false,
+        nonSealed: false,
+        hasConstConstructor: false,
+        docComment: '',
+        generics: <GenericParameterMetadata>[],
+        interfaces: <InterfaceMetadata>[],
+        allValueTInterfaces: <Interface>[],
+        allFields: <NameTypeClassComment>[],
+        ownFieldNames: <String>{},
+        factoryMethods: <FactoryMethodInfo>[],
+        explicitSubtypes: <Interface>[],
+        isInParentExplicitSubtypes: false,
+        classElement: _FakeClassElement(),
+        agentDirectiveInfo: const AgentDirectiveInfo(),
+        namedConstructors: const [],
+        allAnnotatedClasses: <String, ClassElement>{},
+      );
 }
 
 class _FakeConfig extends GenerationConfig {

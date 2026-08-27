@@ -66,10 +66,12 @@ class PluginRegistry {
         // Check if any other remaining plugin declares runBefore=[p.name].
         // That would mean that plugin must run before p, so p must wait.
         final pendingBefore = remaining
-            .where((other) =>
-                other != p &&
-                other.runBefore.contains(p.name) &&
-                !emitted.contains(other.name))
+            .where(
+              (other) =>
+                  other != p &&
+                  other.runBefore.contains(p.name) &&
+                  !emitted.contains(other.name),
+            )
             .toList();
 
         if (pendingAfter.isEmpty && pendingBefore.isEmpty) {

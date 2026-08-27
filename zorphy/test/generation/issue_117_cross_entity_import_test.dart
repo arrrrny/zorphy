@@ -37,8 +37,9 @@ import 'package:test/test.dart';
 /// field's declared (concrete) type. The fixture pair lives at
 /// `example/lib/various/issue117_ref/` and `example/lib/various/issue117_repro/`.
 void main() {
-  final reproFixture =
-      File('example/lib/various/issue117_repro/issue117_repro.zorphy.dart');
+  final reproFixture = File(
+    'example/lib/various/issue117_repro/issue117_repro.zorphy.dart',
+  );
 
   late String output;
 
@@ -70,7 +71,8 @@ void main() {
       expect(
         RegExp(r'\)\s*as\s+\$Issue117Ref\b').hasMatch(output),
         isFalse,
-        reason: 'patchWith cast must NOT target the abstract \$Issue117Ref form',
+        reason:
+            'patchWith cast must NOT target the abstract \$Issue117Ref form',
       );
     });
 

@@ -42,9 +42,12 @@ class AgentDirectiveGenerator extends UniversalGenerator {
         info.toolNamespace != null ||
         info.toolDescription != null) {
       final toolParts = <String>[];
-      if (info.toolName != null) toolParts.add("name: '${_escape(info.toolName!)}'");
-      if (info.toolNamespace != null) toolParts.add("namespace: '${_escape(info.toolNamespace!)}'");
-      if (info.toolDescription != null) toolParts.add("description: '${_escape(info.toolDescription!)}'");
+      if (info.toolName != null)
+        toolParts.add("name: '${_escape(info.toolName!)}'");
+      if (info.toolNamespace != null)
+        toolParts.add("namespace: '${_escape(info.toolNamespace!)}'");
+      if (info.toolDescription != null)
+        toolParts.add("description: '${_escape(info.toolDescription!)}'");
       parts.add('tool: const AgentToolDirective(${toolParts.join(', ')}),');
     }
 
@@ -65,9 +68,11 @@ class AgentDirectiveGenerator extends UniversalGenerator {
 
     // params
     if (info.paramDescriptions.isNotEmpty) {
-      final paramEntries = info.paramDescriptions.entries.map((e) {
-        return "'${_escape(e.key)}': const AgentParamDirective(description: '${_escape(e.value)}')";
-      }).join(', ');
+      final paramEntries = info.paramDescriptions.entries
+          .map((e) {
+            return "'${_escape(e.key)}': const AgentParamDirective(description: '${_escape(e.value)}')";
+          })
+          .join(', ');
       parts.add('params: {$paramEntries},');
     }
 

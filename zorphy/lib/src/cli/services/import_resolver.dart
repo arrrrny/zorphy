@@ -67,7 +67,10 @@ class ImportResolver {
 
     if (explicitSubtypes != null) {
       for (final subtype in explicitSubtypes) {
-        final cleanSubtype = subtype.replaceAll(RegExp(r'^\$+'), '').split(':').first;
+        final cleanSubtype = subtype
+            .replaceAll(RegExp(r'^\$+'), '')
+            .split(':')
+            .first;
         if (cleanSubtype != className) {
           if (!(generateSubtypes && isSealed)) {
             final subtypeSnakeName = NamingUtils.toSnakeCase(cleanSubtype);

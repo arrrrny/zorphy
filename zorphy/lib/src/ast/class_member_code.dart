@@ -24,6 +24,8 @@ class ClassMemberCode implements Spec {
   R accept<R>(covariant SpecVisitor<R> visitor, [R? context]) {
     // This is never called directly by the emitter — the orchestrator
     // unwraps it before building the Library.
-    throw UnsupportedError('ClassMemberCode should be unwrapped by the orchestrator');
+    throw UnsupportedError(
+      'ClassMemberCode should be unwrapped by the orchestrator',
+    );
   }
 }

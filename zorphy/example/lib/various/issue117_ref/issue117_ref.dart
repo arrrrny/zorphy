@@ -12,4 +12,3 @@ part 'issue117_ref.g.dart';
 abstract class $Issue117Ref {
   String get id;
 }
-

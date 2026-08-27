@@ -165,7 +165,10 @@ void main() {
       final meta = _concreteMeta(
         name: 'SearchQuery',
         agentDirectiveInfo: const AgentDirectiveInfo(
-          paramDescriptions: {'query': 'The search query string', 'limit': 'Max results to return'},
+          paramDescriptions: {
+            'query': 'The search query string',
+            'limit': 'Max results to return',
+          },
           hasAgentAnnotations: true,
         ),
       );
@@ -180,9 +183,7 @@ void main() {
     test('safe risk tier is omitted from output (default)', () {
       final meta = _concreteMeta(
         name: 'Simple',
-        agentDirectiveInfo: const AgentDirectiveInfo(
-          hasAgentAnnotations: true,
-        ),
+        agentDirectiveInfo: const AgentDirectiveInfo(hasAgentAnnotations: true),
       );
       final context = GenerationContext(metadata: meta, config: _bareConfig());
       final specs = AgentDirectiveGenerator().generateSpec(context);

@@ -37,11 +37,7 @@ part 'issue127_value_equality_example.g.dart';
 // 1. Back-compat default — autoId with no exclusion. The minted uuid
 //    is still in ==/hashCode/toJsonLean/compareTo (unchanged), and the
 //    new valueEquals/toJsonValue methods drop it.
-@Zorphy(
-  generateJson: true,
-  autoId: true,
-  generateCompareTo: true,
-)
+@Zorphy(generateJson: true, autoId: true, generateCompareTo: true)
 abstract class $AutoIdDefault {
   String get id;
   String get toolName;

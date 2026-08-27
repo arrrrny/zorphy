@@ -25,7 +25,8 @@ void main() {
     expect(
       g.contains('hashCode'),
       isFalse,
-      reason: 'json_serializable must not serialize the computed hashCode getter',
+      reason:
+          'json_serializable must not serialize the computed hashCode getter',
     );
   });
 }

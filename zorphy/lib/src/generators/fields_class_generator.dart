@@ -36,9 +36,9 @@ class FieldsClassGenerator extends UniversalGenerator {
       c.docs.add('/// Field descriptors for [$className] query construction');
 
       for (final g in metadata.generics) {
-        c.types.add(referType(
-          g.bound != null ? '${g.name} extends ${g.bound}' : g.name,
-        ));
+        c.types.add(
+          referType(g.bound != null ? '${g.name} extends ${g.bound}' : g.name),
+        );
       }
 
       for (final field in metadata.allFields) {
@@ -47,57 +47,75 @@ class FieldsClassGenerator extends UniversalGenerator {
         fieldType = _cleanType(fieldType);
 
         if (hasGenerics) {
-          c.methods.add(Method((m) {
-            m.name = '_\$$fieldName';
-            m.static = true;
-            for (final g in metadata.generics) {
-              m.types.add(TypeReference((t) {
-                t.symbol = g.name;
-                if (g.bound != null) {
-                  t.bound = referType(g.bound);
-                }
-              }));
-            }
-            m.returns = referType(fieldType);
-            m.requiredParameters.add(Parameter((p) {
-              p.name = 'e';
-              p.type = referType(classType);
-            }));
-            m.body = Code('return e.$fieldName;');
-          }));
-          c.methods.add(Method((m) {
-            m.name = fieldName;
-            m.static = true;
-            for (final g in metadata.generics) {
-              m.types.add(TypeReference((t) {
-                t.symbol = g.name;
-                if (g.bound != null) {
-                  t.bound = referType(g.bound);
-                }
-              }));
-            }
-            m.returns = referType('Field<$classType, $fieldType>');
-            m.body = Code(
-              "return Field<$classType, $fieldType>('$fieldName', _\$$fieldName$genericsArgsStr);",
-            );
-          }));
+          c.methods.add(
+            Method((m) {
+              m.name = '_\$$fieldName';
+              m.static = true;
+              for (final g in metadata.generics) {
+                m.types.add(
+                  TypeReference((t) {
+                    t.symbol = g.name;
+                    if (g.bound != null) {
+                      t.bound = referType(g.bound);
+                    }
+                  }),
+                );
+              }
+              m.returns = referType(fieldType);
+              m.requiredParameters.add(
+                Parameter((p) {
+                  p.name = 'e';
+                  p.type = referType(classType);
+                }),
+              );
+              m.body = Code('return e.$fieldName;');
+            }),
+          );
+          c.methods.add(
+            Method((m) {
+              m.name = fieldName;
+              m.static = true;
+              for (final g in metadata.generics) {
+                m.types.add(
+                  TypeReference((t) {
+                    t.symbol = g.name;
+                    if (g.bound != null) {
+                      t.bound = referType(g.bound);
+                    }
+                  }),
+                );
+              }
+              m.returns = referType('Field<$classType, $fieldType>');
+              m.body = Code(
+                "return Field<$classType, $fieldType>('$fieldName', _\$$fieldName$genericsArgsStr);",
+              );
+            }),
+          );
         } else {
-          c.methods.add(Method((m) {
-            m.name = '_\$$fieldName';
-            m.static = true;
-            m.returns = referType(fieldType);
-            m.requiredParameters.add(Parameter((p) {
-              p.name = 'e';
-              p.type = referType(className);
-            }));
-            m.body = Code('return e.$fieldName;');
-          }));
-          c.fields.add(Field((f) {
-            f.name = fieldName;
-            f.modifier = FieldModifier.constant;
-            f.static = true;
-            f.assignment = Code("Field<$className, $fieldType>('$fieldName', _\$$fieldName)");
-          }));
+          c.methods.add(
+            Method((m) {
+              m.name = '_\$$fieldName';
+              m.static = true;
+              m.returns = referType(fieldType);
+              m.requiredParameters.add(
+                Parameter((p) {
+                  p.name = 'e';
+                  p.type = referType(className);
+                }),
+              );
+              m.body = Code('return e.$fieldName;');
+            }),
+          );
+          c.fields.add(
+            Field((f) {
+              f.name = fieldName;
+              f.modifier = FieldModifier.constant;
+              f.static = true;
+              f.assignment = Code(
+                "Field<$className, $fieldType>('$fieldName', _\$$fieldName)",
+              );
+            }),
+          );
         }
       }
     });

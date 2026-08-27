@@ -30,4 +30,3 @@ abstract class $Issue117Repro {
   bool get summarized;
   String? get summary;
 }
-

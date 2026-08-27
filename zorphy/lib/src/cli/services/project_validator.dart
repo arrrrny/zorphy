@@ -22,10 +22,8 @@ class ProjectValidator {
   /// Glob pattern for source directories to scan (relative to [projectDir]).
   final List<String> sourceDirs;
 
-  ProjectValidator({
-    required this.projectDir,
-    List<String>? sourceDirs,
-  }) : sourceDirs = sourceDirs ?? const ['lib'];
+  ProjectValidator({required this.projectDir, List<String>? sourceDirs})
+    : sourceDirs = sourceDirs ?? const ['lib'];
 
   /// Check if the file content has actual @Zorphy or @zorphy annotations
   /// (not in comments or string literals).
@@ -71,7 +69,8 @@ class ProjectValidator {
         // Skip generated files
         if (file.path.endsWith('.zorphy.dart') ||
             file.path.endsWith('.g.dart') ||
-            file.path.endsWith('.freezed.dart')) continue;
+            file.path.endsWith('.freezed.dart'))
+          continue;
 
         filesScanned++;
         final content = file.readAsStringSync();
@@ -169,8 +168,7 @@ class ProjectValidator {
                 "'build_runner' not found in dev_dependencies (required for code generation)",
             severity: ValidationSeverity.warning,
             filePath: pubspecPath,
-            fixSuggestion:
-                'Add dev dependency: dart pub add dev:build_runner',
+            fixSuggestion: 'Add dev dependency: dart pub add dev:build_runner',
           ),
         );
       }
@@ -180,7 +178,7 @@ class ProjectValidator {
           message: 'Failed to parse pubspec.yaml: $e',
           severity: ValidationSeverity.error,
           filePath: pubspecPath,
-          ),
+        ),
       );
     }
 
@@ -267,9 +265,11 @@ class ProjectValidator {
       }
     } catch (e) {
       // Fall back to string search if parsing fails
-      hasZorphyPart = content.contains("part '$zorphyPart'") ||
+      hasZorphyPart =
+          content.contains("part '$zorphyPart'") ||
           content.contains('part "$zorphyPart"');
-      hasGPart = content.contains("part '$gPart'") ||
+      hasGPart =
+          content.contains("part '$gPart'") ||
           content.contains('part "$gPart"');
     }
 
@@ -316,7 +316,8 @@ class ProjectValidator {
           message: "Generated file '$base.zorphy.dart' does not exist",
           severity: ValidationSeverity.error,
           filePath: sourcePath,
-          fixSuggestion: 'Run: dart run build_runner build --delete-conflicting-outputs',
+          fixSuggestion:
+              'Run: dart run build_runner build --delete-conflicting-outputs',
         ),
       );
     } else {
@@ -343,7 +344,8 @@ class ProjectValidator {
           message: "Generated file '$base.g.dart' does not exist",
           severity: ValidationSeverity.error,
           filePath: sourcePath,
-          fixSuggestion: 'Run: dart run build_runner build --delete-conflicting-outputs',
+          fixSuggestion:
+              'Run: dart run build_runner build --delete-conflicting-outputs',
         ),
       );
     } else {
@@ -351,8 +353,7 @@ class ProjectValidator {
       if (sourceModTime.isAfter(gMod)) {
         findings.add(
           ValidationFinding(
-            message:
-                "'$base.g.dart' is stale (source is newer than generated)",
+            message: "'$base.g.dart' is stale (source is newer than generated)",
             severity: ValidationSeverity.warning,
             filePath: sourcePath,
             fixSuggestion: 'Run: dart run build_runner build',

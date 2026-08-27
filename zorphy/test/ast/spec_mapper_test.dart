@@ -58,7 +58,7 @@ ClassMetadata _testMeta({
     classElement: _StubClassElement(cleanName),
     agentDirectiveInfo: const AgentDirectiveInfo(),
     namedConstructors: const [],
-      allAnnotatedClasses: const {},
+    allAnnotatedClasses: const {},
   );
 }
 
@@ -93,9 +93,7 @@ void main() {
   // ── mapGenericParameter ──────────────────────────────────────────
   group('mapGenericParameter', () {
     test('unbounded type parameter', () {
-      final tp = mapGenericParameter(
-        const GenericParameterMetadata(name: 'T'),
-      );
+      final tp = mapGenericParameter(const GenericParameterMetadata(name: 'T'));
       expect(tp.symbol, 'T');
       expect(tp.bound, isNull);
     });
@@ -124,9 +122,7 @@ void main() {
   // ── mapField ──────────────────────────────────────────────────────
   group('mapField', () {
     test('simple field with type', () {
-      final field = mapField(
-        NameTypeClassComment('name', 'String', 'User'),
-      );
+      final field = mapField(NameTypeClassComment('name', 'String', 'User'));
       expect(field.name, 'name');
       // Type should be 'String'.
       final typeStr = field.type!.accept(DartEmitter()).toString();
@@ -143,10 +139,10 @@ void main() {
     });
 
     test('nullable field type preserved', () {
-      final field = mapField(
-        NameTypeClassComment('value', 'int?', 'Item'),
-      );
-      final typeStr = field.type!.accept(DartEmitter(useNullSafetySyntax: true)).toString();
+      final field = mapField(NameTypeClassComment('value', 'int?', 'Item'));
+      final typeStr = field.type!
+          .accept(DartEmitter(useNullSafetySyntax: true))
+          .toString();
       expect(typeStr, 'int?');
     });
 
@@ -155,7 +151,9 @@ void main() {
         NameTypeClassComment('data', 'Map<String, dynamic>', 'Record'),
       );
       // Raw emitter output is structurally correct; spacing is a formatter concern.
-      final typeStr = field.type!.accept(DartEmitter(useNullSafetySyntax: true)).toString();
+      final typeStr = field.type!
+          .accept(DartEmitter(useNullSafetySyntax: true))
+          .toString();
       expect(typeStr, contains('Map<String,'));
       expect(typeStr, contains(',dynamic>'));
     });
@@ -177,9 +175,7 @@ void main() {
     });
 
     test('field without type defaults to dynamic', () {
-      final field = mapField(
-        NameTypeClassComment('anything', null, 'Thing'),
-      );
+      final field = mapField(NameTypeClassComment('anything', null, 'Thing'));
       final typeStr = field.type!.accept(DartEmitter()).toString();
       expect(typeStr, 'dynamic');
     });
@@ -222,21 +218,24 @@ void main() {
       expect(emitted, contains('abstract class Shape'));
     });
 
-    test('sealed class shape (\$\$Shape with !nonSealed → sealed class Shape)', () {
-      final meta = _testMeta(
-        originalName: r'$$Shape',
-        isAbstract: true,
-        isSealed: true,
-      );
-      final cls = mapClass(meta);
-      expect(cls.name, 'Shape');
-      expect(cls.sealed, true);
-      // In code_builder, sealed classes are NOT marked abstract separately.
-      // The 'sealed' keyword implies abstract.
+    test(
+      'sealed class shape (\$\$Shape with !nonSealed → sealed class Shape)',
+      () {
+        final meta = _testMeta(
+          originalName: r'$$Shape',
+          isAbstract: true,
+          isSealed: true,
+        );
+        final cls = mapClass(meta);
+        expect(cls.name, 'Shape');
+        expect(cls.sealed, true);
+        // In code_builder, sealed classes are NOT marked abstract separately.
+        // The 'sealed' keyword implies abstract.
 
-      final emitted = _emitClass(cls);
-      expect(emitted, contains('sealed class Shape'));
-    });
+        final emitted = _emitClass(cls);
+        expect(emitted, contains('sealed class Shape'));
+      },
+    );
 
     test('concrete class shape (\$User → class User)', () {
       final meta = _testMeta(
@@ -260,9 +259,7 @@ void main() {
         originalName: r'$Box',
         isAbstract: false,
         isSealed: false,
-        generics: const [
-          GenericParameterMetadata(name: 'T'),
-        ],
+        generics: const [GenericParameterMetadata(name: 'T')],
       );
       final cls = mapClass(meta);
       expect(cls.name, 'Box');
@@ -273,26 +270,29 @@ void main() {
       expect(emitted, contains('class Box<T>'));
     });
 
-    test('generic class with bounded type param (Map type param preservation)', () {
-      final meta = _testMeta(
-        originalName: r'$SortedMap',
-        isAbstract: false,
-        isSealed: false,
-        generics: const [
-          GenericParameterMetadata(name: 'K', bound: 'Comparable<K>'),
-          GenericParameterMetadata(name: 'V'),
-        ],
-      );
-      final cls = mapClass(meta);
-      expect(cls.types.length, 2);
-      expect(cls.types[0].symbol, 'K');
-      expect(cls.types[1].symbol, 'V');
+    test(
+      'generic class with bounded type param (Map type param preservation)',
+      () {
+        final meta = _testMeta(
+          originalName: r'$SortedMap',
+          isAbstract: false,
+          isSealed: false,
+          generics: const [
+            GenericParameterMetadata(name: 'K', bound: 'Comparable<K>'),
+            GenericParameterMetadata(name: 'V'),
+          ],
+        );
+        final cls = mapClass(meta);
+        expect(cls.types.length, 2);
+        expect(cls.types[0].symbol, 'K');
+        expect(cls.types[1].symbol, 'V');
 
-      final emitted = _emitClass(cls);
-      // Raw emitter omits spaces after commas in type param lists.
-      expect(emitted, contains('class SortedMap<K extends Comparable<K>,'));
-      expect(emitted, contains(',V>'));
-    });
+        final emitted = _emitClass(cls);
+        // Raw emitter omits spaces after commas in type param lists.
+        expect(emitted, contains('class SortedMap<K extends Comparable<K>,'));
+        expect(emitted, contains(',V>'));
+      },
+    );
 
     test('class with implements clause', () {
       final meta = _testMeta(
@@ -301,7 +301,10 @@ void main() {
         isSealed: false,
         interfaces: [
           _testInterface(name: 'Serializable'),
-          _testInterface(name: 'Comparable', typeParams: [NameType('User', '')]),
+          _testInterface(
+            name: 'Comparable',
+            typeParams: [NameType('User', '')],
+          ),
         ],
       );
       final cls = mapClass(meta);

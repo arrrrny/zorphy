@@ -9,7 +9,9 @@ void main() {
       test('major version bump is newer', () {
         final checker = VersionChecker(currentVersion: '1.9.0');
         final result = checker.checkForUpdateSync(
-          pubDevResponse: {'latest': {'version': '2.0.0'}},
+          pubDevResponse: {
+            'latest': {'version': '2.0.0'},
+          },
         );
         expect(result.updateAvailable, isTrue);
         expect(result.latestVersion, equals('2.0.0'));
@@ -18,7 +20,9 @@ void main() {
       test('minor version bump is newer', () {
         final checker = VersionChecker(currentVersion: '2.0.0');
         final result = checker.checkForUpdateSync(
-          pubDevResponse: {'latest': {'version': '2.1.0'}},
+          pubDevResponse: {
+            'latest': {'version': '2.1.0'},
+          },
         );
         expect(result.updateAvailable, isTrue);
       });
@@ -26,7 +30,9 @@ void main() {
       test('patch version bump is newer', () {
         final checker = VersionChecker(currentVersion: '2.0.0');
         final result = checker.checkForUpdateSync(
-          pubDevResponse: {'latest': {'version': '2.0.1'}},
+          pubDevResponse: {
+            'latest': {'version': '2.0.1'},
+          },
         );
         expect(result.updateAvailable, isTrue);
       });
@@ -34,7 +40,9 @@ void main() {
       test('same version is not newer', () {
         final checker = VersionChecker(currentVersion: '2.0.0');
         final result = checker.checkForUpdateSync(
-          pubDevResponse: {'latest': {'version': '2.0.0'}},
+          pubDevResponse: {
+            'latest': {'version': '2.0.0'},
+          },
         );
         expect(result.updateAvailable, isFalse);
       });
@@ -42,7 +50,9 @@ void main() {
       test('older version is not newer', () {
         final checker = VersionChecker(currentVersion: '2.1.0');
         final result = checker.checkForUpdateSync(
-          pubDevResponse: {'latest': {'version': '2.0.0'}},
+          pubDevResponse: {
+            'latest': {'version': '2.0.0'},
+          },
         );
         expect(result.updateAvailable, isFalse);
       });
@@ -50,7 +60,9 @@ void main() {
       test('handles v-prefix in version string', () {
         final checker = VersionChecker(currentVersion: '2.0.0');
         final result = checker.checkForUpdateSync(
-          pubDevResponse: {'latest': {'version': 'v2.1.0'}},
+          pubDevResponse: {
+            'latest': {'version': 'v2.1.0'},
+          },
         );
         expect(result.updateAvailable, isTrue);
       });
@@ -58,7 +70,9 @@ void main() {
       test('strips pre-release suffix for comparison', () {
         final checker = VersionChecker(currentVersion: '2.0.0');
         final result = checker.checkForUpdateSync(
-          pubDevResponse: {'latest': {'version': '2.1.0-beta.1'}},
+          pubDevResponse: {
+            'latest': {'version': '2.1.0-beta.1'},
+          },
         );
         expect(result.updateAvailable, isTrue);
       });
@@ -88,7 +102,9 @@ void main() {
           currentVersion: '2.0.0',
           fetchJson: _mockFetchJson({
             'latest': {'version': '2.0.0'},
-            'versions': [{'version': '2.0.0'}],
+            'versions': [
+              {'version': '2.0.0'},
+            ],
           }),
         );
 
@@ -161,7 +177,9 @@ void main() {
           currentVersion: '2.0.0',
           fetchJson: (url, {timeout}) async {
             capturedUrl = url;
-            return jsonEncode({'latest': {'version': '2.0.0'}});
+            return jsonEncode({
+              'latest': {'version': '2.0.0'},
+            });
           },
         );
 
@@ -275,10 +293,7 @@ void main() {
       });
 
       test('formats success without verifiable version', () {
-        final result = UpdateResult(
-          success: true,
-          message: 'Update applied',
-        );
+        final result = UpdateResult(success: true, message: 'Update applied');
         final output = result.toString();
         expect(output, contains('Update successful'));
         expect(output, isNot(contains('New version')));

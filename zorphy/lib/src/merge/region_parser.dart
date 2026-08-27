@@ -54,14 +54,14 @@ class RegionParser {
       if (trimmed.startsWith(preserveEnd)) {
         if (preserveStack.isNotEmpty) {
           final start = preserveStack.removeLast();
-          regions.add(SourceRegion(
-            startLine: start.line,
-            endLine: i + 1,
-            type: RegionType.preserved,
-            content: lines
-                .sublist(start.line, i + 1)
-                .join('\n'),
-          ));
+          regions.add(
+            SourceRegion(
+              startLine: start.line,
+              endLine: i + 1,
+              type: RegionType.preserved,
+              content: lines.sublist(start.line, i + 1).join('\n'),
+            ),
+          );
         }
         continue;
       }
@@ -75,14 +75,14 @@ class RegionParser {
       if (trimmed.startsWith(generatedEnd)) {
         if (genStack.isNotEmpty) {
           final start = genStack.removeLast();
-          regions.add(SourceRegion(
-            startLine: start.line,
-            endLine: i + 1,
-            type: RegionType.generated,
-            content: lines
-                .sublist(start.line, i + 1)
-                .join('\n'),
-          ));
+          regions.add(
+            SourceRegion(
+              startLine: start.line,
+              endLine: i + 1,
+              type: RegionType.generated,
+              content: lines.sublist(start.line, i + 1).join('\n'),
+            ),
+          );
         }
         continue;
       }
@@ -92,8 +92,8 @@ class RegionParser {
     // We don't create explicit user regions — the merge engine treats
     // gaps between regions as user code.
 
-        regions.sort((a, b) => a.startLine.compareTo(b.startLine));
-return regions;
+    regions.sort((a, b) => a.startLine.compareTo(b.startLine));
+    return regions;
   }
 
   /// Extract preserved regions from a generated block's content.
@@ -113,9 +113,9 @@ return regions;
         stack.add(i);
       } else if (trimmed.startsWith(preserveEnd) && stack.isNotEmpty) {
         final start = stack.removeLast();
-        blocks.add(PreservedBlock(
-          content: lines.sublist(start, i + 1).join('\n'),
-        ));
+        blocks.add(
+          PreservedBlock(content: lines.sublist(start, i + 1).join('\n')),
+        );
       }
     }
 

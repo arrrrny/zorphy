@@ -30,10 +30,13 @@ void main() {
 
       expect(result.dryRun, isTrue);
       expect(result.deletedCount, equals(2));
-      expect(result.deletedFiles, containsAll([
-        '${libDir.path}/user.zorphy.dart',
-        '${libDir.path}/product.zorphy.dart',
-      ]));
+      expect(
+        result.deletedFiles,
+        containsAll([
+          '${libDir.path}/user.zorphy.dart',
+          '${libDir.path}/product.zorphy.dart',
+        ]),
+      );
       expect(result.regeneratedCount, equals(0));
       expect(result.buildExitCode, isNull);
 
@@ -49,7 +52,8 @@ void main() {
       final service = DoctorService(projectDir: tempPath);
       final result = await service.run(dryRun: true);
 
-      final json = jsonDecode(jsonEncode(result.toJson())) as Map<String, dynamic>;
+      final json =
+          jsonDecode(jsonEncode(result.toJson())) as Map<String, dynamic>;
       expect(json['dryRun'], isTrue);
       expect(json['deletedCount'], equals(1));
       expect(json['health'], equals('healthy'));
@@ -68,12 +72,15 @@ void main() {
           processCalled = true;
           receivedWorkingDir = workingDirectory;
           expect(executable, equals('dart'));
-          expect(args, containsAll([
-            'run',
-            'build_runner',
-            'build',
-            '--delete-conflicting-outputs',
-          ]));
+          expect(
+            args,
+            containsAll([
+              'run',
+              'build_runner',
+              'build',
+              '--delete-conflicting-outputs',
+            ]),
+          );
           return ProcessResult(0, 0, 'Build succeeded', '');
         },
       );
@@ -101,9 +108,7 @@ void main() {
           // Simulate build_runner recreating the file with InvalidType
           File('${libDir.path}/user.zorphy.dart')
             ..createSync()
-            ..writeAsStringSync(
-              'class User { InvalidType? field; }',
-            );
+            ..writeAsStringSync('class User { InvalidType? field; }');
           return ProcessResult(0, 0, 'Build succeeded', '');
         },
       );
@@ -194,8 +199,12 @@ void main() {
 
       final output = result.toString();
       expect(output, contains('dry-run (no changes made)'));
-      expect(output,
-          contains('Would run: dart run build_runner build --delete-conflicting-outputs'));
+      expect(
+        output,
+        contains(
+          'Would run: dart run build_runner build --delete-conflicting-outputs',
+        ),
+      );
     });
 
     test('toString formats warnings result correctly', () {
@@ -212,10 +221,7 @@ void main() {
     });
 
     test('toString formats unhealthy result correctly', () {
-      final result = DoctorResult(
-        projectDir: '/tmp/test',
-        buildExitCode: 1,
-      );
+      final result = DoctorResult(projectDir: '/tmp/test', buildExitCode: 1);
 
       final output = result.toString();
       expect(output, contains('Project health: unhealthy'));
@@ -241,10 +247,7 @@ void main() {
     });
 
     test('health is healthy when no issues', () {
-      final result = DoctorResult(
-        projectDir: '/tmp',
-        buildExitCode: 0,
-      );
+      final result = DoctorResult(projectDir: '/tmp', buildExitCode: 0);
       expect(result.health, equals(DoctorHealth.healthy));
     });
 
@@ -258,10 +261,7 @@ void main() {
     });
 
     test('health is unhealthy when build fails', () {
-      final result = DoctorResult(
-        projectDir: '/tmp',
-        buildExitCode: 1,
-      );
+      final result = DoctorResult(projectDir: '/tmp', buildExitCode: 1);
       expect(result.health, equals(DoctorHealth.unhealthy));
     });
   });

@@ -46,9 +46,10 @@ void main() {
       expect(src, contains('is_'));
       expect(src, contains('de_AT'));
       expect(src, contains('zh_Hans'));
-      expect(src, contains(
-        "import 'package:json_annotation/json_annotation.dart';",
-      ));
+      expect(
+        src,
+        contains("import 'package:json_annotation/json_annotation.dart';"),
+      );
     });
 
     test('explicit member:wire pairs are emitted with @JsonValue', () async {

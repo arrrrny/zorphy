@@ -13,14 +13,14 @@ part 'interface_copywithfield_example.zorphy.dart';
 ///   - The generated `InterfaceCar` should have:
 ///     * `copyWithField` (all fields: make, model, year, doors)
 ///     * `copyWithVehicleField` (only Vehicle fields: make, model, year)
-@Zorphy(generateJson: true, nonSealed: true)
+@Zorphy(nonSealed: true)
 abstract class $Vehicle {
   String get make;
   String get model;
   int get year;
 }
 
-@Zorphy(generateJson: true)
+@zorphy
 abstract class $InterfaceCar implements $Vehicle {
   int get doors;
 }

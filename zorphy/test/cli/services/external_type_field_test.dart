@@ -59,9 +59,7 @@ void main() {
       await tmp.delete(recursive: true);
     });
 
-    Future<String> createEntityWithExternalField(
-      String refType,
-    ) async {
+    Future<String> createEntityWithExternalField(String refType) async {
       final creator = EntityCreator(baseOutputDir: tmp.path);
       final field = FieldDefinition.parse('url:$refType');
       final result = await creator.create(
@@ -75,41 +73,45 @@ void main() {
       return File(result.filePath).readAsString();
     }
 
-    test('external field emits plain type, no \$ prefix, no bogus import',
-        () async {
-      final src = await createEntityWithExternalField('!WebUri?');
+    test(
+      'external field emits plain type, no \$ prefix, no bogus import',
+      () async {
+        final src = await createEntityWithExternalField('!WebUri?');
 
-      // The field declaration must be the PLAIN type (no `\$` prefix, no
-      // `!` leak).
-      expect(
-        src,
-        contains('WebUri? get url;'),
-        reason: 'External type must be emitted verbatim without the `\$` '
-            'prefix or the `!` marker.',
-      );
-      expect(
-        src,
-        isNot(contains(r'$!WebUri')),
-        reason: '`\$!WebUri` is the #349 defect — `!` was treated as part '
-            'of the type name and `\$`-prefixed by `_determinePrefix`.',
-      );
-      expect(
-        src,
-        isNot(contains(r'$WebUri')),
-        reason: 'External types are not entities — no `\$` prefix.',
-      );
-      // No entity import for the external type, and no bogus enum import.
-      expect(
-        src,
-        isNot(contains("import '../web_uri/web_uri.dart';")),
-        reason: 'No entity import must be resolved for an external type.',
-      );
-      expect(
-        src,
-        isNot(contains("import '../enums/index.dart';")),
-        reason: 'No enum import must be resolved for an external type.',
-      );
-    });
+        // The field declaration must be the PLAIN type (no `\$` prefix, no
+        // `!` leak).
+        expect(
+          src,
+          contains('WebUri? get url;'),
+          reason:
+              'External type must be emitted verbatim without the `\$` '
+              'prefix or the `!` marker.',
+        );
+        expect(
+          src,
+          isNot(contains(r'$!WebUri')),
+          reason:
+              '`\$!WebUri` is the #349 defect — `!` was treated as part '
+              'of the type name and `\$`-prefixed by `_determinePrefix`.',
+        );
+        expect(
+          src,
+          isNot(contains(r'$WebUri')),
+          reason: 'External types are not entities — no `\$` prefix.',
+        );
+        // No entity import for the external type, and no bogus enum import.
+        expect(
+          src,
+          isNot(contains("import '../web_uri/web_uri.dart';")),
+          reason: 'No entity import must be resolved for an external type.',
+        );
+        expect(
+          src,
+          isNot(contains("import '../enums/index.dart';")),
+          reason: 'No enum import must be resolved for an external type.',
+        );
+      },
+    );
 
     test('external non-nullable field emits plain type', () async {
       final src = await createEntityWithExternalField('!WebUri');
@@ -117,30 +119,32 @@ void main() {
       expect(src, isNot(contains(r'$WebUri')));
     });
 
-    test('external field next to entity field keeps sibling prefixing',
-        () async {
-      final creator = EntityCreator(baseOutputDir: tmp.path);
-      final result = await creator.create(
-        EntityConfig(
-          name: 'MixedHolder',
-          outputDir: tmp.path,
-          fields: [
-            FieldDefinition.parse('url:!WebUri?'),
-            FieldDefinition.parse('peer:SiblingEntity?'),
-          ],
-        ),
-      );
-      expect(result.isSuccess, isTrue, reason: result.error);
-      final src = await File(result.filePath).readAsString();
-      // External stays plain; forward-referenced sibling entity keeps the
-      // `$` prefix (existing behavior must not regress).
-      expect(src, contains('WebUri? get url;'));
-      expect(src, contains(r'$SiblingEntity? get peer;'));
-      // The sibling import is still resolved.
-      expect(
-        src,
-        contains("import '../sibling_entity/sibling_entity.dart';"),
-      );
-    });
+    test(
+      'external field next to entity field keeps sibling prefixing',
+      () async {
+        final creator = EntityCreator(baseOutputDir: tmp.path);
+        final result = await creator.create(
+          EntityConfig(
+            name: 'MixedHolder',
+            outputDir: tmp.path,
+            fields: [
+              FieldDefinition.parse('url:!WebUri?'),
+              FieldDefinition.parse('peer:SiblingEntity?'),
+            ],
+          ),
+        );
+        expect(result.isSuccess, isTrue, reason: result.error);
+        final src = await File(result.filePath).readAsString();
+        // External stays plain; forward-referenced sibling entity keeps the
+        // `$` prefix (existing behavior must not regress).
+        expect(src, contains('WebUri? get url;'));
+        expect(src, contains(r'$SiblingEntity? get peer;'));
+        // The sibling import is still resolved.
+        expect(
+          src,
+          contains("import '../sibling_entity/sibling_entity.dart';"),
+        );
+      },
+    );
   });
 }

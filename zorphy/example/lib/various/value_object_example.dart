@@ -17,7 +17,11 @@ abstract class $ParserOptions {
 }
 
 void main() {
-  final options = ParserOptions(separator: ',', trimWhitespace: true, maxDepth: 3);
+  final options = ParserOptions(
+    separator: ',',
+    trimWhitespace: true,
+    maxDepth: 3,
+  );
   final copy = options.copyWith(maxDepth: 5);
   print('options=$options copy=$copy options==copy: ${options == copy}');
 }

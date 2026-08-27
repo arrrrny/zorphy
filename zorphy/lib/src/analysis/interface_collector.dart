@@ -223,14 +223,14 @@ class InterfaceCollector {
     final headerRegex = RegExp(
       // Modifiers (any combination, in any order, separated by whitespace).
       r'(?:[\s]*(?:abstract|sealed|base|final|interface)[\s]+)*' +
-      r'class\s+' +
-      escapedName +
-      r'\b' +
-      // Everything up to the body `{`. We match `{` only at depth 0
-      // (outside generic `<...>`), but since RegExp has no recursion,
-      // we approximate by matching any char that isn't `{`. This works
-      // for zorphy source classes (no `{` in type bounds).
-      r'([^{]*)\{',
+          r'class\s+' +
+          escapedName +
+          r'\b' +
+          // Everything up to the body `{`. We match `{` only at depth 0
+          // (outside generic `<...>`), but since RegExp has no recursion,
+          // we approximate by matching any char that isn't `{`. This works
+          // for zorphy source classes (no `{` in type bounds).
+          r'([^{]*)\{',
       multiLine: true,
     );
     final headerMatch = headerRegex.firstMatch(sourceText);
@@ -284,7 +284,8 @@ class InterfaceCollector {
       // or a `$`-prefixed name (e.g., `$AuthenticationResult`).
       // `allAnnotatedClasses` keys by the source class name which
       // includes the `$` prefix (e.g., `$AuthenticationResult`).
-      final element = allAnnotatedClasses[name] ??
+      final element =
+          allAnnotatedClasses[name] ??
           allAnnotatedClasses['\$$name'] ??
           allAnnotatedClasses['\$\$$name'];
       if (element == null) {

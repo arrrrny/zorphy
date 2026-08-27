@@ -95,13 +95,14 @@ void main() {
   group('behavior: runner executed in example package context', () {
     test('all runtime checks pass', () async {
       if (!runner.existsSync()) {
-        fail('Behavior runner missing: example/tool/issue_131_behavior_check.dart');
+        fail(
+          'Behavior runner missing: example/tool/issue_131_behavior_check.dart',
+        );
       }
-      final result = await Process.run(
-        'dart',
-        ['run', 'tool/issue_131_behavior_check.dart'],
-        workingDirectory: 'example',
-      );
+      final result = await Process.run('dart', [
+        'run',
+        'tool/issue_131_behavior_check.dart',
+      ], workingDirectory: 'example');
       final stdoutText = result.stdout as String;
       // Surface the runner output for CI debugging on failure.
       expect(stdoutText, contains('ALL CHECKS PASSED'));

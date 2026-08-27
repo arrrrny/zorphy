@@ -71,7 +71,7 @@ ClassMetadata _concreteMeta({
     classElement: _StubClassElement(name),
     agentDirectiveInfo: const AgentDirectiveInfo(),
     namedConstructors: const [],
-      allAnnotatedClasses: const {},
+    allAnnotatedClasses: const {},
   );
 }
 
@@ -131,9 +131,7 @@ void main() {
       // value MUST be emitted as `required this.name`.
       final meta = _concreteMeta(
         name: 'User',
-        fields: [
-          NameTypeClassComment('name', 'String', 'User'),
-        ],
+        fields: [NameTypeClassComment('name', 'String', 'User')],
       );
       final specs = generator.generateSpec(
         GenerationContext(metadata: meta, config: _bareConfig()),
@@ -148,10 +146,7 @@ void main() {
       expect(ctor, contains('required'));
       // Negative assertion: must NOT contain a plain named parameter
       // (i.e. `String name` without `this.`).
-      expect(
-        ctor,
-        isNot(contains(RegExp(r'String\s+name(?!\s*=\s*name)'))),
-      );
+      expect(ctor, isNot(contains(RegExp(r'String\s+name(?!\s*=\s*name)'))));
     });
 
     test(
@@ -161,9 +156,7 @@ void main() {
         // as `this.email` (no `required`, but still `this.`-prefixed).
         final meta = _concreteMeta(
           name: 'Account',
-          fields: [
-            NameTypeClassComment('email', 'String?', 'Account'),
-          ],
+          fields: [NameTypeClassComment('email', 'String?', 'Account')],
         );
         final specs = generator.generateSpec(
           GenerationContext(metadata: meta, config: _bareConfig()),
@@ -203,35 +196,32 @@ void main() {
       expect(ctor, contains('this.nickname'));
     });
 
-    test(
-      'field WITH default value keeps explicit initializer form',
-      () {
-        // A field with a JsonKey defaultValue keeps the
-        // `this.<field> = <field> ?? <default>` initializer form
-        // (Parameter.toThis cannot carry a default initializer).
-        final meta = _concreteMeta(
-          name: 'Config',
-          fields: [
-            NameTypeClassComment(
-              'retries',
-              'int',
-              'Config',
-              jsonKeyInfo: const JsonKeyInfo(defaultValue: 3),
-            ),
-          ],
-        );
-        final specs = generator.generateSpec(
-          GenerationContext(metadata: meta, config: _bareConfig()),
-        );
-        final emitted = _emitClass(specs.first as Class);
-        final ctor = _extractConstructor(emitted, 'Config');
+    test('field WITH default value keeps explicit initializer form', () {
+      // A field with a JsonKey defaultValue keeps the
+      // `this.<field> = <field> ?? <default>` initializer form
+      // (Parameter.toThis cannot carry a default initializer).
+      final meta = _concreteMeta(
+        name: 'Config',
+        fields: [
+          NameTypeClassComment(
+            'retries',
+            'int',
+            'Config',
+            jsonKeyInfo: const JsonKeyInfo(defaultValue: 3),
+          ),
+        ],
+      );
+      final specs = generator.generateSpec(
+        GenerationContext(metadata: meta, config: _bareConfig()),
+      );
+      final emitted = _emitClass(specs.first as Class);
+      final ctor = _extractConstructor(emitted, 'Config');
 
-        // Default-value branch: parameter is named `retries`, and the
-        // initializer list contains `this.retries = retries ?? 3`.
-        expect(ctor, contains('retries'));
-        expect(emitted, contains('this.retries = retries ?? 3'));
-      },
-    );
+      // Default-value branch: parameter is named `retries`, and the
+      // initializer list contains `this.retries = retries ?? 3`.
+      expect(ctor, contains('retries'));
+      expect(emitted, contains('this.retries = retries ?? 3'));
+    });
 
     test('mixed default + non-default fields', () {
       // Combine both branches to ensure they coexist correctly:

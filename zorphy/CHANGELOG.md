@@ -1,3 +1,15 @@
+## [2.3.1] - 2026-08-27
+
+### Fix
+
+- CLI: escape special characters (apostrophes, backslashes, dollar signs) in
+  `@JsonKey(name:)` annotations when generating entity code (PR #133).
+- Generators: `copyWithField` on child classes with interfaces now uses the
+  parent's `Field<Parent, T>` type with `@override` instead of `covariant`,
+  keeping LSP-safe polymorphic dispatch via Dart's declaration-site covariance.
+- Generators: `copyWithField` on child classes handles ALL fields (parent + own)
+  — no need for separate `copyWith{Interface}Field` methods.
+
 ## [2.3.0] - 2026-08-23
 
 ### Feat

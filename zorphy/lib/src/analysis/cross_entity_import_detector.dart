@@ -119,9 +119,7 @@ class CrossEntityImportDetector {
   /// Matches any identifier starting with `$` followed by an uppercase
   /// letter and more word characters. The optional leading `final ` is
   /// consumed (and stripped) when present.
-  static final _fieldTypeRegex = RegExp(
-    r'(?:final\s+)?\$[A-Z][a-zA-Z0-9_]*',
-  );
+  static final _fieldTypeRegex = RegExp(r'(?:final\s+)?\$[A-Z][a-zA-Z0-9_]*');
 
   /// Detects missing cross-entity imports in [source].
   ///
@@ -225,8 +223,7 @@ class CrossEntityImportDetector {
   ///
   /// Exposed publicly so callers (and tests) can reuse the same
   /// regex the detector uses.
-  static Set<String> scanImportUris(String source) =>
-      _scanImportUris(source);
+  static Set<String> scanImportUris(String source) => _scanImportUris(source);
 
   static Set<String> _scanImportUris(String source) {
     final uris = <String>{};
@@ -272,7 +269,8 @@ class CrossEntityImportDetector {
           source.startsWith('import', i) &&
           (i + 6 >= source.length || !_isWordChar(source[i + 6]))) {
         final before = i == 0 ? ' ' : source[i - 1];
-        final isBoundary = before == ' ' ||
+        final isBoundary =
+            before == ' ' ||
             before == '\n' ||
             before == '\t' ||
             before == ';' ||

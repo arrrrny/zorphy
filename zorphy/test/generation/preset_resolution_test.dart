@@ -75,10 +75,7 @@ void main() {
 
     test('explicit flag overrides preset (lean + generatePatch)', () {
       final config = _resolve(
-        const AnnotationOptions(
-          preset: ZorphyPreset.lean,
-          generatePatch: true,
-        ),
+        const AnnotationOptions(preset: ZorphyPreset.lean, generatePatch: true),
       );
 
       expect(config.generatePatch, isTrue);
@@ -106,10 +103,7 @@ void main() {
         expect(config.generateJson, isFalse, reason: 'preset $preset');
       }
       final withJson = _resolve(
-        const AnnotationOptions(
-          preset: ZorphyPreset.lean,
-          generateJson: true,
-        ),
+        const AnnotationOptions(preset: ZorphyPreset.lean, generateJson: true),
       );
       expect(withJson.generateJson, isTrue);
     });

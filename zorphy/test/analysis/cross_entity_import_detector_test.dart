@@ -33,18 +33,20 @@ class PlainWidget extends StatelessWidget {}
         expect(result.hasMissing, isFalse);
       });
 
-      test('returns empty result when @Zorphy is mentioned only in a comment',
-          () {
-        // The pre-filter is `source.contains('@Zorphy')` — even a comment
-        // mention passes the pre-filter. Then the field-type regex scans
-        // for `\$Type` patterns and finds none, so no missing imports.
-        final result = CrossEntityImportDetector.detect('''
+      test(
+        'returns empty result when @Zorphy is mentioned only in a comment',
+        () {
+          // The pre-filter is `source.contains('@Zorphy')` — even a comment
+          // mention passes the pre-filter. Then the field-type regex scans
+          // for `\$Type` patterns and finds none, so no missing imports.
+          final result = CrossEntityImportDetector.detect('''
 // See @Zorphy docs for details.
 class Plain {}
 ''');
-        expect(result.detectedTypes, isEmpty);
-        expect(result.hasMissing, isFalse);
-      });
+          expect(result.detectedTypes, isEmpty);
+          expect(result.hasMissing, isFalse);
+        },
+      );
     });
 
     group('self-reference', () {
@@ -63,8 +65,11 @@ abstract class \$SelfRef {
         // so that the public field only exposes TRUE cross-entity
         // references (pointing at OTHER entities).
         expect(result.detectedTypes, isEmpty);
-        expect(result.hasMissing, isFalse,
-            reason: 'A class is always visible inside its own library');
+        expect(
+          result.hasMissing,
+          isFalse,
+          reason: 'A class is always visible inside its own library',
+        );
         expect(result.toGuidanceComment(), isNull);
       });
 
@@ -106,7 +111,10 @@ abstract class \$ArtifactStore {
         expect(result.hasMissing, isTrue);
         final comment = result.toGuidanceComment();
         expect(comment, isNotNull);
-        expect(comment!, contains("import '../artifact_ref/artifact_ref.dart';"));
+        expect(
+          comment!,
+          contains("import '../artifact_ref/artifact_ref.dart';"),
+        );
         expect(comment, contains('\$ArtifactRef'));
       });
 
@@ -184,8 +192,14 @@ abstract class \$Composite {
         expect(result.detectedTypes, {'\$ArtifactRef', '\$Issue117Ref'});
         expect(result.hasMissing, isTrue);
         final comment = result.toGuidanceComment()!;
-        expect(comment, contains("import '../artifact_ref/artifact_ref.dart';"));
-        expect(comment, contains("import '../issue117_ref/issue117_ref.dart';"));
+        expect(
+          comment,
+          contains("import '../artifact_ref/artifact_ref.dart';"),
+        );
+        expect(
+          comment,
+          contains("import '../issue117_ref/issue117_ref.dart';"),
+        );
       });
     });
 
@@ -203,8 +217,11 @@ abstract class \$ArtifactStore {
 }
 ''');
         expect(result.detectedTypes, {'\$ArtifactRef'});
-        expect(result.hasMissing, isFalse,
-            reason: 'The sibling is imported via a relative path');
+        expect(
+          result.hasMissing,
+          isFalse,
+          reason: 'The sibling is imported via a relative path',
+        );
         expect(result.toGuidanceComment(), isNull);
       });
 
@@ -222,10 +239,11 @@ abstract class \$ArtifactStore {
         expect(result.hasMissing, isFalse);
       });
 
-      test('does NOT flag when caller-supplied importUris include the sibling',
-          () {
-        final result = CrossEntityImportDetector.detect(
-          '''
+      test(
+        'does NOT flag when caller-supplied importUris include the sibling',
+        () {
+          final result = CrossEntityImportDetector.detect(
+            '''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'artifact_store.zorphy.dart';
 
@@ -234,19 +252,21 @@ abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
 }
 ''',
-          importUris: {
-            'package:zorphy_annotation/zorphy_annotation.dart',
-            '../artifact_ref/artifact_ref.dart',
-          },
-        );
-        expect(result.hasMissing, isFalse);
-      });
+            importUris: {
+              'package:zorphy_annotation/zorphy_annotation.dart',
+              '../artifact_ref/artifact_ref.dart',
+            },
+          );
+          expect(result.hasMissing, isFalse);
+        },
+      );
 
-      test('flags \$Ref even when ../other/artifact_ref.dart is imported (regression for finding #2)',
-          () {
-        // The canonical pattern `ref/ref.dart` should NOT match
-        // `../other/artifact_ref.dart` even though it ends with `ref.dart`.
-        final result = CrossEntityImportDetector.detect('''
+      test(
+        'flags \$Ref even when ../other/artifact_ref.dart is imported (regression for finding #2)',
+        () {
+          // The canonical pattern `ref/ref.dart` should NOT match
+          // `../other/artifact_ref.dart` even though it ends with `ref.dart`.
+          final result = CrossEntityImportDetector.detect('''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../other/artifact_ref.dart';
 part 'holder.zorphy.dart';
@@ -256,17 +276,23 @@ abstract class \$Holder {
   \$Ref get ref;
 }
 ''');
-        expect(result.detectedTypes, {'\$Ref'});
-        expect(result.hasMissing, isTrue,
-            reason: 'artifact_ref.dart does not match the canonical ref/ref.dart pattern');
-        final comment = result.toGuidanceComment()!;
-        expect(comment, contains("import '../ref/ref.dart';"));
-      });
+          expect(result.detectedTypes, {'\$Ref'});
+          expect(
+            result.hasMissing,
+            isTrue,
+            reason:
+                'artifact_ref.dart does not match the canonical ref/ref.dart pattern',
+          );
+          final comment = result.toGuidanceComment()!;
+          expect(comment, contains("import '../ref/ref.dart';"));
+        },
+      );
 
-      test('does NOT flag when the canonical snake/snake.dart import is present (regression for finding #2)',
-          () {
-        // Verify that the canonical `ref/ref.dart` pattern DOES match correctly.
-        final result = CrossEntityImportDetector.detect('''
+      test(
+        'does NOT flag when the canonical snake/snake.dart import is present (regression for finding #2)',
+        () {
+          // Verify that the canonical `ref/ref.dart` pattern DOES match correctly.
+          final result = CrossEntityImportDetector.detect('''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../ref/ref.dart';
 part 'holder.zorphy.dart';
@@ -276,35 +302,51 @@ abstract class \$Holder {
   \$Ref get ref;
 }
 ''');
-        expect(result.detectedTypes, {'\$Ref'});
-        expect(result.hasMissing, isFalse,
-            reason: 'The canonical ref/ref.dart import is present');
-      });
+          expect(result.detectedTypes, {'\$Ref'});
+          expect(
+            result.hasMissing,
+            isFalse,
+            reason: 'The canonical ref/ref.dart import is present',
+          );
+        },
+      );
     });
 
     group('snake_case conversion', () {
       test('converts simple PascalCase names', () {
-        expect(CrossEntityImportDetector.toSnakeCase('ArtifactRef'),
-            'artifact_ref');
-        expect(CrossEntityImportDetector.toSnakeCase('Issue117Ref'),
-            'issue117_ref');
+        expect(
+          CrossEntityImportDetector.toSnakeCase('ArtifactRef'),
+          'artifact_ref',
+        );
+        expect(
+          CrossEntityImportDetector.toSnakeCase('Issue117Ref'),
+          'issue117_ref',
+        );
       });
 
-      test('converts acronym-style names matching NamingUtils behavior (regression for finding #3)',
-          () {
-        // The toSnakeCase implementation now matches NamingUtils.toSnakeCase
-        // from the CLI, which inserts `_` before EVERY uppercase letter
-        // (except the first). This means `HTTPServer` -> `h_t_t_p_server`,
-        // not `httpserver` or `http_server`.
-        expect(CrossEntityImportDetector.toSnakeCase('HTTPServer'),
+      test(
+        'converts acronym-style names matching NamingUtils behavior (regression for finding #3)',
+        () {
+          // The toSnakeCase implementation now matches NamingUtils.toSnakeCase
+          // from the CLI, which inserts `_` before EVERY uppercase letter
+          // (except the first). This means `HTTPServer` -> `h_t_t_p_server`,
+          // not `httpserver` or `http_server`.
+          expect(
+            CrossEntityImportDetector.toSnakeCase('HTTPServer'),
             'h_t_t_p_server',
-            reason: 'Should match NamingUtils behavior for acronyms');
-        expect(CrossEntityImportDetector.toSnakeCase('ArtifactRef'),
-            'artifact_ref');
-        expect(CrossEntityImportDetector.toSnakeCase('XMLParser'),
+            reason: 'Should match NamingUtils behavior for acronyms',
+          );
+          expect(
+            CrossEntityImportDetector.toSnakeCase('ArtifactRef'),
+            'artifact_ref',
+          );
+          expect(
+            CrossEntityImportDetector.toSnakeCase('XMLParser'),
             'x_m_l_parser',
-            reason: 'Each uppercase letter gets its own underscore');
-      });
+            reason: 'Each uppercase letter gets its own underscore',
+          );
+        },
+      );
 
       test('handles single-word names', () {
         expect(CrossEntityImportDetector.toSnakeCase('User'), 'user');
@@ -335,14 +377,22 @@ import 'real.dart';
 // Another commented import: import "also_commented.dart";
 ''');
         expect(uris, contains('real.dart'));
-        expect(uris, isNot(contains('commented_out.dart')),
-            reason: 'Line-commented imports should be excluded');
-        expect(uris, isNot(contains('also_commented.dart')),
-            reason: 'Line-commented imports should be excluded');
+        expect(
+          uris,
+          isNot(contains('commented_out.dart')),
+          reason: 'Line-commented imports should be excluded',
+        );
+        expect(
+          uris,
+          isNot(contains('also_commented.dart')),
+          reason: 'Line-commented imports should be excluded',
+        );
       });
 
-      test('excludes imports in block comments (regression for finding #1)', () {
-        final uris = CrossEntityImportDetector.scanImportUris('''
+      test(
+        'excludes imports in block comments (regression for finding #1)',
+        () {
+          final uris = CrossEntityImportDetector.scanImportUris('''
 /* import 'block_commented.dart'; */
 import 'real.dart';
 /*
@@ -350,25 +400,41 @@ import 'real.dart';
   import "multi_line_commented.dart";
 */
 ''');
-        expect(uris, contains('real.dart'));
-        expect(uris, isNot(contains('block_commented.dart')),
-            reason: 'Block-commented imports should be excluded');
-        expect(uris, isNot(contains('multi_line_commented.dart')),
-            reason: 'Block-commented imports should be excluded');
-      });
+          expect(uris, contains('real.dart'));
+          expect(
+            uris,
+            isNot(contains('block_commented.dart')),
+            reason: 'Block-commented imports should be excluded',
+          );
+          expect(
+            uris,
+            isNot(contains('multi_line_commented.dart')),
+            reason: 'Block-commented imports should be excluded',
+          );
+        },
+      );
 
-      test('excludes imports in string literals (regression for finding #1)', () {
-        final uris = CrossEntityImportDetector.scanImportUris('''
+      test(
+        'excludes imports in string literals (regression for finding #1)',
+        () {
+          final uris = CrossEntityImportDetector.scanImportUris('''
 String example = "import 'not_a_real_import.dart';";
 import 'real.dart';
 final doc = 'Usage: import "fake_import.dart";';
 ''');
-        expect(uris, contains('real.dart'));
-        expect(uris, isNot(contains('not_a_real_import.dart')),
-            reason: 'Imports in string literals should be excluded');
-        expect(uris, isNot(contains('fake_import.dart')),
-            reason: 'Imports in string literals should be excluded');
-      });
+          expect(uris, contains('real.dart'));
+          expect(
+            uris,
+            isNot(contains('not_a_real_import.dart')),
+            reason: 'Imports in string literals should be excluded',
+          );
+          expect(
+            uris,
+            isNot(contains('fake_import.dart')),
+            reason: 'Imports in string literals should be excluded',
+          );
+        },
+      );
     });
 
     group('guidance comment format', () {
@@ -386,10 +452,8 @@ abstract class \$ArtifactStore {
         // The header lines should be stable so downstream tools can
         // detect+parse the guidance comment.
         expect(comment, contains('Cross-entity references detected.'));
-        expect(comment,
-            contains('Part files inherit imports from their'));
-        expect(comment,
-            contains('add these imports to <name>.dart'));
+        expect(comment, contains('Part files inherit imports from their'));
+        expect(comment, contains('add these imports to <name>.dart'));
       });
 
       test('emits one import line per missing sibling', () {
@@ -429,7 +493,10 @@ abstract class \$Holder {
         // The suggested import is a relative path that works for the
         // canonical zorphy entity layout: <entity_dir>/<entity_dir>.dart
         // (e.g. `entities/artifact_ref/artifact_ref.dart`).
-        expect(comment, contains("import '../artifact_ref/artifact_ref.dart';"));
+        expect(
+          comment,
+          contains("import '../artifact_ref/artifact_ref.dart';"),
+        );
       });
     });
 
@@ -462,8 +529,10 @@ abstract class \$ArtifactStoreResult {
         expect(result.detectedTypes, {'\$ArtifactRef'});
         expect(result.hasMissing, isTrue);
         final comment = result.toGuidanceComment()!;
-        expect(comment,
-            contains("import '../artifact_ref/artifact_ref.dart';"));
+        expect(
+          comment,
+          contains("import '../artifact_ref/artifact_ref.dart';"),
+        );
         expect(comment, contains('\$ArtifactRef'));
       });
 

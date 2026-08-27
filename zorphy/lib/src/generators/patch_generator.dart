@@ -15,7 +15,8 @@ class PatchGenerator extends ConcreteClassGenerator {
     if (!context.config.generatePatch) return false;
     // NonSealed abstract bases need Patch because parent entities
     // reference them in their own Patch generation (withXxxPatch methods).
-    if (context.metadata.isAbstract && !context.metadata.nonSealed) return false;
+    if (context.metadata.isAbstract && !context.metadata.nonSealed)
+      return false;
     return context.metadata.allFields.isNotEmpty ||
         context.metadata.isInParentExplicitSubtypes;
   }
@@ -176,7 +177,8 @@ class PatchClassGenerator extends ConcreteClassGenerator {
     if (!context.config.generatePatch) return false;
     // NonSealed abstract bases need Patch because parent entities
     // reference them in their own Patch generation (withXxxPatch methods).
-    if (context.metadata.isAbstract && !context.metadata.nonSealed) return false;
+    if (context.metadata.isAbstract && !context.metadata.nonSealed)
+      return false;
     return context.metadata.allFields.isNotEmpty ||
         context.metadata.isInParentExplicitSubtypes;
   }
@@ -197,26 +199,28 @@ class PatchClassGenerator extends ConcreteClassGenerator {
       // parameterized entity type in PatchBase (e.g. BasePatch<T, U extends
       // num> extends PatchBase<Base<T, U>, Base$>). The field enum stays
       // unparameterized.
-      final genericParams = metadata.generics
-          .map((g) => g.toString())
-          .toList();
+      final genericParams = metadata.generics.map((g) => g.toString()).toList();
       final genericDecl = genericParams.isEmpty
           ? ''
           : '<${genericParams.join(', ')}>';
       final genericArgs = genericParams.isEmpty
           ? ''
           : '<${metadata.generics.map((g) => g.name).join(', ')}>';
-      final stub = Code('abstract class ${metadata.cleanName}Patch'
-          '$genericDecl extends PatchBase<$cleanName$genericArgs, '
-          '${metadata.cleanName}\$> {}');
+      final stub = Code(
+        'abstract class ${metadata.cleanName}Patch'
+        '$genericDecl extends PatchBase<$cleanName$genericArgs, '
+        '${metadata.cleanName}\$> {}',
+      );
       if (metadata.allFields.isEmpty) {
         // Fieldless subtype: the stub references ${cleanName}$ but
         // getEnumPropertyList emits nothing for empty fields — emit the
         // same placeholder enum getPatchClass uses for fieldless classes.
         return [
           stub,
-          Code('/// Placeholder field enum for fieldless [$cleanName].\n'
-              'enum ${metadata.cleanName}\$ { none }'),
+          Code(
+            '/// Placeholder field enum for fieldless [$cleanName].\n'
+            'enum ${metadata.cleanName}\$ { none }',
+          ),
         ];
       }
       return [stub];
@@ -244,9 +248,9 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
     return context.config.generatePatch &&
         (context.metadata.isAbstract && context.metadata.nonSealed
             ? context.metadata.allFields.isNotEmpty ||
-                context.metadata.isInParentExplicitSubtypes
+                  context.metadata.isInParentExplicitSubtypes
             : !context.metadata.isAbstract &&
-                context.metadata.allFields.isNotEmpty);
+                  context.metadata.allFields.isNotEmpty);
   }
 
   @override

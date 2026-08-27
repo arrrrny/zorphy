@@ -26,19 +26,25 @@ class AstDiff {
     final existingDecls = extractDeclarationsFromSource(existingSource);
     final generatedDecls = extractDeclarationsFromSource(generatedSource);
 
-    final existingByName = {for (final d in existingDecls) '${d.kind}:${d.name}': d};
-    final generatedByName = {for (final d in generatedDecls) '${d.kind}:${d.name}': d};
+    final existingByName = {
+      for (final d in existingDecls) '${d.kind}:${d.name}': d,
+    };
+    final generatedByName = {
+      for (final d in generatedDecls) '${d.kind}:${d.name}': d,
+    };
 
     // Find modifications and removals.
     for (final existing in existingDecls) {
       final generated = generatedByName['${existing.kind}:${existing.name}'];
       if (generated == null) {
-        entries.add(DiffEntry(
-          description: 'Removed: ${existing.kind} ${existing.name}',
-          type: DiffType.removed,
-          oldLine: existing.startLine,
-          newLine: -1,
-        ));
+        entries.add(
+          DiffEntry(
+            description: 'Removed: ${existing.kind} ${existing.name}',
+            type: DiffType.removed,
+            oldLine: existing.startLine,
+            newLine: -1,
+          ),
+        );
       } else {
         final oldContent = existingLines
             .sublist(existing.startLine, existing.endLine)
@@ -47,12 +53,14 @@ class AstDiff {
             .sublist(generated.startLine, generated.endLine)
             .join('\n');
         if (oldContent != newContent) {
-          entries.add(DiffEntry(
-            description: 'Modified: ${existing.kind} ${existing.name}',
-            type: DiffType.modified,
-            oldLine: existing.startLine,
-            newLine: generated.startLine,
-          ));
+          entries.add(
+            DiffEntry(
+              description: 'Modified: ${existing.kind} ${existing.name}',
+              type: DiffType.modified,
+              oldLine: existing.startLine,
+              newLine: generated.startLine,
+            ),
+          );
         }
       }
     }
@@ -60,29 +68,35 @@ class AstDiff {
     // Find additions.
     for (final generated in generatedDecls) {
       if (!existingByName.containsKey('${generated.kind}:${generated.name}')) {
-        entries.add(DiffEntry(
-          description: 'Added: ${generated.kind} ${generated.name}',
-          type: DiffType.added,
-          oldLine: -1,
-          newLine: generated.startLine,
-        ));
+        entries.add(
+          DiffEntry(
+            description: 'Added: ${generated.kind} ${generated.name}',
+            type: DiffType.added,
+            oldLine: -1,
+            newLine: generated.startLine,
+          ),
+        );
       }
     }
 
     // Check for header changes.
-    final existingHeaderEnd =
-        existingDecls.isEmpty ? existingLines.length : existingDecls.first.startLine;
-    final generatedHeaderEnd =
-        generatedDecls.isEmpty ? generatedLines.length : generatedDecls.first.startLine;
+    final existingHeaderEnd = existingDecls.isEmpty
+        ? existingLines.length
+        : existingDecls.first.startLine;
+    final generatedHeaderEnd = generatedDecls.isEmpty
+        ? generatedLines.length
+        : generatedDecls.first.startLine;
 
     if (existingLines.sublist(0, existingHeaderEnd).join('\n') !=
         generatedLines.sublist(0, generatedHeaderEnd).join('\n')) {
-      entries.add(DiffEntry(
-        description: 'Modified: file header (imports/comments)',
-        type: DiffType.modified,
-        oldLine: 0,
-        newLine: 0,
-      ));
+      entries.add(
+        DiffEntry(
+          description: 'Modified: file header (imports/comments)',
+          type: DiffType.modified,
+          oldLine: 0,
+          newLine: 0,
+        ),
+      );
     }
 
     return entries;

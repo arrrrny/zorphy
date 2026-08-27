@@ -62,7 +62,7 @@ ClassMetadata _concreteMeta({
     classElement: _StubClassElement(name),
     agentDirectiveInfo: const AgentDirectiveInfo(),
     namedConstructors: const [],
-      allAnnotatedClasses: const {},
+    allAnnotatedClasses: const {},
   );
 }
 
@@ -140,16 +140,11 @@ void main() {
         // JsonKey annotation.
         expect(
           emitted,
-          contains(
-            '@JsonKey(includeFromJson: false, includeToJson: false)',
-          ),
+          contains('@JsonKey(includeFromJson: false, includeToJson: false)'),
         );
         // The field declaration itself is preserved (so the $Foo
         // interface contract is still satisfied).
-        expect(
-          emitted,
-          contains('final void Function(WebUri? url)? onClick;'),
-        );
+        expect(emitted, contains('final void Function(WebUri? url)? onClick;'));
         // Non-function-typed fields are NOT annotated with the
         // skip-serialization JsonKey (no behavior change for them).
         expect(emitted, contains('final String id;'));
@@ -257,9 +252,7 @@ void main() {
         expect(matches, hasLength(1));
         expect(
           emitted,
-          contains(
-            '@JsonKey(includeFromJson: false, includeToJson: false)',
-          ),
+          contains('@JsonKey(includeFromJson: false, includeToJson: false)'),
         );
       },
     );
@@ -283,10 +276,7 @@ void main() {
 
       // No JsonKey annotations at all — none of these are function-typed
       // and the user didn't provide any.
-      expect(
-        emitted,
-        isNot(contains('@JsonKey')),
-      );
+      expect(emitted, isNot(contains('@JsonKey')));
     });
 
     test('various function-type shapes are all detected', () {
@@ -330,13 +320,7 @@ void main() {
       for (final entry in cases.entries) {
         final meta = _concreteMeta(
           name: 'Probe',
-          fields: [
-            NameTypeClassComment(
-              'f',
-              entry.key,
-              'Probe',
-            ),
-          ],
+          fields: [NameTypeClassComment('f', entry.key, 'Probe')],
         );
         final specs = generator.generateSpec(
           GenerationContext(metadata: meta, config: _jsonConfig()),

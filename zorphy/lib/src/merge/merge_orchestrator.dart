@@ -109,7 +109,9 @@ class MergeOrchestrator {
     final buffer = StringBuffer(safeFormat(generatedContent));
     for (final decl in userDecls) {
       buffer.writeln();
-      buffer.write(existingLines.sublist(decl.startLine, decl.endLine).join('\n'));
+      buffer.write(
+        existingLines.sublist(decl.startLine, decl.endLine).join('\n'),
+      );
     }
 
     return MergeResult(
@@ -134,7 +136,9 @@ class MergeOrchestrator {
     final oldLines = old.split('\n');
     final newLines = nu.split('\n');
     final buffer = StringBuffer();
-    final maxLen = oldLines.length > newLines.length ? oldLines.length : newLines.length;
+    final maxLen = oldLines.length > newLines.length
+        ? oldLines.length
+        : newLines.length;
     for (int i = 0; i < maxLen; i++) {
       final o = i < oldLines.length ? oldLines[i] : null;
       final n = i < newLines.length ? newLines[i] : null;

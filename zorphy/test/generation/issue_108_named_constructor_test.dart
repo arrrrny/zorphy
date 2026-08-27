@@ -72,7 +72,9 @@ GenerationConfig _bareConfig() {
 
 String _emitClass(Class cls) {
   final lib = Library((b) => b.body.add(cls));
-  return lib.accept(DartEmitter(allocator: Allocator.simplePrefixing())).toString();
+  return lib
+      .accept(DartEmitter(allocator: Allocator.simplePrefixing()))
+      .toString();
 }
 
 void main() {
@@ -80,9 +82,7 @@ void main() {
     test('generates a single named constructor with body', () {
       final meta = _concreteMeta(
         name: 'ContentWorld',
-        fields: [
-          NameTypeClassComment('name', 'String', 'ContentWorld'),
-        ],
+        fields: [NameTypeClassComment('name', 'String', 'ContentWorld')],
         namedConstructors: [
           const NamedConstructorInfo(
             name: 'world',
@@ -106,12 +106,13 @@ void main() {
     test('generates multiple named constructors', () {
       final meta = _concreteMeta(
         name: 'Port',
-        fields: [
-          NameTypeClassComment('port', 'int', 'Port'),
-        ],
+        fields: [NameTypeClassComment('port', 'int', 'Port')],
         namedConstructors: [
           const NamedConstructorInfo(name: 'http', body: 'assert(port == 80);'),
-          const NamedConstructorInfo(name: 'https', body: 'assert(port == 443);'),
+          const NamedConstructorInfo(
+            name: 'https',
+            body: 'assert(port == 443);',
+          ),
         ],
       );
       final context = GenerationContext(metadata: meta, config: _bareConfig());
@@ -131,7 +132,10 @@ void main() {
           NameTypeClassComment('port', 'int', 'Config'),
         ],
         namedConstructors: [
-          const NamedConstructorInfo(name: 'secure', body: 'assert(port == 443);'),
+          const NamedConstructorInfo(
+            name: 'secure',
+            body: 'assert(port == 443);',
+          ),
         ],
       );
       final context = GenerationContext(metadata: meta, config: _bareConfig());
@@ -145,9 +149,7 @@ void main() {
     test('no named constructors when list is empty', () {
       final meta = _concreteMeta(
         name: 'Simple',
-        fields: [
-          NameTypeClassComment('value', 'String', 'Simple'),
-        ],
+        fields: [NameTypeClassComment('value', 'String', 'Simple')],
       );
       final context = GenerationContext(metadata: meta, config: _bareConfig());
       final specs = ClassDeclarationGenerator().generateSpec(context);
@@ -160,9 +162,7 @@ void main() {
     test('factory named constructor emits a factory with plain params', () {
       final meta = _concreteMeta(
         name: 'ContentWorld',
-        fields: [
-          NameTypeClassComment('name', 'String', 'ContentWorld'),
-        ],
+        fields: [NameTypeClassComment('name', 'String', 'ContentWorld')],
         namedConstructors: [
           const NamedConstructorInfo(
             name: 'world',
@@ -176,8 +176,14 @@ void main() {
       final code = _emitClass(specs.first as Class);
       // Factory keyword present; the factory ctor uses a plain `name` param
       // (no field formal `this.name`), and the body constructs the instance.
-      expect(code, contains('factory ContentWorld.world({required String name})'));
-      expect(code, isNot(contains('ContentWorld.world({required String this.name})')));
+      expect(
+        code,
+        contains('factory ContentWorld.world({required String name})'),
+      );
+      expect(
+        code,
+        isNot(contains('ContentWorld.world({required String this.name})')),
+      );
       expect(code, contains('return ContentWorld(name: name)'));
     });
 

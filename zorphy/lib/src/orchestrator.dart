@@ -117,7 +117,10 @@ class Orchestrator {
     }
 
     // Phase 5: Assemble and emit via spec pipeline
-    return _emitViaSpecPipeline(allSpecs, pluginImports: pluginContext?.imports);
+    return _emitViaSpecPipeline(
+      allSpecs,
+      pluginImports: pluginContext?.imports,
+    );
   }
 
   /// Runs the plugin transform pass over collected specs.
@@ -136,10 +139,7 @@ class Orchestrator {
     ClassMetadata metadata,
     GenerationConfig config,
   ) {
-    final pluginContext = PluginContext(
-      metadata: metadata,
-      config: config,
-    );
+    final pluginContext = PluginContext(metadata: metadata, config: config);
     final orderedPlugins = registry.ordered();
 
     // Class decorators (empty set until annotation supports decorators field)
@@ -148,7 +148,8 @@ class Orchestrator {
     for (final plugin in orderedPlugins) {
       // Check if plugin should run for this class based on decoratorNames
       final pluginDecorators = plugin.decoratorNames;
-      final shouldRun = pluginDecorators.isEmpty ||
+      final shouldRun =
+          pluginDecorators.isEmpty ||
           classDecorators.any((d) => pluginDecorators.contains(d));
 
       if (!shouldRun) continue;
@@ -163,10 +164,7 @@ class Orchestrator {
             // Transform fields within the class.
             final transformedFields = <Field>[];
             for (final field in originalClass.fields) {
-              final fieldResult = plugin.transformField(
-                field,
-                pluginContext,
-              );
+              final fieldResult = plugin.transformField(field, pluginContext);
               transformedFields.add(fieldResult is Field ? fieldResult : field);
             }
             // Transform methods within the class.
@@ -176,8 +174,9 @@ class Orchestrator {
                 method,
                 pluginContext,
               );
-              transformedMethods
-                  .add(methodResult is Method ? methodResult : method);
+              transformedMethods.add(
+                methodResult is Method ? methodResult : method,
+              );
             }
             // Rebuild the class with transformed members.
             transformed = Class((c) {
@@ -232,7 +231,8 @@ class Orchestrator {
     // 1. Separate specs by category.
     Class? primaryClass;
     final memberSpecs = <Method>[]; // Method -> into Class
-    final classMemberCodes = <ClassMemberCode>[]; // ClassMemberCode -> into Class
+    final classMemberCodes =
+        <ClassMemberCode>[]; // ClassMemberCode -> into Class
     final topLevelSpecs = <Spec>[]; // Everything else -> library level
 
     for (final spec in specs) {

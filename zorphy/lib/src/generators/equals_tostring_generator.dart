@@ -73,10 +73,12 @@ class EqualsToStringGenerator extends ConcreteClassGenerator {
       m.annotations.add(refer('override'));
       m.name = 'operator ==';
       m.returns = refer('bool');
-      m.requiredParameters.add(Parameter((p) {
-        p.name = 'other';
-        p.type = refer('Object');
-      }));
+      m.requiredParameters.add(
+        Parameter((p) {
+          p.name = 'other';
+          p.type = refer('Object');
+        }),
+      );
       m.body = Code(body.join('\n'));
     });
   }
@@ -91,9 +93,7 @@ class EqualsToStringGenerator extends ConcreteClassGenerator {
     } else if (fields.length == 1) {
       body.add('return Object.hash(${fields[0].name}, 0);');
     } else if (fields.length <= 20) {
-      final fieldRefs = fields
-          .map((f) => 'this.${f.name}')
-          .join(', ');
+      final fieldRefs = fields.map((f) => 'this.${f.name}').join(', ');
       body.add('return Object.hash($fieldRefs);');
     } else {
       // Chunk into groups of 20
@@ -105,9 +105,7 @@ class EqualsToStringGenerator extends ConcreteClassGenerator {
         final start = c * chunkSize;
         final end = (start + chunkSize).clamp(0, fields.length);
         final chunkFields = fields.sublist(start, end);
-        final fieldRefs = chunkFields
-            .map((f) => 'this.${f.name}')
-            .join(', ');
+        final fieldRefs = chunkFields.map((f) => 'this.${f.name}').join(', ');
 
         if (chunkFields.length == 1) {
           parts.add('Object.hash($fieldRefs, 0)');

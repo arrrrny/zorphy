@@ -36,16 +36,15 @@ void main() {
   });
 
   group('autoId', () {
-    test('concrete constructor takes optional String? id defaulting to uuid',
-        () {
-      expect(autoIdOutput, contains('String? id,'));
-      expect(
-        autoIdOutput,
-        contains('this.id = id ?? const Uuid().v4()'),
-      );
-      // The id must NOT be a required toThis param.
-      expect(autoIdOutput, isNot(contains('required String this.id')));
-    });
+    test(
+      'concrete constructor takes optional String? id defaulting to uuid',
+      () {
+        expect(autoIdOutput, contains('String? id,'));
+        expect(autoIdOutput, contains('this.id = id ?? const Uuid().v4()'));
+        // The id must NOT be a required toThis param.
+        expect(autoIdOutput, isNot(contains('required String this.id')));
+      },
+    );
 
     test('final id field is emitted with the other fields', () {
       expect(autoIdOutput, contains('final String id;'));

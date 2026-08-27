@@ -61,7 +61,7 @@ ClassMetadata _baseMeta({
     isInParentExplicitSubtypes: false,
     classElement: _StubClassElement(name),
     agentDirectiveInfo: const AgentDirectiveInfo(),
-      allAnnotatedClasses: const {},
+    allAnnotatedClasses: const {},
   );
 }
 
@@ -91,7 +91,7 @@ ClassMetadata _subtypeMeta({
     isInParentExplicitSubtypes: true,
     classElement: _StubClassElement(name),
     agentDirectiveInfo: const AgentDirectiveInfo(),
-      allAnnotatedClasses: const {},
+    allAnnotatedClasses: const {},
   );
 }
 
@@ -135,10 +135,12 @@ String _emitSpecs(List<Spec> specs) {
       methods.add(spec);
     }
   }
-  final cls = Class((b) => b
-    ..name = 'Synthetic'
-    ..constructors.addAll(constructors)
-    ..methods.addAll(methods));
+  final cls = Class(
+    (b) => b
+      ..name = 'Synthetic'
+      ..constructors.addAll(constructors)
+      ..methods.addAll(methods),
+  );
   final lib = Library((b) => b.body.add(cls));
   return lib.accept(DartEmitter(useNullSafetySyntax: true)).toString();
 }
@@ -197,8 +199,7 @@ void main() {
       expect(emitted, contains("json['type'] = 'DisplayMode'"));
     });
 
-    test(
-        'subtype own toJson (via _addToJsonWithDiscriminator) uses inherited '
+    test('subtype own toJson (via _addToJsonWithDiscriminator) uses inherited '
         'typeKey + own subtypeWireValue', () {
       // The subtype inherits typeKey='type' from the base (resolved by
       // ClassAnalyzer._resolveInheritedTypeKey). In this unit test we
@@ -219,34 +220,32 @@ void main() {
       expect(emitted, isNot(contains("'DefaultMode'")));
     });
 
-    test('default behavior unchanged when typeKey/subtypeWireValue are null', () {
-      final meta = _baseMeta(
-        name: 'PaymentMethod',
-        subtypes: [
-          _subtype('CreditCard'),
-          _subtype('PayPal'),
-        ],
-      );
-      final specs = generator.generateSpec(
-        GenerationContext(metadata: meta, config: _jsonConfig()),
-      );
-      final emitted = _emitSpecs(specs);
+    test(
+      'default behavior unchanged when typeKey/subtypeWireValue are null',
+      () {
+        final meta = _baseMeta(
+          name: 'PaymentMethod',
+          subtypes: [_subtype('CreditCard'), _subtype('PayPal')],
+        );
+        final specs = generator.generateSpec(
+          GenerationContext(metadata: meta, config: _jsonConfig()),
+        );
+        final emitted = _emitSpecs(specs);
 
-      // Default key is __typename.
-      expect(emitted, contains("json['__typename']"));
-      // Default wire values are clean class names.
-      expect(emitted, contains("'CreditCard'"));
-      expect(emitted, contains("'PayPal'"));
-      expect(emitted, contains("'PaymentMethod'"));
-    });
+        // Default key is __typename.
+        expect(emitted, contains("json['__typename']"));
+        // Default wire values are clean class names.
+        expect(emitted, contains("'CreditCard'"));
+        expect(emitted, contains("'PayPal'"));
+        expect(emitted, contains("'PaymentMethod'"));
+      },
+    );
 
     test('_sanitizeJson strips the custom typeKey (not __typename)', () {
       final meta = _baseMeta(
         name: 'DisplayMode',
         typeKey: 'type',
-        subtypes: [
-          _subtype('DefaultMode', wireValue: 'DEFAULT_MODE'),
-        ],
+        subtypes: [_subtype('DefaultMode', wireValue: 'DEFAULT_MODE')],
       );
       final specs = generator.generateSpec(
         GenerationContext(metadata: meta, config: _jsonConfig()),
@@ -264,9 +263,7 @@ void main() {
         typeKey: 'type',
         isAbstract: true,
         nonSealed: false,
-        subtypes: [
-          _subtype('DefaultMode', wireValue: 'DEFAULT_MODE'),
-        ],
+        subtypes: [_subtype('DefaultMode', wireValue: 'DEFAULT_MODE')],
       );
       final specs = generator.generateSpec(
         GenerationContext(metadata: meta, config: _jsonConfig()),

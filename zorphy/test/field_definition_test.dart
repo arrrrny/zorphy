@@ -35,9 +35,7 @@ void main() {
     });
 
     test('parses wire name for GraphQL _and operator', () {
-      final f = FieldDefinition.parse(
-        'and:ProductFilterParameter:json=_and',
-      );
+      final f = FieldDefinition.parse('and:ProductFilterParameter:json=_and');
       expect(f.name, 'and');
       expect(f.type, 'ProductFilterParameter');
       expect(f.jsonName, '_and');

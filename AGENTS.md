@@ -3,6 +3,15 @@ For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
 <!-- SPECKIT END -->
 
+## Branch Strategy
+
+- **Default base for all PRs:** `master`
+- **Feature/fix branches:** Branch off master → PR to master
+- **development branch:** Scratch/backlog only (optional); NOT a merge target
+- **Release flow:** Merge to master with version bump + CHANGELOG = release
+- **CI requirements:** All jobs green + 1 review approval before merge
+- **No bulk dev→master PRs:** Each PR is individually curated with tests
+
 # Shared terminal (`pallet`)
 
 Long-running or user-visible commands (e.g. `dart run build_runner build`)

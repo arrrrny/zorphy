@@ -273,14 +273,22 @@ class \$User {
         generatedContent: generated,
       );
       // Verify the merged output contains exactly one END GENERATED marker
-      final endGeneratedCount = '// END GENERATED'.allMatches(result.content).length;
-      expect(endGeneratedCount, equals(1),
-          reason: 'Should have exactly one END GENERATED marker');
+      final endGeneratedCount = '// END GENERATED'
+          .allMatches(result.content)
+          .length;
+      expect(
+        endGeneratedCount,
+        equals(1),
+        reason: 'Should have exactly one END GENERATED marker',
+      );
 
       // Verify the preserved block appears exactly once
       final customCount = 'get custom =>'.allMatches(result.content).length;
-      expect(customCount, equals(1),
-          reason: 'Preserved block should appear exactly once');
+      expect(
+        customCount,
+        equals(1),
+        reason: 'Preserved block should appear exactly once',
+      );
     });
   });
 }

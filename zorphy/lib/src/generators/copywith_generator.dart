@@ -17,9 +17,7 @@ Set<String> _getCovariantFields(
 ) {
   var covariantFields = <String>{};
   for (var f in classFields) {
-    var classType = helpers.replaceDollarTypesWithConcrete(
-      f.type ?? 'dynamic',
-    );
+    var classType = helpers.replaceDollarTypesWithConcrete(f.type ?? 'dynamic');
     for (var iface in interfaces) {
       var ifaceField = iface.fields.cast<NameType?>().firstWhere(
         (x) => x?.name == f.name,
@@ -75,69 +73,78 @@ class CopyWithGenerator extends UniversalGenerator {
     final activeFields = fields.where((f) => !f.isGetterOnly).toList();
 
     // 1. Standard copyWith
-    specs.add(_buildCopyWithMethod(
-      activeFields,
-      classNameTrimmed,
-      hidePublicConstructor: context.config.hidePublicConstructor,
-      covariantFields: _getCovariantFields(
-        fields,
-        metadata.allValueTInterfaces,
+    specs.add(
+      _buildCopyWithMethod(
+        activeFields,
+        classNameTrimmed,
+        hidePublicConstructor: context.config.hidePublicConstructor,
+        covariantFields: _getCovariantFields(
+          fields,
+          metadata.allValueTInterfaces,
+        ),
       ),
-    ));
+    );
 
     // Field-selector copyWithField (issue #131): replaces a single
     // field picked by a typed `Field<E, T>` selector.
+    // On child classes with interfaces, use the parent's type in
+    // Field<Parent, T> (Dart's declaration-site covariance makes this
+    // accept both parent and child Field tokens without covariant).
+    String? parentEntityType;
+    if (metadata.allValueTInterfaces.isNotEmpty) {
+      final firstIface = metadata.allValueTInterfaces.first;
+      final ifaceName = firstIface.interfaceName;
+      if (ifaceName.startsWith(r'$') && !ifaceName.startsWith(r'$$')) {
+        parentEntityType = ifaceName.substring(1); // strip leading $
+      }
+    }
     specs.add(
       _buildCopyWithFieldMethod(
         activeFields,
         classNameTrimmed,
         metadata.generics.map((g) => g.name).toList(),
+        parentEntityType: parentEntityType,
       ),
     );
 
     // 2. Alias: copyWith{ClassName}
-    specs.add(_buildCopyWithAliasMethod(
-      activeFields,
-      classNameTrimmed,
-    ));
+    specs.add(_buildCopyWithAliasMethod(activeFields, classNameTrimmed));
 
     // 3. Function-based copyWithFn
     if (config.generateCopyWithFn) {
-      specs.add(_buildCopyWithFnMethod(
-        activeFields,
-        classNameTrimmed,
-      ));
+      specs.add(_buildCopyWithFnMethod(activeFields, classNameTrimmed));
     }
 
     // 4. Interface-scoped copyWith methods
-    specs.addAll(_buildInterfaceCopyWithMethods(
-      metadata.allValueTInterfaces,
-      metadata.allFields,
-      metadata.cleanName,
-      classNameTrimmed,
-      covariantFields: _getCovariantFields(
-        fields,
-        metadata.allValueTInterfaces,
-      ),
-    ));
-
-    // 4b. Interface-scoped copyWithField methods
-    specs.addAll(_buildInterfaceCopyWithFieldMethods(
-      metadata.allValueTInterfaces,
-      metadata.allFields,
-      metadata.cleanName,
-      classNameTrimmed,
-      metadata.generics.map((g) => g.name).toList(),
-    ));
-
-    // 5. Interface-scoped copyWithFn methods
-    if (config.generateCopyWithFn) {
-      specs.addAll(_buildInterfaceCopyWithFnMethods(
+    specs.addAll(
+      _buildInterfaceCopyWithMethods(
         metadata.allValueTInterfaces,
         metadata.allFields,
         metadata.cleanName,
         classNameTrimmed,
-      ));
+        covariantFields: _getCovariantFields(
+          fields,
+          metadata.allValueTInterfaces,
+        ),
+      ),
+    );
+
+    // 4b. Interface-scoped copyWithField methods — REMOVED.
+    // Child classes inherit copyWithField from the parent (which handles
+    // parent fields). For the child's own fields, use copyWith() directly.
+    // This avoids the type override violation (Field<Child, T> vs
+    // Field<Parent, T>) and keeps the API simple.
+
+    // 5. Interface-scoped copyWithFn methods
+    if (config.generateCopyWithFn) {
+      specs.addAll(
+        _buildInterfaceCopyWithFnMethods(
+          metadata.allValueTInterfaces,
+          metadata.allFields,
+          metadata.cleanName,
+          classNameTrimmed,
+        ),
+      );
     }
 
     return specs;
@@ -166,19 +173,21 @@ class CopyWithGenerator extends UniversalGenerator {
       );
       final nullableType =
           (fieldType.endsWith('?') ||
-                   fieldType == 'dynamic' ||
-                   fieldType.startsWith('dynamic<') ||
-                   fieldType.startsWith('dynamic '))
-              ? fieldType
-              : '$fieldType?';
-      params.add(Parameter((p) {
-        p.name = f.name;
-        p.type = refer(nullableType);
-        p.named = true;
-        if (covariantFields.contains(f.name)) {
-          p.covariant = true;
-        }
-      }));
+              fieldType == 'dynamic' ||
+              fieldType.startsWith('dynamic<') ||
+              fieldType.startsWith('dynamic '))
+          ? fieldType
+          : '$fieldType?';
+      params.add(
+        Parameter((p) {
+          p.name = f.name;
+          p.type = refer(nullableType);
+          p.named = true;
+          if (covariantFields.contains(f.name)) {
+            p.covariant = true;
+          }
+        }),
+      );
     }
 
     final body = <String>[];
@@ -225,11 +234,18 @@ class CopyWithGenerator extends UniversalGenerator {
   /// value of a nullable field. Selectors for unknown or getter-only
   /// fields throw an [ArgumentError] instead of silently returning
   /// `this`.
+  ///
+  /// When [parentEntityType] is provided (child class with interfaces),
+  /// the field parameter uses `Field<Parent, T>` instead of
+  /// `Field<Child, T>`, and the method is marked `@override`. This
+  /// keeps the override LSP-safe: both parent and child Field tokens
+  /// are accepted via Dart's declaration-site covariance.
   Method _buildCopyWithFieldMethod(
     List<NameTypeClassComment> fields,
     String classNameTrimmed,
-    List<String> genericNames,
-  ) {
+    List<String> genericNames, {
+    String? parentEntityType,
+  }) {
     final hasGenerics = genericNames.isNotEmpty;
     // The entity type as seen from inside the class body: parameterized
     // for generic entities so `{ClassName}Fields<T>` selectors assign
@@ -238,6 +254,10 @@ class CopyWithGenerator extends UniversalGenerator {
         ? '$classNameTrimmed<${genericNames.join(', ')}>'
         : classNameTrimmed;
     final valueTypeParam = _valueTypeParameterName(genericNames);
+
+    // For child classes with interfaces, use the parent's type in
+    // Field<Parent, T> to keep the override LSP-safe.
+    final fieldTypeEntity = parentEntityType ?? entityType;
 
     final body = <String>[];
     if (fields.isEmpty) {
@@ -271,6 +291,9 @@ class CopyWithGenerator extends UniversalGenerator {
         '/// Delegates to [copyWith]: the receiver is never mutated and a',
       );
       m.docs.add('/// null [value] keeps the current field value.');
+      if (parentEntityType != null) {
+        m.annotations.add(refer('override'));
+      }
       m.name = 'copyWithField';
       // Raw return type mirrors the existing copyWith emission: for
       // generic entities the copyWith constructor inference produces
@@ -278,14 +301,18 @@ class CopyWithGenerator extends UniversalGenerator {
       // type would require an unsafe cast.
       m.returns = refer(classNameTrimmed);
       m.types.add(refer(valueTypeParam));
-      m.requiredParameters.add(Parameter((p) {
-        p.name = 'field';
-        p.type = refer('Field<$entityType, $valueTypeParam>');
-      }));
-      m.requiredParameters.add(Parameter((p) {
-        p.name = 'value';
-        p.type = refer(valueTypeParam);
-      }));
+      m.requiredParameters.add(
+        Parameter((p) {
+          p.name = 'field';
+          p.type = refer('Field<$fieldTypeEntity, $valueTypeParam>');
+        }),
+      );
+      m.requiredParameters.add(
+        Parameter((p) {
+          p.name = 'value';
+          p.type = refer(valueTypeParam);
+        }),
+      );
       m.body = Code(body.join('\n'));
     });
   }
@@ -303,24 +330,24 @@ class CopyWithGenerator extends UniversalGenerator {
       );
       final nullableType =
           (fieldType.endsWith('?') ||
-                   fieldType == 'dynamic' ||
-                   fieldType.startsWith('dynamic<') ||
-                   fieldType.startsWith('dynamic '))
-              ? fieldType
-              : '$fieldType?';
-      params.add(Parameter((p) {
-        p.name = f.name;
-        p.type = refer(nullableType);
-        p.named = true;
-      }));
+              fieldType == 'dynamic' ||
+              fieldType.startsWith('dynamic<') ||
+              fieldType.startsWith('dynamic '))
+          ? fieldType
+          : '$fieldType?';
+      params.add(
+        Parameter((p) {
+          p.name = f.name;
+          p.type = refer(nullableType);
+          p.named = true;
+        }),
+      );
     }
 
     final body = <String>[];
     body.add('return copyWith(');
     if (fields.isNotEmpty) {
-      final paramStr = fields
-          .map((f) => '${f.name}: ${f.name}')
-          .join(', ');
+      final paramStr = fields.map((f) => '${f.name}: ${f.name}').join(', ');
       body.add('  $paramStr,');
     }
     body.add(');');
@@ -344,11 +371,13 @@ class CopyWithGenerator extends UniversalGenerator {
       final fieldType = helpers.replaceDollarTypesWithConcrete(
         f.type ?? 'dynamic',
       );
-      params.add(Parameter((p) {
-        p.name = f.name;
-        p.type = refer('$fieldType Function($fieldType)?');
-        p.named = true;
-      }));
+      params.add(
+        Parameter((p) {
+          p.name = f.name;
+          p.type = refer('$fieldType Function($fieldType)?');
+          p.named = true;
+        }),
+      );
     }
 
     final body = <String>[];
@@ -382,8 +411,7 @@ class CopyWithGenerator extends UniversalGenerator {
 
     for (var i in interfaces) {
       var interfaceName = i.interfaceName;
-      if (!interfaceName.startsWith("\$") ||
-          interfaceName.startsWith("\$\$")) {
+      if (!interfaceName.startsWith("\$") || interfaceName.startsWith("\$\$")) {
         continue;
       }
       var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
@@ -391,8 +419,7 @@ class CopyWithGenerator extends UniversalGenerator {
 
       var seenFields = <String>{};
       var interfaceFields = i.fields.where((f) {
-        if (classFieldNames.contains(f.name) &&
-            !seenFields.contains(f.name)) {
+        if (classFieldNames.contains(f.name) && !seenFields.contains(f.name)) {
           seenFields.add(f.name);
           return true;
         }
@@ -409,16 +436,17 @@ class CopyWithGenerator extends UniversalGenerator {
         var fieldType = helpers.replaceDollarTypesWithConcrete(
           classField.type ?? f.type ?? 'dynamic',
         );
-        var nullableType =
-            fieldType.endsWith('?') ? fieldType : '$fieldType?';
-        params.add(Parameter((p) {
-          p.name = f.name;
-          p.type = refer(nullableType);
-          p.named = true;
-          if (covariantFields.contains(f.name)) {
-            p.covariant = true;
-          }
-        }));
+        var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
+        params.add(
+          Parameter((p) {
+            p.name = f.name;
+            p.type = refer(nullableType);
+            p.named = true;
+            if (covariantFields.contains(f.name)) {
+              p.covariant = true;
+            }
+          }),
+        );
       }
 
       final body = <String>[];
@@ -429,12 +457,14 @@ class CopyWithGenerator extends UniversalGenerator {
       body.add('  $paramStr,');
       body.add(');');
 
-      methods.add(Method((m) {
-        m.name = 'copyWith$interfaceNameTrimmed';
-        m.returns = refer(classNameTrimmed);
-        m.optionalParameters.addAll(params);
-        m.body = Code(body.join('\n'));
-      }));
+      methods.add(
+        Method((m) {
+          m.name = 'copyWith$interfaceNameTrimmed';
+          m.returns = refer(classNameTrimmed);
+          m.optionalParameters.addAll(params);
+          m.body = Code(body.join('\n'));
+        }),
+      );
     }
 
     return methods;
@@ -459,8 +489,7 @@ class CopyWithGenerator extends UniversalGenerator {
 
     for (var i in interfaces) {
       var interfaceName = i.interfaceName;
-      if (!interfaceName.startsWith("\$") ||
-          interfaceName.startsWith("\$\$")) {
+      if (!interfaceName.startsWith("\$") || interfaceName.startsWith("\$\$")) {
         continue;
       }
       var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
@@ -468,8 +497,7 @@ class CopyWithGenerator extends UniversalGenerator {
 
       var seenFields = <String>{};
       var interfaceFields = i.fields.where((f) {
-        if (classFieldNames.contains(f.name) &&
-            !seenFields.contains(f.name)) {
+        if (classFieldNames.contains(f.name) && !seenFields.contains(f.name)) {
           seenFields.add(f.name);
           return true;
         }
@@ -497,32 +525,38 @@ class CopyWithGenerator extends UniversalGenerator {
       );
       body.add('}');
 
-      methods.add(Method((m) {
-        m.docs.add(
-          '/// Returns a copy of this entity with the $interfaceNameTrimmed [field] set to [value].',
-        );
-        m.docs.add('///');
-        m.docs.add(
-          '/// Delegates to [copyWith]: the receiver is never mutated and a',
-        );
-        m.docs.add('/// null [value] keeps the current field value.');
-        m.docs.add('///');
-        m.docs.add(
-          '/// Only fields exposed by the $interfaceNameTrimmed interface are accepted.',
-        );
-        m.name = 'copyWith${interfaceNameTrimmed}Field';
-        m.returns = refer(classNameTrimmed);
-        m.types.add(refer(valueTypeParam));
-        m.requiredParameters.add(Parameter((p) {
-          p.name = 'field';
-          p.type = refer('Field<$entityType, $valueTypeParam>');
-        }));
-        m.requiredParameters.add(Parameter((p) {
-          p.name = 'value';
-          p.type = refer(valueTypeParam);
-        }));
-        m.body = Code(body.join('\n'));
-      }));
+      methods.add(
+        Method((m) {
+          m.docs.add(
+            '/// Returns a copy of this entity with the $interfaceNameTrimmed [field] set to [value].',
+          );
+          m.docs.add('///');
+          m.docs.add(
+            '/// Delegates to [copyWith]: the receiver is never mutated and a',
+          );
+          m.docs.add('/// null [value] keeps the current field value.');
+          m.docs.add('///');
+          m.docs.add(
+            '/// Only fields exposed by the $interfaceNameTrimmed interface are accepted.',
+          );
+          m.name = 'copyWith${interfaceNameTrimmed}Field';
+          m.returns = refer(classNameTrimmed);
+          m.types.add(refer(valueTypeParam));
+          m.requiredParameters.add(
+            Parameter((p) {
+              p.name = 'field';
+              p.type = refer('Field<$entityType, $valueTypeParam>');
+            }),
+          );
+          m.requiredParameters.add(
+            Parameter((p) {
+              p.name = 'value';
+              p.type = refer(valueTypeParam);
+            }),
+          );
+          m.body = Code(body.join('\n'));
+        }),
+      );
     }
 
     return methods;
@@ -540,8 +574,7 @@ class CopyWithGenerator extends UniversalGenerator {
 
     for (var i in interfaces) {
       var interfaceName = i.interfaceName;
-      if (!interfaceName.startsWith("\$") ||
-          interfaceName.startsWith("\$\$")) {
+      if (!interfaceName.startsWith("\$") || interfaceName.startsWith("\$\$")) {
         continue;
       }
       var interfaceNameTrimmed = interfaceName.replaceAll("\$", "");
@@ -567,13 +600,14 @@ class CopyWithGenerator extends UniversalGenerator {
         var fieldType = helpers.replaceDollarTypesWithConcrete(
           classField.type ?? f.type ?? 'dynamic',
         );
-        var nullableType =
-            fieldType.endsWith('?') ? fieldType : '$fieldType?';
-        params.add(Parameter((p) {
-          p.name = f.name;
-          p.type = refer('$nullableType Function()?');
-          p.named = true;
-        }));
+        var nullableType = fieldType.endsWith('?') ? fieldType : '$fieldType?';
+        params.add(
+          Parameter((p) {
+            p.name = f.name;
+            p.type = refer('$nullableType Function()?');
+            p.named = true;
+          }),
+        );
       }
 
       final body = <String>[];
@@ -587,12 +621,14 @@ class CopyWithGenerator extends UniversalGenerator {
       body.add('  $paramStr,');
       body.add(');');
 
-      methods.add(Method((m) {
-        m.name = 'copyWith${interfaceNameTrimmed}Fn';
-        m.returns = refer(classNameTrimmed);
-        m.optionalParameters.addAll(params);
-        m.body = Code(body.join('\n'));
-      }));
+      methods.add(
+        Method((m) {
+          m.name = 'copyWith${interfaceNameTrimmed}Fn';
+          m.returns = refer(classNameTrimmed);
+          m.optionalParameters.addAll(params);
+          m.body = Code(body.join('\n'));
+        }),
+      );
     }
 
     return methods;

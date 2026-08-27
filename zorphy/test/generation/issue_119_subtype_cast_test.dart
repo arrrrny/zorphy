@@ -54,7 +54,7 @@ ClassMetadata _concreteMeta({
     isInParentExplicitSubtypes: false,
     classElement: _StubClassElement(name),
     agentDirectiveInfo: const AgentDirectiveInfo(),
-      allAnnotatedClasses: const {},
+    allAnnotatedClasses: const {},
   );
 }
 
@@ -87,32 +87,43 @@ String _emitMethod(Method spec) {
 }
 
 void main() {
-  group('Issue #119 — patchWith cast strips leading \$ from subtype field types', () {
-    final generator = PatchGenerator();
+  group(
+    'Issue #119 — patchWith cast strips leading \$ from subtype field types',
+    () {
+      final generator = PatchGenerator();
 
-    test('main patchWith casts use the trimmed reference type', () {
-      final meta = _concreteMeta(
-        name: 'InitializationParams',
-        fields: [
-          NameTypeClassComment('credentials', r'$Credentials?', 'InitializationParams'),
-          NameTypeClassComment('settings', r'$Settings?', 'InitializationParams'),
-          NameTypeClassComment('label', 'String?', 'InitializationParams'),
-        ],
-      );
-      final specs = generator.generateSpec(
-        GenerationContext(metadata: meta, config: _patchConfig()),
-      );
-      final emitted = _emitMethod(specs.first as Method);
+      test('main patchWith casts use the trimmed reference type', () {
+        final meta = _concreteMeta(
+          name: 'InitializationParams',
+          fields: [
+            NameTypeClassComment(
+              'credentials',
+              r'$Credentials?',
+              'InitializationParams',
+            ),
+            NameTypeClassComment(
+              'settings',
+              r'$Settings?',
+              'InitializationParams',
+            ),
+            NameTypeClassComment('label', 'String?', 'InitializationParams'),
+          ],
+        );
+        final specs = generator.generateSpec(
+          GenerationContext(metadata: meta, config: _patchConfig()),
+        );
+        final emitted = _emitMethod(specs.first as Method);
 
-      // Casts must use the trimmed reference type, not the raw subtype name.
-      expect(emitted, contains('as Credentials?'));
-      expect(emitted, contains('as Settings?'));
-      // The broken form (`as $Credentials?`) must never appear. A legit `$`
-      // only shows up in the field-enum name (e.g. `InitializationParams$`),
-      // never inside an `as` cast.
-      expect(emitted, isNot(contains(RegExp(r'as \$\w+\?'))));
-      // Non-subtype fields are unaffected.
-      expect(emitted, contains('as String?'));
-    });
-  });
+        // Casts must use the trimmed reference type, not the raw subtype name.
+        expect(emitted, contains('as Credentials?'));
+        expect(emitted, contains('as Settings?'));
+        // The broken form (`as $Credentials?`) must never appear. A legit `$`
+        // only shows up in the field-enum name (e.g. `InitializationParams$`),
+        // never inside an `as` cast.
+        expect(emitted, isNot(contains(RegExp(r'as \$\w+\?'))));
+        // Non-subtype fields are unaffected.
+        expect(emitted, contains('as String?'));
+      });
+    },
+  );
 }

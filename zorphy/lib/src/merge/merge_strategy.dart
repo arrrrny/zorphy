@@ -62,8 +62,9 @@ class MergeStrategy {
 
       // Emit user code before this region.
       if (cursor < region.startLine) {
-        final userCode =
-            existingLines.sublist(cursor, region.startLine).join('\n');
+        final userCode = existingLines
+            .sublist(cursor, region.startLine)
+            .join('\n');
         buffer.write(userCode);
         if (cursor < region.startLine) buffer.writeln();
       }
@@ -74,8 +75,9 @@ class MergeStrategy {
       } else if (region.type == RegionType.generated) {
         // Extract any @preserve blocks from the existing generated region
         // before replacing it.
-        final preservedBlocks =
-            RegionParser.extractPreservedBlocks(region.content);
+        final preservedBlocks = RegionParser.extractPreservedBlocks(
+          region.content,
+        );
 
         // Replace the generated region with the new generated content.
         final replacement = _findGeneratedReplacement(
@@ -85,10 +87,7 @@ class MergeStrategy {
 
         if (replacement != null) {
           // Splice preserved blocks into the replacement.
-          final merged = _splicePreservedBlocks(
-            replacement,
-            preservedBlocks,
-          );
+          final merged = _splicePreservedBlocks(replacement, preservedBlocks);
           final formatted = _safeFormat(merged);
           buffer.write(formatted);
           buffer.writeln();
@@ -103,7 +102,8 @@ class MergeStrategy {
           // Could not find matching generated content — conflict.
           conflicts.add(
             MergeConflict(
-              message: 'Generated block at line ${region.startLine + 1} '
+              message:
+                  'Generated block at line ${region.startLine + 1} '
                   'has no matching generated content',
               line: region.startLine,
               existingContent: region.content,
@@ -128,8 +128,8 @@ class MergeStrategy {
 
     final result = buffer.toString();
     final formatted = _safeFormat(result);
-    final hasChanges = formatted.trimRight() !=
-        _safeFormat(existingContent).trimRight();
+    final hasChanges =
+        formatted.trimRight() != _safeFormat(existingContent).trimRight();
 
     return MergeResult(
       content: formatted,
@@ -162,9 +162,7 @@ class MergeStrategy {
     );
 
     if (genStartIdx >= 0 && genEndIdx > genStartIdx) {
-      return generatedLines
-          .sublist(genStartIdx, genEndIdx + 1)
-          .join('\n');
+      return generatedLines.sublist(genStartIdx, genEndIdx + 1).join('\n');
     }
 
     // Fallback: match declarations by name.
@@ -178,9 +176,7 @@ class MergeStrategy {
       declNames.add(classMatch.group(1)!);
     }
 
-    final extMatch = RegExp(
-      r'extension\s+(\w+)',
-    ).firstMatch(regionContent);
+    final extMatch = RegExp(r'extension\s+(\w+)').firstMatch(regionContent);
     if (extMatch != null && !declNames.contains(extMatch.group(1))) {
       declNames.add(extMatch.group(1)!);
     }
@@ -210,9 +206,9 @@ class MergeStrategy {
     for (int i = 0; i < matchingDecls.length; i++) {
       final decl = matchingDecls[i];
       if (i > 0) buffer.writeln();
-      buffer.write(generatedLines
-          .sublist(decl.startLine, decl.endLine)
-          .join('\n'));
+      buffer.write(
+        generatedLines.sublist(decl.startLine, decl.endLine).join('\n'),
+      );
     }
 
     return buffer.toString();

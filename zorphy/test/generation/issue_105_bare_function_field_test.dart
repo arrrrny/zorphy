@@ -64,7 +64,7 @@ ClassMetadata _concreteMeta({
     isInParentExplicitSubtypes: false,
     classElement: _StubClassElement(name),
     agentDirectiveInfo: const AgentDirectiveInfo(),
-      allAnnotatedClasses: const {},
+    allAnnotatedClasses: const {},
   );
 }
 
@@ -190,9 +190,7 @@ void main() {
 
       expect(
         emitted,
-        contains(
-          '@JsonKey(includeFromJson: false, includeToJson: false)',
-        ),
+        contains('@JsonKey(includeFromJson: false, includeToJson: false)'),
       );
       expect(emitted, contains('final Function onReady;'));
     });
@@ -250,9 +248,7 @@ void main() {
       expect(
         emitted,
         isNot(
-          contains(
-            '@JsonKey(includeFromJson: false, includeToJson: false)',
-          ),
+          contains('@JsonKey(includeFromJson: false, includeToJson: false)'),
         ),
       );
     });
@@ -292,37 +288,34 @@ void main() {
       expect(emitted, contains('final String? icon;'));
     });
 
-    test(
-      'user-provided @JsonKey on bare Function field is augmented',
-      () {
-        // If the user provides their own @JsonKey (e.g. with a custom
-        // wire name) on a bare `Function?` field but doesn't set
-        // includeFromJson/includeToJson, we must still add those —
-        // otherwise json_serializable will still try to generate a
-        // serializer for the bare Function type and fail.
-        final meta = _concreteMeta(
-          name: 'Foo',
-          fields: [
-            NameTypeClassComment(
-              'onLoad',
-              'Function?',
-              'Foo',
-              jsonKeyInfo: const JsonKeyInfo(name: 'on_load'),
-            ),
-          ],
-        );
-        final specs = generator.generateSpec(
-          GenerationContext(metadata: meta, config: _jsonConfig()),
-        );
-        final emitted = _emitClass(specs.first as Class);
-
-        expect(
-          emitted,
-          contains(
-            "@JsonKey(name: 'on_load', includeFromJson: false, includeToJson: false)",
+    test('user-provided @JsonKey on bare Function field is augmented', () {
+      // If the user provides their own @JsonKey (e.g. with a custom
+      // wire name) on a bare `Function?` field but doesn't set
+      // includeFromJson/includeToJson, we must still add those —
+      // otherwise json_serializable will still try to generate a
+      // serializer for the bare Function type and fail.
+      final meta = _concreteMeta(
+        name: 'Foo',
+        fields: [
+          NameTypeClassComment(
+            'onLoad',
+            'Function?',
+            'Foo',
+            jsonKeyInfo: const JsonKeyInfo(name: 'on_load'),
           ),
-        );
-      },
-    );
+        ],
+      );
+      final specs = generator.generateSpec(
+        GenerationContext(metadata: meta, config: _jsonConfig()),
+      );
+      final emitted = _emitClass(specs.first as Class);
+
+      expect(
+        emitted,
+        contains(
+          "@JsonKey(name: 'on_load', includeFromJson: false, includeToJson: false)",
+        ),
+      );
+    });
   });
 }

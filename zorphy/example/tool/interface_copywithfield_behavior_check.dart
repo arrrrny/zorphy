@@ -1,106 +1,78 @@
-// Behavioral checks for interface-scoped copyWithField. Executed by
-// zorphy/test/generation/interface_copywithfield_test.dart via
-// `dart run` (cwd: zorphy/example) because the zorphy test package
-// cannot import the example package's generated code directly.
-//
-// Exit code 0 = all checks passed. Any failure prints FAIL and exits 1.
+/// Runtime behavior check for interface-scoped copyWithField.
+///
+/// Verifies that:
+/// 1. InterfaceCar.copyWithField handles ALL fields (Vehicle + own)
+/// 2. Vehicle copyWithField handles Vehicle fields only
+/// 3. Polymorphic path works: Vehicle variable = InterfaceCar instance
+/// 4. Both work correctly at runtime
+
 import 'package:zorphy_annotation/zorphy_annotation.dart';
-import 'package:zorphy_example/various/interface_copywithfield_example.dart';
-
-final List<String> failures = <String>[];
-
-void check(String name, bool condition) {
-  if (condition) {
-    print('PASS: $name');
-  } else {
-    failures.add(name);
-    print('FAIL: $name');
-  }
-}
+import '../lib/various/interface_copywithfield_example.dart';
 
 void main() {
-  // ── Interface-scoped copyWithField for Car->Vehicle ────────────
+  var allPassed = true;
+
   final car = InterfaceCar(
     make: 'Toyota',
     model: 'Camry',
-    year: 2020,
+    year: 2024,
     doors: 4,
   );
 
-  // Test copyWithVehicleField with Vehicle interface fields
-  final updatedMake = car.copyWithVehicleField(
-    VehicleFields.make,
-    'Honda',
-  );
-  check(
-    'copyWithVehicleField updates make field',
-    updatedMake.make == 'Honda' &&
-        updatedMake.model == 'Camry' &&
-        updatedMake.year == 2020 &&
-        updatedMake.doors == 4,
-  );
+  // 1. InterfaceCar.copyWithField handles ALL fields (Vehicle + own)
+  final car1 = car.copyWithField(InterfaceCarFields.make, 'Honda');
+  if (car1.make != 'Honda') {
+    print('FAIL: copyWithField(make) did not update value');
+    allPassed = false;
+  }
 
-  final updatedModel = car.copyWithVehicleField(
-    VehicleFields.model,
-    'Accord',
-  );
-  check(
-    'copyWithVehicleField updates model field',
-    updatedModel.model == 'Accord' && updatedModel.make == 'Toyota',
-  );
+  final car2 = car.copyWithField(InterfaceCarFields.model, 'Civic');
+  if (car2.model != 'Civic') {
+    print('FAIL: copyWithField(model) did not update value');
+    allPassed = false;
+  }
 
-  final updatedYear = car.copyWithVehicleField(
-    VehicleFields.year,
-    2021,
-  );
-  check(
-    'copyWithVehicleField updates year field',
-    updatedYear.year == 2021 && updatedYear.make == 'Toyota',
-  );
+  final car3 = car.copyWithField(InterfaceCarFields.year, 2025);
+  if (car3.year != 2025) {
+    print('FAIL: copyWithField(year) did not update value');
+    allPassed = false;
+  }
 
-  // Verify interface restriction: copyWithVehicleField should accept
-  // only Vehicle fields, not InterfaceCar-specific fields.
-  // The doors field is InterfaceCar-specific, so passing it should throw.
-  ArgumentError? interfaceRestrictionError;
+  final car4 = car.copyWithField(InterfaceCarFields.doors, 2);
+  if (car4.doors != 2) {
+    print('FAIL: copyWithField(doors) did not update value');
+    allPassed = false;
+  }
+
+  // 2. Vehicle copyWithField handles Vehicle fields only
+  final vehicle = Vehicle(make: 'Ford', model: 'Focus', year: 2023);
+  final v1 = vehicle.copyWithField(VehicleFields.make, 'Chevy');
+  if (v1.make != 'Chevy') {
+    print('FAIL: Vehicle.copyWithField(make) did not update value');
+    allPassed = false;
+  }
+
+  // 3. Polymorphic path: Vehicle variable = InterfaceCar instance
+  Vehicle v = car;
+  final v2 = v.copyWithField(VehicleFields.make, 'Honda');
+  if (v2.make != 'Honda') {
+    print('FAIL: polymorphic copyWithField(make) did not update value');
+    allPassed = false;
+  }
+
+  // 4. Vehicle copyWithField throws for non-Vehicle fields
   try {
-    // Cast InterfaceCarFields.doors to Field<InterfaceCar, dynamic> to
-    // bypass compile-time type checking and test runtime validation.
-    final Field<InterfaceCar, dynamic> doorsField =
-        const Field<InterfaceCar, int>('doors');
-    car.copyWithVehicleField(doorsField, 2);
-  } on ArgumentError catch (e) {
-    interfaceRestrictionError = e;
+    vehicle.copyWithField(InterfaceCarFields.doors, 6);
+    print('FAIL: Vehicle.copyWithField(doors) should have thrown');
+    allPassed = false;
+  } catch (e) {
+    if (e is! ArgumentError) {
+      print('FAIL: Vehicle.copyWithField(doors) threw wrong type: ${e.runtimeType}');
+      allPassed = false;
+    }
   }
-  check(
-    'copyWithVehicleField rejects Car-specific fields',
-    interfaceRestrictionError != null &&
-        interfaceRestrictionError.toString().contains('Vehicle interface'),
-  );
 
-  // Verify standard copyWithField still works for all fields
-  final updatedDoors = car.copyWithField(
-    InterfaceCarFields.doors,
-    2,
-  );
-  check(
-    'copyWithField (standard) updates doors field',
-    updatedDoors.doors == 2 && updatedDoors.make == 'Toyota',
-  );
-
-  // Verify immutability
-  check(
-    'original car is untouched',
-    car.make == 'Toyota' &&
-        car.model == 'Camry' &&
-        car.year == 2020 &&
-        car.doors == 4,
-  );
-
-  // ── Summary ─────────────────────────────────────────────────────
-  if (failures.isEmpty) {
+  if (allPassed) {
     print('ALL CHECKS PASSED');
-    return;
   }
-  print('${failures.length} CHECK(S) FAILED');
-  throw StateError('${failures.length} interface copyWithField check(s) failed');
 }

@@ -60,7 +60,7 @@ ClassMetadata _meta({
     isInParentExplicitSubtypes: isInParentExplicitSubtypes,
     classElement: _StubClassElement(cleanName),
     agentDirectiveInfo: const AgentDirectiveInfo(),
-      allAnnotatedClasses: const {},
+    allAnnotatedClasses: const {},
   );
 }
 
@@ -113,8 +113,10 @@ void main() {
       // parameterized entity type, and the field enum stays unparameterized.
       expect(
         emitted,
-        contains('abstract class BasePatch<T, U extends num> '
-            'extends PatchBase<Base<T, U>, Base\$> {}'),
+        contains(
+          'abstract class BasePatch<T, U extends num> '
+          'extends PatchBase<Base<T, U>, Base\$> {}',
+        ),
       );
       expect(emitted, isNot(contains('Base\$<')));
       expect(emitted, isNot(contains('PatchBase<Base, Base\$>')));
@@ -155,13 +157,9 @@ void main() {
     });
 
     test('PatchGenerator emits no methods for abstract nonSealed bases', () {
-      final iface = InterfaceMetadata(
-        '\$Named',
-        [],
-        [],
-        [NameType('name', 'String')],
-        element: _StubClassElement('Named'),
-      );
+      final iface = InterfaceMetadata('\$Named', [], [], [
+        NameType('name', 'String'),
+      ], element: _StubClassElement('Named'));
       final meta = _meta(
         originalName: '\$\$Base',
         cleanName: 'Base',

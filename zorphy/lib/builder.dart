@@ -30,11 +30,13 @@ Builder zorphyBuilder(BuilderOptions options) {
   final isDryRun = options.config['dry_run'] == true;
   final isForce = options.config['force'] == true;
   return PartBuilder(
-    [ZorphyGenerator(
-      pluginUris: pluginUris,
-      isDryRun: isDryRun,
-      isForce: isForce,
-    )],
+    [
+      ZorphyGenerator(
+        pluginUris: pluginUris,
+        isDryRun: isDryRun,
+        isForce: isForce,
+      ),
+    ],
     '.zorphy.dart',
     header: '''
 // ignore_for_file: UNNECESSARY_CAST

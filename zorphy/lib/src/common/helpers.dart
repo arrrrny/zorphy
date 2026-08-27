@@ -752,7 +752,6 @@ String typeToString(
   return manual != null ? "$manual$nullMarker" : type.toString();
 }
 
-
 /// Strips Dart keywords and annotations from a recovered raw type string.
 ///
 /// Ported verbatim from `ClassAnalyzer._cleanRecoveredType` so that field
@@ -861,7 +860,6 @@ String recoverTypeFromSource(Element element, String currentType) {
       return currentType;
     }
 
-
     // Treat -1 / 0 as "no offset" — the analyzer returns these for synthetic
     // or unresolved elements. Fall through to the text-search fallback.
     final hasValidOffset = nameOffset != null && nameOffset > 0;
@@ -935,7 +933,11 @@ String recoverTypeFromSource(Element element, String currentType) {
         // Try constructor-parameter pattern first (original behavior —
         // preserves the recovery for method params that was already working).
         final ctorPattern = RegExp(
-          '\b' + containerName + r'\b\s*\([\s\S]*?([\w<>,? ]+)\s+\b' + entityName + r'\b',
+          '\b' +
+              containerName +
+              r'\b\s*\([\s\S]*?([\w<>,? ]+)\s+\b' +
+              entityName +
+              r'\b',
         );
         var match = ctorPattern.firstMatch(commentFreeSource);
         if (match != null) {
@@ -1133,4 +1135,3 @@ String _resolveFieldType(
   }
   return result;
 }
-

@@ -343,11 +343,12 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           ? helpers.replaceDollarTypesWithConcrete(f.type!)
           : f.type;
 
-      final isNullable = fieldType != null &&
-        (fieldType.endsWith('?') ||
-         fieldType == 'dynamic' ||
-         fieldType.startsWith('dynamic<') ||
-         fieldType.startsWith('dynamic '));
+      final isNullable =
+          fieldType != null &&
+          (fieldType.endsWith('?') ||
+              fieldType == 'dynamic' ||
+              fieldType.startsWith('dynamic<') ||
+              fieldType.startsWith('dynamic '));
 
       final isParentField =
           hasExtends &&
@@ -401,13 +402,15 @@ class ClassDeclarationGenerator extends UniversalGenerator {
         initializers.add('this.${f.name} = ${f.name} ?? $defaultValueString');
       } else {
         var safeFieldType = fieldType ?? 'dynamic';
-        params.add(Parameter((p) {
-          p.name = f.name;
-          p.type = referType(safeFieldType);
-          p.named = true;
-          p.required = !isNullable;
-          p.toThis = true;
-        }));
+        params.add(
+          Parameter((p) {
+            p.name = f.name;
+            p.type = referType(safeFieldType);
+            p.named = true;
+            p.required = !isNullable;
+            p.toThis = true;
+          }),
+        );
       }
     }
 
@@ -465,13 +468,12 @@ class ClassDeclarationGenerator extends UniversalGenerator {
             : f.type;
         // `dynamic` is already nullable — appending `?` produces
         // `dynamic?` which is redundant (issue #351 secondary).
-        var alreadyNullable = fieldType!.endsWith('?') ||
+        var alreadyNullable =
+            fieldType!.endsWith('?') ||
             fieldType == 'dynamic' ||
             fieldType.startsWith('dynamic<') ||
             fieldType.startsWith('dynamic ');
-        var nullableFieldType = alreadyNullable
-            ? fieldType
-            : '$fieldType?';
+        var nullableFieldType = alreadyNullable ? fieldType : '$fieldType?';
         copyWithParams.add(
           Parameter((p) {
             p.name = f.name;
@@ -504,7 +506,6 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       );
     }
   }
-
 
   /// Adds user-declared named constructors (from @ZorphyNamedConstructor)
   /// to the concrete class spec.
@@ -540,11 +541,12 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           var fieldType = f.type != null
               ? helpers.replaceDollarTypesWithConcrete(f.type!)
               : f.type;
-          final isNullable = fieldType != null &&
-            (fieldType.endsWith('?') ||
-             fieldType == 'dynamic' ||
-             fieldType.startsWith('dynamic<') ||
-             fieldType.startsWith('dynamic '));
+          final isNullable =
+              fieldType != null &&
+              (fieldType.endsWith('?') ||
+                  fieldType == 'dynamic' ||
+                  fieldType.startsWith('dynamic<') ||
+                  fieldType.startsWith('dynamic '));
           params.add(
             Parameter((p) {
               p.name = f.name;
@@ -575,11 +577,12 @@ class ClassDeclarationGenerator extends UniversalGenerator {
             ? helpers.replaceDollarTypesWithConcrete(f.type!)
             : f.type;
 
-        final isNullable = fieldType != null &&
-          (fieldType.endsWith('?') ||
-           fieldType == 'dynamic' ||
-           fieldType.startsWith('dynamic<') ||
-           fieldType.startsWith('dynamic '));
+        final isNullable =
+            fieldType != null &&
+            (fieldType.endsWith('?') ||
+                fieldType == 'dynamic' ||
+                fieldType.startsWith('dynamic<') ||
+                fieldType.startsWith('dynamic '));
 
         final isParentField =
             hasExtendsParam &&
@@ -591,7 +594,9 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           var safeFieldType = fieldType ?? 'dynamic';
           var isNull = safeFieldType.endsWith('?');
           var paramType = (isNull || hasDefaultValue)
-              ? (safeFieldType.endsWith('?') ? safeFieldType : '$safeFieldType?')
+              ? (safeFieldType.endsWith('?')
+                    ? safeFieldType
+                    : '$safeFieldType?')
               : safeFieldType;
           params.add(
             Parameter((p) {
@@ -633,13 +638,15 @@ class ClassDeclarationGenerator extends UniversalGenerator {
           initializers.add('this.${f.name} = ${f.name} ?? $defaultValueString');
         } else {
           var safeFieldType = fieldType ?? 'dynamic';
-          params.add(Parameter((p) {
-            p.name = f.name;
-            p.type = referType(safeFieldType);
-            p.named = true;
-            p.required = !isNullable;
-            p.toThis = true;
-          }));
+          params.add(
+            Parameter((p) {
+              p.name = f.name;
+              p.type = referType(safeFieldType);
+              p.named = true;
+              p.required = !isNullable;
+              p.toThis = true;
+            }),
+          );
         }
       }
 
@@ -873,10 +880,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       if (!isFn) return null;
       // Function-typed field with no user-provided @JsonKey — auto-emit
       // the skip-serialization JsonKey.
-      return const JsonKeyInfo(
-        includeFromJson: false,
-        includeToJson: false,
-      );
+      return const JsonKeyInfo(includeFromJson: false, includeToJson: false);
     }
 
     if (!isFn) {

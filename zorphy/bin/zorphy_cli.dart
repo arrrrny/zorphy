@@ -530,7 +530,6 @@ class _FromJsonCommand extends Command<void> {
   }
 }
 
-
 class _ValidateCommand extends Command<void> {
   @override
   String get name => 'validate';
@@ -549,11 +548,7 @@ class _ValidateCommand extends Command<void> {
       'source',
       help: 'Additional source directories to scan (default: lib)',
     );
-    argParser.addFlag(
-      'json',
-      negatable: false,
-      help: 'Output results as JSON',
-    );
+    argParser.addFlag('json', negatable: false, help: 'Output results as JSON');
   }
 
   @override
@@ -577,7 +572,7 @@ class _ValidateCommand extends Command<void> {
               'message': 'Directory not found: $dir',
               'severity': 'error',
               'filePath': dir,
-            }
+            },
           ],
         };
         print(const JsonEncoder.withIndent('  ').convert(errorOutput));
@@ -587,10 +582,7 @@ class _ValidateCommand extends Command<void> {
       exit(1);
     }
 
-    final validator = ProjectValidator(
-      projectDir: dir,
-      sourceDirs: sourceDirs,
-    );
+    final validator = ProjectValidator(projectDir: dir, sourceDirs: sourceDirs);
     final result = validator.validate();
 
     if (asJson) {
@@ -605,13 +597,17 @@ class _ValidateCommand extends Command<void> {
   }
 
   void _printJsonResult(ValidationResult result) {
-    final findingsJson = result.findings.map((f) => {
-      'message': f.message,
-      'severity': f.severity.name,
-      if (f.filePath != null) 'filePath': f.filePath,
-      if (f.lineNumber != null) 'lineNumber': f.lineNumber,
-      if (f.fixSuggestion != null) 'fixSuggestion': f.fixSuggestion,
-    }).toList();
+    final findingsJson = result.findings
+        .map(
+          (f) => {
+            'message': f.message,
+            'severity': f.severity.name,
+            if (f.filePath != null) 'filePath': f.filePath,
+            if (f.lineNumber != null) 'lineNumber': f.lineNumber,
+            if (f.fixSuggestion != null) 'fixSuggestion': f.fixSuggestion,
+          },
+        )
+        .toList();
 
     final output = {
       'directory': result.validatedDir,
@@ -625,7 +621,6 @@ class _ValidateCommand extends Command<void> {
     print(const JsonEncoder.withIndent('  ').convert(output));
   }
 }
-
 
 class _SelfUpdateCommand extends Command<void> {
   @override
@@ -642,11 +637,7 @@ class _SelfUpdateCommand extends Command<void> {
       negatable: false,
       help: 'Only check for updates, do not install',
     );
-    argParser.addFlag(
-      'json',
-      negatable: false,
-      help: 'Output results as JSON',
-    );
+    argParser.addFlag('json', negatable: false, help: 'Output results as JSON');
   }
 
   @override
@@ -712,7 +703,6 @@ class _SelfUpdateCommand extends Command<void> {
   }
 }
 
-
 class _DoctorCommand extends Command<void> {
   @override
   String get name => 'doctor';
@@ -736,11 +726,7 @@ class _DoctorCommand extends Command<void> {
       negatable: false,
       help: 'Preview files to delete without making changes',
     );
-    argParser.addFlag(
-      'json',
-      negatable: false,
-      help: 'Output results as JSON',
-    );
+    argParser.addFlag('json', negatable: false, help: 'Output results as JSON');
   }
 
   @override
@@ -771,10 +757,7 @@ class _DoctorCommand extends Command<void> {
       exit(1);
     }
 
-    final service = DoctorService(
-      projectDir: dir,
-      sourceDirs: sourceDirs,
-    );
+    final service = DoctorService(projectDir: dir, sourceDirs: sourceDirs);
     final result = await service.run(dryRun: dryRun);
 
     if (asJson) {

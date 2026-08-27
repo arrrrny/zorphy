@@ -33,10 +33,10 @@ class Declaration {
   @override
   bool operator ==(Object other) =>
       other is Declaration &&
-          other.kind == kind &&
-          other.name == name &&
-          other.startLine == startLine &&
-          other.endLine == endLine;
+      other.kind == kind &&
+      other.name == name &&
+      other.startLine == startLine &&
+      other.endLine == endLine;
 
   @override
   int get hashCode => Object.hash(kind, name, startLine, endLine);
@@ -75,8 +75,18 @@ List<Declaration> extractDeclarationsFromSource(String source) {
   // Keywords that signal a declaration we should skip (part, import,
   // export, etc.).
   const skipPrefixes = [
-    'import ', 'export ', 'part ', '//', '///', '/*', '* ',
-    '@', 'const ', 'final ', 'var ', 'late ',
+    'import ',
+    'export ',
+    'part ',
+    '//',
+    '///',
+    '/*',
+    '* ',
+    '@',
+    'const ',
+    'final ',
+    'var ',
+    'late ',
   ];
 
   int i = 0;
@@ -98,12 +108,9 @@ List<Declaration> extractDeclarationsFromSource(String source) {
       final kind = declMatch.group(1)!;
       final name = declMatch.group(2)!;
       final endLine = _findDeclarationEnd(lines, i);
-      declarations.add(Declaration(
-        kind: kind,
-        name: name,
-        startLine: i,
-        endLine: endLine,
-      ));
+      declarations.add(
+        Declaration(kind: kind, name: name, startLine: i, endLine: endLine),
+      );
       i = endLine;
       continue;
     }
@@ -119,17 +126,26 @@ List<Declaration> extractDeclarationsFromSource(String source) {
     if (funcMatch != null && _looksLikeFunction(lines, i)) {
       final name = funcMatch.group(1)!;
       // Skip known Dart keywords that aren't function names.
-      if (const ['if', 'for', 'while', 'switch', 'catch', 'on'].contains(name)) {
+      if (const [
+        'if',
+        'for',
+        'while',
+        'switch',
+        'catch',
+        'on',
+      ].contains(name)) {
         i++;
         continue;
       }
       final endLine = _findDeclarationEnd(lines, i);
-      declarations.add(Declaration(
-        kind: 'function',
-        name: name,
-        startLine: i,
-        endLine: endLine,
-      ));
+      declarations.add(
+        Declaration(
+          kind: 'function',
+          name: name,
+          startLine: i,
+          endLine: endLine,
+        ),
+      );
       i = endLine;
       continue;
     }
@@ -155,12 +171,15 @@ int _findDeclarationEnd(List<String> lines, int startLine) {
 
   for (int i = startLine; i < lines.length; i++) {
     for (final ch in lines[i].runes) {
-      if (ch == 0x7B) { // '{'
+      if (ch == 0x7B) {
+        // '{'
         depth++;
         foundOpen = true;
-      } else if (ch == 0x7D) { // '}'
+      } else if (ch == 0x7D) {
+        // '}'
         depth--;
-      } else if (ch == 0x3B && !foundOpen) { // ';' before any '{'
+      } else if (ch == 0x3B && !foundOpen) {
+        // ';' before any '{'
         // Brace-less declaration (e.g. typedef) — end after this line.
         return i + 1;
       }
@@ -184,8 +203,14 @@ bool _looksLikeFunction(List<String> lines, int lineIndex) {
   if (!trimmed.contains('(')) return false;
 
   // Must NOT start with return/throw/await/yield — those are statements.
-  if (const ['return ', 'return;', 'throw ', 'throw;', 'await ', 'yield ']
-      .any((p) => trimmed.startsWith(p))) {
+  if (const [
+    'return ',
+    'return;',
+    'throw ',
+    'throw;',
+    'await ',
+    'yield ',
+  ].any((p) => trimmed.startsWith(p))) {
     return false;
   }
 

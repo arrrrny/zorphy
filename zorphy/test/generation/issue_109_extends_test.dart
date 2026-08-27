@@ -35,8 +35,9 @@ import 'package:test/test.dart';
 /// routed to `c.extend` by `ClassDeclarationGenerator._getExtendedParentName`
 /// — producing proper Dart inheritance on the generated concrete class.
 void main() {
-  final fixture =
-      File('example/lib/various/issue_109_extends_value_object.zorphy.dart');
+  final fixture = File(
+    'example/lib/various/issue_109_extends_value_object.zorphy.dart',
+  );
   late String output;
 
   setUpAll(() {
@@ -50,101 +51,104 @@ void main() {
   });
 
   group('#109 — value-object inheritance via Dart `extends`', () {
-    test(
-      'base value object is generated as a standalone concrete class',
-      () {
-        expect(
-          output,
-          contains('class UrlAuthenticationChallenge {'),
-          reason: 'The base value object has no `extends`, so the generated '
-              'concrete class should also have no `extends` clause.',
-        );
-      },
-    );
+    test('base value object is generated as a standalone concrete class', () {
+      expect(
+        output,
+        contains('class UrlAuthenticationChallenge {'),
+        reason:
+            'The base value object has no `extends`, so the generated '
+            'concrete class should also have no `extends` clause.',
+      );
+    });
 
-    test(
-      'subclass uses `extends` (not `implements`) on the generated '
-      'concrete class',
-      () {
-        expect(
-          output,
-          contains('class ServerTrustAuthResponse extends UrlAuthenticationChallenge'),
-          reason: 'When the abstract class declares `extends \$Base`, the '
-              'generated concrete class must emit `class Sub extends Base` — '
-              'proper Dart inheritance. Using `implements` would require '
-              're-implementing all of Base\'s generated methods '
-              '(copyWithBase, patchWithBase, ==, hashCode, toString, ...).',
-        );
+    test('subclass uses `extends` (not `implements`) on the generated '
+        'concrete class', () {
+      expect(
+        output,
+        contains(
+          'class ServerTrustAuthResponse extends UrlAuthenticationChallenge',
+        ),
+        reason:
+            'When the abstract class declares `extends \$Base`, the '
+            'generated concrete class must emit `class Sub extends Base` — '
+            'proper Dart inheritance. Using `implements` would require '
+            're-implementing all of Base\'s generated methods '
+            '(copyWithBase, patchWithBase, ==, hashCode, toString, ...).',
+      );
 
-        expect(
-          output,
-          isNot(contains('class ServerTrustAuthResponse implements')),
-          reason: 'implements is the wrong relationship for subclassing a '
-              'concrete base — it would fail to compile '
-              '(non_abstract_class_inherits_abstract_member).',
-        );
-      },
-    );
+      expect(
+        output,
+        isNot(contains('class ServerTrustAuthResponse implements')),
+        reason:
+            'implements is the wrong relationship for subclassing a '
+            'concrete base — it would fail to compile '
+            '(non_abstract_class_inherits_abstract_member).',
+      );
+    });
 
-    test(
-      'subclass constructor calls `super()` with the inherited fields',
-      () {
-        expect(
-          output,
-          contains(
-            'ServerTrustAuthResponse({\n'
-            '    required String protectionSpace,\n'
-            '    required String this.action,\n'
-            '  }) : super(protectionSpace: protectionSpace);',
-          ),
-          reason: 'The subclass constructor must accept the inherited '
-              'field `protectionSpace` as a parameter (NOT `this.protectionSpace` '
-              'because it isn\'t redeclared on the subclass) and forward it '
-              'to the base constructor via `super(protectionSpace: protectionSpace)`. '
-              'Only the subclass\'s own field `action` becomes `this.action`.',
-        );
-      },
-    );
+    test('subclass constructor calls `super()` with the inherited fields', () {
+      expect(
+        output,
+        contains(
+          'ServerTrustAuthResponse({\n'
+          '    required String protectionSpace,\n'
+          '    required String this.action,\n'
+          '  }) : super(protectionSpace: protectionSpace);',
+        ),
+        reason:
+            'The subclass constructor must accept the inherited '
+            'field `protectionSpace` as a parameter (NOT `this.protectionSpace` '
+            'because it isn\'t redeclared on the subclass) and forward it '
+            'to the base constructor via `super(protectionSpace: protectionSpace)`. '
+            'Only the subclass\'s own field `action` becomes `this.action`.',
+      );
+    });
 
-    test(
-      'inherited field is NOT redeclared on the subclass',
-      () {
-        // The subclass should not redeclare `protectionSpace` as a final
-        // field — it inherits it via `extends`. Only `action` (the
-        // subclass's own field) should appear as a `final String action`.
-        final classBlock = _extractClassBlock(output, 'ServerTrustAuthResponse');
-        expect(classBlock, isNotNull,
-            reason: 'ServerTrustAuthResponse class block should exist');
+    test('inherited field is NOT redeclared on the subclass', () {
+      // The subclass should not redeclare `protectionSpace` as a final
+      // field — it inherits it via `extends`. Only `action` (the
+      // subclass's own field) should appear as a `final String action`.
+      final classBlock = _extractClassBlock(output, 'ServerTrustAuthResponse');
+      expect(
+        classBlock,
+        isNotNull,
+        reason: 'ServerTrustAuthResponse class block should exist',
+      );
 
-        // `final String action;` is the subclass's own field.
-        expect(
-          classBlock!,
-          contains('final String action;'),
-          reason: 'The subclass\'s own field `action` must be declared as '
-              '`final String action;` on the generated concrete subclass.',
-        );
+      // `final String action;` is the subclass's own field.
+      expect(
+        classBlock!,
+        contains('final String action;'),
+        reason:
+            'The subclass\'s own field `action` must be declared as '
+            '`final String action;` on the generated concrete subclass.',
+      );
 
-        // `final String protectionSpace;` MUST NOT appear — that field
-        // is inherited from UrlAuthenticationChallenge via `extends`.
-        expect(
-          classBlock,
-          isNot(contains('final String protectionSpace;')),
-          reason: 'Inherited field `protectionSpace` must not be redeclared '
-              'on the subclass. It is inherited from the base via `extends`.',
-        );
-      },
-    );
+      // `final String protectionSpace;` MUST NOT appear — that field
+      // is inherited from UrlAuthenticationChallenge via `extends`.
+      expect(
+        classBlock,
+        isNot(contains('final String protectionSpace;')),
+        reason:
+            'Inherited field `protectionSpace` must not be redeclared '
+            'on the subclass. It is inherited from the base via `extends`.',
+      );
+    });
 
     test(
       'multiple subclasses of the same base are all generated with `extends`',
       () {
         expect(
           output,
-          contains('class ClientCertChallenge extends UrlAuthenticationChallenge'),
+          contains(
+            'class ClientCertChallenge extends UrlAuthenticationChallenge',
+          ),
         );
         expect(
           output,
-          contains('class HttpAuthChallenge extends UrlAuthenticationChallenge'),
+          contains(
+            'class HttpAuthChallenge extends UrlAuthenticationChallenge',
+          ),
         );
       },
     );
@@ -156,8 +160,11 @@ void main() {
       // generated concrete base.
       expect(
         output,
-        contains('class ServerTrustAuthResponse extends UrlAuthenticationChallenge'),
-        reason: 'Without `extends`, `isA<UrlAuthenticationChallenge>()` would '
+        contains(
+          'class ServerTrustAuthResponse extends UrlAuthenticationChallenge',
+        ),
+        reason:
+            'Without `extends`, `isA<UrlAuthenticationChallenge>()` would '
             'be false at runtime — defeating the purpose of the hierarchy.',
       );
     });

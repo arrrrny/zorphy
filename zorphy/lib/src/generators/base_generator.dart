@@ -39,8 +39,7 @@ abstract class ConcreteClassGenerator implements CodeGenerator {
 abstract class AbstractClassGenerator implements CodeGenerator {
   @override
   /// Returns true when the target class is abstract.
-  bool shouldGenerate(GenerationContext context) =>
-      context.metadata.isAbstract;
+  bool shouldGenerate(GenerationContext context) => context.metadata.isAbstract;
 }
 
 /// Base class for generators that run for both abstract and concrete.

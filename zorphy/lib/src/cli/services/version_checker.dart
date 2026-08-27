@@ -12,16 +12,12 @@ import '../models/update_result.dart';
 /// Functional type for fetching JSON from a URL.
 /// Returns the response body as a string, or throws on network/HTTP errors.
 /// Used to allow injecting a mock in tests without implementing HttpClientResponse.
-typedef FetchJsonFunction = Future<String> Function(
-  String url, {
-  Duration? timeout,
-});
+typedef FetchJsonFunction =
+    Future<String> Function(String url, {Duration? timeout});
 
 /// Functional type for running a subprocess.
-typedef RunProcessFunction = Future<ProcessResult> Function(
-  String executable,
-  List<String> args,
-);
+typedef RunProcessFunction =
+    Future<ProcessResult> Function(String executable, List<String> args);
 
 /// Service that checks the latest published version of zorphy on pub.dev
 /// and can perform a self-update via `dart pub global activate`.
@@ -84,7 +80,8 @@ class VersionChecker {
       return UpdateCheckResult(
         currentVersion: currentVersion,
         updateAvailable: false,
-        message: 'Network error: Could not reach $apiBaseUrl. '
+        message:
+            'Network error: Could not reach $apiBaseUrl. '
             'Check your internet connection.',
       );
     } on FormatException catch (e) {
@@ -140,14 +137,16 @@ class VersionChecker {
       if (result.exitCode == 0) {
         return UpdateResult(
           success: true,
-          message: 'Successfully updated $packageName. '
+          message:
+              'Successfully updated $packageName. '
               'Run `zorphy_cli --version` to verify.',
         );
       } else {
         return UpdateResult(
           success: false,
           exitCode: result.exitCode,
-          message: '`dart pub global activate $packageName` failed.\n'
+          message:
+              '`dart pub global activate $packageName` failed.\n'
               '${result.stderr}',
         );
       }
@@ -177,14 +176,16 @@ class VersionChecker {
       } else {
         return UpdateResult(
           success: true,
-          message: 'Update applied but version verification failed. '
+          message:
+              'Update applied but version verification failed. '
               'Run `zorphy_cli --version` to check manually.',
         );
       }
     } catch (e) {
       return UpdateResult(
         success: true,
-        message: 'Update applied but could not verify. '
+        message:
+            'Update applied but could not verify. '
             'Run `zorphy_cli --version` to check.',
       );
     }
@@ -291,34 +292,41 @@ class VersionChecker {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10);
     try {
-      return await Future.value(null).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () async {
-          throw TimeoutException('HTTP request timed out after 10 seconds');
-        },
-      ).then((_) async {
-        final request = await client.getUrl(uri);
-        request.headers.set('User-Agent',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.0');
-        request.headers.set('Accept', 'application/json');
-        final response = await request.close();
+      return await Future.value(null)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () async {
+              throw TimeoutException('HTTP request timed out after 10 seconds');
+            },
+          )
+          .then((_) async {
+            final request = await client.getUrl(uri);
+            request.headers.set(
+              'User-Agent',
+              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.0',
+            );
+            request.headers.set('Accept', 'application/json');
+            final response = await request.close();
 
-        if (response.statusCode != 200) {
-          throw HttpException(
-            'pub.dev API returned status ${response.statusCode}',
-            uri: uri,
-          );
-        }
+            if (response.statusCode != 200) {
+              throw HttpException(
+                'pub.dev API returned status ${response.statusCode}',
+                uri: uri,
+              );
+            }
 
-        return await response.transform(utf8.decoder).join();
-      });
+            return await response.transform(utf8.decoder).join();
+          });
     } finally {
       client.close(force: true);
     }
   }
 
   /// Run a subprocess.
-  Future<ProcessResult> _runProcess(String executable, List<String> args) async {
+  Future<ProcessResult> _runProcess(
+    String executable,
+    List<String> args,
+  ) async {
     if (processRunner != null) {
       return processRunner!(executable, args);
     }

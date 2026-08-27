@@ -102,10 +102,12 @@ class ValueEqualityGenerator extends ConcreteClassGenerator {
       m.docs.add('/// Value equality that ignores the auto-generated `id`');
       m.docs.add('/// field (and any other field listed in');
       m.docs.add('/// `@Zorphy(equalityExcludes: ...)`). See issue #127.');
-      m.requiredParameters.add(Parameter((p) {
-        p.name = 'other';
-        p.type = refer('Object');
-      }));
+      m.requiredParameters.add(
+        Parameter((p) {
+          p.name = 'other';
+          p.type = refer('Object');
+        }),
+      );
       m.body = Code(body.join('\n'));
     });
   }
@@ -135,8 +137,9 @@ class ValueEqualityGenerator extends ConcreteClassGenerator {
         'ToJson(this);',
       );
     } else {
-      final toJsonArgs =
-          metadata.generics.map((g) => 'toJson${g.name}').join(', ');
+      final toJsonArgs = metadata.generics
+          .map((g) => 'toJson${g.name}')
+          .join(', ');
       body.add(
         'final Map<String, dynamic> data = _\$$className'
         'ToJson(this, $toJsonArgs);',
@@ -162,10 +165,12 @@ class ValueEqualityGenerator extends ConcreteClassGenerator {
       m.docs.add('/// type for deduplication. See issue #127.');
       if (metadata.generics.isNotEmpty) {
         for (final g in metadata.generics) {
-          m.requiredParameters.add(Parameter((p) {
-            p.name = 'toJson${g.name}';
-            p.type = refer('Object? Function(${g.name} value)');
-          }));
+          m.requiredParameters.add(
+            Parameter((p) {
+              p.name = 'toJson${g.name}';
+              p.type = refer('Object? Function(${g.name} value)');
+            }),
+          );
         }
       }
       m.body = Code(body.join('\n'));
