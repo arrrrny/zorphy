@@ -68,5 +68,8 @@ app.*.map.json
 .**
 # But allow .github directory for workflows
 !.github/
+# Allow the GYM training artifacts (spec 022 / issue #397) — the miki
+# GYM runner consumes .gym/gym.yaml from each package.
+!zorphy/.gym/
 .handoffs
 .contracts

@@ -1,0 +1,6 @@
+{
+  "name": "Espresso",
+  "price": 4.5,
+  "stock": 12,
+  "tags": ["hot", "small"]
+}
