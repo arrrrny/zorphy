@@ -48,3 +48,13 @@ and CLI reference.
 This rule ensures code generation integrity and reproducible builds.
 
 -- auto-added by assistant for zorphy code generation integrity
+
+## 🔍 Code Search — MANDATORY FIRST STEP
+
+**STOP. Before using `grep`, `find`, `rg`, `ripgrep`, or ANY shell-based search, you MUST use semantic search first.**
+
+```
+mcp__claude_context__search_code(query="what you're looking for", path="/absolute/path/to/repo")
+```
+
+**Why?** Semantic search understands code relationships, finds implementations by meaning (not just text), and catches things grep misses entirely.
