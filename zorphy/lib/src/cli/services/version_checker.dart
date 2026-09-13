@@ -13,12 +13,16 @@ import '../models/update_result.dart';
 /// Functional type for fetching JSON from a URL.
 /// Returns the response body as a string, or throws on network/HTTP errors.
 /// Used to allow injecting a mock in tests without implementing HttpClientResponse.
-typedef FetchJsonFunction =
-    Future<String> Function(String url, {Duration? timeout});
+typedef FetchJsonFunction = Future<String> Function(
+  String url, {
+  Duration? timeout,
+});
 
 /// Functional type for running a subprocess.
-typedef RunProcessFunction =
-    Future<ProcessResult> Function(String executable, List<String> args);
+typedef RunProcessFunction = Future<ProcessResult> Function(
+  String executable,
+  List<String> args,
+);
 
 /// Service that checks the latest published version of zorphy on pub.dev
 /// and can perform a self-update via `dart pub global activate`.
