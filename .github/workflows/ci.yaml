@@ -50,7 +50,16 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
         working-directory: zorphy/example
       - name: Archive prepared workspace
-        run: tar -czf prepared-workspace.tar.gz --exclude=.git .
+        # build_runner's exit-path flushes can still touch .dart_tool files
+        # seconds after it exits, making tar fail with "file changed as we
+        # read it". Retry once after a short settle window rather than
+        # flaking the whole gate on the race.
+        run: |
+          tar -czf prepared-workspace.tar.gz --exclude=.git . || {
+            sleep 5
+            rm -f prepared-workspace.tar.gz
+            tar -czf prepared-workspace.tar.gz --exclude=.git .
+          }
       - name: Upload prepared workspace
         uses: actions/upload-artifact@v4
         with:
