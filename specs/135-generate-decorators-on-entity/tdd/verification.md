@@ -34,14 +34,15 @@ production files' feature changes, which is verifiable via
 
 | Command | Result |
 |---|---|
-| `dart test test/generation/decorator_preservation_test.dart` | `+20: All tests passed!` |
-| `dart test test/generation/decorator_preservation_e2e_test.dart` | `+7: All tests passed!` |
-| `cd example && dart run build_runner build` (2nd pass) | `192 skipped` — stable, no regeneration |
-| `cd example && rm -rf .dart_tool/build && dart run build_runner build` (cold) | 163 outputs; artifact contains ported decorators, zero directive re-emissions, zero cascade (`$$Task` etc.) classes |
+| `dart test test/generation/decorator_preservation_test.dart` | `+23: All tests passed!` |
+| `dart test test/generation/decorator_preservation_e2e_test.dart` | `+6: All tests passed!` |
+| `cd example && dart run build_runner build` (2nd pass) | `94 skipped, 1 same` — stable, no regeneration |
+| `cd example && dart run build_runner build --delete-conflicting-outputs` (cold) | 163 outputs; artifact contains ported decorators, zero directive re-emissions, zero cascade (`$$Task` etc.) classes |
 | `dart analyze` (changed files) | `No issues found!` |
 | `dart analyze` (package) | `No issues found!` |
-| `dart test` (full suite) | `+317: All tests passed!` |
-| `dart format` (7 touched files) | clean; re-run after format still `+27: All tests passed!` |
+| `dart test` (full suite) | `+319: All tests passed!` |
+| `dart format --output=none --set-exit-if-changed .` (run without `dart pub get`, as the CI `format` job does) | `0 changed`, exit 0 |
+| `dart analyze` in `example/` with `**/*.zorphy.dart` un-excluded | zero errors attributable to `decorator_preservation.*` (was 38) |
 
 ## 4. Test-strength audit (mutation spot-check)
 
@@ -74,12 +75,12 @@ analyzer clean).
 
 | Criterion (spec.md) | Covered by |
 |---|---|
-| SC-1 Cacheable ports to generated classes | U2, U4, U5; A1 (e2e) |
-| SC-2 mixed positional/named/const args verbatim | U6, U7; A3 (e2e, `@Throttle(30, per: Duration(seconds: 5))`) |
-| SC-3 N decorators, both generated classes, source order | U3, U4, U5; A1, A3, A4 (e2e incl. sealed base + subtype) |
-| SC-4 no-op without decorators | U10, U10b; A3 (e2e `Plain`); full suite 317/317 |
+| SC-1 Cacheable ports to the generated class | U2, U4, U5; A1 (e2e concrete `class Task`) |
+| SC-2 mixed positional/named/const args verbatim | U6, U7; A5 (e2e `@Throttle(30, per: Duration(seconds: 5))` on `Report`) |
+| SC-3 N decorators, every generated shape, source order | U3, U4, U5; A1, A5, A6 (e2e: concrete `Task`/`Report`, sealed base `Character`, subtype `Hero`) |
+| SC-4 no-op without decorators | U10, U10b; A3 (e2e decorator-free `Plain`); full suite 319/319 |
 | SC-5 no directive re-emission | U3, U9; A2 (e2e); cold-rebuild cascade check |
-| SC-6 analyze + suites | both `dart analyze` runs clean; 317/317 + 27 new tests |
+| SC-6 analyze + suites | both `dart analyze` runs clean; 319/319 + 29 new tests (23 unit, 6 e2e) |
 
 ## 7. Remediation tasks
 

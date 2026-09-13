@@ -304,6 +304,43 @@ void main() {
       expect(common_helpers.extractClassDecorators(element), ['Immutable()']);
     });
 
+    test('filters prefixed directives by source fallback', () {
+      // No resolved element: `@dep.Zorphy(...)` must still be recognised
+      // as a directive from its source text alone.
+      final element = _StubClassElement(
+        'Task',
+        annotations: [
+          const _SourceOnlyAnnotation('@dep.Zorphy(generateJson: true)'),
+          const _SourceOnlyAnnotation('@Immutable()'),
+        ],
+      );
+      expect(common_helpers.extractClassDecorators(element), ['Immutable()']);
+    });
+
+    test('filters named-constructor directives by source fallback', () {
+      // No resolved element: `@Zorphy.named()` must still be filtered —
+      // the fallback cannot tell a named constructor from an import
+      // prefix, so both segments are checked.
+      final element = _StubClassElement(
+        'Task',
+        annotations: [
+          const _SourceOnlyAnnotation('@Zorphy.named()'),
+          const _SourceOnlyAnnotation('@Immutable()'),
+        ],
+      );
+      expect(common_helpers.extractClassDecorators(element), ['Immutable()']);
+    });
+
+    test('keeps prefixed custom decorators with the prefix intact', () {
+      final element = _StubClassElement(
+        'Task',
+        annotations: [const _SourceOnlyAnnotation('@prefix.Cacheable(ttl: 1)')],
+      );
+      expect(common_helpers.extractClassDecorators(element), [
+        'prefix.Cacheable(ttl: 1)',
+      ]);
+    });
+
     test('returns empty for directive-only raw class', () {
       final element = _StubClassElement(
         'Task',

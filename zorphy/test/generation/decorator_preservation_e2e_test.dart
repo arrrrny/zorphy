@@ -43,15 +43,6 @@ void main() {
       },
     );
 
-    test('US3: @Cacheable ports to generated concrete Task as well', () {
-      final annotations = _annotationsAbove(output, RegExp(r'^class Task\b'));
-      expect(
-        annotations,
-        contains('@Cacheable(ttl: Duration(hours: 1))'),
-        reason: 'custom decorator @Cacheable was dropped from concrete Task',
-      );
-    });
-
     test(
       'SC-2/SC-3: multiple decorators with mixed args port verbatim, in order',
       () {

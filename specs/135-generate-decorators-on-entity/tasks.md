@@ -43,7 +43,7 @@ description: "Task list for feature 135 — preserve custom decorators on genera
 ## Phase 4: End-to-end fixture proof (US1–US4)
 
 ^- [x] **T009** [P] [Setup] Add e2e fixture `zorphy/example/lib/various/decorator_preservation.dart`: custom decorator classes (`Cacheable`, `Throttle`, `Immutable`, `Audited`, `Endpoint`) + raw entities: one with `@Cacheable(ttl: Duration(hours: 1)) @Zorphy(generateJson: true)`, one mixing decorators, one with NO custom decorators; plus a dummy importable decorator library for an import-prefixed decorator case if feasible within fixture constraints.
-^- [x] **T010** [US1–US4] **TEST-FIRST** Failing e2e test `zorphy/test/generation/decorator_preservation_e2e_test.dart` following the `issue_109_extends_test.dart` pattern (fail with build command if artifact missing): assert `@Cacheable(ttl: Duration(hours: 1))` on `$Task` and on concrete `Task`; assert `@Zorphy` absent from generated classes; assert decorator-free entity emits no ported annotations. Run `cd zorphy/example && dart run build_runner build` to regenerate fixtures and make GREEN.
+^- [x] **T010** [US1–US4] **TEST-FIRST** Failing e2e test `zorphy/test/generation/decorator_preservation_e2e_test.dart` following the `issue_109_extends_test.dart` pattern (fail with build command if artifact missing): assert `@Cacheable(ttl: Duration(hours: 1))` on the generated concrete `Task` and, for the `$$`/`$` hierarchy, `@Audited()` on the sealed base plus `@Cacheable(ttl: Duration(minutes: 5))` on the concrete subtype; assert `@Zorphy` absent from generated classes; assert decorator-free entity emits no ported annotations. Run `cd zorphy/example && dart run build_runner build` to regenerate fixtures and make GREEN.
 
 ## Phase 5: Non-behavioural hardening + regression (US5)
 
