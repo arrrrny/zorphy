@@ -1,5 +1,7 @@
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
+
 import '../models/entity_config.dart';
 import '../utils/naming_utils.dart';
 

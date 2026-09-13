@@ -45,19 +45,16 @@ void main() {
       expect(output, contains("case 'doors':"));
     });
 
-    test('InterfaceCar copyWithField uses parent Field type (Field<Vehicle, T>)', () {
-      // The override uses Field<Vehicle, T> (parent type), NOT Field<InterfaceCar, T>.
-      // This keeps the override LSP-safe: both parent and child Field tokens
-      // are accepted via Dart's declaration-site covariance.
-      expect(
-        output,
-        contains('Field<Vehicle, T> field'),
-      );
-      expect(
-        output,
-        isNot(contains('Field<InterfaceCar, T> field')),
-      );
-    });
+    test(
+      'InterfaceCar copyWithField uses parent Field type (Field<Vehicle, T>)',
+      () {
+        // The override uses Field<Vehicle, T> (parent type), NOT Field<InterfaceCar, T>.
+        // This keeps the override LSP-safe: both parent and child Field tokens
+        // are accepted via Dart's declaration-site covariance.
+        expect(output, contains('Field<Vehicle, T> field'));
+        expect(output, isNot(contains('Field<InterfaceCar, T> field')));
+      },
+    );
 
     test('InterfaceCar copyWithField has @override annotation', () {
       expect(output, contains('@override'));
@@ -88,27 +85,23 @@ void main() {
   });
 
   group('behavior: runner executed in example package context', () {
-    test(
-      'all runtime checks pass (including polymorphic path)',
-      () async {
-        final runner = File(
-          'example/tool/interface_copywithfield_behavior_check.dart',
+    test('all runtime checks pass (including polymorphic path)', () async {
+      final runner = File(
+        'example/tool/interface_copywithfield_behavior_check.dart',
+      );
+      if (!runner.existsSync()) {
+        fail(
+          'Behavior runner missing: example/tool/interface_copywithfield_behavior_check.dart',
         );
-        if (!runner.existsSync()) {
-          fail(
-            'Behavior runner missing: example/tool/interface_copywithfield_behavior_check.dart',
-          );
-        }
-        final result = await Process.run('dart', [
-          'run',
-          'tool/interface_copywithfield_behavior_check.dart',
-        ], workingDirectory: 'example');
-        final stdoutText = result.stdout as String;
-        // Surface the runner output for CI debugging on failure.
-        expect(stdoutText, contains('ALL CHECKS PASSED'));
-        expect(result.exitCode, 0, reason: stdoutText);
-      },
-      timeout: const Timeout(Duration(minutes: 2)),
-    );
+      }
+      final result = await Process.run('dart', [
+        'run',
+        'tool/interface_copywithfield_behavior_check.dart',
+      ], workingDirectory: 'example');
+      final stdoutText = result.stdout as String;
+      // Surface the runner output for CI debugging on failure.
+      expect(stdoutText, contains('ALL CHECKS PASSED'));
+      expect(result.exitCode, 0, reason: stdoutText);
+    }, timeout: const Timeout(Duration(minutes: 2)));
   });
 }

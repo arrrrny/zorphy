@@ -1,6 +1,7 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:source_gen/source_gen.dart';
+
 import '../common/NameType.dart';
 import '../common/helpers.dart' as common_helpers;
 import '../helpers.dart' as codegen_helpers;
@@ -239,9 +240,9 @@ class ClassAnalyzer {
       // Read the subtype's own @Zorphy(subtypeWireValue: ...) so the
       // base's dispatch can match the wire value the remote API sends.
       // Defaults to null -> clean class name (resolved at codegen time).
-      final subtypeWireValue = _readSubtypeAnnotation(
-        el,
-      )?.peek('subtypeWireValue')?.stringValue;
+      final subtypeWireValue = _readSubtypeAnnotation(el)
+          ?.peek('subtypeWireValue')
+          ?.stringValue;
       return Interface.fromGenerics(
         el.name ?? "",
         el.typeParameters.map((tp) {

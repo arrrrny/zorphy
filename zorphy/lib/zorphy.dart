@@ -6,6 +6,7 @@
 library zorphy;
 
 export 'src/zorphy_generator.dart';
+
 export 'package:zorphy_annotation/zorphy_annotation.dart';
 
 // Plugin API

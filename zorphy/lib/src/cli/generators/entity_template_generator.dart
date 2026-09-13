@@ -1,4 +1,5 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
+
 import '../models/entity_config.dart';
 
 /// Generates entity template code

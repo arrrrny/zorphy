@@ -853,9 +853,8 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     // boundaries. The character class `[^A-Za-z0-9_]` matches `?`, `>`,
     // `,`, `<`, `)`, etc., so `Function?`, `List<Function>`,
     // `Map<String, Function?>` all hit this branch.
-    return RegExp(
-      r'(?:^|[^A-Za-z0-9_])Function(?:$|[^A-Za-z0-9_])',
-    ).hasMatch(cleaned);
+    return RegExp(r'(?:^|[^A-Za-z0-9_])Function(?:$|[^A-Za-z0-9_])')
+        .hasMatch(cleaned);
   }
 
   /// Computes the effective [JsonKeyInfo] to emit for [field].

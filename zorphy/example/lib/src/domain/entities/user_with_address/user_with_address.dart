@@ -2,6 +2,7 @@
 /// Generated at: 2026-02-06T20:16:39.573564
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
+
 import '../address/address.dart';
 
 part 'user_with_address.zorphy.dart';

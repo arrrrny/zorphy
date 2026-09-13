@@ -18,6 +18,7 @@
 // (the concrete form, via helpers.replaceDollarTypesWithConcrete), matching
 // the field's declared type and resolving cleanly.
 import 'package:zorphy_annotation/zorphy_annotation.dart';
+
 import '../issue117_ref/issue117_ref.dart';
 
 part 'issue117_repro.zorphy.dart';

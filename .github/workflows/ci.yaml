@@ -23,9 +23,15 @@ jobs:
         run: dart format --output=none --set-exit-if-changed .
         working-directory: zorphy
 
-  analyze:
+  # Runs the shared pub-get + example build_runner work once and uploads the
+  # whole workspace (incl. .dart_tool and generated sources) as an artifact so
+  # the analyze/test/build_runner_smoke/analyzer_compat jobs can reuse it
+  # instead of each repeating the 1-3 min codegen. The committed example
+  # pubspec.lock pins identical resolution in every leg, so the artifact is
+  # byte-identical for all consumers; analyzer_compat still re-resolves zorphy
+  # itself with its pinned analyzer after restoring.
+  prepare:
     runs-on: ubuntu-latest
-    needs: version_sync
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
@@ -37,6 +43,34 @@ jobs:
       - name: Install dependencies (zorphy)
         run: dart pub get
         working-directory: zorphy
+      - name: Install dependencies (example)
+        run: dart pub get
+        working-directory: zorphy/example
+      - name: Run build_runner (example)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: zorphy/example
+      - name: Archive prepared workspace
+        run: tar -czf prepared-workspace.tar.gz --exclude=.git .
+      - name: Upload prepared workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-workspace
+          path: prepared-workspace.tar.gz
+          retention-days: 1
+
+  analyze:
+    runs-on: ubuntu-latest
+    needs: [version_sync, prepare]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - uses: actions/download-artifact@v4
+        with:
+          name: prepared-workspace
+      - name: Restore prepared workspace
+        run: tar -xzf prepared-workspace.tar.gz
       - name: Analyze (zorphy_annotation)
         run: dart analyze
         working-directory: zorphy_annotation
@@ -46,55 +80,41 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: [version_sync, format]
+    needs: [version_sync, format, prepare]
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
-      - name: Install dependencies (zorphy_annotation)
-        run: dart pub get
-        working-directory: zorphy_annotation
-      - name: Install dependencies (zorphy)
-        run: dart pub get
-        working-directory: zorphy
-      - name: Install dependencies (example)
-        run: dart pub get
-        working-directory: zorphy/example
-      - name: Run build_runner (example)
-        run: dart run build_runner build --delete-conflicting-outputs
-        working-directory: zorphy/example
+      - uses: actions/download-artifact@v4
+        with:
+          name: prepared-workspace
+      - name: Restore prepared workspace
+        run: tar -xzf prepared-workspace.tar.gz
       - name: Run tests (zorphy)
         run: dart test
         working-directory: zorphy
 
   build_runner_smoke:
     runs-on: ubuntu-latest
-    needs: version_sync
+    needs: [version_sync, prepare]
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
-      - name: Install dependencies (zorphy_annotation)
-        run: dart pub get
-        working-directory: zorphy_annotation
-      - name: Install dependencies (zorphy)
-        run: dart pub get
-        working-directory: zorphy
-      - name: Install dependencies (example)
-        run: dart pub get
-        working-directory: zorphy/example
-      - name: Run build_runner (example)
-        run: dart run build_runner build --delete-conflicting-outputs
-        working-directory: zorphy/example
+      - uses: actions/download-artifact@v4
+        with:
+          name: prepared-workspace
+      - name: Restore prepared workspace
+        run: tar -xzf prepared-workspace.tar.gz
       - name: Verify generated code analyzes clean
         run: dart analyze
         working-directory: zorphy/example
 
   analyzer_compat:
     runs-on: ubuntu-latest
-    needs: version_sync
+    needs: [version_sync, prepare]
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +124,11 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
+      - uses: actions/download-artifact@v4
+        with:
+          name: prepared-workspace
+      - name: Restore prepared workspace
+        run: tar -xzf prepared-workspace.tar.gz
       - name: Pin analyzer ${{ matrix.analyzer }}.x
         working-directory: zorphy
         run: |
@@ -128,12 +153,6 @@ jobs:
       - name: Analyze (analyzer ${{ matrix.analyzer }})
         run: dart analyze lib
         working-directory: zorphy
-      - name: Install dependencies (example)
-        run: dart pub get
-        working-directory: zorphy/example
-      - name: Run build_runner (example)
-        run: dart run build_runner build --delete-conflicting-outputs
-        working-directory: zorphy/example
       - name: Run tests (analyzer ${{ matrix.analyzer }})
         run: dart test
         working-directory: zorphy

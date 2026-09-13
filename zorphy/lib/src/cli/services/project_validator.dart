@@ -8,9 +8,11 @@
 library;
 
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+
 import '../models/validation_result.dart';
 
 /// Runs all validation checks against a project directory and returns
@@ -154,8 +156,7 @@ class ProjectValidator {
             message: "'zorphy_annotation' not found in dependencies",
             severity: ValidationSeverity.error,
             filePath: pubspecPath,
-            fixSuggestion:
-                "Add 'zorphy_annotation: ^2.0.0' to dependencies in pubspec.yaml",
+            fixSuggestion: "Add 'zorphy_annotation: ^2.0.0' to dependencies in pubspec.yaml",
           ),
         );
       }
@@ -164,8 +165,7 @@ class ProjectValidator {
       if (!_yamlKeyExists(devDepsText, 'build_runner')) {
         findings.add(
           ValidationFinding(
-            message:
-                "'build_runner' not found in dev_dependencies (required for code generation)",
+            message: "'build_runner' not found in dev_dependencies (required for code generation)",
             severity: ValidationSeverity.warning,
             filePath: pubspecPath,
             fixSuggestion: 'Add dev dependency: dart pub add dev:build_runner',

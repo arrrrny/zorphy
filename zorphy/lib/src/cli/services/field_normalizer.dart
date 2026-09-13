@@ -1,5 +1,7 @@
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
+
 import '../models/entity_config.dart';
 import '../utils/naming_utils.dart';
 
@@ -119,14 +121,12 @@ class FieldNormalizer {
       // produce false positives (issue #310 hardening).
       final content = _stripComments(raw);
 
-      if (RegExp(
-        r'abstract\s+class\s+\$\$' + typeName + r'\b',
-      ).hasMatch(content)) {
+      if (RegExp(r'abstract\s+class\s+\$\$' + typeName + r'\b')
+          .hasMatch(content)) {
         return '\$\$';
       }
-      if (RegExp(
-        r'abstract\s+class\s+\$' + typeName + r'\b',
-      ).hasMatch(content)) {
+      if (RegExp(r'abstract\s+class\s+\$' + typeName + r'\b')
+          .hasMatch(content)) {
         return '\$';
       }
     } catch (_) {}

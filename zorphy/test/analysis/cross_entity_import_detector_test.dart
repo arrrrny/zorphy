@@ -261,12 +261,10 @@ abstract class \$ArtifactStore {
         },
       );
 
-      test(
-        'flags \$Ref even when ../other/artifact_ref.dart is imported (regression for finding #2)',
-        () {
-          // The canonical pattern `ref/ref.dart` should NOT match
-          // `../other/artifact_ref.dart` even though it ends with `ref.dart`.
-          final result = CrossEntityImportDetector.detect('''
+      test('flags \$Ref even when ../other/artifact_ref.dart is imported (regression for finding #2)', () {
+        // The canonical pattern `ref/ref.dart` should NOT match
+        // `../other/artifact_ref.dart` even though it ends with `ref.dart`.
+        final result = CrossEntityImportDetector.detect('''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../other/artifact_ref.dart';
 part 'holder.zorphy.dart';
@@ -276,23 +274,19 @@ abstract class \$Holder {
   \$Ref get ref;
 }
 ''');
-          expect(result.detectedTypes, {'\$Ref'});
-          expect(
-            result.hasMissing,
-            isTrue,
-            reason:
-                'artifact_ref.dart does not match the canonical ref/ref.dart pattern',
-          );
-          final comment = result.toGuidanceComment()!;
-          expect(comment, contains("import '../ref/ref.dart';"));
-        },
-      );
+        expect(result.detectedTypes, {'\$Ref'});
+        expect(
+          result.hasMissing,
+          isTrue,
+          reason: 'artifact_ref.dart does not match the canonical ref/ref.dart pattern',
+        );
+        final comment = result.toGuidanceComment()!;
+        expect(comment, contains("import '../ref/ref.dart';"));
+      });
 
-      test(
-        'does NOT flag when the canonical snake/snake.dart import is present (regression for finding #2)',
-        () {
-          // Verify that the canonical `ref/ref.dart` pattern DOES match correctly.
-          final result = CrossEntityImportDetector.detect('''
+      test('does NOT flag when the canonical snake/snake.dart import is present (regression for finding #2)', () {
+        // Verify that the canonical `ref/ref.dart` pattern DOES match correctly.
+        final result = CrossEntityImportDetector.detect('''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../ref/ref.dart';
 part 'holder.zorphy.dart';
@@ -302,14 +296,13 @@ abstract class \$Holder {
   \$Ref get ref;
 }
 ''');
-          expect(result.detectedTypes, {'\$Ref'});
-          expect(
-            result.hasMissing,
-            isFalse,
-            reason: 'The canonical ref/ref.dart import is present',
-          );
-        },
-      );
+        expect(result.detectedTypes, {'\$Ref'});
+        expect(
+          result.hasMissing,
+          isFalse,
+          reason: 'The canonical ref/ref.dart import is present',
+        );
+      });
     });
 
     group('snake_case conversion', () {
@@ -324,29 +317,26 @@ abstract class \$Holder {
         );
       });
 
-      test(
-        'converts acronym-style names matching NamingUtils behavior (regression for finding #3)',
-        () {
-          // The toSnakeCase implementation now matches NamingUtils.toSnakeCase
-          // from the CLI, which inserts `_` before EVERY uppercase letter
-          // (except the first). This means `HTTPServer` -> `h_t_t_p_server`,
-          // not `httpserver` or `http_server`.
-          expect(
-            CrossEntityImportDetector.toSnakeCase('HTTPServer'),
-            'h_t_t_p_server',
-            reason: 'Should match NamingUtils behavior for acronyms',
-          );
-          expect(
-            CrossEntityImportDetector.toSnakeCase('ArtifactRef'),
-            'artifact_ref',
-          );
-          expect(
-            CrossEntityImportDetector.toSnakeCase('XMLParser'),
-            'x_m_l_parser',
-            reason: 'Each uppercase letter gets its own underscore',
-          );
-        },
-      );
+      test('converts acronym-style names matching NamingUtils behavior (regression for finding #3)', () {
+        // The toSnakeCase implementation now matches NamingUtils.toSnakeCase
+        // from the CLI, which inserts `_` before EVERY uppercase letter
+        // (except the first). This means `HTTPServer` -> `h_t_t_p_server`,
+        // not `httpserver` or `http_server`.
+        expect(
+          CrossEntityImportDetector.toSnakeCase('HTTPServer'),
+          'h_t_t_p_server',
+          reason: 'Should match NamingUtils behavior for acronyms',
+        );
+        expect(
+          CrossEntityImportDetector.toSnakeCase('ArtifactRef'),
+          'artifact_ref',
+        );
+        expect(
+          CrossEntityImportDetector.toSnakeCase('XMLParser'),
+          'x_m_l_parser',
+          reason: 'Each uppercase letter gets its own underscore',
+        );
+      });
 
       test('handles single-word names', () {
         expect(CrossEntityImportDetector.toSnakeCase('User'), 'user');
