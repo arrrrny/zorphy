@@ -33,10 +33,7 @@ void main() {
       'SC-1: @Cacheable(ttl: Duration(hours: 1)) ports to generated Task',
       () {
         // Plain entities emit a single generated concrete class.
-        final annotations = _annotationsAbove(
-          output,
-          RegExp(r'^class Task\b'),
-        );
+        final annotations = _annotationsAbove(output, RegExp(r'^class Task\b'));
         expect(annotations, isNotEmpty, reason: 'generated Task not found');
         expect(
           annotations,
@@ -47,10 +44,7 @@ void main() {
     );
 
     test('US3: @Cacheable ports to generated concrete Task as well', () {
-      final annotations = _annotationsAbove(
-        output,
-        RegExp(r'^class Task\b'),
-      );
+      final annotations = _annotationsAbove(output, RegExp(r'^class Task\b'));
       expect(
         annotations,
         contains('@Cacheable(ttl: Duration(hours: 1))'),
@@ -61,11 +55,14 @@ void main() {
     test(
       'SC-2/SC-3: multiple decorators with mixed args port verbatim, in order',
       () {
+        // Plain entities emit a single generated concrete class; both
+        // decorators must sit above it in source order, ahead of the
+        // generator-added @JsonSerializable.
         final annotations = _annotationsAbove(
           output,
-          RegExp(r'^abstract class \$Report\b'),
+          RegExp(r'^class Report\b'),
         );
-        expect(annotations, isNotEmpty, reason: 'generated \$Report not found');
+        expect(annotations, isNotEmpty, reason: 'generated Report not found');
         expect(
           annotations,
           contains('@Throttle(30, per: Duration(seconds: 5))'),
@@ -76,17 +73,12 @@ void main() {
           lessThan(annotations.indexOf('@Audited()')),
           reason: 'decorator source order must be preserved',
         );
-
-        final concrete = _annotationsAbove(
-          output,
-          RegExp(r'^class Report\b'),
-        );
-        expect(concrete, isNotEmpty);
+        // Ported decorators precede the generator-added JsonSerializable.
         expect(
-          concrete,
-          contains('@Throttle(30, per: Duration(seconds: 5))'),
+          _indexOfPrefix(annotations, '@Throttle'),
+          lessThan(_indexOfPrefix(annotations, '@JsonSerializable')),
+          reason: 'user decorators must precede generator-added annotation',
         );
-        expect(concrete, contains('@Audited()'));
       },
     );
 
@@ -109,10 +101,7 @@ void main() {
     );
 
     test('SC-4: decorator-free entity emits no ported class annotations', () {
-      final annotations = _annotationsAbove(
-        output,
-        RegExp(r'^class Plain\b'),
-      );
+      final annotations = _annotationsAbove(output, RegExp(r'^class Plain\b'));
       expect(annotations, isNotEmpty, reason: 'generated Plain not found');
       for (final decorator in ['@Cacheable', '@Throttle', '@Audited']) {
         expect(
@@ -140,15 +129,16 @@ void main() {
 
     test('US3: decorators port to generated concrete subtype classes', () {
       // Raw `$Hero` (with @Cacheable) generates concrete `class Hero`.
-      final annotations = _annotationsAbove(
-        output,
-        RegExp(r'^class Hero\b'),
-      );
+      final annotations = _annotationsAbove(output, RegExp(r'^class Hero\b'));
       expect(annotations, isNotEmpty, reason: 'generated Hero not found');
       expect(annotations, contains('@Cacheable(ttl: Duration(minutes: 5))'));
     });
   });
 }
+
+/// Index of the first element starting with [prefix], or -1.
+int _indexOfPrefix(List<String> list, String prefix) =>
+    list.indexWhere((a) => a.startsWith(prefix));
 
 /// Returns the annotation lines (`@...`) directly above the top-level
 /// class declaration matching [declaration], in source order.

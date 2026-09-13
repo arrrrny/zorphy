@@ -58,6 +58,91 @@ List<ElementAnnotation> _extractAnnotations(dynamic rawMetadata) {
   return [];
 }
 
+/// Annotation names that are generator/build-step directives. They are
+/// consumed from the raw entity and must NOT be ported onto generated
+/// classes.
+///
+/// - `Zorphy` / `Zorphy2`: re-emitting them would make the generated
+///   class (a part of the same library) look like an input entity on
+///   the next build pass, cascading `$$Task`, `$$$Task`, ... generation.
+/// - `JsonSerializable`: synthesised by the generator on the concrete
+///   class; re-emitting the raw class's own copy onto the abstract
+///   generated class would change json_serializable's build behaviour.
+const Set<String> kGeneratorDirectiveAnnotations = {
+  'Zorphy',
+  'Zorphy2',
+  'JsonSerializable',
+};
+
+/// Resolves the plain annotation name for [annotation], preferring the
+/// enclosing class name for constructor-backed annotations (so
+/// `@Zorphy.named()` resolves to `Zorphy`), falling back to the source
+/// text when the element is not resolvable.
+String? _annotationName(ElementAnnotation annotation, String source) {
+  try {
+    final element = annotation.element;
+    if (element != null) {
+      String? enclosing;
+      try {
+        final dynamic dyn = element;
+        enclosing = dyn.enclosingElement?.name;
+      } catch (_) {}
+      if (element is ConstructorElement) {
+        final n = enclosing;
+        if (n != null && n.isNotEmpty) return n;
+      }
+      final name = element.name;
+      if (name != null && name.isNotEmpty) return name;
+      if (enclosing != null && enclosing.isNotEmpty) return enclosing;
+    }
+  } catch (_) {}
+  // Source fallback: `@Foo(...)`, `@prefix.Foo(...)` -> `Foo`.
+  final match = RegExp(r'^@\s*([A-Za-z_$][\w$]*)').firstMatch(source);
+  return match?.group(1);
+}
+
+/// Extracts class-level decorators from a raw entity [ClassElement] as
+/// port-ready source strings.
+///
+/// Each returned string is the annotation's verbatim source with the
+/// leading `@` stripped (code_builder's DartEmitter adds `@` when
+/// emitting an annotation entry). Arguments — positional, named, and
+/// const expressions — are therefore preserved character-for-character,
+/// and import prefixes (e.g. `dep.Tagged(...)`) resolve within the
+/// generated part file's enclosing library.
+///
+/// Directive annotations ([kGeneratorDirectiveAnnotations]) are filtered
+/// out. Returns an empty list when [element] is null, its metadata is
+/// unreadable (e.g. test stubs), or no non-directive decorators exist.
+List<String> extractClassDecorators(ClassElement? element) {
+  if (element == null) return const [];
+  List<ElementAnnotation> annotations;
+  try {
+    annotations = _extractAnnotations((element as dynamic).metadata);
+  } catch (_) {
+    return const [];
+  }
+  final decorators = <String>[];
+  for (final annotation in annotations) {
+    String source;
+    try {
+      source = annotation.toSource();
+    } catch (_) {
+      continue;
+    }
+    if (source.isEmpty) continue;
+    final name = _annotationName(annotation, source);
+    if (name != null && kGeneratorDirectiveAnnotations.contains(name)) {
+      continue;
+    }
+    var decorator = source.startsWith('@') ? source.substring(1) : source;
+    decorator = decorator.trimLeft();
+    if (decorator.isEmpty) continue;
+    decorators.add(decorator);
+  }
+  return List.unmodifiable(decorators);
+}
+
 /// Extracts JsonKey configuration from a field or accessor.
 JsonKeyInfo? extractJsonKeyInfo(Element element) {
   try {

@@ -83,6 +83,20 @@ class ClassMetadata {
   /// All subtypes in this hierarchy (for polymorphic property helpers)
   final List<Interface> polymorphicSubtypes;
 
+  /// Class-level decorators captured from the raw entity source, with
+  /// the leading `@` stripped (code_builder re-adds it when emitting).
+  ///
+  /// Generator/build directives (`Zorphy`, `Zorphy2`,
+  /// `JsonSerializable`) are excluded: they are consumed as build-step
+  /// instructions and must NOT be re-emitted onto generated classes —
+  /// a re-emitted `@Zorphy` would make the generated class look like an
+  /// input entity on the next build pass (generated classes are part of
+  /// the same library), cascading `$$Task`, `$$$Task`, ... generation.
+  ///
+  /// Empty for decorator-free entities, which keeps their generated
+  /// output byte-identical to the pre-#135 behaviour.
+  final List<String> classDecorators;
+
   /// Creates a complete metadata record for a Zorphy class.
   const ClassMetadata({
     required this.originalName,
@@ -107,6 +121,7 @@ class ClassMetadata {
     this.agentDirectiveInfo = const AgentDirectiveInfo(),
     this.namedConstructors = const [],
     this.polymorphicSubtypes = const [],
+    this.classDecorators = const [],
   });
 
   /// Get class name with $ prefix for generated abstract class

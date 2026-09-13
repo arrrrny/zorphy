@@ -43,6 +43,14 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     return Class((c) {
       c.name = className;
 
+      // Port custom class-level decorators from the raw entity (issue
+      // #135). Source strings are `@`-stripped — DartEmitter adds `@`.
+      // Emitted above the class declaration in source order; empty for
+      // decorator-free entities, keeping their output unchanged.
+      for (final decorator in metadata.classDecorators) {
+        c.annotations.add(CodeExpression(Code(decorator)));
+      }
+
       // Modifiers
       if (metadata.isSealed) {
         c.sealed = true;
@@ -126,6 +134,14 @@ class ClassDeclarationGenerator extends UniversalGenerator {
 
     return Class((c) {
       c.name = className;
+
+      // Port custom class-level decorators from the raw entity (issue
+      // #135), ahead of the generator-added @JsonSerializable so the
+      // user's decorator order is preserved on top. Source strings are
+      // `@`-stripped — DartEmitter adds `@`.
+      for (final decorator in metadata.classDecorators) {
+        c.annotations.add(CodeExpression(Code(decorator)));
+      }
 
       // @JsonSerializable annotation
       // NOTE: Do NOT include the `@` prefix here — code_builder's
@@ -853,8 +869,9 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     // boundaries. The character class `[^A-Za-z0-9_]` matches `?`, `>`,
     // `,`, `<`, `)`, etc., so `Function?`, `List<Function>`,
     // `Map<String, Function?>` all hit this branch.
-    return RegExp(r'(?:^|[^A-Za-z0-9_])Function(?:$|[^A-Za-z0-9_])')
-        .hasMatch(cleaned);
+    return RegExp(
+      r'(?:^|[^A-Za-z0-9_])Function(?:$|[^A-Za-z0-9_])',
+    ).hasMatch(cleaned);
   }
 
   /// Computes the effective [JsonKeyInfo] to emit for [field].

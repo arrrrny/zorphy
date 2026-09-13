@@ -104,6 +104,7 @@ class ClassAnalyzer {
       namedConstructors: _extractNamedConstructors(classElement),
       classElement: classElement,
       allAnnotatedClasses: allAnnotatedClasses,
+      classDecorators: common_helpers.extractClassDecorators(classElement),
       polymorphicSubtypes: _extractPolymorphicSubtypes(
         classElement,
         annotation,
@@ -240,9 +241,9 @@ class ClassAnalyzer {
       // Read the subtype's own @Zorphy(subtypeWireValue: ...) so the
       // base's dispatch can match the wire value the remote API sends.
       // Defaults to null -> clean class name (resolved at codegen time).
-      final subtypeWireValue = _readSubtypeAnnotation(el)
-          ?.peek('subtypeWireValue')
-          ?.stringValue;
+      final subtypeWireValue = _readSubtypeAnnotation(
+        el,
+      )?.peek('subtypeWireValue')?.stringValue;
       return Interface.fromGenerics(
         el.name ?? "",
         el.typeParameters.map((tp) {

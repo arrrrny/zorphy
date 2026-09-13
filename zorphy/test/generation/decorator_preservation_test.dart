@@ -29,9 +29,12 @@ import 'package:zorphy/src/models/generation_config.dart';
 // Analyzer stubs
 // ────────────────────────────────────────────────────────────────────
 
-/// Minimal fake [Element] carrying only a name (e.g. the annotation
-/// class `Cacheable` behind a `@Cacheable(...)` annotation).
-class _FakeAnnotationElement implements Element {
+/// Minimal fake [InterfaceElement] carrying only a name (e.g. the
+/// annotation class `Cacheable` behind a `@Cacheable(...)` annotation,
+/// or the enclosing class behind a constructor annotation).
+/// [InterfaceElement] is what `ConstructorElement.enclosingElement`
+/// returns, while still satisfying plain [Element] usages.
+class _FakeAnnotationElement implements InterfaceElement {
   @override
   final String? name;
 
@@ -60,22 +63,38 @@ class _FakeAnnotation implements ElementAnnotation {
   dynamic noSuchMethod(Invocation invocation) => null;
 }
 
-/// [ClassElement] stub; returns [metadataValue] for the `metadata`
-/// getter so the dual-API shim in helpers is exercised, and `null`
-/// (via noSuchMethod) for everything else — same robustness contract
-/// as the repo's other stubs.
+/// [ClassElement] stub; returns a [Metadata]-shaped object wrapping
+/// [annotations] for the `metadata` getter (the dynamic dispatch enforces
+/// the declared `Metadata` return type), and `null` via noSuchMethod for
+/// everything else — same robustness contract as the repo's other stubs.
 class _StubClassElement implements ClassElement {
   @override
   final String name;
 
   final Object? metadataValue;
 
-  _StubClassElement(this.name, {this.metadataValue});
+  _StubClassElement(this.name, {List<ElementAnnotation>? annotations})
+    : metadataValue = annotations == null ? null : _FakeMetadata(annotations);
 
   @override
   dynamic noSuchMethod(Invocation invocation) {
     if (invocation.isGetter && invocation.memberName == #metadata) {
       return metadataValue;
+    }
+    return null;
+  }
+}
+
+/// Stand-in for the analyzer's `Metadata` object returned by
+/// `Element.metadata` on the current analyzer API.
+class _FakeMetadata implements Metadata {
+  final List<ElementAnnotation> annotations;
+  _FakeMetadata(this.annotations);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    if (invocation.isGetter && invocation.memberName == #annotations) {
+      return annotations;
     }
     return null;
   }
@@ -163,7 +182,7 @@ void main() {
       () {
         final element = _StubClassElement(
           'Task',
-          metadataValue: [
+          annotations: [
             _FakeAnnotation(
               '@Cacheable(ttl: Duration(hours: 1))',
               element: _FakeAnnotationElement('Cacheable'),
@@ -179,7 +198,7 @@ void main() {
     test('captures parameterless decorator without synthesising parens', () {
       final element = _StubClassElement(
         'Task',
-        metadataValue: [
+        annotations: [
           _FakeAnnotation(
             '@Audited',
             element: _FakeAnnotationElement('Audited'),
@@ -192,7 +211,7 @@ void main() {
     test('preserves multiple decorators in source order', () {
       final element = _StubClassElement(
         'Task',
-        metadataValue: [
+        annotations: [
           _FakeAnnotation(
             '@Cacheable(ttl: Duration(hours: 1))',
             element: _FakeAnnotationElement('Cacheable'),
@@ -201,7 +220,10 @@ void main() {
             '@Immutable()',
             element: _FakeAnnotationElement('Immutable'),
           ),
-          _FakeAnnotation('@Audited', element: _FakeAnnotationElement('Audited')),
+          _FakeAnnotation(
+            '@Audited',
+            element: _FakeAnnotationElement('Audited'),
+          ),
         ],
       );
       expect(common_helpers.extractClassDecorators(element), [
@@ -214,7 +236,7 @@ void main() {
     test('keeps import prefix intact', () {
       final element = _StubClassElement(
         'Task',
-        metadataValue: [
+        annotations: [
           _FakeAnnotation(
             "@dep.Tagged('x')",
             element: _FakeAnnotationElement('Tagged'),
@@ -226,18 +248,16 @@ void main() {
       ]);
     });
 
-    test('handles Metadata-object style metadata (new analyzer API)', () {
-      // Some analyzer versions expose element.metadata as a Metadata
-      // object with .annotations instead of a List. The dual-API shim
-      // must handle both.
+    test('skips annotations with empty source safely', () {
       final element = _StubClassElement(
         'Task',
-        metadataValue: _FakeMetadataObject([
+        annotations: [
+          const _SourceOnlyAnnotation(''),
           _FakeAnnotation(
             '@Cacheable(ttl: Duration(hours: 1))',
             element: _FakeAnnotationElement('Cacheable'),
           ),
-        ]),
+        ],
       );
       expect(common_helpers.extractClassDecorators(element), [
         'Cacheable(ttl: Duration(hours: 1))',
@@ -249,7 +269,7 @@ void main() {
     test('filters Zorphy, Zorphy2 and JsonSerializable directives', () {
       final element = _StubClassElement(
         'Task',
-        metadataValue: [
+        annotations: [
           _FakeAnnotation(
             '@Zorphy(generateJson: true)',
             element: _FakeAnnotationElement('Zorphy'),
@@ -276,7 +296,7 @@ void main() {
     test('filters directives by source fallback when element is null', () {
       final element = _StubClassElement(
         'Task',
-        metadataValue: [
+        annotations: [
           const _SourceOnlyAnnotation('@Zorphy(generateJson: true)'),
           const _SourceOnlyAnnotation('@Immutable()'),
         ],
@@ -287,7 +307,7 @@ void main() {
     test('returns empty for directive-only raw class', () {
       final element = _StubClassElement(
         'Task',
-        metadataValue: [
+        annotations: [
           _FakeAnnotation(
             '@Zorphy(generateJson: true)',
             element: _FakeAnnotationElement('Zorphy'),
@@ -303,7 +323,7 @@ void main() {
       // enclosing class name too.
       final element = _StubClassElement(
         'Task',
-        metadataValue: [
+        annotations: [
           _FakeAnnotation(
             '@Zorphy.named()',
             element: _FakeNamedConstructorElement('named', 'Zorphy'),
@@ -388,7 +408,7 @@ void main() {
         generics: const [],
         interfaces: const [],
         allValueTInterfaces: const [],
-        allFields: const [NameTypeClassComment('id', 'String', 'Task')],
+        allFields: [NameTypeClassComment('id', 'String', 'Task')],
         ownFieldNames: const {'id'},
         factoryMethods: const [],
         explicitSubtypes: const [],
@@ -507,13 +527,6 @@ void main() {
 // Additional fakes
 // ────────────────────────────────────────────────────────────────────
 
-/// Stand-in for the new analyzer `Metadata` object style
-/// (`element.metadata.annotations` instead of a bare List).
-class _FakeMetadataObject {
-  final List<ElementAnnotation> annotations;
-  _FakeMetadataObject(this.annotations);
-}
-
 /// Annotation with no resolvable element — the helper must fall back to
 /// the source text for its name (directive filtering still applies).
 class _SourceOnlyAnnotation implements ElementAnnotation {
@@ -528,13 +541,17 @@ class _SourceOnlyAnnotation implements ElementAnnotation {
 }
 
 /// Fake constructor element (name + enclosing class) for annotations
-/// like `@Zorphy.named()`.
-class _FakeNamedConstructorElement implements Element {
+/// like `@Zorphy.named()`. Implements [ConstructorElement] so the
+/// helper's constructor-aware name resolution kicks in.
+class _FakeNamedConstructorElement implements ConstructorElement {
   @override
-  final String? name;
+  String? get name => _name;
+
+  final String _name;
+
   final String enclosingName;
 
-  _FakeNamedConstructorElement(this.name, this.enclosingName);
+  _FakeNamedConstructorElement(this._name, this.enclosingName);
 
   @override
   dynamic noSuchMethod(Invocation invocation) {
