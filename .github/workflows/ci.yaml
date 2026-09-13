@@ -49,17 +49,17 @@ jobs:
       - name: Run build_runner (example)
         run: dart run build_runner build --delete-conflicting-outputs
         working-directory: zorphy/example
-      - name: Archive prepared workspace
-        # build_runner's exit-path flushes can still touch .dart_tool files
-        # seconds after it exits, making tar fail with "file changed as we
-        # read it". Retry once after a short settle window rather than
-        # flaking the whole gate on the race.
+      - name: Detect workspace writers (temporary diagnostic)
         run: |
-          tar -czf prepared-workspace.tar.gz --exclude=.git . || {
-            sleep 5
-            rm -f prepared-workspace.tar.gz
-            tar -czf prepared-workspace.tar.gz --exclude=.git .
-          }
+          echo "=== files modified in trailing 8s windows after build_runner ==="
+          for i in $(seq 1 6); do
+            echo "--- window $i ($(date +%T)) ---"
+            find . -path ./.git -prune -o -type f -newermt '-8 seconds' -print 2>/dev/null | head -30
+            sleep 8
+          done
+          echo "=== detection done ==="
+      - name: Archive prepared workspace
+        run: tar -czf prepared-workspace.tar.gz --exclude=.git .
       - name: Upload prepared workspace
         uses: actions/upload-artifact@v4
         with:
