@@ -7,6 +7,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'decorator_preservation.zorphy.dart';
+part 'decorator_preservation.g.dart';
 
 // ────────────────────────────────────────────────────────────────────
 // Custom decorators (user-authored, not part of zorphy)
@@ -32,9 +33,14 @@ class Audited {
 // ────────────────────────────────────────────────────────────────────
 
 /// Single custom decorator with a named argument (spec SC-1).
+///
+/// Per the repo's raw-entity convention the raw class carries the `$`
+/// prefix, so the generator emits exactly one concrete `class Task` —
+/// the un-prefixed name would collide with that generated declaration in
+/// this same library.
 @Cacheable(ttl: Duration(hours: 1))
 @Zorphy(generateJson: true)
-abstract class Task {
+abstract class $Task {
   String get id;
   String get title;
 }
@@ -44,14 +50,14 @@ abstract class Task {
 @Throttle(30, per: Duration(seconds: 5))
 @Audited()
 @Zorphy(generateJson: true)
-abstract class Report {
+abstract class $Report {
   String get id;
   int get count;
 }
 
 /// No custom decorators at all — output must be unchanged (spec SC-4).
 @Zorphy(generateJson: true)
-abstract class Plain {
+abstract class $Plain {
   String get id;
 }
 

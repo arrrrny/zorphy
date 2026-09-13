@@ -77,7 +77,7 @@ const Set<String> kGeneratorDirectiveAnnotations = {
 /// Resolves the plain annotation name for [annotation], preferring the
 /// enclosing class name for constructor-backed annotations (so
 /// `@Zorphy.named()` resolves to `Zorphy`), falling back to the source
-/// text when the element is not resolvable.
+/// identifier chain when the element is not resolvable.
 String? _annotationName(ElementAnnotation annotation, String source) {
   try {
     final element = annotation.element;
@@ -96,9 +96,14 @@ String? _annotationName(ElementAnnotation annotation, String source) {
       if (enclosing != null && enclosing.isNotEmpty) return enclosing;
     }
   } catch (_) {}
-  // Source fallback: `@Foo(...)`, `@prefix.Foo(...)` -> `Foo`.
-  final match = RegExp(r'^@\s*([A-Za-z_$][\w$]*)').firstMatch(source);
-  return match?.group(1);
+  // Source fallback: `@Foo(...)`, `@prefix.Foo(...)`, `@Foo.named()` ->
+  // `Foo`, `prefix.Foo`, `Foo.named`. The whole identifier chain is kept:
+  // with no resolved element an import prefix and a named constructor are
+  // syntactically identical, so the directive check below tests every
+  // segment — a prefixed `@dep.Zorphy(...)` must not slip past the filter.
+  final match = RegExp(r'^@\s*([A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*)')
+      .firstMatch(source);
+  return match?.group(1)?.replaceAll(RegExp(r'\s+'), '');
 }
 
 /// Extracts class-level decorators from a raw entity [ClassElement] as
@@ -132,7 +137,8 @@ List<String> extractClassDecorators(ClassElement? element) {
     }
     if (source.isEmpty) continue;
     final name = _annotationName(annotation, source);
-    if (name != null && kGeneratorDirectiveAnnotations.contains(name)) {
+    if (name != null &&
+        name.split('.').any(kGeneratorDirectiveAnnotations.contains)) {
       continue;
     }
     var decorator = source.startsWith('@') ? source.substring(1) : source;

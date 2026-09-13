@@ -101,3 +101,36 @@ Fixture switched to the semantically identical `@Audited()`.
 - `dart format` on the 7 touched files → 4 reformatted (test files only);
   suite re-run after formatting: `+27: All tests passed!`
 - Dart-test cache hygiene per repo protocol (`rm -rf .dart_tool/test/`).
+
+---
+
+## Cycle 3 — review-fix pass (post-review hardening)
+
+Fixes applied after the automated review of PR #137:
+
+- **Fixture validity**: raw entities renamed `Task`/`Report`/`Plain` →
+  `$Task`/`$Report`/`$Plain` (the un-prefixed raw names collided with the
+  generated concrete classes in the same library), and the missing
+  `part 'decorator_preservation.g.dart';` added so json_serializable
+  attaches and `_$TaskFromJson`/`_$TaskToJson` resolve. Verified by
+  re-analyzing `example/` with `**/*.zorphy.dart` temporarily un-excluded:
+  zero errors attributable to `decorator_preservation.*` (down from 38).
+- **Directive filter on the source fallback**: `_annotationName` captures
+  the whole identifier chain and `extractClassDecorators` checks every
+  segment, so `@dep.Zorphy(...)` no longer slips past the filter while
+  `@Zorphy.named()` still resolves as a directive when no element is
+  resolvable.
+- **Formatting**: two unrelated `dart format` reflows reverted
+  (`class_analyzer.dart`, `class_declaration_generator.dart`) so the CI
+  `format` job is green again.
+- **Duplicate e2e test** removed (the `US3` case that duplicated `SC-1`).
+
+**GREEN evidence (re-run after the fixes):**
+
+- `dart test test/generation/decorator_preservation_test.dart` → `+23`
+- `cd example && dart run build_runner build` then
+  `dart test test/generation/decorator_preservation_e2e_test.dart` → `+6`
+- `dart test` (full suite) → `+319: All tests passed!`
+- `dart analyze` (workspace) → `No issues found!`
+- CI-mode `dart format --output=none --set-exit-if-changed .` (run without
+  `dart pub get`, as the CI `format` job does) → `0 changed`, exit 0

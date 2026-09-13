@@ -20,10 +20,12 @@ Every behavior traced to a success criterion (SC) in `spec.md`. States:
 
 | ID | Behavior | Traces to | State |
 |----|----------|-----------|-------|
-| A1 | E2E: raw entity `@Cacheable(ttl: Duration(hours: 1)) @Zorphy(generateJson: true) abstract class Task` generates `$Task` and concrete `Task` both preceded by `@Cacheable(ttl: Duration(hours: 1))` in the real build_runner artifact | SC-1, SC-3, US1, US3 | green |
+| A1 | E2E: raw entity `@Cacheable(ttl: Duration(hours: 1)) @Zorphy(generateJson: true) abstract class $Task` generates a single concrete `class Task` preceded by `@Cacheable(ttl: Duration(hours: 1))` in the real build_runner artifact | SC-1, SC-3, US1, US3 | green |
 | A2 | E2E: generated artifact contains no `@Zorphy`/`@Zorphy2` annotation on any generated class | SC-5, US4 | green |
-| A3 | E2E: raw entity without custom decorators emits no ported class-level annotation (no-op output) | SC-4, US5 | green |
-| A4 | E2E: import-prefixed decorator `@dep.Tagged('x')` ports verbatim with prefix | FR-6 | green |
+| A3 | E2E: raw entity without custom decorators (`$Plain`) emits the generated concrete `class Plain` with no ported class-level annotation (no-op output) | SC-4, US5 | green |
+| A4 | Unit: import-prefixed decorator `@dep.Tagged('x')` ports verbatim with the prefix intact (no e2e fixture carries an import prefix) | FR-6 | green |
+| A5 | E2E: raw entity `$Report` with mixed decorators emits `@Throttle(30, per: Duration(seconds: 5))` then `@Audited()` in source order, ahead of the generator-added `@JsonSerializable(...)` | SC-2, SC-3 | green |
+| A6 | E2E: `$$Character` (with `@Audited()`) emits `sealed class Character` carrying `@Audited()`, and `$Hero` (with `@Cacheable(ttl: Duration(minutes: 5))`) emits `class Hero` carrying it | SC-3, US1, US3 | green |
 
 ## Inner (unit) behaviors
 
@@ -32,7 +34,7 @@ Every behavior traced to a success criterion (SC) in `spec.md`. States:
 | U1 | `extractClassDecorators` returns `[]` for null element and for stub element that throws on `.metadata` | FR-5, FR-2 robustness | green |
 | U2 | `extractClassDecorators` captures a custom decorator source with `@` stripped, arguments verbatim | SC-1, SC-2, FR-3 | green |
 | U3 | `extractClassDecorators` filters directives `Zorphy`, `Zorphy2`, `JsonSerializable` but keeps custom ones, preserving order | SC-3, SC-5, FR-4 | green |
-| U4 | Generated abstract `$Task` carries ported decorator(s) in source order, emitted above the class declaration | SC-1, SC-3, US1 | green |
+| U4 | Generated abstract/sealed base class carries ported decorator(s) in source order, emitted above the class declaration | SC-1, SC-3, US1 | green |
 | U5 | Generated concrete `Task` carries ported decorator(s), before the generator-added `@JsonSerializable(...)` | US3 | green |
 | U6 | Mixed positional+named args `@Throttle(30, per: Duration(seconds: 5))` reproduced character-for-character | SC-2, FR-3 | green |
 | U7 | Const expression args `@Endpoint(const ['a','b'], name: 'x')` reproduced verbatim | SC-2, FR-3 | green |

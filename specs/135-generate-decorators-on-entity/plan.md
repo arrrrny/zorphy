@@ -6,7 +6,7 @@
 
 ## Summary
 
-Zorphy's code generator consumes `@Zorphy(...)` as a directive but drops every other class-level decorator from the generated output. This plan makes the generator capture class-level decorator source text from the raw entity element (via the analyzer), filter out build-step directives (`Zorphy`, `Zorphy2`, `JsonSerializable`), and re-emit the remaining decorators — verbatim, in source order — on both generated entity classes (abstract `$Task` and concrete `Task`) in `class_declaration_generator.dart`. Field-level annotation handling is untouched.
+Zorphy's code generator consumes `@Zorphy(...)` as a directive but drops every other class-level decorator from the generated output. This plan makes the generator capture class-level decorator source text from the raw entity element (via the analyzer), filter out build-step directives (`Zorphy`, `Zorphy2`, `JsonSerializable`), and re-emit the remaining decorators — verbatim, in source order — on **every class it emits for that entity** from `class_declaration_generator.dart`. The generated shapes depend on the raw class's prefix: a `$`-prefixed raw entity yields a single concrete class (`$Task` → `class Task`), while a `$$`-prefixed raw base yields a sealed base plus its concrete subtypes (`$$Character` + `$Hero` → `sealed class Character` + `class Hero`). Field-level annotation handling is untouched.
 
 ## Technical Context
 
@@ -122,12 +122,12 @@ At the top of `analyze()`, read `classElement.metadata` through a new public hel
 | Risk | Mitigation |
 |---|---|
 | Re-emitted `@Zorphy` causes recursive generation | Directive filter set; SC-5 asserts no `@Zorphy` on generated classes; e2e double-build stability check (US4.2) |
-| `@JsonSerializable` on a raw class gets re-emitted on abstract `$Task` and breaks json_serializable | `JsonSerializable` in the directive filter set (FR-4) |
+| `@JsonSerializable` on a raw class gets re-emitted on a generated class and breaks json_serializable | `JsonSerializable` in the directive filter set (FR-4) |
 | Output drift for decorator-free entities | `classDecorators` defaults empty; emission loop adds nothing; SC-4 no-op assertion |
 | Analyzer API drift (`List<ElementAnnotation>` vs `Metadata`) | Reuse of the established dual-API shim pattern |
 
 ## Verification Strategy
 
 1. Unit tests (`dart test test/generation/decorator_preservation_test.dart`): stub-element red/green cycles covering SC-1..SC-5 mechanics (order, verbatim args, directive exclusion, no-op).
-2. E2E fixture (`cd zorphy/example && dart run build_runner build`, then `dart test test/generation/decorator_preservation_e2e_test.dart`): real analyzer + real build over a fixture with `@Cacheable`, `@Throttle`, `@Immutable` decorators; asserts on the actual `.zorphy.dart` artifact; includes a no-decorator fixture asserting absence of ported annotations.
+2. E2E fixture (`cd zorphy/example && dart run build_runner build`, then `dart test test/generation/decorator_preservation_e2e_test.dart`): real analyzer + real build over a fixture with `@Cacheable`, `@Throttle`, `@Audited` decorators; asserts on the actual `.zorphy.dart` artifact; includes a no-decorator fixture asserting absence of ported annotations.
 3. Regression: full `dart analyze` on changed files + full existing `dart test` suite in `zorphy/`.
