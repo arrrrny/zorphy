@@ -20,26 +20,27 @@ Every behavior traced to a success criterion (SC) in `spec.md`. States:
 
 | ID | Behavior | Traces to | State |
 |----|----------|-----------|-------|
-| A1 | E2E: raw entity `@Cacheable(ttl: Duration(hours: 1)) @Zorphy(generateJson: true) abstract class Task` generates `$Task` and concrete `Task` both preceded by `@Cacheable(ttl: Duration(hours: 1))` in the real build_runner artifact | SC-1, SC-3, US1, US3 | pending |
-| A2 | E2E: generated artifact contains no `@Zorphy`/`@Zorphy2` annotation on any generated class | SC-5, US4 | pending |
-| A3 | E2E: raw entity without custom decorators emits no ported class-level annotation (no-op output) | SC-4, US5 | pending |
-| A4 | E2E: import-prefixed decorator `@dep.Tagged('x')` ports verbatim with prefix | FR-6 | pending |
+| A1 | E2E: raw entity `@Cacheable(ttl: Duration(hours: 1)) @Zorphy(generateJson: true) abstract class Task` generates `$Task` and concrete `Task` both preceded by `@Cacheable(ttl: Duration(hours: 1))` in the real build_runner artifact | SC-1, SC-3, US1, US3 | green |
+| A2 | E2E: generated artifact contains no `@Zorphy`/`@Zorphy2` annotation on any generated class | SC-5, US4 | green |
+| A3 | E2E: raw entity without custom decorators emits no ported class-level annotation (no-op output) | SC-4, US5 | green |
+| A4 | E2E: import-prefixed decorator `@dep.Tagged('x')` ports verbatim with prefix | FR-6 | green |
 
 ## Inner (unit) behaviors
 
 | ID | Behavior | Traces to | State |
 |----|----------|-----------|-------|
-| U1 | `extractClassDecorators` returns `[]` for null element and for stub element that throws on `.metadata` | FR-5, FR-2 robustness | pending |
-| U2 | `extractClassDecorators` captures a custom decorator source with `@` stripped, arguments verbatim | SC-1, SC-2, FR-3 | pending |
-| U3 | `extractClassDecorators` filters directives `Zorphy`, `Zorphy2`, `JsonSerializable` but keeps custom ones, preserving order | SC-3, SC-5, FR-4 | pending |
-| U4 | Generated abstract `$Task` carries ported decorator(s) in source order, emitted above the class declaration | SC-1, SC-3, US1 | pending |
-| U5 | Generated concrete `Task` carries ported decorator(s), before the generator-added `@JsonSerializable(...)` | US3 | pending |
-| U6 | Mixed positional+named args `@Throttle(30, per: Duration(seconds: 5))` reproduced character-for-character | SC-2, FR-3 | pending |
-| U7 | Const expression args `@Endpoint(const ['a','b'], name: 'x')` reproduced verbatim | SC-2, FR-3 | pending |
-| U8 | Parameterless decorator `@Audited` emitted without synthesised parentheses | US2.3 | pending |
-| U9 | Directives on the raw class never reach generated output (abstract + concrete) | SC-5, US4.1 | pending |
-| U10 | Empty `classDecorators` → emitted spec contains no annotation entries (byte-level no-op for decorator-free entities) | SC-4, FR-5, US5.1 | pending |
-| U11 | Analyzer wiring: `ClassAnalyzer.analyze` populates `classDecorators` from a real (fixture-built) library element | FR-1 | pending |
+| U1 | `extractClassDecorators` returns `[]` for null element and for stub element that throws on `.metadata` | FR-5, FR-2 robustness | green |
+| U2 | `extractClassDecorators` captures a custom decorator source with `@` stripped, arguments verbatim | SC-1, SC-2, FR-3 | green |
+| U3 | `extractClassDecorators` filters directives `Zorphy`, `Zorphy2`, `JsonSerializable` but keeps custom ones, preserving order | SC-3, SC-5, FR-4 | green |
+| U4 | Generated abstract `$Task` carries ported decorator(s) in source order, emitted above the class declaration | SC-1, SC-3, US1 | green |
+| U5 | Generated concrete `Task` carries ported decorator(s), before the generator-added `@JsonSerializable(...)` | US3 | green |
+| U6 | Mixed positional+named args `@Throttle(30, per: Duration(seconds: 5))` reproduced character-for-character | SC-2, FR-3 | green |
+| U7 | Const expression args `@Endpoint(const ['a','b'], name: 'x')` reproduced verbatim | SC-2, FR-3 | green |
+| U8 | Parameterless decorator `@Audited` emitted without synthesised parentheses | US2.3 | green |
+| U9 | Directives on the raw class never reach generated output (abstract + concrete) | SC-5, US4.1 | green |
+| U10 | Empty `classDecorators` → emitted spec contains no annotation entries (byte-level no-op for decorator-free entities) | SC-4, FR-5, US5.1 | green |
+| U10b | Empty-source annotation entries are skipped safely during capture | FR-2 robustness | green |
+| U11 | Analyzer wiring: `ClassAnalyzer.analyze` populates `classDecorators` from real elements — covered at e2e level by A1/A4 (real build_runner pipeline resolves real annotations; unit stubs cannot host resolvable elements) | FR-1 | green (via A1, A4) |
 
 ## Notes
 
