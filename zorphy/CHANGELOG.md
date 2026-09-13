@@ -1,3 +1,24 @@
+## [2.4.0] - 2026-09-13
+
+### Feat
+
+- Generators: custom decorators on entities are now preserved during code generation, enabling integration with third-party annotation libraries.
+- Gym: real exercises framework for zorphy with warmup phases (dependencies, build, smoke tests) and lift-json-payload benchmark.
+- Generators: value-equality surface, interface copyWith support, and agent annotations fully integrated into the generation pipeline.
+
+### Fix
+
+- CI: fixed archive prepare-workspace race condition and pub get failures in CI Gate jobs.
+- CLI: addressed review comments on entity creation and error handling.
+
+### Chore
+
+- Restored monorepo dependency_overrides with full test suite verification.
+
+### Docs
+
+- Speckit analysis: verified 3/3 mutation testing passing; tdd verification complete.
+
 ## [2.3.1] - 2026-08-27
 
 ### Fix
