@@ -2,6 +2,7 @@
 /// Generated at: 2026-02-06T20:16:42.574833
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
+
 import '../user/user.dart';
 
 part 'company.zorphy.dart';

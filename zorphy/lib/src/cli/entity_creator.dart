@@ -1,5 +1,7 @@
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
+
 import 'models/entity_config.dart';
 import 'services/field_normalizer.dart';
 import 'services/import_resolver.dart';

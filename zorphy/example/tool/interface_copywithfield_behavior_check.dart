@@ -6,7 +6,6 @@
 /// 3. Polymorphic path works: Vehicle variable = InterfaceCar instance
 /// 4. Both work correctly at runtime
 
-import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../lib/various/interface_copywithfield_example.dart';
 
 void main() {
@@ -67,7 +66,9 @@ void main() {
     allPassed = false;
   } catch (e) {
     if (e is! ArgumentError) {
-      print('FAIL: Vehicle.copyWithField(doors) threw wrong type: ${e.runtimeType}');
+      print(
+        'FAIL: Vehicle.copyWithField(doors) threw wrong type: ${e.runtimeType}',
+      );
       allPassed = false;
     }
   }

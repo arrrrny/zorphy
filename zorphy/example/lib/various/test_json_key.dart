@@ -1,4 +1,5 @@
 import 'package:json_annotation/json_annotation.dart';
+
 import 'converters/locale_converter.dart';
 import 'locale.dart';
 

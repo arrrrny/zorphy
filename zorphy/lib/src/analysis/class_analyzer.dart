@@ -1,6 +1,7 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:source_gen/source_gen.dart';
+
 import '../common/NameType.dart';
 import '../common/helpers.dart' as common_helpers;
 import '../helpers.dart' as codegen_helpers;

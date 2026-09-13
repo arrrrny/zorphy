@@ -7,6 +7,7 @@ library;
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+
 import '../models/update_result.dart';
 
 /// Functional type for fetching JSON from a URL.

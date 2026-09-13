@@ -13,6 +13,7 @@
 // because the example entities are generated (not shipped) and importing the
 // generated outputs into the package's own test suite would be fragile.
 import 'dart:io';
+
 import 'package:test/test.dart';
 
 void main() {

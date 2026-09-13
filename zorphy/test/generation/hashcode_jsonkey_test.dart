@@ -9,6 +9,7 @@
 // no special annotation is required. This test verifies the real invariant:
 // the generated `.g.dart` contains no `hashCode` key.
 import 'dart:io';
+
 import 'package:test/test.dart';
 
 void main() {

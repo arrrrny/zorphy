@@ -1,4 +1,5 @@
 import 'dart:math';
+
 import 'package:dart_style/dart_style.dart';
 
 import 'declaration_scanner.dart';

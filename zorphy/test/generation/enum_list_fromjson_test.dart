@@ -10,6 +10,7 @@
 // `$enumDecode` for enum fields and does not contain the broken
 // `.fromJson(e as Map<String, dynamic>)`-for-enum pattern.
 import 'dart:io';
+
 import 'package:test/test.dart';
 
 void main() {
