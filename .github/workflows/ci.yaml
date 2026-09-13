@@ -49,22 +49,16 @@ jobs:
       - name: Run build_runner (example)
         run: dart run build_runner build --delete-conflicting-outputs
         working-directory: zorphy/example
-      - name: Detect workspace writers (temporary diagnostic)
-        run: |
-          echo "=== files modified in trailing 8s windows after build_runner ==="
-          for i in $(seq 1 6); do
-            echo "--- window $i ($(date +%T)) ---"
-            find . -path ./.git -prune -o -type f -newermt '-8 seconds' -print 2>/dev/null | head -30
-            sleep 8
-          done
-          echo "=== detection done ==="
       - name: Archive prepared workspace
-        run: tar -czf prepared-workspace.tar.gz --exclude=.git .
+        # The archive must live outside the tree being archived: creating it
+        # inside "." changes the root dir's metadata mid-walk, and GNU tar
+        # then fails with "tar: .: file changed as we read it".
+        run: tar -czf "$RUNNER_TEMP/prepared-workspace.tar.gz" --exclude=.git .
       - name: Upload prepared workspace
         uses: actions/upload-artifact@v4
         with:
           name: prepared-workspace
-          path: prepared-workspace.tar.gz
+          path: ${{ runner.temp }}/prepared-workspace.tar.gz
           retention-days: 1
 
   analyze:
