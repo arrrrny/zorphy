@@ -28,6 +28,15 @@ dev_dependencies:
   json_annotation: ^4.12.0
   test: ^1.31.1
 
+dependency_overrides:
+  # Monorepo dev override: zorphy_annotation lives in the same repo
+  # (../zorphy_annotation). The hosted ^2.3.0 constraint above is
+  # what consumers see; this override makes the local tests + CI pick
+  # up the in-tree annotation source so a single PR can change both.
+  # Pattern matches zorphy_migrator/pubspec.yaml.
+  zorphy_annotation:
+    path: ../zorphy_annotation
+
 executables:
   zorphy: zorphy_cli
   zorphy_mcp_server: zorphy_mcp_server
