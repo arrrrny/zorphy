@@ -152,20 +152,18 @@ void main() {
     final root = Directory('test/.issue_138_tmp').absolute.path;
     fixtureDir = Directory(root)..createSync(recursive: true);
     fixtureDir = fixtureDir.createTempSync('fixture_');
-    File(
-      '${fixtureDir.path}/issue138_spark.dart',
-    ).writeAsStringSync(_sparkSource);
-    File(
-      '${fixtureDir.path}/issue138_endpoint.dart',
-    ).writeAsStringSync(_endpointSource);
+    File('${fixtureDir.path}/issue138_spark.dart')
+        .writeAsStringSync(_sparkSource);
+    File('${fixtureDir.path}/issue138_endpoint.dart')
+        .writeAsStringSync(_endpointSource);
     final zikFile = File('${fixtureDir.path}/issue138_zik.dart')
       ..writeAsStringSync(_zikSource);
 
     final collection = AnalysisContextCollection(includedPaths: [zikFile.path]);
     final ctx = collection.contextFor(zikFile.path);
-    final result =
-        await ctx.currentSession.getResolvedUnit(zikFile.path)
-            as ResolvedUnitResult;
+    final result = await ctx.currentSession.getResolvedUnit(
+      zikFile.path,
+    ) as ResolvedUnitResult;
     final element = result.libraryElement.getClass(r'$Issue138Zik')!;
     final annotationReader = ConstantReader(
       _zorphyChecker.firstAnnotationOf(element)!,

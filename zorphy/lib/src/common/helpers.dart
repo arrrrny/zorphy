@@ -101,9 +101,8 @@ String? _annotationName(ElementAnnotation annotation, String source) {
   // with no resolved element an import prefix and a named constructor are
   // syntactically identical, so the directive check below tests every
   // segment — a prefixed `@dep.Zorphy(...)` must not slip past the filter.
-  final match = RegExp(
-    r'^@\s*([A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*)',
-  ).firstMatch(source);
+  final match = RegExp(r'^@\s*([A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*)')
+      .firstMatch(source);
   return match?.group(1)?.replaceAll(RegExp(r'\s+'), '');
 }
 
@@ -1008,9 +1007,8 @@ String recoverTypeFromSource(Element element, String currentType) {
             : null;
         final anchorMatch = anchorPattern?.firstMatch(commentFreeSource);
         final searchStart = anchorMatch == null ? 0 : anchorMatch.end;
-        final nameMatch = RegExp(
-          '\\b' + RegExp.escape(entityName) + r'\b',
-        ).firstMatch(commentFreeSource.substring(searchStart));
+        final nameMatch = RegExp('\\b' + RegExp.escape(entityName) + r'\b')
+            .firstMatch(commentFreeSource.substring(searchStart));
         if (nameMatch != null) {
           final nameStart = searchStart + nameMatch.start;
           final rawType = _collectTypeTokenBefore(commentFreeSource, nameStart);
