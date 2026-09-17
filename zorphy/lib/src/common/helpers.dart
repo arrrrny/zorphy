@@ -101,8 +101,9 @@ String? _annotationName(ElementAnnotation annotation, String source) {
   // with no resolved element an import prefix and a named constructor are
   // syntactically identical, so the directive check below tests every
   // segment — a prefixed `@dep.Zorphy(...)` must not slip past the filter.
-  final match = RegExp(r'^@\s*([A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*)')
-      .firstMatch(source);
+  final match = RegExp(
+    r'^@\s*([A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*)',
+  ).firstMatch(source);
   return match?.group(1)?.replaceAll(RegExp(r'\s+'), '');
 }
 
@@ -990,27 +991,36 @@ String recoverTypeFromSource(Element element, String currentType) {
       if (isParameter && entityName != null) {
         final exec = element.enclosingElement;
         final execName = exec?.name ?? '';
-        // Anchor to the enclosing executable's parameter list. The type is
-        // captured non-greedily so a `required Type name` / generic
-        // `Type<X, Y> name` param is recovered whole (the original greedy
-        // capture overmatched `required Type name`). No trailing `,`/`)`/`}`
-        // is required because named parameters close with `}` (e.g.
-        // `fromUrlSpark({required UrlSpark spark})`). Anchoring to the
-        // executable name also prevents matching a same-named class member
-        // (getter/field) such as `Spark? get spark`.
-        final anchor = execName.isNotEmpty
-            ? r'\b' + RegExp.escape(execName) + r'\b\s*\([\s\S]*?'
-            : r'[\s\S]*?';
-        final paramPattern = RegExp(
-          anchor + r'([\w<>,?.\s]+?)\s+\b' + RegExp.escape(entityName) + r'\b',
-        );
-        final pm = paramPattern.firstMatch(commentFreeSource);
-        if (pm != null) {
-          final candidate = cleanRecoveredType(pm.group(1)!.trim());
-          if (candidate.isNotEmpty &&
-              !candidate.contains('InvalidType') &&
-              !candidate.contains('//')) {
-            return candidate;
+        // Anchor to the enclosing executable's parameter list, locate the
+        // parameter name inside it, and walk backwards to collect ONLY the
+        // type token that immediately precedes the name. The previous
+        // implementation captured `([\w<>,?.\s]+?)` — a class that admits
+        // commas and newlines — so recovering a later parameter
+        // (`create({required String url, required UrlEndpoint urlEndpoint})`)
+        // swallowed every preceding sibling and produced a polluted
+        // "type" like `String url,\n required UrlEndpoint`; the generated
+        // constructor then emitted those fragments as bogus extra
+        // parameters (issue #138: growing-prefix parameter duplication).
+        // Anchoring to the executable name also prevents matching a
+        // same-named class member (getter/field) such as `Spark? get spark`.
+        final anchorPattern = execName.isNotEmpty
+            ? RegExp('\\b' + RegExp.escape(execName) + r'\b\s*\(')
+            : null;
+        final anchorMatch = anchorPattern?.firstMatch(commentFreeSource);
+        final searchStart = anchorMatch == null ? 0 : anchorMatch.end;
+        final nameMatch = RegExp(
+          '\\b' + RegExp.escape(entityName) + r'\b',
+        ).firstMatch(commentFreeSource.substring(searchStart));
+        if (nameMatch != null) {
+          final nameStart = searchStart + nameMatch.start;
+          final rawType = _collectTypeTokenBefore(commentFreeSource, nameStart);
+          if (rawType != null) {
+            final candidate = cleanRecoveredType(rawType);
+            if (candidate.isNotEmpty &&
+                !candidate.contains('InvalidType') &&
+                !candidate.contains('//')) {
+              return candidate;
+            }
           }
         }
         // No executable-anchored parameter match — do NOT fall through to the
@@ -1202,6 +1212,51 @@ String recoverTypeFromSource(Element element, String currentType) {
     print('ZORPHY DEBUG: Error recovering type: ' + e.toString());
     return currentType;
   }
+}
+
+/// Walks [source] backwards from [nameStart] (the offset of a parameter
+/// name) and returns the type token that immediately precedes it.
+///
+/// Stops at top-level parameter separators (`,`) and structural characters
+/// (`(`/`)`/`{`/`}`/`=`/`;`); whitespace and commas are admitted only
+/// inside `<...>` so generic types such as `Map<String, int>` are
+/// recovered whole while preceding sibling parameters are not swallowed.
+/// Returns `null` when no type token can be isolated.
+String? _collectTypeTokenBefore(String source, int nameStart) {
+  var i = nameStart - 1;
+  // Skip the whitespace between the type and the parameter name.
+  while (i >= 0 && source.codeUnitAt(i) <= 32) {
+    i--;
+  }
+  if (i < 0) return null;
+
+  final collected = <String>[];
+  var genericDepth = 0;
+  while (i >= 0) {
+    final ch = source[i];
+    if (ch == '>') {
+      genericDepth++;
+    } else if (ch == '<') {
+      if (genericDepth == 0) break;
+      genericDepth--;
+    } else if (ch == ',') {
+      if (genericDepth == 0) break;
+    } else if (ch == '(' || ch == ')' || ch == '{' || ch == '}') {
+      break;
+    } else if (ch == '=' || ch == ';') {
+      break;
+    } else if (ch.codeUnitAt(0) <= 32) {
+      // Whitespace inside a generic type argument list is part of the
+      // type (`Map<String, int>`); at depth 0 it separates the type from
+      // whatever precedes it (`required String url`) and must stop the
+      // walk, or later parameters would be swallowed (issue #138).
+      if (genericDepth == 0) break;
+    }
+    collected.add(ch);
+    i--;
+  }
+  final type = collected.reversed.join().trim();
+  return type.isEmpty ? null : type;
 }
 
 /// Resolves a field/getter type, falling back to source recovery when the
