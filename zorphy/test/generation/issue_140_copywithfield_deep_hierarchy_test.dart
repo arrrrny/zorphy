@@ -74,9 +74,9 @@ Future<String> _generateFor(Directory fixtureDir, String className) async {
     ..writeAsStringSync(_hierarchySource);
   final collection = AnalysisContextCollection(includedPaths: [source.path]);
   final ctx = collection.contextFor(source.path);
-  final result =
-      await ctx.currentSession.getResolvedUnit(source.path)
-          as ResolvedUnitResult;
+  final result = await ctx.currentSession.getResolvedUnit(
+    source.path,
+  ) as ResolvedUnitResult;
   final element = result.libraryElement.getClass(className)!;
   final annotationReader = ConstantReader(
     _zorphyChecker.firstAnnotationOf(element)!,
