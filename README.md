@@ -156,10 +156,10 @@ Add the dependencies to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zorphy_annotation: ^2.4.1
+  zorphy_annotation: ^2.4.2
 
 dev_dependencies:
-  zorphy: ^2.4.1
+  zorphy: ^2.4.2
   build_runner: ^2.4.0
 ```
 
