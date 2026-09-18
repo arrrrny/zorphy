@@ -1,3 +1,13 @@
+## [2.4.3] - 2026-09-18
+
+### Fix
+
+- Anchor `copyWithField` to the polymorphic chain root (#140)
+
+### Style
+
+- Format the pipeline test to the CI formatter's fixed point (#140)
+
 ## [2.4.2] - 2026-09-18
 
 ### Fix

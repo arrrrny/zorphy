@@ -1,3 +1,9 @@
+## [0.2.4] - 2026-09-18
+
+### Change
+
+- Version bump for zorphy 2.4.3 ecosystem release (no migrator changes).
+
 ## [0.2.3] - 2026-09-18
 
 ### Change
