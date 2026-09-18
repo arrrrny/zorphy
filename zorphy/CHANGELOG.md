@@ -1,3 +1,14 @@
+## [2.4.1] - 2026-09-18
+
+### Fix
+
+- Stop source recovery from swallowing sibling factory params (#138)
+- Address review comments on #139
+
+### Style
+
+- Format to the stable SDK 3.13.4 formatter's fixed point (#138)
+
 ## [2.4.0] - 2026-09-13
 
 ### Feat
