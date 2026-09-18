@@ -3,6 +3,7 @@ import 'package:code_builder/code_builder.dart';
 import '../common/NameType.dart';
 import '../common/classes.dart';
 import '../helpers.dart' as helpers;
+import '../models/class_metadata.dart';
 import 'base_generator.dart';
 
 /// Detects fields that have been overridden with a narrower type in a
@@ -87,16 +88,14 @@ class CopyWithGenerator extends UniversalGenerator {
 
     // Field-selector copyWithField (issue #131): replaces a single
     // field picked by a typed `Field<E, T>` selector.
-    // On child classes with interfaces, use the parent's type in
-    // Field<Parent, T> (Dart's declaration-site covariance makes this
-    // accept both parent and child Field tokens without covariant).
+    // On child classes with interfaces, use the CHAIN ROOT's type in
+    // Field<Root, T> (issue #140): the member being overridden is
+    // inherited from the root of the polymorphic chain, and Dart's
+    // covariant class generics make any narrower type (a descendant's
+    // Field<Mid, T>) an invalid override parameter.
     String? parentEntityType;
     if (metadata.allValueTInterfaces.isNotEmpty) {
-      final firstIface = metadata.allValueTInterfaces.first;
-      final ifaceName = firstIface.interfaceName;
-      if (ifaceName.startsWith(r'$') && !ifaceName.startsWith(r'$$')) {
-        parentEntityType = ifaceName.substring(1); // strip leading $
-      }
+      parentEntityType = _resolveInterfaceChainRootName(metadata);
     }
     specs.add(
       _buildCopyWithFieldMethod(
@@ -208,6 +207,61 @@ class CopyWithGenerator extends UniversalGenerator {
 
   // ── Field-selector copyWithField (issue #131) ──────────────────────────────
 
+  /// Resolves the root of the `$`-interface chain this class participates
+  /// in (issue #140).
+  ///
+  /// `copyWithField` overrides the member inherited from the chain ROOT,
+  /// so its `Field<..., T>` parameter must be typed with the root's name:
+  /// Dart's covariant class generics make any narrower type (a
+  /// descendant's `Field<Mid, T>`) an invalid override parameter.
+  ///
+  /// Starts at the class's first `$`-prefixed interface (the same chain
+  /// selection the previous `.first` logic used) and walks upward through
+  /// the analyzer supertype elements while the current interface itself
+  /// has a `$`-prefixed (non-`$$`) parent inside the collected interface
+  /// set — [InterfaceCollector] populates that set recursively, so every
+  /// ancestor of the chain is present. Sealed (`$$`) roots stay excluded,
+  /// matching the interface-scoped generation rules. Returns the root's
+  /// name with the leading `$` stripped, or null when the class has no
+  /// `$`-prefixed interface.
+  ///
+  /// A class implementing several independent `$` chains anchors to
+  /// whichever chain the first-interface scan finds; a common-ancestor
+  /// anchor (`Field<Object, T>`, a supertype of every `Field<E, T>`)
+  /// would satisfy all of them if that shape ever shows up.
+  String? _resolveInterfaceChainRootName(ClassMetadata metadata) {
+    final byName = {for (final i in metadata.interfaces) i.interfaceName: i};
+    bool isChainInterface(String name) =>
+        name.startsWith(r'$') &&
+        !name.startsWith(r'$$') &&
+        byName.containsKey(name);
+
+    String? currentName;
+    for (final i in metadata.interfaces) {
+      if (isChainInterface(i.interfaceName)) {
+        currentName = i.interfaceName;
+        break;
+      }
+    }
+    if (currentName == null) return null;
+
+    final visited = <String>{currentName};
+    while (visited.length <= byName.length) {
+      String? parentName;
+      for (final supertype in byName[currentName]!.element.allSupertypes) {
+        final name = supertype.element.name ?? '';
+        if (isChainInterface(name) && !visited.contains(name)) {
+          parentName = name;
+          break;
+        }
+      }
+      if (parentName == null) break;
+      visited.add(parentName);
+      currentName = parentName;
+    }
+    return currentName!.substring(1); // strip leading $
+  }
+
   /// Picks a name for the value type parameter of `copyWithField` that
   /// does not shadow any of the entity's own generic type parameters
   /// (a class like `Result<T>` must keep its `T` visible inside the
@@ -235,11 +289,14 @@ class CopyWithGenerator extends UniversalGenerator {
   /// fields throw an [ArgumentError] instead of silently returning
   /// `this`.
   ///
-  /// When [parentEntityType] is provided (child class with interfaces),
-  /// the field parameter uses `Field<Parent, T>` instead of
-  /// `Field<Child, T>`, and the method is marked `@override`. This
-  /// keeps the override LSP-safe: both parent and child Field tokens
-  /// are accepted via Dart's declaration-site covariance.
+  /// When [parentEntityType] is provided (child class in a `$`-interface
+  /// chain), the field parameter uses `Field<ChainRoot, T>` instead of
+  /// `Field<Child, T>`, and the method is marked `@override`. The ROOT of
+  /// the chain anchors the type (issue #140): the overridden member is
+  /// inherited from the root, so any narrower parameter type would be an
+  /// invalid override under Dart's covariant class generics. Root-typed
+  /// parameters keep the override LSP-safe: parent and child Field tokens
+  /// are both accepted.
   Method _buildCopyWithFieldMethod(
     List<NameTypeClassComment> fields,
     String classNameTrimmed,
