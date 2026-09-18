@@ -990,23 +990,63 @@ String recoverTypeFromSource(Element element, String currentType) {
       if (isParameter && entityName != null) {
         final exec = element.enclosingElement;
         final execName = exec?.name ?? '';
-        // Anchor to the enclosing executable's parameter list. The type is
-        // captured non-greedily so a `required Type name` / generic
-        // `Type<X, Y> name` param is recovered whole (the original greedy
-        // capture overmatched `required Type name`). No trailing `,`/`)`/`}`
-        // is required because named parameters close with `}` (e.g.
-        // `fromUrlSpark({required UrlSpark spark})`). Anchoring to the
-        // executable name also prevents matching a same-named class member
-        // (getter/field) such as `Spark? get spark`.
-        final anchor = execName.isNotEmpty
-            ? r'\b' + RegExp.escape(execName) + r'\b\s*\([\s\S]*?'
-            : r'[\s\S]*?';
-        final paramPattern = RegExp(
-          anchor + r'([\w<>,?.\s]+?)\s+\b' + RegExp.escape(entityName) + r'\b',
-        );
-        final pm = paramPattern.firstMatch(commentFreeSource);
-        if (pm != null) {
-          final candidate = cleanRecoveredType(pm.group(1)!.trim());
+        // Anchor to the enclosing executable's parameter list, locate the
+        // parameter name inside it, and walk backwards to collect ONLY the
+        // type token that immediately precedes the name. The previous
+        // implementation captured `([\w<>,?.\s]+?)` — a class that admits
+        // commas and newlines — so recovering a later parameter
+        // (`create({required String url, required UrlEndpoint urlEndpoint})`)
+        // swallowed every preceding sibling and produced a polluted
+        // "type" like `String url,\n required UrlEndpoint`; the generated
+        // constructor then emitted those fragments as bogus extra
+        // parameters (issue #138: growing-prefix parameter duplication).
+        // Anchoring to the executable name also prevents matching a
+        // same-named class member (getter/field) such as `Spark? get spark`.
+        //
+        // The anchor alone is not enough: one file can declare several
+        // entities, each with a same-named executable (two `static create`
+        // factories — exactly the shape issue #138 fixes). Taking the FIRST
+        // `create(` in the file anchors recovery inside the sibling class's
+        // signature, and the backwards walk SUCCEEDS there, silently
+        // returning that class's parameter type. So the search is scoped to
+        // the enclosing class body and every anchor occurrence inside that
+        // scope is tried, accepting the first that yields a usable type.
+        final anchorPattern = execName.isNotEmpty
+            ? RegExp('\\b' + RegExp.escape(execName) + r'\b\s*\(')
+            : null;
+        final entityWord = RegExp('\\b' + RegExp.escape(entityName) + r'\b');
+
+        var searchSource = _enclosingClassBody(commentFreeSource, element);
+        if (searchSource == null ||
+            (anchorPattern != null && !anchorPattern.hasMatch(searchSource))) {
+          // No enclosing class found, or the class body was cut short (a
+          // brace inside a string literal fools the brace walk) and lost the
+          // executable — degrade to the previous unscoped search instead of
+          // reporting "no match".
+          searchSource = commentFreeSource;
+        }
+
+        // An unnamed executable has no anchor to search on; keep the previous
+        // behavior of scanning the scope for the parameter name.
+        final searchStarts = anchorPattern == null
+            ? <int>[0]
+            : [
+                for (final anchor in anchorPattern.allMatches(searchSource))
+                  anchor.end,
+              ];
+
+        for (final searchStart
+            in searchStarts.isEmpty ? <int>[0] : searchStarts) {
+          final nameMatch = entityWord.firstMatch(
+            searchSource.substring(searchStart),
+          );
+          // No occurrence of the parameter name from here on — a later anchor
+          // cannot find one either.
+          if (nameMatch == null) break;
+          final nameStart = searchStart + nameMatch.start;
+          final rawType = _collectTypeTokenBefore(searchSource, nameStart);
+          if (rawType == null) continue;
+          final candidate = cleanRecoveredType(rawType);
           if (candidate.isNotEmpty &&
               !candidate.contains('InvalidType') &&
               !candidate.contains('//')) {
@@ -1021,83 +1061,25 @@ String recoverTypeFromSource(Element element, String currentType) {
       }
 
       if (containerName != null && entityName != null) {
-        // Try constructor-parameter pattern first (original behavior —
-        // preserves the recovery for method params that was already working).
-        final ctorPattern = RegExp(
-          '\b' +
-              containerName +
-              r'\b\s*\([\s\S]*?([\w<>,? ]+)\s+\b' +
-              entityName +
-              r'\b',
-        );
-        var match = ctorPattern.firstMatch(commentFreeSource);
-        if (match != null) {
-          var extracted = match.group(1)!;
-          if (extracted.contains(',')) {
-            extracted = extracted.split(',').last;
-          }
-          var candidate = cleanRecoveredType(extracted.trim());
-          if (candidate.isNotEmpty && !candidate.contains('InvalidType')) {
-            return candidate;
-          }
-        }
-
-        // Field/getter pattern (issue #351): matches `Type get name` or
-        // `Type name;` / `Type name =` / `Type name,` inside the class body.
-        // The capture group grabs the type token sequence before the name,
-        // stopping at the class/member delimiter ( `{` `;` `}` or newline
-        // followed by indentation). We use a non-greedy match scoped to the
-        // enclosing class body so we don't accidentally match a same-named
-        // identifier in a sibling class.
-        //
-        // We try the getter form first (`Type get name`), then the plain
-        // field form (`Type name;`).
-        final escapedName = RegExp.escape(entityName);
-        final getterPattern = RegExp(
-          r'([\w<>,?\s]+?)\s+get\s+\b' + escapedName + r'\b',
-        );
-        final fieldPattern = RegExp(
-          r'([\w<>,?\s]+?)\s+\b' + escapedName + r'\b\s*[;=,]',
-        );
-        for (final pattern in [getterPattern, fieldPattern]) {
-          match = pattern.firstMatch(commentFreeSource);
-          if (match != null) {
-            var candidate = cleanRecoveredType(match.group(1)!.trim());
-            // Reject obviously wrong matches: the type must not contain
-            // the entity name itself, must not be empty, and must not be
-            // a comment fragment.
-            if (candidate.isNotEmpty &&
-                !candidate.contains('InvalidType') &&
-                !candidate.contains('//') &&
-                candidate != entityName) {
-              return candidate;
-            }
-          }
-        }
-
-        // Method (incl. static factory) return-type pattern.
-        //
-        // A static `create` factory often returns the class's CONCRETE
-        // generated type (e.g. `AppConfig`), which the analyzer cannot
-        // resolve during `build_runner` — so `getDisplayString()` yields
-        // `InvalidType`. The getter/field patterns above don't match a
-        // `Type name(` method signature, so a static factory whose return
-        // type is a generated class was silently dropped. This pattern
-        // captures the return type that precedes `name(`.
-        final methodPattern = RegExp(
-          r'(?:\b(?:static|final|const|factory|external|covariant|abstract|late)\s+)*([\w<>,?.\s]+?)\s+\b' +
-              escapedName +
-              r'\b\s*\(',
-        );
-        match = methodPattern.firstMatch(commentFreeSource);
-        if (match != null) {
-          final candidate = cleanRecoveredType(match.group(1)!.trim());
-          if (candidate.isNotEmpty &&
-              !candidate.contains('InvalidType') &&
-              !candidate.contains('//') &&
-              candidate != entityName) {
-            return candidate;
-          }
+        // The member patterns below must read THIS element's own class body:
+        // a file can declare several entities, and a same-named member of a
+        // sibling class (a second `static create` returning its own type, a
+        // same-named field) would otherwise win the match and yield a
+        // silently wrong type — the same hazard the parameter branch above
+        // guards against. Scoped first, then the whole source as a safety
+        // net so a class body we failed to isolate cannot make recovery
+        // worse than it was before.
+        final classBody = _enclosingClassBody(commentFreeSource, element);
+        for (final scope in <String>[
+          if (classBody != null) classBody,
+          commentFreeSource,
+        ]) {
+          final recovered = _recoverMemberTypeFrom(
+            scope,
+            containerName: containerName,
+            entityName: entityName,
+          );
+          if (recovered != null) return recovered;
         }
       }
 
@@ -1202,6 +1184,222 @@ String recoverTypeFromSource(Element element, String currentType) {
     print('ZORPHY DEBUG: Error recovering type: ' + e.toString());
     return currentType;
   }
+}
+
+/// Recovers a field/getter/method type for [entityName] from [source] — the
+/// element's class body when it can be isolated, otherwise the whole file.
+///
+/// Returns the recovered type, or `null` when no pattern matches in [source].
+String? _recoverMemberTypeFrom(
+  String source, {
+  required String containerName,
+  required String entityName,
+}) {
+  // Try constructor-parameter pattern first (original behavior —
+  // preserves the recovery for method params that was already working).
+  final ctorPattern = RegExp(
+    '\b' +
+        containerName +
+        r'\b\s*\([\s\S]*?([\w<>,? ]+)\s+\b' +
+        entityName +
+        r'\b',
+  );
+  var match = ctorPattern.firstMatch(source);
+  if (match != null) {
+    var extracted = match.group(1)!;
+    if (extracted.contains(',')) {
+      extracted = extracted.split(',').last;
+    }
+    var candidate = cleanRecoveredType(extracted.trim());
+    if (candidate.isNotEmpty && !candidate.contains('InvalidType')) {
+      return candidate;
+    }
+  }
+
+  // Field/getter pattern (issue #351): matches `Type get name` or
+  // `Type name;` / `Type name =` / `Type name,` inside the class body.
+  // The capture group grabs the type token sequence before the name,
+  // stopping at the class/member delimiter ( `{` `;` `}` or newline
+  // followed by indentation). Because the caller passes the enclosing class
+  // body, we don't accidentally match a same-named identifier in a sibling
+  // class.
+  //
+  // We try the getter form first (`Type get name`), then the plain
+  // field form (`Type name;`).
+  final escapedName = RegExp.escape(entityName);
+  final getterPattern = RegExp(
+    r'([\w<>,?\s]+?)\s+get\s+\b' + escapedName + r'\b',
+  );
+  final fieldPattern = RegExp(
+    r'([\w<>,?\s]+?)\s+\b' + escapedName + r'\b\s*[;=,]',
+  );
+  for (final pattern in [getterPattern, fieldPattern]) {
+    match = pattern.firstMatch(source);
+    if (match != null) {
+      var candidate = cleanRecoveredType(match.group(1)!.trim());
+      // Reject obviously wrong matches: the type must not contain
+      // the entity name itself, must not be empty, and must not be
+      // a comment fragment.
+      if (candidate.isNotEmpty &&
+          !candidate.contains('InvalidType') &&
+          !candidate.contains('//') &&
+          candidate != entityName) {
+        return candidate;
+      }
+    }
+  }
+
+  // Method (incl. static factory) return-type pattern.
+  //
+  // A static `create` factory often returns the class's CONCRETE
+  // generated type (e.g. `AppConfig`), which the analyzer cannot
+  // resolve during `build_runner` — so `getDisplayString()` yields
+  // `InvalidType`. The getter/field patterns above don't match a
+  // `Type name(` method signature, so a static factory whose return
+  // type is a generated class was silently dropped. This pattern
+  // captures the return type that precedes `name(`.
+  final methodPattern = RegExp(
+    r'(?:\b(?:static|final|const|factory|external|covariant|abstract|late)\s+)*([\w<>,?.\s]+?)\s+\b' +
+        escapedName +
+        r'\b\s*\(',
+  );
+  match = methodPattern.firstMatch(source);
+  if (match != null) {
+    final candidate = cleanRecoveredType(match.group(1)!.trim());
+    if (candidate.isNotEmpty &&
+        !candidate.contains('InvalidType') &&
+        !candidate.contains('//') &&
+        candidate != entityName) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+/// Returns the source text of the body of the class that encloses
+/// [element]'s enclosing executable, or `null` when that class cannot be
+/// located (callers then fall back to the whole source).
+///
+/// Several entities can be declared in one file, so a file-wide search for an
+/// executable name can bind to a sibling class's same-named executable.
+String? _enclosingClassBody(String source, Element element) {
+  // Walk up to two levels: a parameter's enclosing element is the executable
+  // (whose name is no class), a field's or method's is the class itself. The
+  // class-body lookup validates the candidate, so a name that matches no
+  // declaration simply moves the walk up.
+  dynamic owner = element.enclosingElement;
+  for (var level = 0; level < 2 && owner != null; level++) {
+    try {
+      final dynamic name = owner.name;
+      if (name is String && name.isNotEmpty) {
+        final body = _classBodyOf(source, name);
+        if (body != null) return body;
+      }
+      owner = owner.enclosingElement;
+    } catch (_) {
+      return null;
+    }
+  }
+  return null;
+}
+
+/// Returns the source text between the braces of `class <className>`, or
+/// `null` when no such declaration exists in [source].
+String? _classBodyOf(String source, String className) {
+  final declaration = RegExp(r'\bclass\s+' + RegExp.escape(className) + r'\b')
+      .firstMatch(source);
+  if (declaration == null) return null;
+
+  final bodyOpen = source.indexOf('{', declaration.end);
+  if (bodyOpen < 0) return null;
+
+  var depth = 0;
+  for (var i = bodyOpen; i < source.length; i++) {
+    final ch = source[i];
+    if (ch == '{') {
+      depth++;
+    } else if (ch == '}') {
+      depth--;
+      if (depth == 0) return source.substring(declaration.end, i);
+    }
+  }
+  return null;
+}
+
+/// Walks [source] backwards from [nameStart] (the offset of a parameter
+/// name) and returns the type token that immediately precedes it.
+///
+/// Stops at top-level parameter separators (`,`) and structural characters
+/// (`{`/`}`/`=`/`;`); whitespace and commas are admitted only inside `<...>`
+/// so generic types such as `Map<String, int>` are recovered whole while
+/// preceding sibling parameters are not swallowed.
+///
+/// A function-typed parameter (`void Function(String) callback`) puts a
+/// balanced `(...)` group immediately before the name; the parentheses and
+/// the return type in front of `Function` belong to the type and are
+/// collected too, while `required` and the parameter-list `(` still stop the
+/// walk. Returns `null` when no type token can be isolated.
+String? _collectTypeTokenBefore(String source, int nameStart) {
+  var i = nameStart - 1;
+  // Skip the whitespace between the type and the parameter name.
+  while (i >= 0 && source.codeUnitAt(i) <= 32) {
+    i--;
+  }
+  if (i < 0) return null;
+
+  final collected = <String>[];
+  var genericDepth = 0;
+  var parenDepth = 0;
+  // Set once the walk has crossed the whitespace in front of a balanced
+  // `(...)` group and is picking up that group's return type.
+  var collectingReturnType = false;
+  while (i >= 0) {
+    final ch = source[i];
+    if (ch == '>') {
+      genericDepth++;
+    } else if (ch == '<') {
+      if (genericDepth > 0) {
+        genericDepth--;
+      } else if (parenDepth == 0) {
+        break;
+      }
+    } else if (ch == ',') {
+      if (genericDepth == 0 && parenDepth == 0) break;
+    } else if (ch == ')') {
+      // Closing paren of a function type's parameter list.
+      parenDepth++;
+    } else if (ch == '(') {
+      // The `(` opening a function type's parameter list is part of the
+      // type; the executable's own parameter-list `(` ends the walk.
+      if (parenDepth == 0) break;
+      parenDepth--;
+    } else if (ch == '{' || ch == '}') {
+      if (parenDepth == 0) break;
+    } else if (ch == '=' || ch == ';') {
+      if (parenDepth == 0) break;
+    } else if (ch.codeUnitAt(0) <= 32) {
+      if (genericDepth == 0 && parenDepth == 0) {
+        if (collectingReturnType ||
+            collected.isEmpty ||
+            collected.first != ')') {
+          // Whitespace inside a generic type argument list is part of the
+          // type (`Map<String, int>`); at depth 0 it separates the type from
+          // whatever precedes it (`required String url`) and must stop the
+          // walk, or later parameters would be swallowed (issue #138).
+          break;
+        }
+        // The type ends in `)` — a function type. Its return type sits in
+        // front of `Function`, separated by this whitespace, so keep walking
+        // to include it (`void Function(String) callback`).
+        collectingReturnType = true;
+      }
+    }
+    collected.add(ch);
+    i--;
+  }
+  final type = collected.reversed.join().trim();
+  return type.isEmpty ? null : type;
 }
 
 /// Resolves a field/getter type, falling back to source recovery when the
