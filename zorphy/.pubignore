@@ -1,0 +1,8 @@
+# Coverage output — regenerate locally with `dart test --coverage=coverage`
+coverage/
+
+# Locally compiled MCP server executable (`./build_mcp.sh`).
+# Consumers get the server from the Dart entry point:
+#   dart pub global activate zorphy   # registers `zorphy_mcp_server`
+#   dart run zorphy:zorphy_mcp_server
+bin/zorphy_mcp_server

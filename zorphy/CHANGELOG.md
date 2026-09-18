@@ -1,3 +1,13 @@
+## [2.4.2] - 2026-09-18
+
+### Fix
+
+- Publish script now handles two-line path dependencies and strips `dependency_overrides` during release.
+
+### Change
+
+- Published archive slimmed from 9 MB to 223 KB via `.pubignore` (excludes coverage/ and prebuilt MCP binary).
+
 ## [2.4.1] - 2026-09-18
 
 ### Fix

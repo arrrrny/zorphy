@@ -1,3 +1,9 @@
+## [2.4.2] - 2026-09-18
+
+### Change
+
+- Version synced with `zorphy` 2.4.2 (no annotation API changes in this release).
+
 ## [2.4.1] - 2026-09-18
 
 ### Change

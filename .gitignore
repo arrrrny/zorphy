@@ -71,5 +71,8 @@ app.*.map.json
 # Allow the GYM training artifacts (spec 022 / issue #397) — the miki
 # GYM runner consumes .gym/gym.yaml from each package.
 !zorphy/.gym/
+# Allow the .pubignore that trims the published archive (coverage/, prebuilt
+# binary). Without this, `.**` silently excludes it and it never ships.
+!zorphy/.pubignore
 .handoffs
 .contracts

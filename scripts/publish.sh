@@ -73,8 +73,21 @@ update_package "zorphy_annotation" "zorphy_annotation"
 
 # 2. Update zorphy
 update_package "zorphy" "zorphy"
-# Also update the dependency on annotation
-safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "zorphy/pubspec.yaml"
+# Convert zorphy_annotation dependency to hosted version for publishing.
+# to_path.sh may leave the two-line path form:
+#   zorphy_annotation:
+#     path: ../zorphy_annotation
+# or a dependency_overrides block. Both must be cleaned for pub.dev.
+PERL_PUBSPEC="zorphy/pubspec.yaml"
+
+# 1. Two-line path form → single-line hosted
+perl -0777 -i -pe 's/zorphy_annotation:\s*\n\s*path:\s*\.\.\/zorphy_annotation/zorphy_annotation: ^'"$VERSION"'/g' "$PERL_PUBSPEC"
+
+# 2. Any remaining single-line form → hosted
+safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "$PERL_PUBSPEC"
+
+# 3. Strip dependency_overrides block entirely (to_path.sh may have added one)
+perl -0777 -i -pe 's/\n\ndependency_overrides:\n(?:[ \t#].*\n)*//s' "$PERL_PUBSPEC"
 
 # Clean up pubspec_overrides.yaml if it exists
 if [ -f "zorphy/pubspec_overrides.yaml" ]; then
