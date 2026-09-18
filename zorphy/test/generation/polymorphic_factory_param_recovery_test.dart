@@ -10,6 +10,18 @@
 // This also guards the generic-param case (`Map<String, int> spark`): the
 // recovered type must include the full generic (commas inside `<>` must not
 // be treated as parameter separators).
+//
+// Two further guards, added from the PR #139 review findings:
+//
+//  * Several entities can share one file, each declaring a same-named
+//    executable (`static create`). Anchoring to the FIRST `create(` in the
+//    file binds recovery to a sibling class's signature and silently returns
+//    that class's parameter type; recovery must stay inside the enclosing
+//    class body.
+//  * A function-typed parameter (`void Function(String) callback`) puts a
+//    `)` immediately before the name, which the backwards walk treated as a
+//    type boundary — recovery returned `null` and the factory was dropped.
+//    The balanced `(...)` (and its return type) must survive intact.
 
 import 'dart:io';
 
@@ -42,6 +54,38 @@ abstract class \$Zik {
     required String url,
     required UrlEndpoint urlEndpoint,
     Spark? spark,
+  }) => throw UnimplementedError();
+}
+''';
+
+/// PR #139 review finding: two entities in ONE file, each declaring a
+/// same-named `create` executable. Both declare a parameter named `url`, but
+/// with different (first-generation unresolved) types, so an anchor that
+/// binds to the FIRST `create(` in the file recovers `FirstUrl` for the
+/// second class — silently wrong.
+const _sameNamedExecSrc = '''
+abstract class \$First {
+  String get id;
+  static First create({required FirstUrl url}) => throw UnimplementedError();
+}
+
+abstract class \$Second {
+  String get id;
+  static Second create({required SecondUrl url}) =>
+      throw UnimplementedError();
+}
+''';
+
+/// PR #139 review finding: a function-typed parameter. The token immediately
+/// before the name is a balanced `(...)` group, and the type is only complete
+/// once its return type is included too.
+const _functionTypeSrc = '''
+abstract class \$Cb {
+  String get id;
+  static Cb create({
+    required void Function(String) callback,
+    Future<void> Function(int) onDone,
+    void Function(Map<String, int>) onMap,
   }) => throw UnimplementedError();
 }
 ''';
@@ -124,4 +168,61 @@ void main() {
       );
     },
   );
+
+  test(
+    'same-named executable in a sibling class does not capture recovery',
+    () async {
+      // Both classes declare `create({required <Type> url})`; recovery for the
+      // SECOND class must not read the FIRST class's parameter type.
+      expect(
+        await _recoverForParam(
+          'create',
+          'url',
+          source: _sameNamedExecSrc,
+          className: r'$First',
+        ),
+        'FirstUrl',
+      );
+      expect(
+        await _recoverForParam(
+          'create',
+          'url',
+          source: _sameNamedExecSrc,
+          className: r'$Second',
+        ),
+        'SecondUrl',
+      );
+    },
+  );
+
+  test('function-typed param recovers the complete function type', () async {
+    const cb = r'$Cb';
+    expect(
+      await _recoverForParam(
+        'create',
+        'callback',
+        source: _functionTypeSrc,
+        className: cb,
+      ),
+      'void Function(String)',
+    );
+    expect(
+      await _recoverForParam(
+        'create',
+        'onDone',
+        source: _functionTypeSrc,
+        className: cb,
+      ),
+      'Future<void> Function(int)',
+    );
+    expect(
+      await _recoverForParam(
+        'create',
+        'onMap',
+        source: _functionTypeSrc,
+        className: cb,
+      ),
+      'void Function(Map<String, int>)',
+    );
+  });
 }

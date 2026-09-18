@@ -115,6 +115,34 @@ abstract class \$Issue138Zik {
 }
 ''';
 
+/// Two entities in ONE file, each declaring a same-named `static create`
+/// whose parameter type is the OTHER entity's concrete name (unresolvable
+/// during a first-generation build) — the shape that made recovery anchor to
+/// the first `create(` in the file.
+const _pairSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'issue138_pair.zorphy.dart';
+
+@Zorphy(generateJson: true)
+abstract class \$Issue138PairLeft {
+  String get id;
+  String get url;
+
+  static Issue138PairLeft create({required Issue138PairRightUrl url}) =>
+      Issue138PairLeft(id: 'id', url: url);
+}
+
+@Zorphy(generateJson: true)
+abstract class \$Issue138PairRight {
+  String get id;
+  String get url;
+
+  static Issue138PairRight create({required Issue138PairLeftUrl url}) =>
+      Issue138PairRight(id: 'id', url: url);
+}
+''';
+
 /// Extracts the parameter list source of `factory <className>.<name>(...)`.
 String _factoryParams(String output, String className, String name) {
   final marker = 'factory $className.$name(';
@@ -253,5 +281,101 @@ void main() {
           'multi-parameter fragment; params: $params',
     );
     expect(params, contains('Issue138Spark? spark'), reason: 'params: $params');
+  });
+
+  // PR #139 review follow-up: several entities can live in ONE file, each
+  // declaring a same-named `static create` executable. Recovery used to
+  // anchor to the FIRST `create(` in the file, so the SECOND entity's
+  // parameter was read from the FIRST entity's signature — a silently wrong
+  // parameter type in the generated factory, not a crash.
+  group('two entities in one file', () {
+    late Directory pairDir;
+    late String leftGenerated;
+    late String rightGenerated;
+
+    setUpAll(() async {
+      final root = Directory('test/.issue_138_pair_tmp').absolute.path;
+      pairDir = Directory(root)..createSync(recursive: true);
+      pairDir = pairDir.createTempSync('fixture_');
+      final file = File('${pairDir.path}/issue138_pair.dart')
+        ..writeAsStringSync(_pairSource);
+
+      final collection = AnalysisContextCollection(includedPaths: [file.path]);
+      final ctx = collection.contextFor(file.path);
+      final result = await ctx.currentSession.getResolvedUnit(
+        file.path,
+      ) as ResolvedUnitResult;
+
+      String generate(String className) {
+        final element = result.libraryElement.getClass(className)!;
+        final annotationReader = ConstantReader(
+          _zorphyChecker.firstAnnotationOf(element)!,
+        );
+        final graph = ClassGraph.fromLibraryClasses(
+          result.libraryElement.classes.toList(),
+          library: result.libraryElement,
+        );
+        final metadata = ClassAnalyzer.analyze(
+          element,
+          annotationReader,
+          graph.annotated,
+          graph.classesInExplicitSubtypes,
+        );
+        final ownFields = element.children
+            .whereType<FieldElement>()
+            .where((f) => f.name != 'hashCode' && f.name != 'runtimeType')
+            .map((f) => f.name ?? '')
+            .toSet();
+        final options = AnnotationParser.parse(annotationReader);
+        final config = GenerationConfig.fromAnnotationOptions(
+          options,
+          outputExtension: '.zorphy.dart',
+          factoryMethods: metadata.factoryMethods,
+          ownFields: ownFields,
+        );
+        return Orchestrator.generate(
+          element,
+          annotationReader,
+          graph.annotated,
+          config,
+          graph.classesInExplicitSubtypes,
+        );
+      }
+
+      leftGenerated = generate(r'$Issue138PairLeft');
+      rightGenerated = generate(r'$Issue138PairRight');
+    });
+
+    tearDownAll(() {
+      if (pairDir.existsSync()) pairDir.deleteSync(recursive: true);
+      final tmp = Directory('test/.issue_138_pair_tmp');
+      if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
+    });
+
+    test('each entity recovers its own factory parameter type', () {
+      final leftParams = _factoryParams(
+        leftGenerated,
+        'Issue138PairLeft',
+        'create',
+      );
+      expect(
+        leftParams,
+        contains('required Issue138PairRightUrl url'),
+        reason: 'params: $leftParams',
+      );
+
+      final rightParams = _factoryParams(
+        rightGenerated,
+        'Issue138PairRight',
+        'create',
+      );
+      expect(
+        rightParams,
+        contains('required Issue138PairLeftUrl url'),
+        reason:
+            "recovery must read the second entity's own signature, not the "
+            "sibling's same-named create(); params: $rightParams",
+      );
+    });
   });
 }
