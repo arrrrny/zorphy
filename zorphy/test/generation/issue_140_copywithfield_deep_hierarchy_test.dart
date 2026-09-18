@@ -118,9 +118,16 @@ Future<String> _generateFor(Directory fixtureDir, String className) async {
 
 /// The `copyWithField` declaration substring of [output], from a little
 /// before the signature (to capture annotations) through the parameter list.
+///
+/// Anchors on the method signature itself (`copyWithField<...>(`) instead
+/// of the first textual occurrence of the name, so a doc comment carrying
+/// `copyWithField` above an earlier method cannot shift the 120-char
+/// window and silently weaken the `@override` checks below.
 String _copyWithFieldDecl(String output) {
-  final start = output.indexOf('copyWithField');
-  expect(start, greaterThanOrEqualTo(0), reason: 'no copyWithField emitted');
+  final match = RegExp(r'copyWithField<[A-Za-z_$][A-Za-z_$0-9]*>\(')
+      .firstMatch(output);
+  expect(match, isNotNull, reason: 'no copyWithField signature emitted');
+  final start = match!.start;
   final from = (start - 120).clamp(0, output.length);
   final end = output.indexOf('{', start);
   expect(end, greaterThan(start), reason: 'unterminated copyWithField');

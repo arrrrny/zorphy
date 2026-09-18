@@ -224,6 +224,11 @@ class CopyWithGenerator extends UniversalGenerator {
   /// matching the interface-scoped generation rules. Returns the root's
   /// name with the leading `$` stripped, or null when the class has no
   /// `$`-prefixed interface.
+  ///
+  /// A class implementing several independent `$` chains anchors to
+  /// whichever chain the first-interface scan finds; a common-ancestor
+  /// anchor (`Field<Object, T>`, a supertype of every `Field<E, T>`)
+  /// would satisfy all of them if that shape ever shows up.
   String? _resolveInterfaceChainRootName(ClassMetadata metadata) {
     final byName = {for (final i in metadata.interfaces) i.interfaceName: i};
     bool isChainInterface(String name) =>
