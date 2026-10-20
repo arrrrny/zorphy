@@ -1,3 +1,9 @@
+## [2.4.4] - 2026-10-20
+
+### Change
+
+- Support `build` 5.x so the latest `build_runner` resolves. `zorphy` pinned `build: ^4.0.4`, but `build_runner` 2.17.1 requires `build >=5.0.0 <5.1.0`, so no consumer could use zorphy together with the current build_runner — pub version solving failed outright. The blocker was zorphy's own `build` constraint, not `source_gen`: `source_gen` 4.3.1 already allows `build >=3.0.2 <6.0.0`. The constraint is now `build: ">=4.0.4 <6.0.0"`, with `source_gen: ^4.3.1` and `analyzer: ">=14.0.0 <15.0.0"` (what `source_gen` 4.3.x requires), and the dev dependency on `build_runner` moves to `^2.17.1`. Verified against build 5.0.0 / build_runner 2.17.1 / source_gen 4.3.1 / analyzer 14.5.0: the generator test suite is green and the emitted code is unchanged (#143)
+
 ## [2.4.3] - 2026-09-18
 
 ### Fix
