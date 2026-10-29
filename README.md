@@ -717,6 +717,12 @@ String describeShape(Shape shape) => switch (shape) {
 };
 ```
 
+Dart restricts subtyping of a `sealed` class to the library that declares it, so
+the base and its subtypes must live in the **same file** for the generated base
+to be `sealed`. When the subtypes are declared in other files, the base is
+generated `abstract` instead — any library may then implement it, and the
+hierarchy compiles (exhaustiveness checking is not available across libraries).
+
 #### Non-Sealed Abstract Classes
 
 Use `nonSealed: true` to create non-sealed abstract classes:

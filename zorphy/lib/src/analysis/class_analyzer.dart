@@ -26,7 +26,6 @@ class ClassAnalyzer {
     final className = classElement.name ?? '';
     final isAbstract = className.startsWith(r'$$');
     final nonSealed = annotation.read('nonSealed').boolValue;
-    final isSealed = isAbstract && !nonSealed;
     // typeKey: own value takes precedence; otherwise inherit from the
     // nearest @Zorphy/@Zorphy2-annotated supertype that declares
     // explicitSubTypes. Subtypes inherit so the generated subtype
@@ -60,6 +59,18 @@ class ClassAnalyzer {
       annotation,
       allAnnotatedClasses,
     );
+
+    // Issue #142: a generated `sealed` base may only be implemented inside
+    // the library that declares it, so a hierarchy whose subtypes live in
+    // other files cannot compile. Sealing is worth emitting only when at
+    // least one subtype is declared in THIS library (the sole case where it
+    // buys switch exhaustiveness), and it is only legal when no known
+    // subtype lives in another library — otherwise the base stays `abstract`
+    // and any library may implement it.
+    final isSealed =
+        isAbstract &&
+        !nonSealed &&
+        _canSealBase(classElement, allAnnotatedClasses);
 
     // Resolve all fields (inherited + own)
     final allFields = FieldResolver.resolve(classElement, allAnnotatedClasses);
@@ -148,6 +159,63 @@ class ClassAnalyzer {
     }
 
     return const [];
+  }
+
+  /// Whether the generated base for [classElement] may be emitted as Dart
+  /// `sealed` (issue #142).
+  ///
+  /// `sealed` restricts subtyping to the declaring library, while zorphy
+  /// emits one library per source file. A `$$` base whose subtypes are
+  /// declared in other files therefore generated uncompilable code:
+  ///
+  ///   The class 'ShadNode' can't be extended, implemented, or mixed in
+  ///   outside of its library because it's a sealed class.
+  ///
+  /// Sealing is emitted only when it can do its job — at least one subtype is
+  /// declared in the SAME library, which is the only situation where the
+  /// compiler can use it for switch exhaustiveness — and only when every
+  /// known subtype lives in that library. A base with no same-library subtype
+  /// (the cross-library case, including the plain `$$Base` with subtypes
+  /// elsewhere) stays `abstract`, which is implementable from any library.
+  ///
+  /// [allAnnotatedClasses] holds the current library's annotated classes,
+  /// annotated classes reachable through its imports, and — because
+  /// `_extractExplicitSubtypes` registers them — every explicit subtype,
+  /// wherever it is declared.
+  static bool _canSealBase(
+    ClassElement classElement,
+    Map<String, ClassElement> allAnnotatedClasses,
+  ) {
+    var hasSameLibrarySubtype = false;
+    for (final candidate in allAnnotatedClasses.values) {
+      if (identical(candidate, classElement)) continue;
+      if (!_isSubtypeOf(candidate, classElement)) continue;
+      if (!_isSameLibrary(candidate, classElement)) {
+        // A subtype in another library would be rejected by the compiler.
+        return false;
+      }
+      hasSameLibrarySubtype = true;
+    }
+    return hasSameLibrarySubtype;
+  }
+
+  /// Whether [candidate] implements or extends [base].
+  static bool _isSubtypeOf(ClassElement candidate, ClassElement base) {
+    for (final supertype in candidate.allSupertypes) {
+      final element = supertype.element;
+      if (identical(element, base)) return true;
+      if (element.name == base.name && _isSameLibrary(element, base)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Whether [a] and [b] are declared in the same library (source file).
+  static bool _isSameLibrary(Element a, Element b) {
+    final aUri = a.library?.firstFragment.source.uri;
+    final bUri = b.library?.firstFragment.source.uri;
+    return aUri != null && aUri == bUri;
   }
 
   /// Validate class structure.
