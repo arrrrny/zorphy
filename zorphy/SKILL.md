@@ -406,6 +406,8 @@ final updated = doc1.patchWithDocument(patchInput: DocumentPatch.create()..withC
 - Enable generateJson for serialization
 - Use explicitSubTypes for polymorphic hierarchies
 - Use nonSealed when subtypes may expand
+- Keep a `$$` base and its subtypes in the SAME file when you want a `sealed`
+  base; subtypes declared in other files make the base generate `abstract`
 - Prefer static factories for complex creation
 - Use patching for partial updates
 
