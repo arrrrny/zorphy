@@ -102,6 +102,12 @@ class JsonKeyInfo {
   final String? fromJson;
   final String? converter;
 
+  /// The `unknownEnumValue:` argument, kept as its raw source expression
+  /// (e.g. `ParserType.empty`). json_serializable turns it into
+  /// `$enumDecodeNullable(map, v, unknownValue: ...)`; dropping it makes the
+  /// generated `fromJson` throw on an unknown enum wire value (issue #2054).
+  final String? unknownEnumValue;
+
   /// Creates a JsonKeyInfo record with optional parameters.
   const JsonKeyInfo({
     this.name,
@@ -115,6 +121,7 @@ class JsonKeyInfo {
     this.toJson,
     this.fromJson,
     this.converter,
+    this.unknownEnumValue,
   });
 
   /// Generates the annotation string representation.
@@ -139,6 +146,8 @@ class JsonKeyInfo {
     if (toJson != null) params.add("toJson: $toJson");
     if (fromJson != null) params.add("fromJson: $fromJson");
     if (converter != null) params.add("converter: $converter");
+    if (unknownEnumValue != null)
+      params.add("unknownEnumValue: $unknownEnumValue");
 
     if (params.isEmpty) return "JsonKey()";
     return "JsonKey(${params.join(", ")})";
@@ -161,6 +170,7 @@ class JsonKeyInfo {
     if (toJson != null) result.add("toJson");
     if (fromJson != null) result.add("fromJson");
     if (converter != null) result.add("converter");
+    if (unknownEnumValue != null) result.add("unknownEnumValue");
     return result;
   }
 }
