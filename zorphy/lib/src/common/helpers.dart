@@ -206,6 +206,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
     String? toJson;
     String? fromJson;
     String? converter;
+    String? unknownEnumValue;
 
     try {
       final nameValue = reader.read('name');
@@ -301,6 +302,11 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
     } catch (_) {}
 
     try {
+      final source = annotation.toSource();
+      unknownEnumValue = _extractAnnotationArgument(source, 'unknownEnumValue');
+    } catch (_) {}
+
+    try {
       final converterValue = reader.read('converter');
       if (!converterValue.isNull) {
         final revived = converterValue.revive();
@@ -326,7 +332,8 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
         disallowNullValue != null ||
         toJson != null ||
         fromJson != null ||
-        converter != null) {
+        converter != null ||
+        unknownEnumValue != null) {
       return JsonKeyInfo(
         name: name,
         ignore: ignore,
@@ -339,6 +346,7 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
         toJson: toJson,
         fromJson: fromJson,
         converter: converter,
+        unknownEnumValue: unknownEnumValue,
       );
     }
   } catch (e) {
@@ -349,7 +357,26 @@ JsonKeyInfo? extractJsonKeyInfo(Element element) {
 }
 
 String? _extractDefaultValue(String annotationSource) {
-  final match = RegExp(r"defaultValue\s*:\s*").firstMatch(annotationSource);
+  return _extractAnnotationArgument(annotationSource, 'defaultValue');
+}
+
+/// Extracts the raw source expression of a named `@JsonKey` argument.
+///
+/// Returns the argument's source text verbatim (e.g. `ParserType.empty`), so
+/// the generator can re-emit it without re-deriving a value from the analyzer's
+/// constant model. Returns null when the argument is absent.
+///
+/// The name is only matched as a TOP-LEVEL named argument — the pattern
+/// requires a preceding `(` or `,`, so an occurrence inside another
+/// argument's string value (e.g. `@JsonKey(name: 'unknownEnumValue: x')`)
+/// cannot match. Comments are safe: `annotation.toSource()` drops them.
+String? _extractAnnotationArgument(
+  String annotationSource,
+  String argumentName,
+) {
+  final match = RegExp(
+    r'(?:^|[(,])\s*' + RegExp.escape(argumentName) + r'\s*:\s*',
+  ).firstMatch(annotationSource);
   if (match == null) return null;
 
   final start = match.end;

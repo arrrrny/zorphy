@@ -921,6 +921,7 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       toJson: user.toJson,
       fromJson: user.fromJson,
       converter: user.converter,
+      unknownEnumValue: user.unknownEnumValue,
     );
   }
 }
