@@ -24,4 +24,3 @@ abstract class $Parser2054 {
   )
   ParserType2054 get type;
 }
-

@@ -1451,4 +1451,3 @@ String _resolveFieldType(
   }
   return result;
 }
-

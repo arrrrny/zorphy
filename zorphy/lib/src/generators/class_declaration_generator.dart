@@ -925,4 +925,3 @@ class ClassDeclarationGenerator extends UniversalGenerator {
     );
   }
 }
-
