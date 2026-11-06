@@ -101,9 +101,8 @@ String? _annotationName(ElementAnnotation annotation, String source) {
   // with no resolved element an import prefix and a named constructor are
   // syntactically identical, so the directive check below tests every
   // segment — a prefixed `@dep.Zorphy(...)` must not slip past the filter.
-  final match = RegExp(
-    r'^@\s*([A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*)',
-  ).firstMatch(source);
+  final match = RegExp(r'^@\s*([A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*)')
+      .firstMatch(source);
   return match?.group(1)?.replaceAll(RegExp(r'\s+'), '');
 }
 
@@ -366,13 +365,17 @@ String? _extractDefaultValue(String annotationSource) {
 /// Returns the argument's source text verbatim (e.g. `ParserType.empty`), so
 /// the generator can re-emit it without re-deriving a value from the analyzer's
 /// constant model. Returns null when the argument is absent.
+///
+/// The name is only matched as a TOP-LEVEL named argument — the pattern
+/// requires a preceding `(` or `,`, so an occurrence inside another
+/// argument's string value (e.g. `@JsonKey(name: 'unknownEnumValue: x')`)
+/// cannot match. Comments are safe: `annotation.toSource()` drops them.
 String? _extractAnnotationArgument(
   String annotationSource,
   String argumentName,
 ) {
   final match = RegExp(
-    '${RegExp.escape(argumentName)}'
-    r'\s*:\s*',
+    r'(?:^|[(,])\s*' + RegExp.escape(argumentName) + r'\s*:\s*',
   ).firstMatch(annotationSource);
   if (match == null) return null;
 
@@ -1331,9 +1334,8 @@ String? _enclosingClassBody(String source, Element element) {
 /// Returns the source text between the braces of `class <className>`, or
 /// `null` when no such declaration exists in [source].
 String? _classBodyOf(String source, String className) {
-  final declaration = RegExp(
-    r'\bclass\s+' + RegExp.escape(className) + r'\b',
-  ).firstMatch(source);
+  final declaration = RegExp(r'\bclass\s+' + RegExp.escape(className) + r'\b')
+      .firstMatch(source);
   if (declaration == null) return null;
 
   final bodyOpen = source.indexOf('{', declaration.end);
@@ -1449,3 +1451,4 @@ String _resolveFieldType(
   }
   return result;
 }
+

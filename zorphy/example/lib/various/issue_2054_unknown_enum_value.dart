@@ -5,7 +5,6 @@
 // `@JsonKey` and emits `$enumDecodeNullable(map, v, unknownValue: ...)`.
 // When zorphy drops the argument, an unknown wire value throws
 // `CheckedFromJsonException` instead of falling back.
-import 'package:json_annotation/json_annotation.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'issue_2054_unknown_enum_value.zorphy.dart';
@@ -25,3 +24,4 @@ abstract class $Parser2054 {
   )
   ParserType2054 get type;
 }
+

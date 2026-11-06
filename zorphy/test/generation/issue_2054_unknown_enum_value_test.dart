@@ -21,7 +21,6 @@ void main() {
   final fixture = File(
     'example/lib/various/issue_2054_unknown_enum_value.zorphy.dart',
   );
-  final runner = File('example/tool/issue_2054_behavior_check.dart');
   late String output;
 
   setUpAll(() {
@@ -69,3 +68,4 @@ void main() {
     });
   });
 }
+
