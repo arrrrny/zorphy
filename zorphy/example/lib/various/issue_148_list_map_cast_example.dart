@@ -24,3 +24,13 @@ abstract class $MarketplaceResult {
 abstract class $NullablePayloads {
   List<Map<String, dynamic>>? get payloads;
 }
+
+/// Exercises typed map values at the same cast sites: a decoded
+/// `Map<String, dynamic>` entry must be converted entry-wise to the
+/// declared `Map<String, String>` element type instead of failing a
+/// hard element cast.
+@Zorphy(generateJson: true)
+abstract class $TaggedResult {
+  List<Map<String, String>> get tags;
+  List<Map<String, String>>? get maybeTags;
+}

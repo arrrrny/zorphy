@@ -136,18 +136,38 @@ ListMapFieldType? parseListMapFieldType(String type) {
 /// type [fieldType].
 ///
 /// For `List<Map<...>>` fields (issue #148) emits json_serializable's
-/// checked element-wise conversion — `(v as List<dynamic>).map((e) => e
-/// as Map<String, dynamic>).toList()` — instead of a hard list-level
-/// cast that throws a TypeError on raw JSON payloads. Nullability is
-/// preserved: a nullable field yields `(v as List<dynamic>?)?.map((e)
-/// => e as Map<String, dynamic>)?.toList()`, passing null through. Any
+/// checked element-wise conversion instead of a hard cast that throws a
+/// TypeError on raw JSON payloads, in two layers:
+///
+/// - A fast path keeps the value when its runtime type already matches
+///   the declared field type — the old hard cast's O(1),
+///   identity-preserving behavior for the common typed call path.
+/// - Otherwise each element is converted entry-wise to the declared Map
+///   element type (`Map<K, V>.from`): decoded JSON entries are
+///   `Map<String, dynamic>`, so a hard element cast
+///   `e as Map<String, String>` throws even when every value already
+///   carries the declared type. Entries with the declared runtime type
+///   pass through untouched; non-convertible entries still fail with
+///   the same TypeError class as the old cast.
+///
+/// Nullability is preserved: a nullable field yields
+/// `(v as List<dynamic>?)?.map(...)?.toList()`, passing null through
+/// (the `is` fast path accepts null via the nullable type test). Any
 /// other type keeps the plain hard cast.
 String fieldCastExpression(String expr, String fieldType) {
   final listMap = parseListMapFieldType(fieldType);
   if (listMap == null) return '$expr as $fieldType';
   final outer = listMap.isNullable ? 'List<dynamic>?' : 'List<dynamic>';
   final chain = listMap.isNullable ? '?.' : '.';
-  return '($expr as $outer)$chain map((e) => e as ${listMap.elementType})$chain toList()';
+  final element = listMap.elementType;
+  final elemExpr =
+      'e is $element ? e : $element.from(e as Map<dynamic, dynamic>)';
+  final checked =
+      '($expr as $outer)$chain map((e) => $elemExpr)$chain toList()';
+  // Parenthesized: the patch-merge arms embed this whole expression in
+  // the THEN branch of another conditional, and a conditional must not
+  // appear there unparenthesized.
+  return '($expr is $fieldType ? $expr : $checked)';
 }
 
 /// Dart enum members that collide with the implicit enum members and cannot be

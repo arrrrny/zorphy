@@ -7,7 +7,11 @@
 // (`value as List<Map<String, dynamic>>` in the copyWithField switch,
 // `... as List<Map<String, dynamic>>` in the patch-merge arms) threw an
 // uncaught TypeError. The generator must emit json_serializable's
-// checked element-wise conversion instead.
+// checked element-wise conversion instead, with an entry-wise Map
+// conversion for typed map values (`List<Map<String, String>>` — a
+// decoded `Map<String, dynamic>` entry must be converted, not hard-cast;
+// CodeRabbit finding on PR #149) and an identity fast path for values
+// already carrying the declared runtime type.
 //
 // Two layers, mirroring the issue_131 test shape:
 //
@@ -57,15 +61,22 @@ void main() {
     });
 
     test('emits checked element-wise conversion, not a hard list cast', () {
+      // Fast path keeps an already-typed value; the conversion branch
+      // maps the raw list and converts each entry to the declared Map
+      // element type (CodeRabbit finding on PR #149) instead of a hard
+      // element cast.
       expect(
         compact,
         contains(
           'returncopyWith(marketplaces:'
+          '(valueisList<Map<String,dynamic>>?value:'
           '(valueasList<dynamic>)'
-          '.map((e)=>easMap<String,dynamic>).toList(),);',
+          '.map((e)=>eisMap<String,dynamic>'
+          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList()),);',
         ),
       );
-      expect(compact, isNot(contains('valueasList<Map<String,dynamic>>')));
+      expect(compact, isNot(contains('valueasList<Map')));
+      expect(compact, isNot(contains('=>easMap<String,dynamic>')));
     });
 
     test('nullable list field keeps null-aware semantics', () {
@@ -73,8 +84,10 @@ void main() {
         compact,
         contains(
           'returncopyWith(payloads:'
+          '(valueisList<Map<String,dynamic>>??value:'
           '(valueasList<dynamic>?)?'
-          '.map((e)=>easMap<String,dynamic>)?.toList(),);',
+          '.map((e)=>eisMap<String,dynamic>'
+          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),)?.toList()),);',
         ),
       );
     });
@@ -92,17 +105,22 @@ void main() {
         compact,
         contains(
           'asList<dynamic>)'
-          '.map((e)=>easMap<String,dynamic>).toList():this.marketplaces,',
+          '.map((e)=>eisMap<String,dynamic>'
+          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList())'
+          ':this.marketplaces,',
         ),
       );
       expect(
         compact,
         contains(
           'asList<dynamic>)'
-          '.map((e)=>easMap<String,dynamic>).toList():this.errors,',
+          '.map((e)=>eisMap<String,dynamic>'
+          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList())'
+          ':this.errors,',
         ),
       );
-      expect(compact, isNot(contains(')asList<Map<String,dynamic>>:')));
+      expect(compact, isNot(contains(')asList<Map')));
+      expect(compact, isNot(contains('=>easMap<String,dynamic>')));
     });
 
     test('nullable patch arm keeps null-aware semantics', () {
@@ -110,9 +128,51 @@ void main() {
         compact,
         contains(
           'asList<dynamic>?)?'
-          '.map((e)=>easMap<String,dynamic>)?.toList():this.payloads,',
+          '.map((e)=>eisMap<String,dynamic>'
+          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),)?.toList())'
+          ':this.payloads,',
         ),
       );
+    });
+  });
+
+  group('golden: typed map values (CodeRabbit finding on PR #149)', () {
+    test('switch arm covers the typed-map fixture fields', () {
+      expect(output, contains("case 'tags':"));
+      expect(output, contains("case 'maybeTags':"));
+    });
+
+    test('entries are converted to the declared map element type', () {
+      expect(
+        compact,
+        contains(
+          'returncopyWith(tags:'
+          '(valueisList<Map<String,String>>?value:'
+          '(valueasList<dynamic>)'
+          '.map((e)=>eisMap<String,String>'
+          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),).toList()),);',
+        ),
+      );
+      expect(
+        compact,
+        contains(
+          'returncopyWith(maybeTags:'
+          '(valueisList<Map<String,String>>??value:'
+          '(valueasList<dynamic>?)?'
+          '.map((e)=>eisMap<String,String>'
+          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),)?.toList()),);',
+        ),
+      );
+      expect(
+        compact,
+        contains(
+          'asList<dynamic>)'
+          '.map((e)=>eisMap<String,String>'
+          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),).toList())'
+          ':this.tags,',
+        ),
+      );
+      expect(compact, isNot(contains('=>easMap<String,String>')));
     });
   });
 

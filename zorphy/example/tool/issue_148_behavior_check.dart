@@ -97,6 +97,67 @@ void main() {
     kept.payloads!.length == 1,
   );
 
+  // ── typed map values (CodeRabbit finding on PR #149) ────────────
+  // A field declared List<Map<String, String>> receives decoded
+  // Map<String, dynamic> entries at the cast sites; the element cast
+  // must convert entry-wise, not throw.
+  const typedWire = '{"tags": [{"a": "b"}]}';
+  final typedJson = jsonDecode(typedWire) as Map<String, dynamic>;
+  final tagged = TaggedResult.fromJson(typedJson);
+  check(
+    'fromJson baseline for typed map values',
+    tagged.tags.first['a'] == 'b' && tagged.maybeTags == null,
+  );
+  try {
+    final patchedTags = tagged.copyWithField<dynamic>(
+      TaggedResultFields.tags,
+      typedJson['tags'],
+    );
+    check(
+      'copyWithField converts decoded Map<String, dynamic> entries to the declared map type',
+      patchedTags.tags.first['a'] == 'b',
+    );
+    final patchedMaybe = tagged.copyWithField<dynamic>(
+      TaggedResultFields.maybeTags,
+      typedJson['tags'],
+    );
+    check(
+      'nullable typed-map field converts decoded entries too',
+      patchedMaybe.maybeTags!.first['a'] == 'b',
+    );
+  } catch (e) {
+    print('FAIL: typed-map cast sites threw $e');
+    failures.add('typed-map cast sites accept decoded entries');
+  }
+
+  // Typed input keeps the same instance: the fast path restores the old
+  // hard cast's O(1), identity-preserving behavior.
+  final typedList = <Map<String, String>>[
+    {'e': 'f'},
+  ];
+  final identityPatched = tagged.copyWithField(
+    TaggedResultFields.tags,
+    typedList,
+  );
+  check(
+    'copyWithField keeps an already-typed list instance (fast path)',
+    identical(identityPatched.tags, typedList),
+  );
+
+  // ── patch-merge arm with decoded typed-map entries ──────────────
+  try {
+    final tagPatch = TaggedResultPatch()
+      ..patchMap[TaggedResult$.tags] = typedJson['tags'];
+    final tagPatched = tagged.patchWithTaggedResult(tagPatch);
+    check(
+      'patch-merge arm converts decoded Map<String, dynamic> entries to the declared map type',
+      tagPatched.tags.first['a'] == 'b',
+    );
+  } catch (e) {
+    print('FAIL: patch-merge arm typed-map threw $e');
+    failures.add('patch-merge arm accepts decoded typed-map entries');
+  }
+
   if (failures.isNotEmpty) {
     print('${failures.length} CHECK(S) FAILED');
     exit(1);
