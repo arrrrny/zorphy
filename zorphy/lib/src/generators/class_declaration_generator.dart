@@ -54,7 +54,10 @@ class ClassDeclarationGenerator extends UniversalGenerator {
       // Modifiers
       if (metadata.isSealed) {
         c.sealed = true;
-      } else if (metadata.nonSealed) {
+      } else if (metadata.isAbstract) {
+        // A `$$` base that is not sealed (explicit `nonSealed: true`, or a
+        // hierarchy whose subtypes live in another library — issue #142)
+        // must still be declared `abstract`.
         c.abstract = true;
       }
 

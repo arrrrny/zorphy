@@ -717,6 +717,27 @@ String describeShape(Shape shape) => switch (shape) {
 };
 ```
 
+Dart restricts subtyping of a `sealed` class to the library that declares it.
+The generated base is `sealed` only when the closed hierarchy is **explicitly
+declared** on the base — `explicitSubTypes` — AND every declared subtype lives
+in the same file:
+
+```dart
+@Zorphy(explicitSubTypes: [Circle, Rectangle])
+abstract class $$Shape {
+  double get area;
+}
+```
+
+Same-file subtypes alone do not seal the base: the generator cannot see a
+subtype declared in another file that merely imports the base, so sealing on
+same-file evidence alone would emit a `sealed` base that remote subtype cannot
+implement. Without the explicit declaration — and whenever subtypes are
+declared in other files — the base is generated `abstract` instead; any
+library may then implement it, and the hierarchy compiles (exhaustiveness
+checking is not available across libraries). `nonSealed: true` always opts
+out of sealing.
+
 #### Non-Sealed Abstract Classes
 
 Use `nonSealed: true` to create non-sealed abstract classes:

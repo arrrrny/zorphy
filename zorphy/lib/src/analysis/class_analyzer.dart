@@ -26,7 +26,6 @@ class ClassAnalyzer {
     final className = classElement.name ?? '';
     final isAbstract = className.startsWith(r'$$');
     final nonSealed = annotation.read('nonSealed').boolValue;
-    final isSealed = isAbstract && !nonSealed;
     // typeKey: own value takes precedence; otherwise inherit from the
     // nearest @Zorphy/@Zorphy2-annotated supertype that declares
     // explicitSubTypes. Subtypes inherit so the generated subtype
@@ -60,6 +59,26 @@ class ClassAnalyzer {
       annotation,
       allAnnotatedClasses,
     );
+
+    // Issue #142: a generated `sealed` base may only be implemented inside
+    // the library that declares it, so a hierarchy whose subtypes live in
+    // other files cannot compile. Sealing additionally requires an EXPLICIT
+    // closed-hierarchy guarantee (`explicitSubTypes` on the base — PR #146
+    // review finding): same-library visibility alone cannot prove that no
+    // undiscoverable subtype exists in another file, so an undeclared
+    // hierarchy keeps the base `abstract` and any library may implement it.
+    // When closure IS declared, sealing is worth emitting only when at least
+    // one subtype is declared in THIS library (the sole case where it buys
+    // switch exhaustiveness), and it is only legal when no known subtype
+    // lives in another library.
+    final isSealed =
+        isAbstract &&
+        !nonSealed &&
+        _canSealBase(
+          classElement,
+          allAnnotatedClasses,
+          closureDeclared: explicitSubtypes.isNotEmpty,
+        );
 
     // Resolve all fields (inherited + own)
     final allFields = FieldResolver.resolve(classElement, allAnnotatedClasses);
@@ -148,6 +167,76 @@ class ClassAnalyzer {
     }
 
     return const [];
+  }
+
+  /// Whether the generated base for [classElement] may be emitted as Dart
+  /// `sealed` (issue #142).
+  ///
+  /// `sealed` restricts subtyping to the declaring library, while zorphy
+  /// emits one library per source file. A `$$` base whose subtypes are
+  /// declared in other files therefore generated uncompilable code:
+  ///
+  ///   The class 'ShadNode' can't be extended, implemented, or mixed in
+  ///   outside of its library because it's a sealed class.
+  ///
+  /// Sealing is emitted only when the closed hierarchy is EXPLICITLY
+  /// guaranteed — the base declares its subtype set via `explicitSubTypes` —
+  /// and it can do its job: at least one subtype is declared in the SAME
+  /// library (the only situation where the compiler can use `sealed` for
+  /// switch exhaustiveness) and every known subtype lives in that library.
+  ///
+  /// Same-library evidence alone does NOT establish closure:
+  /// [allAnnotatedClasses] holds the current library's annotated classes,
+  /// annotated classes reachable through its imports, and — because
+  /// `_extractExplicitSubtypes` registers them — every explicitly declared
+  /// subtype. A subtype in another file that merely imports the base is
+  /// invisible here, so sealing on same-library visibility alone would emit
+  /// `sealed class ShadNode` while a remote `$RemoteNode implements $$ShadNode`
+  /// fails to compile (PR #146 review finding — the failure case is same-file
+  /// subtype + undiscoverable remote subtype). A base whose closure is not
+  /// explicitly declared — including one with same-library subtypes but no
+  /// `explicitSubTypes` — stays `abstract`, which is implementable from any
+  /// library. `nonSealed: true` remains the hard opt-out and never seals.
+  static bool _canSealBase(
+    ClassElement classElement,
+    Map<String, ClassElement> allAnnotatedClasses, {
+    required bool closureDeclared,
+  }) {
+    if (!closureDeclared) {
+      // Without an explicit closed-hierarchy guarantee the graph cannot
+      // prove that no undiscoverable subtype exists in another library.
+      return false;
+    }
+    var hasSameLibrarySubtype = false;
+    for (final candidate in allAnnotatedClasses.values) {
+      if (identical(candidate, classElement)) continue;
+      if (!_isSubtypeOf(candidate, classElement)) continue;
+      if (!_isSameLibrary(candidate, classElement)) {
+        // A subtype in another library would be rejected by the compiler.
+        return false;
+      }
+      hasSameLibrarySubtype = true;
+    }
+    return hasSameLibrarySubtype;
+  }
+
+  /// Whether [candidate] implements or extends [base].
+  static bool _isSubtypeOf(ClassElement candidate, ClassElement base) {
+    for (final supertype in candidate.allSupertypes) {
+      final element = supertype.element;
+      if (identical(element, base)) return true;
+      if (element.name == base.name && _isSameLibrary(element, base)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Whether [a] and [b] are declared in the same library (source file).
+  static bool _isSameLibrary(Element a, Element b) {
+    final aUri = a.library?.firstFragment.source.uri;
+    final bUri = b.library?.firstFragment.source.uri;
+    return aUri != null && aUri == bUri;
   }
 
   /// Validate class structure.
