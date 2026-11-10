@@ -101,8 +101,18 @@ class PatchGenerator extends ConcreteClassGenerator {
         final f = fields[i];
         final comma = i == fields.length - 1 ? '' : ',';
         if (interfaceFieldNames.contains(f.name)) {
+          final patchKey =
+              '_patchMap[$enumName.${helpers.enumMemberName(f.name)}]';
+          // Composite list fields (List<Map<...>>, issue #148): a hard
+          // list-level cast throws a TypeError on raw JSON payloads
+          // (List<dynamic> with Map elements) — emit json_serializable's
+          // checked element-wise conversion instead.
+          final castExpr = helpers.fieldCastExpression(
+            '( ($patchKey is Function) ? $patchKey(this.${f.name}) : ($patchKey is Patch) ? $patchKey.applyTo(this.${f.name}) : $patchKey )',
+            f.type!.replaceAll(r'$', ''),
+          );
           bodyLines.add(
-            "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? ( (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] ) as ${f.type!.replaceAll(r'$', '')} : this.${f.name}$comma",
+            "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? $castExpr : this.${f.name}$comma",
           );
         } else {
           bodyLines.add('${f.name}: this.${f.name},');
@@ -145,8 +155,17 @@ class PatchGenerator extends ConcreteClassGenerator {
     for (var i = 0; i < fields.length; i++) {
       final f = fields[i];
       final comma = i == fields.length - 1 ? '' : ',';
+      final patchKey = '_patchMap[$enumName.${helpers.enumMemberName(f.name)}]';
+      // Composite list fields (List<Map<...>>, issue #148): a hard
+      // list-level cast throws a TypeError on raw JSON payloads
+      // (List<dynamic> with Map elements) — emit json_serializable's
+      // checked element-wise conversion instead.
+      final castExpr = helpers.fieldCastExpression(
+        '( ($patchKey is Function) ? $patchKey(this.${f.name}) : ($patchKey is Patch) ? $patchKey.applyTo(this.${f.name}) : $patchKey )',
+        f.type!.replaceAll(r'$', ''),
+      );
       bodyLines.add(
-        "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? ( (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] ) as ${f.type!.replaceAll(r'$', '')} : this.${f.name}$comma",
+        "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? $castExpr : this.${f.name}$comma",
       );
     }
 

@@ -329,7 +329,14 @@ class CopyWithGenerator extends UniversalGenerator {
           f.type ?? 'dynamic',
         );
         body.add("  case '${f.name}':");
-        body.add('    return copyWith(${f.name}: value as $fieldType);');
+        // Composite list fields (List<Map<...>>, issue #148): a hard
+        // list-level cast throws a TypeError on raw JSON payloads
+        // (List<dynamic> with Map elements) — emit json_serializable's
+        // checked element-wise conversion instead.
+        body.add(
+          '    return copyWith(${f.name}: '
+          '${helpers.fieldCastExpression('value', fieldType)});',
+        );
       }
       body.add('  default:');
       body.add(

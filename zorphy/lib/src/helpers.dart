@@ -107,6 +107,49 @@ String replaceDollarTypesWithConcrete(String type) {
   return '${result}${isOuterNullable ? '?' : ''}';
 }
 
+/// Parsed shape of a `List<Map<...>>` field type (issue #148): the
+/// declared Map element type and whether the list itself is nullable.
+class ListMapFieldType {
+  final String elementType;
+  final bool isNullable;
+  const ListMapFieldType(this.elementType, this.isNullable);
+}
+
+/// Parses [type] (already dollar-stripped) as `List<Map<...>>` /
+/// `List<Map<...>>?`. Returns null for any other shape.
+///
+/// Only these composite list fields need the checked element-wise
+/// conversion: a hard list-level cast fails on raw JSON payloads, whose
+/// list arrives as `List<dynamic>` with `Map<String, dynamic>` elements
+/// (issue #148).
+ListMapFieldType? parseListMapFieldType(String type) {
+  var t = type.trim();
+  final isNullable = t.endsWith('?');
+  if (isNullable) t = t.substring(0, t.length - 1).trim();
+  if (!t.startsWith('List<') || !t.endsWith('>')) return null;
+  final element = t.substring('List<'.length, t.length - 1).trim();
+  if (element != 'Map' && !element.startsWith('Map<')) return null;
+  return ListMapFieldType(element, isNullable);
+}
+
+/// Emission for the cast applied when [expr] is assigned to a field of
+/// type [fieldType].
+///
+/// For `List<Map<...>>` fields (issue #148) emits json_serializable's
+/// checked element-wise conversion — `(v as List<dynamic>).map((e) => e
+/// as Map<String, dynamic>).toList()` — instead of a hard list-level
+/// cast that throws a TypeError on raw JSON payloads. Nullability is
+/// preserved: a nullable field yields `(v as List<dynamic>?)?.map((e)
+/// => e as Map<String, dynamic>)?.toList()`, passing null through. Any
+/// other type keeps the plain hard cast.
+String fieldCastExpression(String expr, String fieldType) {
+  final listMap = parseListMapFieldType(fieldType);
+  if (listMap == null) return '$expr as $fieldType';
+  final outer = listMap.isNullable ? 'List<dynamic>?' : 'List<dynamic>';
+  final chain = listMap.isNullable ? '?.' : '.';
+  return '($expr as $outer)$chain map((e) => e as ${listMap.elementType})$chain toList()';
+}
+
 /// Dart enum members that collide with the implicit enum members and cannot be
 /// used as a constant name in an enum declaration (issue #313).
 const Set<String> _reservedEnumMemberNames = {'values', 'index', 'name'};
