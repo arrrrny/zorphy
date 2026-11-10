@@ -14,17 +14,20 @@ void main() {
       final root = Directory.systemTemp.createTempSync('zorphy_smoke');
       addTearDown(() => root.deleteSync(recursive: true));
 
-      final repoRoot = p.normalize(
-        p.join(Directory.current.path, '..'),
-      );
+      final repoRoot = p.normalize(p.join(Directory.current.path, '..'));
 
       // 1. Stage the freezed source project.
       final libDir = p.join(root.path, 'lib');
       Directory(libDir).createSync(recursive: true);
       File(p.join(libDir, 'models.dart')).writeAsStringSync(
         File(
-          p.join(Directory.current.path, 'test', 'fixtures', 'smoke',
-              'input.dart'),
+          p.join(
+            Directory.current.path,
+            'test',
+            'fixtures',
+            'smoke',
+            'input.dart',
+          ),
         ).readAsStringSync(),
       );
       File(p.join(root.path, 'pubspec.yaml')).writeAsStringSync('''
@@ -65,9 +68,7 @@ dependency_overrides:
       expect(migrated, contains('ZorphyPreset.lean'));
       expect(migrated, contains('generateJson: true'));
 
-      final report = File(
-        p.join(root.path, 'MIGRATION.md'),
-      ).readAsStringSync();
+      final report = File(p.join(root.path, 'MIGRATION.md')).readAsStringSync();
       expect(report, contains('Converted classes (11)'));
       expect(report, contains('Needs manual attention (0)'));
 
@@ -78,15 +79,19 @@ dependency_overrides:
             "import 'package:freezed_annotation/freezed_annotation.dart';",
             "import 'package:zorphy_annotation/zorphy_annotation.dart';",
           )
-          .replaceAll("part 'input.freezed.dart';", "part 'models.zorphy.dart';\npart 'models.g.dart';");
+          .replaceAll(
+            "part 'input.freezed.dart';",
+            "part 'models.zorphy.dart';\npart 'models.g.dart';",
+          );
       File(p.join(libDir, 'models.dart')).writeAsStringSync(finalized);
 
       // 4. Generate with zorphy 2.0 and analyze.
-      _run(
-        'dart',
-        ['run', 'build_runner', 'build', '--delete-conflicting-outputs'],
-        root.path,
-      );
+      _run('dart', [
+        'run',
+        'build_runner',
+        'build',
+        '--delete-conflicting-outputs',
+      ], root.path);
       expect(
         File(p.join(libDir, 'models.zorphy.dart')).existsSync(),
         isTrue,

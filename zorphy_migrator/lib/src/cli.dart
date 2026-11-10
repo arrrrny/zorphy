@@ -22,7 +22,11 @@ class MigratorCli {
 
   Future<int> run(List<String> arguments) async {
     final parser = ArgParser()
-      ..addFlag('dry-run', abbr: 'n', help: 'Print unified diff, write nothing (default).')
+      ..addFlag(
+        'dry-run',
+        abbr: 'n',
+        help: 'Print unified diff, write nothing (default).',
+      )
       ..addFlag('apply', abbr: 'a', help: 'Rewrite files in place.')
       ..addOption('report', abbr: 'r', help: 'Write markdown report to file.')
       ..addFlag(
@@ -39,7 +43,9 @@ class MigratorCli {
       return exitAnalysisError;
     }
 
-    if (args['help'] as bool || args.rest.length < 2 || args.rest.first != 'migrate') {
+    if (args['help'] as bool ||
+        args.rest.length < 2 ||
+        args.rest.first != 'migrate') {
       stdout.writeln(
         'Usage: zorphy_migrator migrate <path> [--dry-run] [--apply] '
         '[--report <file>] [--fail-on-manual]',
@@ -140,9 +146,7 @@ class MigratorCli {
     final report = MigrationReport(
       converted: converted,
       manualItems: manual,
-      hasExchangeable: models.any(
-        (m) => m.dialect != ModelDialect.freezed,
-      ),
+      hasExchangeable: models.any((m) => m.dialect != ModelDialect.freezed),
     );
     if (reportPath != null) {
       await File(reportPath).writeAsString(report.toMarkdown());
@@ -165,9 +169,9 @@ class MigratorCli {
 
     bool skip(File file) =>
         _generatedFilePattern.hasMatch(file.path) ||
-        file.path.split(Platform.pathSeparator).any(
-          (seg) => seg.startsWith('.') || seg == 'build',
-        );
+        file.path
+            .split(Platform.pathSeparator)
+            .any((seg) => seg.startsWith('.') || seg == 'build');
 
     if (entity == FileSystemEntityType.file) {
       final f = File(target);

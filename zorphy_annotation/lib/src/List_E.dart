@@ -85,12 +85,10 @@ class List_E<E> {
   void sort([int Function(E a, E b)? compare]) => _list.sort(compare);
 
   @override
-
   /// Returns a string representation of the list.
   String toString() => _list.toString();
 
   @override
-
   /// Compares two List_E instances by value.
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -98,10 +96,10 @@ class List_E<E> {
           runtimeType == other.runtimeType &&
           _list.length == other._list.length &&
           _list.every(
-              (element) => other._list[_list.indexOf(element)] == element);
+            (element) => other._list[_list.indexOf(element)] == element,
+          );
 
   @override
-
   /// Returns a hash code based on list contents.
   int get hashCode => _list.hashCode;
 }

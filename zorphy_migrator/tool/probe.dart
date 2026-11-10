@@ -9,7 +9,8 @@ void main() async {
   print('detected=${models.length}');
   for (final m in models) {
     // ignore: avoid_print
-    print('name=${m.name} span=${m.spanStart}-${m.spanEnd} migratable=${m.isMigratable}');
+    print(
+      'name=${m.name} span=${m.spanStart}-${m.spanEnd} migratable=${m.isMigratable}',
+    );
   }
 }
-

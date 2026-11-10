@@ -1,4 +1,5 @@
 import 'package:meta/meta.dart';
+
 import 'field.dart';
 
 /// Represents a sort operation on a field
@@ -18,9 +19,9 @@ class Sort<TEntity> {
 
   /// Serializes this sort configuration to JSON.
   Map<String, dynamic> toJson() => {
-        'field': field.name,
-        'descending': descending,
-      };
+    'field': field.name,
+    'descending': descending,
+  };
 
   /// Compares two items based on this sort configuration.
   /// Requires [field.getValue] to be defined.
