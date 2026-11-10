@@ -1,3 +1,9 @@
+## [2.4.5] - 2026-11-10
+
+### Change
+
+- Version synced with `zorphy` 2.4.5 (no annotation API changes in this release; generator-side fixes #142 and #148 ship in `zorphy`).
+
 ## [2.4.4] - 2026-10-20
 
 ### Change

@@ -1,3 +1,10 @@
+## [2.4.5] - 2026-11-10
+
+### Fix
+
+- fix #142: generated `$$` bases stay implementable across libraries (cross-library sealed-base rejection resolved by PR #146)
+- fix #148: generator no longer hard-casts `List<Map<String, dynamic>>` fields at copyWithField/patch arms (raw JSON payloads no longer TypeError)
+
 ## [2.4.4] - 2026-10-20
 
 ### Change
