@@ -406,8 +406,12 @@ final updated = doc1.patchWithDocument(patchInput: DocumentPatch.create()..withC
 - Enable generateJson for serialization
 - Use explicitSubTypes for polymorphic hierarchies
 - Use nonSealed when subtypes may expand
-- Keep a `$$` base and its subtypes in the SAME file when you want a `sealed`
-  base; subtypes declared in other files make the base generate `abstract`
+- A `$$` base generates `sealed` only when the closed hierarchy is declared
+  EXPLICITLY via `explicitSubTypes` on the base AND every declared subtype
+  lives in the same file; without that declaration the base stays `abstract`
+  (same-file subtypes alone do not seal — an unimported remote subtype would
+  fail to compile), and subtypes declared in other files always generate
+  `abstract`. `nonSealed: true` always opts out
 - Prefer static factories for complex creation
 - Use patching for partial updates
 

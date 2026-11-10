@@ -62,15 +62,23 @@ class ClassAnalyzer {
 
     // Issue #142: a generated `sealed` base may only be implemented inside
     // the library that declares it, so a hierarchy whose subtypes live in
-    // other files cannot compile. Sealing is worth emitting only when at
-    // least one subtype is declared in THIS library (the sole case where it
-    // buys switch exhaustiveness), and it is only legal when no known
-    // subtype lives in another library — otherwise the base stays `abstract`
-    // and any library may implement it.
+    // other files cannot compile. Sealing additionally requires an EXPLICIT
+    // closed-hierarchy guarantee (`explicitSubTypes` on the base — PR #146
+    // review finding): same-library visibility alone cannot prove that no
+    // undiscoverable subtype exists in another file, so an undeclared
+    // hierarchy keeps the base `abstract` and any library may implement it.
+    // When closure IS declared, sealing is worth emitting only when at least
+    // one subtype is declared in THIS library (the sole case where it buys
+    // switch exhaustiveness), and it is only legal when no known subtype
+    // lives in another library.
     final isSealed =
         isAbstract &&
         !nonSealed &&
-        _canSealBase(classElement, allAnnotatedClasses);
+        _canSealBase(
+          classElement,
+          allAnnotatedClasses,
+          closureDeclared: explicitSubtypes.isNotEmpty,
+        );
 
     // Resolve all fields (inherited + own)
     final allFields = FieldResolver.resolve(classElement, allAnnotatedClasses);
@@ -171,21 +179,34 @@ class ClassAnalyzer {
   ///   The class 'ShadNode' can't be extended, implemented, or mixed in
   ///   outside of its library because it's a sealed class.
   ///
-  /// Sealing is emitted only when it can do its job — at least one subtype is
-  /// declared in the SAME library, which is the only situation where the
-  /// compiler can use it for switch exhaustiveness — and only when every
-  /// known subtype lives in that library. A base with no same-library subtype
-  /// (the cross-library case, including the plain `$$Base` with subtypes
-  /// elsewhere) stays `abstract`, which is implementable from any library.
+  /// Sealing is emitted only when the closed hierarchy is EXPLICITLY
+  /// guaranteed — the base declares its subtype set via `explicitSubTypes` —
+  /// and it can do its job: at least one subtype is declared in the SAME
+  /// library (the only situation where the compiler can use `sealed` for
+  /// switch exhaustiveness) and every known subtype lives in that library.
   ///
+  /// Same-library evidence alone does NOT establish closure:
   /// [allAnnotatedClasses] holds the current library's annotated classes,
   /// annotated classes reachable through its imports, and — because
-  /// `_extractExplicitSubtypes` registers them — every explicit subtype,
-  /// wherever it is declared.
+  /// `_extractExplicitSubtypes` registers them — every explicitly declared
+  /// subtype. A subtype in another file that merely imports the base is
+  /// invisible here, so sealing on same-library visibility alone would emit
+  /// `sealed class ShadNode` while a remote `$RemoteNode implements $$ShadNode`
+  /// fails to compile (PR #146 review finding — the failure case is same-file
+  /// subtype + undiscoverable remote subtype). A base whose closure is not
+  /// explicitly declared — including one with same-library subtypes but no
+  /// `explicitSubTypes` — stays `abstract`, which is implementable from any
+  /// library. `nonSealed: true` remains the hard opt-out and never seals.
   static bool _canSealBase(
     ClassElement classElement,
-    Map<String, ClassElement> allAnnotatedClasses,
-  ) {
+    Map<String, ClassElement> allAnnotatedClasses, {
+    required bool closureDeclared,
+  }) {
+    if (!closureDeclared) {
+      // Without an explicit closed-hierarchy guarantee the graph cannot
+      // prove that no undiscoverable subtype exists in another library.
+      return false;
+    }
     var hasSameLibrarySubtype = false;
     for (final candidate in allAnnotatedClasses.values) {
       if (identical(candidate, classElement)) continue;
@@ -309,9 +330,9 @@ class ClassAnalyzer {
       // Read the subtype's own @Zorphy(subtypeWireValue: ...) so the
       // base's dispatch can match the wire value the remote API sends.
       // Defaults to null -> clean class name (resolved at codegen time).
-      final subtypeWireValue = _readSubtypeAnnotation(el)
-          ?.peek('subtypeWireValue')
-          ?.stringValue;
+      final subtypeWireValue = _readSubtypeAnnotation(
+        el,
+      )?.peek('subtypeWireValue')?.stringValue;
       return Interface.fromGenerics(
         el.name ?? "",
         el.typeParameters.map((tp) {

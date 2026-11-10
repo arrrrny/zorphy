@@ -21,6 +21,12 @@
 // subtype lives in another library. Otherwise emit `abstract`, which is
 // implementable from any library.
 //
+// PR #146 review finding tightens this further: same-library visibility alone
+// does NOT establish closure (a subtype in another file that merely imports
+// the base is invisible to the base-generation graph). Sealing now requires
+// the closed hierarchy to be declared EXPLICITLY via `explicitSubTypes` on
+// the base; `nonSealed` stays the hard opt-out.
+//
 // The tests drive the REAL pipeline (resolved ClassElement -> ClassAnalyzer ->
 // Orchestrator.generate) over two-library fixtures and then run the analyzer
 // over the generated sources, so the reported compile error is reproduced
@@ -69,15 +75,15 @@ abstract class \$ButtonNode implements \$\$ShadNode {
 }
 ''';
 
-/// Control shape: base and subtype in the SAME library, where `sealed` is
-/// both legal and useful (switch exhaustiveness) — that behaviour must not be
-/// relaxed by the #142 fix.
+/// Control shape: base and subtype in the SAME library with the closed
+/// hierarchy explicitly declared (`explicitSubTypes`) — `sealed` is both
+/// legal and useful there (switch exhaustiveness) and must keep working.
 const _sameLibrarySource = '''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'same_library_nodes.zorphy.dart';
 
-@Zorphy()
+@Zorphy(explicitSubTypes: [\$Circle])
 abstract class \$\$Shape {
   double get area;
 }
@@ -85,6 +91,40 @@ abstract class \$\$Shape {
 @Zorphy()
 abstract class \$Circle implements \$\$Shape {
   double get radius;
+}
+''';
+
+/// The PR #146 review finding's unsafe shape: a same-library subtype exists,
+/// but the subtype set is NOT explicitly declared — and a REMOTE library
+/// (which only imports the base, so the base-generation graph never sees it)
+/// also implements the base. Same-library evidence alone must not seal the
+/// base, or the remote subtype cannot compile.
+const _undeclaredSameLibraryBaseSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'undeclared_base.zorphy.dart';
+
+@Zorphy()
+abstract class \$\$ShadNode {
+  String get id;
+}
+
+@Zorphy()
+abstract class \$LocalNode implements \$\$ShadNode {
+  String get label;
+}
+''';
+
+const _undeclaredSameLibraryRemoteSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+import 'undeclared_base.dart';
+
+part 'remote_node.zorphy.dart';
+
+@Zorphy()
+abstract class \$RemoteNode implements \$\$ShadNode {
+  String get name;
 }
 ''';
 
@@ -99,9 +139,9 @@ Future<String> _generate(
     includedPaths: [fixtureDir.path],
   );
   final ctx = collection.contextFor(libraryPath);
-  final result = await ctx.currentSession.getResolvedUnit(
-    libraryPath,
-  ) as ResolvedUnitResult;
+  final result =
+      await ctx.currentSession.getResolvedUnit(libraryPath)
+          as ResolvedUnitResult;
   final element = result.libraryElement.getClass(className);
   expect(element, isNotNull, reason: 'class $className not resolved');
   final annotationReader = ConstantReader(
@@ -155,8 +195,9 @@ void _writePart(
   String partName,
   String generated,
 ) {
-  File('${fixtureDir.path}/$partName')
-      .writeAsStringSync("part of '$libraryName';\n\n$generated");
+  File(
+    '${fixtureDir.path}/$partName',
+  ).writeAsStringSync("part of '$libraryName';\n\n$generated");
 }
 
 /// Every diagnostic the analyzer reports for the libraries at [libraryPaths]
@@ -172,9 +213,9 @@ Future<List<String>> _diagnostics(
   final diagnostics = <String>[];
   for (final path in libraryPaths) {
     final ctx = collection.contextFor(path);
-    final library = await ctx.currentSession.getResolvedLibrary(
-      path,
-    ) as ResolvedLibraryResult;
+    final library =
+        await ctx.currentSession.getResolvedLibrary(path)
+            as ResolvedLibraryResult;
     for (final unit in library.units) {
       for (final diagnostic in unit.diagnostics) {
         diagnostics.add(
@@ -291,11 +332,85 @@ void main() {
       if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
     });
 
-    test('base implemented in the same library still seals', () {
+    test('base with an explicitly declared closed hierarchy still seals', () {
       expect(
         output,
         contains('sealed class Shape'),
-        reason: 'switch exhaustiveness inside one library must keep working',
+        reason:
+            'a declared closed hierarchy in one library keeps exhaustiveness',
+      );
+    });
+  });
+
+  group('issue #142 follow-up (PR #146 review) — undeclared same-library '
+      'hierarchy with a remote subtype stays abstract', () {
+    late Directory fixtureDir;
+    late String baseOutput;
+    late String remoteOutput;
+    late List<String> diagnostics;
+
+    setUpAll(() async {
+      final root = Directory('test/.issue_142_undeclared_tmp').absolute.path;
+      fixtureDir = Directory(root)..createSync(recursive: true);
+      fixtureDir = fixtureDir.createTempSync('fixture_');
+
+      final basePath = '${fixtureDir.path}/undeclared_base.dart';
+      final remotePath = '${fixtureDir.path}/remote_node.dart';
+      File(basePath).writeAsStringSync(_undeclaredSameLibraryBaseSource);
+      File(remotePath).writeAsStringSync(_undeclaredSameLibraryRemoteSource);
+
+      // The base first: its generated part must exist before the remote
+      // library (which imports it) is resolved.
+      baseOutput = await _generate(fixtureDir, basePath, r'$$ShadNode');
+      _writePart(
+        fixtureDir,
+        'undeclared_base.dart',
+        'undeclared_base.zorphy.dart',
+        baseOutput,
+      );
+
+      remoteOutput = await _generate(fixtureDir, remotePath, r'$RemoteNode');
+      _writePart(
+        fixtureDir,
+        'remote_node.dart',
+        'remote_node.zorphy.dart',
+        remoteOutput,
+      );
+
+      diagnostics = await _diagnostics(fixtureDir, [basePath, remotePath]);
+    });
+
+    tearDownAll(() {
+      if (fixtureDir.existsSync()) fixtureDir.deleteSync(recursive: true);
+      final tmp = Directory('test/.issue_142_undeclared_tmp');
+      if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
+    });
+
+    test('same-library subtype without an explicit declaration does not '
+        'seal the base', () {
+      // The review finding: same-library evidence alone cannot prove that no
+      // undiscoverable subtype exists in another file, so the base must stay
+      // abstract even though $LocalNode shares its library.
+      expect(
+        baseOutput,
+        isNot(contains('sealed class ShadNode')),
+        reason: 'an undeclared hierarchy must stay open for remote subtypes',
+      );
+      expect(baseOutput, contains('abstract class ShadNode'));
+    });
+
+    test('remote subtype against the undeclared base compiles', () {
+      expect(remoteOutput, contains('class RemoteNode implements ShadNode'));
+    });
+
+    test('generated undeclared two-library hierarchy analyzes with no '
+        'sealed error', () {
+      expect(
+        diagnostics.where(
+          (d) => d.contains('invalid_use_of_type_outside_library'),
+        ),
+        isEmpty,
+        reason: 'diagnostics:\n${diagnostics.join('\n')}',
       );
     });
   });
