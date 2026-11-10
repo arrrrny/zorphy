@@ -139,9 +139,9 @@ Future<String> _generate(
     includedPaths: [fixtureDir.path],
   );
   final ctx = collection.contextFor(libraryPath);
-  final result =
-      await ctx.currentSession.getResolvedUnit(libraryPath)
-          as ResolvedUnitResult;
+  final result = await ctx.currentSession.getResolvedUnit(
+    libraryPath,
+  ) as ResolvedUnitResult;
   final element = result.libraryElement.getClass(className);
   expect(element, isNotNull, reason: 'class $className not resolved');
   final annotationReader = ConstantReader(
@@ -195,9 +195,8 @@ void _writePart(
   String partName,
   String generated,
 ) {
-  File(
-    '${fixtureDir.path}/$partName',
-  ).writeAsStringSync("part of '$libraryName';\n\n$generated");
+  File('${fixtureDir.path}/$partName')
+      .writeAsStringSync("part of '$libraryName';\n\n$generated");
 }
 
 /// Every diagnostic the analyzer reports for the libraries at [libraryPaths]
@@ -213,9 +212,9 @@ Future<List<String>> _diagnostics(
   final diagnostics = <String>[];
   for (final path in libraryPaths) {
     final ctx = collection.contextFor(path);
-    final library =
-        await ctx.currentSession.getResolvedLibrary(path)
-            as ResolvedLibraryResult;
+    final library = await ctx.currentSession.getResolvedLibrary(
+      path,
+    ) as ResolvedLibraryResult;
     for (final unit in library.units) {
       for (final diagnostic in unit.diagnostics) {
         diagnostics.add(
