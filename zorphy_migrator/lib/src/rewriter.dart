@@ -88,10 +88,14 @@ class Rewriter {
           : end;
 
       final slice = ops.sublist(start, stop);
-      final oldStart = slice.firstWhere((o) => o.oldLine != null,
-          orElse: () => slice.first);
-      final newStart = slice.firstWhere((o) => o.newLine != null,
-          orElse: () => slice.first);
+      final oldStart = slice.firstWhere(
+        (o) => o.oldLine != null,
+        orElse: () => slice.first,
+      );
+      final newStart = slice.firstWhere(
+        (o) => o.newLine != null,
+        orElse: () => slice.first,
+      );
       final oldCount = slice.where((o) => o.tag != '+').length;
       final newCount = slice.where((o) => o.tag != '-').length;
 
@@ -119,8 +123,8 @@ class Rewriter {
         table[i][j] = a[i] == b[j]
             ? table[i + 1][j + 1] + 1
             : (table[i + 1][j] > table[i][j + 1]
-                ? table[i + 1][j]
-                : table[i][j + 1]);
+                  ? table[i + 1][j]
+                  : table[i][j + 1]);
       }
     }
     return table;

@@ -19,9 +19,7 @@ class FreezedDetector {
   Future<List<FreezedClassModel>> detect(List<String> filePaths) async {
     if (filePaths.isEmpty) return const [];
 
-    final roots = <String>{
-      for (final f in filePaths) p.dirname(f),
-    }.toList();
+    final roots = <String>{for (final f in filePaths) p.dirname(f)}.toList();
 
     final collection = AnalysisContextCollection(
       includedPaths: roots,
@@ -147,7 +145,8 @@ class FreezedDetector {
           filePath: filePath,
           line: lineInfo.getLocation(node.offset).lineNumber,
           construct: name,
-          reason: '@unfreezed mutable model — zorphy is immutable-first; '
+          reason:
+              '@unfreezed mutable model — zorphy is immutable-first; '
               'migrate by hand',
         ),
       );
@@ -199,12 +198,12 @@ class FreezedDetector {
         final uri = obj.type?.element?.library?.firstFragment.source.uri
             .toString();
         final src = meta.toSource();
-        if (typeName == 'Default' &&
-            (uri?.startsWith(_freezedPkg) ?? false)) {
+        if (typeName == 'Default' && (uri?.startsWith(_freezedPkg) ?? false)) {
           defaultExpr =
-              RegExp(r'^@Default\((.*)\)$', dotAll: true)
-                  .firstMatch(src)
-                  ?.group(1) ??
+              RegExp(
+                r'^@Default\((.*)\)$',
+                dotAll: true,
+              ).firstMatch(src)?.group(1) ??
               src;
         } else if (typeName == 'JsonKey') {
           jsonKeys.add(src);
@@ -217,7 +216,8 @@ class FreezedDetector {
             filePath: filePath,
             line: lineInfo.getLocation(param.offset).lineNumber,
             construct: paramName,
-            reason: '@Default expression references its own field — '
+            reason:
+                '@Default expression references its own field — '
                 'migrate by hand',
           ),
         );

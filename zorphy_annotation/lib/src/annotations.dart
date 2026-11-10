@@ -45,8 +45,10 @@ const zorphy = Zorphy();
 /// exactly like `@zorphy` and is slated for removal in a later major.
 /// ---
 /// {@macro ZorphyX}
-@Deprecated('Use @zorphy instead. Behaves identically since zorphy 2.0; '
-    'will be removed in a later major release.')
+@Deprecated(
+  'Use @zorphy instead. Behaves identically since zorphy 2.0; '
+  'will be removed in a later major release.',
+)
 const zorphy2 = Zorphy2();
 
 /// Annotation alias for a value object: `@ZValueObject` expands to
@@ -64,8 +66,6 @@ const zorphy2 = Zorphy2();
 /// }
 /// ```
 const ZValueObject = Zorphy(kind: ZorphyKind.valueObject);
-
-
 
 /// Annotation to declare a named constructor with a custom body on the
 /// generated concrete class.
@@ -123,6 +123,7 @@ class ZorphyNamedConstructor {
     this.factory = false,
   });
 }
+
 class Zorphy implements ZorphyX {
   /// if we want a copyWith (cwX) method for a subtype in this same class
   final List<Type>? explicitSubTypes;

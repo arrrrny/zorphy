@@ -31,9 +31,7 @@ void main() {
       test('$name converts byte-identical to expected.dart', () async {
         final dir = p.join(fixturesDir, name);
         final inputFile = p.join(dir, 'input.dart');
-        final expected = File(
-          p.join(dir, 'expected.dart'),
-        ).readAsStringSync();
+        final expected = File(p.join(dir, 'expected.dart')).readAsStringSync();
 
         final models = await FreezedDetector().detect([
           File(inputFile).absolute.path,
@@ -105,9 +103,7 @@ void main() {
       test('$name converts byte-identical to expected.dart', () async {
         final dir = p.join(fixturesDir, name);
         final inputFile = p.join(dir, 'input.dart');
-        final expected = File(
-          p.join(dir, 'expected.dart'),
-        ).readAsStringSync();
+        final expected = File(p.join(dir, 'expected.dart')).readAsStringSync();
 
         final models = await ExchangeableDetector().detect([
           File(inputFile).absolute.path,
@@ -132,36 +128,42 @@ void main() {
       });
     }
 
-    test('exchangeable_object_ctor_initializers is report-only (untouched, manual item recorded)', () async {
-      final dir = p.join(fixturesDir, 'exchangeable_object_ctor_initializers');
-      final inputFile = File(p.join(dir, 'input.dart'));
-      final source = inputFile.readAsStringSync();
-
-      final models = await ExchangeableDetector().detect([
-        inputFile.absolute.path,
-      ]);
-      expect(models, isNotEmpty, reason: 'no class detected');
-
-      final renderer = ZorphyRenderer(
-        siblingClassNames: models.map((m) => m.name).toSet(),
-      );
-      final rewriter = Rewriter();
-      final revised = rewriter.applySpans(
-        source,
-        replacementsFor(models, renderer.render),
-      );
-
-      // File content unchanged — nothing migratable was rewritten.
-      expect(revised, source);
-      // Every detected class carries at least one manual item.
-      for (final m in models) {
-        expect(
-          m.manualItems,
-          isNotEmpty,
-          reason: '${m.name} should produce a manual item',
+    test(
+      'exchangeable_object_ctor_initializers is report-only (untouched, manual item recorded)',
+      () async {
+        final dir = p.join(
+          fixturesDir,
+          'exchangeable_object_ctor_initializers',
         );
-      }
-    });
+        final inputFile = File(p.join(dir, 'input.dart'));
+        final source = inputFile.readAsStringSync();
+
+        final models = await ExchangeableDetector().detect([
+          inputFile.absolute.path,
+        ]);
+        expect(models, isNotEmpty, reason: 'no class detected');
+
+        final renderer = ZorphyRenderer(
+          siblingClassNames: models.map((m) => m.name).toSet(),
+        );
+        final rewriter = Rewriter();
+        final revised = rewriter.applySpans(
+          source,
+          replacementsFor(models, renderer.render),
+        );
+
+        // File content unchanged — nothing migratable was rewritten.
+        expect(revised, source);
+        // Every detected class carries at least one manual item.
+        for (final m in models) {
+          expect(
+            m.manualItems,
+            isNotEmpty,
+            reason: '${m.name} should produce a manual item',
+          );
+        }
+      },
+    );
 
     // Focused assertions for static-factory fixtures: manualItems must be
     // empty and informationalItems must record the preserved-factory reason.
@@ -169,100 +171,112 @@ void main() {
       'exchangeable_object_static_factory',
       'exchangeable_object_static_factory_doc',
     ]) {
-      test('$name has no manual items and records preserved-factory info',
-          () async {
-        final dir = p.join(fixturesDir, name);
-        final inputFile = p.join(dir, 'input.dart');
+      test(
+        '$name has no manual items and records preserved-factory info',
+        () async {
+          final dir = p.join(fixturesDir, name);
+          final inputFile = p.join(dir, 'input.dart');
 
-        final models = await ExchangeableDetector().detect([
-          File(inputFile).absolute.path,
-        ]);
-        expect(
-          models.where((m) => m.isMigratable),
-          isNotEmpty,
-          reason: 'no migratable model detected in $name',
-        );
-
-        for (final m in models) {
+          final models = await ExchangeableDetector().detect([
+            File(inputFile).absolute.path,
+          ]);
           expect(
-            m.manualItems,
-            isEmpty,
-            reason: '${m.name} must have no manual items',
-          );
-          expect(
-            m.informationalItems,
+            models.where((m) => m.isMigratable),
             isNotEmpty,
-            reason: '${m.name} must record a preserved-factory info item',
+            reason: 'no migratable model detected in $name',
           );
-          expect(
-            m.informationalItems.every(
-              (item) => item.reason.contains('preserved verbatim'),
-            ),
-            isTrue,
-            reason:
-                '${m.name} informational items should mention preserved factory',
-          );
-        }
-      });
+
+          for (final m in models) {
+            expect(
+              m.manualItems,
+              isEmpty,
+              reason: '${m.name} must have no manual items',
+            );
+            expect(
+              m.informationalItems,
+              isNotEmpty,
+              reason: '${m.name} must record a preserved-factory info item',
+            );
+            expect(
+              m.informationalItems.every(
+                (item) => item.reason.contains('preserved verbatim'),
+              ),
+              isTrue,
+              reason:
+                  '${m.name} informational items should mention preserved factory',
+            );
+          }
+        },
+      );
     }
 
-    test('detector strips the codegen `_` suffix and records dialects', () async {
-      final inputFile = File(
-        p.join(fixturesDir, 'exchangeable_object', 'input.dart'),
-      );
-      final models = await ExchangeableDetector().detect([
-        inputFile.absolute.path,
-      ]);
-      final names = models.map((m) => m.name).toSet();
-      expect(names, containsAll(['NavigationAction', 'URLRequest']));
-      expect(
-        models.every((m) => m.dialect == ModelDialect.exchangeableObject),
-        isTrue,
-      );
-      // Fields carry types, required flags and constructor defaults.
-      final navigation = models.singleWhere((m) => m.name == 'NavigationAction');
-      final title = navigation.fields.singleWhere((f) => f.name == 'title');
-      expect(title.defaultExpression, "'default-title'");
-      expect(title.isRequired, isFalse);
-      expect(
-        navigation.fields.singleWhere((f) => f.name == 'request').isRequired,
-        isTrue,
-      );
-      expect(
-        navigation.fields.singleWhere((f) => f.name == 'request').type,
-        'URLRequest_',
-      );
-    });
+    test(
+      'detector strips the codegen `_` suffix and records dialects',
+      () async {
+        final inputFile = File(
+          p.join(fixturesDir, 'exchangeable_object', 'input.dart'),
+        );
+        final models = await ExchangeableDetector().detect([
+          inputFile.absolute.path,
+        ]);
+        final names = models.map((m) => m.name).toSet();
+        expect(names, containsAll(['NavigationAction', 'URLRequest']));
+        expect(
+          models.every((m) => m.dialect == ModelDialect.exchangeableObject),
+          isTrue,
+        );
+        // Fields carry types, required flags and constructor defaults.
+        final navigation = models.singleWhere(
+          (m) => m.name == 'NavigationAction',
+        );
+        final title = navigation.fields.singleWhere((f) => f.name == 'title');
+        expect(title.defaultExpression, "'default-title'");
+        expect(title.isRequired, isFalse);
+        expect(
+          navigation.fields.singleWhere((f) => f.name == 'request').isRequired,
+          isTrue,
+        );
+        expect(
+          navigation.fields.singleWhere((f) => f.name == 'request').type,
+          'URLRequest_',
+        );
+      },
+    );
 
-    test('enum detector preserves members and reports non-sequential wires',
-        () async {
-      final inputFile = File(
-        p.join(fixturesDir, 'exchangeable_enum', 'input.dart'),
-      );
-      final models = await ExchangeableDetector().detect([
-        inputFile.absolute.path,
-      ]);
-      final navigation = models.singleWhere((m) => m.name == 'NavigationType');
-      expect(
-        navigation.enumMembers,
-        ['LINK_ACTIVATED', 'FORM_SUBMITTED'],
-      );
-      expect(navigation.manualItems, isEmpty);
-      expect(navigation.isMigratable, isTrue);
+    test(
+      'enum detector preserves members and reports non-sequential wires',
+      () async {
+        final inputFile = File(
+          p.join(fixturesDir, 'exchangeable_enum', 'input.dart'),
+        );
+        final models = await ExchangeableDetector().detect([
+          inputFile.absolute.path,
+        ]);
+        final navigation = models.singleWhere(
+          (m) => m.name == 'NavigationType',
+        );
+        expect(navigation.enumMembers, ['LINK_ACTIVATED', 'FORM_SUBMITTED']);
+        expect(navigation.manualItems, isEmpty);
+        expect(navigation.isMigratable, isTrue);
 
-      // Non-sequential int wire values do NOT block the conversion — the
-      // enum still migrates, but an informational item flags the wire glue.
-      final networkServiceType = models.singleWhere(
-        (m) => m.name == 'URLRequestNetworkServiceType',
-      );
-      expect(networkServiceType.enumMembers, ['DEFAULT', 'VIDEO', 'BACKGROUND']);
-      expect(networkServiceType.isMigratable, isTrue);
-      expect(networkServiceType.informationalItems, isNotEmpty);
-      expect(
-        networkServiceType.informationalItems.single.reason,
-        contains('not sequential 0..n-1'),
-      );
-    });
+        // Non-sequential int wire values do NOT block the conversion — the
+        // enum still migrates, but an informational item flags the wire glue.
+        final networkServiceType = models.singleWhere(
+          (m) => m.name == 'URLRequestNetworkServiceType',
+        );
+        expect(networkServiceType.enumMembers, [
+          'DEFAULT',
+          'VIDEO',
+          'BACKGROUND',
+        ]);
+        expect(networkServiceType.isMigratable, isTrue);
+        expect(networkServiceType.informationalItems, isNotEmpty);
+        expect(
+          networkServiceType.informationalItems.single.reason,
+          contains('not sequential 0..n-1'),
+        );
+      },
+    );
   });
 
   group('assert-only constructor body handling (#99)', () {
@@ -280,8 +294,10 @@ void main() {
         'dependencies:\n'
         '  freezed_annotation: ^3.1.0\n',
       );
-      final result = Process.runSync('dart', ['pub', 'get'],
-          workingDirectory: scratch.path);
+      final result = Process.runSync('dart', [
+        'pub',
+        'get',
+      ], workingDirectory: scratch.path);
       if (result.exitCode != 0) {
         fail('pub get failed in scratch package: ${result.stderr}');
       }
@@ -289,12 +305,11 @@ void main() {
     }
 
     test(
-        'assert-only bodies convert with a note; non-assert and mixed stay manual',
-        () async {
-      final scratch =
-          Directory.systemTemp.createTempSync('zorphy_assert_99');
-      try {
-        final path = stageInline(scratch, r'''
+      'assert-only bodies convert with a note; non-assert and mixed stay manual',
+      () async {
+        final scratch = Directory.systemTemp.createTempSync('zorphy_assert_99');
+        try {
+          final path = stageInline(scratch, r'''
 @ExchangeableObject()
 class MultiAssert_ {
   ///The left edge.
@@ -359,64 +374,83 @@ class EmptyBody_ {
   EmptyBody_({required this.templateImage, required this.extensionIdentifier});
 }
 ''');
-        final models = await ExchangeableDetector().detect([path]);
+          final models = await ExchangeableDetector().detect([path]);
 
-        // (1) Assert-only body (multiple asserts) -> converts, and an
-        //     informational note records the dropped asserts. Fields are
-        //     collected from the constructor parameters.
-        final multiAssert =
-            models.singleWhere((m) => m.name == 'MultiAssert');
-        expect(multiAssert.isMigratable, isTrue,
-            reason: 'an assert-only body must not block conversion');
-        expect(multiAssert.manualItems, isEmpty);
-        expect(multiAssert.informationalItems, hasLength(1));
-        expect(
-          multiAssert.informationalItems.single.reason,
-          contains('assert-only constructor body dropped'),
-        );
-        expect(
-          multiAssert.fields.map((f) => f.name).toList(),
-          ['left', 'top', 'width', 'height'],
-        );
+          // (1) Assert-only body (multiple asserts) -> converts, and an
+          //     informational note records the dropped asserts. Fields are
+          //     collected from the constructor parameters.
+          final multiAssert = models.singleWhere(
+            (m) => m.name == 'MultiAssert',
+          );
+          expect(
+            multiAssert.isMigratable,
+            isTrue,
+            reason: 'an assert-only body must not block conversion',
+          );
+          expect(multiAssert.manualItems, isEmpty);
+          expect(multiAssert.informationalItems, hasLength(1));
+          expect(
+            multiAssert.informationalItems.single.reason,
+            contains('assert-only constructor body dropped'),
+          );
+          expect(multiAssert.fields.map((f) => f.name).toList(), [
+            'left',
+            'top',
+            'width',
+            'height',
+          ]);
 
-        // (2) Non-assert body (default-computation statement) -> stays
-        //     manual; the custom-ctor manual item is recorded.
-        final defaultComputation = models.singleWhere(
-            (m) => m.name == 'DefaultComputation');
-        expect(defaultComputation.isMigratable, isFalse,
-            reason: 'a non-assert body statement must stay manual');
-        expect(
-          defaultComputation.manualItems.any(
-            (mi) => mi.reason.contains('custom @ExchangeableObjectConstructor'),
-          ),
-          isTrue,
-        );
-        expect(defaultComputation.informationalItems, isEmpty);
+          // (2) Non-assert body (default-computation statement) -> stays
+          //     manual; the custom-ctor manual item is recorded.
+          final defaultComputation = models.singleWhere(
+            (m) => m.name == 'DefaultComputation',
+          );
+          expect(
+            defaultComputation.isMigratable,
+            isFalse,
+            reason: 'a non-assert body statement must stay manual',
+          );
+          expect(
+            defaultComputation.manualItems.any(
+              (mi) =>
+                  mi.reason.contains('custom @ExchangeableObjectConstructor'),
+            ),
+            isTrue,
+          );
+          expect(defaultComputation.informationalItems, isEmpty);
 
-        // (3) Mixed assert + non-assert statements -> stays manual (not all
-        //     statements are asserts).
-        final mixed = models.singleWhere((m) => m.name == 'MixedBody');
-        expect(mixed.isMigratable, isFalse,
-            reason: 'a body with any non-assert statement must stay manual');
-        expect(
-          mixed.manualItems.any(
-            (mi) => mi.reason.contains('custom @ExchangeableObjectConstructor'),
-          ),
-          isTrue,
-        );
+          // (3) Mixed assert + non-assert statements -> stays manual (not all
+          //     statements are asserts).
+          final mixed = models.singleWhere((m) => m.name == 'MixedBody');
+          expect(
+            mixed.isMigratable,
+            isFalse,
+            reason: 'a body with any non-assert statement must stay manual',
+          );
+          expect(
+            mixed.manualItems.any(
+              (mi) =>
+                  mi.reason.contains('custom @ExchangeableObjectConstructor'),
+            ),
+            isTrue,
+          );
 
-        // (4) Empty body with @ExchangeableObjectConstructor -> converts
-        //     with NO informational note (#94 regression guard: an empty
-        //     body is not assert-only and must not emit a note).
-        final empty = models.singleWhere((m) => m.name == 'EmptyBody');
-        expect(empty.isMigratable, isTrue);
-        expect(empty.manualItems, isEmpty);
-        expect(empty.informationalItems, isEmpty,
-            reason: 'empty body must not emit an assert-only note (#94 guard)');
-      } finally {
-        scratch.deleteSync(recursive: true);
-      }
-    });
+          // (4) Empty body with @ExchangeableObjectConstructor -> converts
+          //     with NO informational note (#94 regression guard: an empty
+          //     body is not assert-only and must not emit a note).
+          final empty = models.singleWhere((m) => m.name == 'EmptyBody');
+          expect(empty.isMigratable, isTrue);
+          expect(empty.manualItems, isEmpty);
+          expect(
+            empty.informationalItems,
+            isEmpty,
+            reason: 'empty body must not emit an assert-only note (#94 guard)',
+          );
+        } finally {
+          scratch.deleteSync(recursive: true);
+        }
+      },
+    );
   });
 
   group('CLI', () {
@@ -436,9 +470,7 @@ class EmptyBody_ {
     String stageFixture(String name) {
       final target = p.join(scratch.path, name);
       Directory(target).createSync(recursive: true);
-      for (final file in Directory(
-        p.join(fixturesDir, name),
-      ).listSync()) {
+      for (final file in Directory(p.join(fixturesDir, name)).listSync()) {
         // Only stage the freezed input — expected.dart is zorphy output
         // and must not be scanned as a migration source.
         if (file is File && p.basename(file.path) == 'input.dart') {
@@ -452,8 +484,10 @@ class EmptyBody_ {
         'dependencies:\n'
         '  freezed_annotation: ^3.1.0\n',
       );
-      final result = Process.runSync('dart', ['pub', 'get'],
-          workingDirectory: target);
+      final result = Process.runSync('dart', [
+        'pub',
+        'get',
+      ], workingDirectory: target);
       if (result.exitCode != 0) {
         fail('pub get failed in scratch package: ${result.stderr}');
       }
@@ -510,16 +544,18 @@ class EmptyBody_ {
       expect(inputFile.readAsStringSync().trimRight(), expected.trimRight());
     });
 
-    test('directory without models warns and exits 1 instead of clean',
-        () async {
-      final dir = stageFixture('simple_class');
-      File(p.join(dir, 'input.dart')).deleteSync();
-      File(p.join(dir, 'plain.dart')).writeAsStringSync('class Plain {}\n');
+    test(
+      'directory without models warns and exits 1 instead of clean',
+      () async {
+        final dir = stageFixture('simple_class');
+        File(p.join(dir, 'input.dart')).deleteSync();
+        File(p.join(dir, 'plain.dart')).writeAsStringSync('class Plain {}\n');
 
-      final code = await MigratorCli().run(['migrate', dir]);
+        final code = await MigratorCli().run(['migrate', dir]);
 
-      expect(code, MigratorCli.exitManualItems);
-    });
+        expect(code, MigratorCli.exitManualItems);
+      },
+    );
 
     test('--fail-on-manual exits 1 when manual items exist', () async {
       final dir = stageFixture('unfreezed');

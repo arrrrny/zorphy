@@ -36,9 +36,7 @@ class ExchangeableDetector {
   Future<List<FreezedClassModel>> detect(List<String> filePaths) async {
     if (filePaths.isEmpty) return const [];
 
-    final roots = <String>{
-      for (final f in filePaths) p.dirname(f),
-    }.toList();
+    final roots = <String>{for (final f in filePaths) p.dirname(f)}.toList();
 
     final collection = AnalysisContextCollection(
       includedPaths: roots,
@@ -178,7 +176,8 @@ class ExchangeableDetector {
             filePath: unit.path,
             line: lineInfo.getLocation(member.offset).lineNumber,
             construct: name,
-            reason: 'custom @ExchangeableObjectConstructor with non-empty body '
+            reason:
+                'custom @ExchangeableObjectConstructor with non-empty body '
                 'or initializers — migrate by hand',
           ),
         );
@@ -223,13 +222,12 @@ class ExchangeableDetector {
           // Capture verbatim from the start of the member's line (or its doc
           // comment) so the re-emitted factory keeps its original
           // indentation and documentation.
-          var start = member.beginToken.precedingComments?.offset ?? member.offset;
+          var start =
+              member.beginToken.precedingComments?.offset ?? member.offset;
           while (start > 0 && unit.content[start - 1] != '\n') {
             start--;
           }
-          staticMethods.add(
-            unit.content.substring(start, member.end),
-          );
+          staticMethods.add(unit.content.substring(start, member.end));
           informational.add(
             ManualItem(
               filePath: unit.path,
@@ -261,7 +259,8 @@ class ExchangeableDetector {
             filePath: unit.path,
             line: lineInfo.getLocation(member.offset).lineNumber,
             construct: name,
-            reason: 'custom @ExchangeableObjectMethod/@ExchangeableObjectProperty '
+            reason:
+                'custom @ExchangeableObjectMethod/@ExchangeableObjectProperty '
                 'member — migrate by hand',
           ),
         );
@@ -278,7 +277,8 @@ class ExchangeableDetector {
                 filePath: unit.path,
                 line: lineInfo.getLocation(variable.offset).lineNumber,
                 construct: '$name.$fieldName',
-                reason: 'instance field not a constructor parameter — '
+                reason:
+                    'instance field not a constructor parameter — '
                     'migrate by hand',
               ),
             );
@@ -332,9 +332,7 @@ class ExchangeableDetector {
         final memberName = variable.name.lexeme;
         enumMembers.add(memberName);
         enumMemberDocs.add(
-          variable.documentationComment?.tokens
-              .map((t) => t.lexeme)
-              .join('\n'),
+          variable.documentationComment?.tokens.map((t) => t.lexeme).join('\n'),
         );
 
         final initializer = variable.initializer?.toSource() ?? '';
@@ -367,8 +365,7 @@ class ExchangeableDetector {
 
     // int-wire enums: `.index` only matches the old `_value` when values are
     // exactly 0..n-1 in declaration order.
-    if (intValues.isNotEmpty &&
-        !_isSequential(intValues)) {
+    if (intValues.isNotEmpty && !_isSequential(intValues)) {
       informational.add(
         ManualItem(
           filePath: unit.path,
@@ -438,14 +435,10 @@ class ExchangeableDetector {
     return statements.every((s) => s is AssertStatement);
   }
 
-
   /// The declared type of a constructor parameter. For `this.x` params the
   /// param node carries no type, so fall back to the matching field
   /// declaration in the class body.
-  String? _paramType(
-    FormalParameter param,
-    List<ClassMember> members,
-  ) {
+  String? _paramType(FormalParameter param, List<ClassMember> members) {
     final elementType = param.declaredFragment?.element.type;
     if (elementType != null) return elementType.getDisplayString();
 

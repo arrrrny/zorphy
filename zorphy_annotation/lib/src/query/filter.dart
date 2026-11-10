@@ -1,4 +1,5 @@
 import 'package:meta/meta.dart';
+
 import 'field.dart';
 
 /// Base class for all filters
@@ -23,12 +24,10 @@ class AlwaysMatch<TEntity> extends Filter<TEntity> {
   const AlwaysMatch();
 
   @override
-
   /// Returns an empty JSON representation.
   Map<String, dynamic> toJson() => {};
 
   @override
-
   /// Always returns true for any [item].
   bool matches(TEntity item) => true;
 }
@@ -42,12 +41,10 @@ class Eq<TEntity, TValue> extends Filter<TEntity> {
   const Eq(this.field, this.value);
 
   @override
-
   /// Serializes the equality predicate to JSON.
   Map<String, dynamic> toJson() => {field.name: value};
 
   @override
-
   /// Returns true when the field value equals [value].
   bool matches(TEntity item) => field.getValue!(item) == value;
 }
@@ -61,14 +58,12 @@ class Neq<TEntity, TValue> extends Filter<TEntity> {
   const Neq(this.field, this.value);
 
   @override
-
   /// Serializes the inequality predicate to JSON.
   Map<String, dynamic> toJson() => {
-        field.name: {'neq': value}
-      };
+    field.name: {'neq': value},
+  };
 
   @override
-
   /// Returns true when the field value differs from [value].
   bool matches(TEntity item) => field.getValue!(item) != value;
 }
@@ -82,14 +77,12 @@ class Gt<TEntity, TValue> extends Filter<TEntity> {
   const Gt(this.field, this.value);
 
   @override
-
   /// Serializes the greater-than predicate to JSON.
   Map<String, dynamic> toJson() => {
-        field.name: {'gt': value}
-      };
+    field.name: {'gt': value},
+  };
 
   @override
-
   /// Returns true when the field value is greater than [value].
   bool matches(TEntity item) {
     final val = field.getValue!(item);
@@ -109,14 +102,12 @@ class Gte<TEntity, TValue> extends Filter<TEntity> {
   const Gte(this.field, this.value);
 
   @override
-
   /// Serializes the greater-than-or-equal predicate to JSON.
   Map<String, dynamic> toJson() => {
-        field.name: {'gte': value}
-      };
+    field.name: {'gte': value},
+  };
 
   @override
-
   /// Returns true when the field value is greater than or equal to [value].
   bool matches(TEntity item) {
     final val = field.getValue!(item);
@@ -136,14 +127,12 @@ class Lt<TEntity, TValue> extends Filter<TEntity> {
   const Lt(this.field, this.value);
 
   @override
-
   /// Serializes the less-than predicate to JSON.
   Map<String, dynamic> toJson() => {
-        field.name: {'lt': value}
-      };
+    field.name: {'lt': value},
+  };
 
   @override
-
   /// Returns true when the field value is less than [value].
   bool matches(TEntity item) {
     final val = field.getValue!(item);
@@ -163,14 +152,12 @@ class Lte<TEntity, TValue> extends Filter<TEntity> {
   const Lte(this.field, this.value);
 
   @override
-
   /// Serializes the less-than-or-equal predicate to JSON.
   Map<String, dynamic> toJson() => {
-        field.name: {'lte': value}
-      };
+    field.name: {'lte': value},
+  };
 
   @override
-
   /// Returns true when the field value is less than or equal to [value].
   bool matches(TEntity item) {
     final val = field.getValue!(item);
@@ -190,14 +177,12 @@ class Contains<TEntity, TValue> extends Filter<TEntity> {
   const Contains(this.field, this.value);
 
   @override
-
   /// Serializes the contains predicate to JSON.
   Map<String, dynamic> toJson() => {
-        field.name: {'contains': value}
-      };
+    field.name: {'contains': value},
+  };
 
   @override
-
   /// Returns true when the field value contains [value].
   bool matches(TEntity item) {
     final val = field.getValue!(item);
@@ -220,14 +205,12 @@ class InList<TEntity, TValue> extends Filter<TEntity> {
   const InList(this.field, this.value);
 
   @override
-
   /// Serializes the inclusion predicate to JSON.
   Map<String, dynamic> toJson() => {
-        field.name: {'in': value}
-      };
+    field.name: {'in': value},
+  };
 
   @override
-
   /// Returns true when the field value is contained in [value].
   bool matches(TEntity item) => value.contains(field.getValue!(item));
 }
@@ -240,14 +223,12 @@ class And<TEntity> extends Filter<TEntity> {
   const And(this.filters);
 
   @override
-
   /// Serializes the logical AND predicate to JSON.
   Map<String, dynamic> toJson() => {
-        'and': filters.map((f) => f.toJson()).toList(),
-      };
+    'and': filters.map((f) => f.toJson()).toList(),
+  };
 
   @override
-
   /// Returns true when every filter matches the [item].
   bool matches(TEntity item) => filters.every((f) => f.matches(item));
 }
@@ -260,14 +241,12 @@ class Or<TEntity> extends Filter<TEntity> {
   const Or(this.filters);
 
   @override
-
   /// Serializes the logical OR predicate to JSON.
   Map<String, dynamic> toJson() => {
-        'or': filters.map((f) => f.toJson()).toList(),
-      };
+    'or': filters.map((f) => f.toJson()).toList(),
+  };
 
   @override
-
   /// Returns true when any filter matches the [item].
   bool matches(TEntity item) => filters.any((f) => f.matches(item));
 }
@@ -283,14 +262,10 @@ class Nested<TEntity, TValue> extends Filter<TEntity> {
   const Nested(this.field, this.filter);
 
   @override
-
   /// Serializes the nested filter to JSON.
-  Map<String, dynamic> toJson() => {
-        field.name: filter.toJson(),
-      };
+  Map<String, dynamic> toJson() => {field.name: filter.toJson()};
 
   @override
-
   /// Returns true when the nested value (or any value in its collection) matches [filter].
   bool matches(TEntity item) {
     final value = field.getValue!(item);
@@ -312,12 +287,10 @@ class Not<TEntity> extends Filter<TEntity> {
   const Not(this.filter);
 
   @override
-
   /// Serializes the logical NOT predicate to JSON.
   Map<String, dynamic> toJson() => {'not': filter.toJson()};
 
   @override
-
   /// Returns true when the inner filter does not match the [item].
   bool matches(TEntity item) => !filter.matches(item);
 }
@@ -359,14 +332,12 @@ class Has<TEntity, TElement> extends Filter<TEntity> {
   const Has(this.field, this.value);
 
   @override
-
   /// Serializes the has predicate to JSON.
   Map<String, dynamic> toJson() => {
-        field.name: {'has': value}
-      };
+    field.name: {'has': value},
+  };
 
   @override
-
   /// Returns true when the list field contains [value].
   bool matches(TEntity item) => field.getValue!(item).contains(value);
 }

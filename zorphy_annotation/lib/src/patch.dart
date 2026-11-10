@@ -9,6 +9,7 @@ abstract class Patch<T> {
   /// Creates a patch from a JSON map
   static Patch<T> fromJson<T>(Map<String, dynamic> json) {
     throw UnimplementedError(
-        'fromJson must be implemented by generated Patch classes');
+      'fromJson must be implemented by generated Patch classes',
+    );
   }
 }

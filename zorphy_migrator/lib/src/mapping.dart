@@ -100,8 +100,9 @@ class ZorphyRenderer {
     return '@Zorphy(${args.join(', ')})';
   }
 
-  String _typeParams(FreezedClassModel model) =>
-      model.typeParameters.isEmpty ? '' : '<${model.typeParameters.join(', ')}>';
+  String _typeParams(FreezedClassModel model) => model.typeParameters.isEmpty
+      ? ''
+      : '<${model.typeParameters.join(', ')}>';
 
   void _renderSimple(FreezedClassModel model, StringBuffer sb) {
     final className = '\$${model.name}';
@@ -169,11 +170,7 @@ class ZorphyRenderer {
 
   /// Emits a preserved static factory on the `$` class, re-pointing the
   /// codegen `Name_` back to the generated concrete `Name`.
-  void _renderStaticFactory(
-    String methodSource,
-    String name,
-    StringBuffer sb,
-  ) {
+  void _renderStaticFactory(String methodSource, String name, StringBuffer sb) {
     final oldName = '${name}_';
     // The source is captured from the start of its line (including the
     // original indentation), so no re-indent pass is needed here. Re-point
@@ -200,13 +197,9 @@ class ZorphyRenderer {
       }
     }
     if (field.defaultExpression != null) {
-      sb.writeln(
-        '  @JsonKey(defaultValue: ${field.defaultExpression})',
-      );
+      sb.writeln('  @JsonKey(defaultValue: ${field.defaultExpression})');
     }
-    sb.writeln(
-      '  ${_convertExchangeableType(field.type)} get ${field.name};',
-    );
+    sb.writeln('  ${_convertExchangeableType(field.type)} get ${field.name};');
   }
 
   /// Renders an `@ExchangeableEnum()` class-based enum as a plain Dart
@@ -243,9 +236,7 @@ class ZorphyRenderer {
             .toList(),
       ),
     );
-    sb.writeln(
-      'abstract class \$${'\$'}${model.name}${_typeParams(model)} {',
-    );
+    sb.writeln('abstract class \$${'\$'}${model.name}${_typeParams(model)} {');
     sb.writeln('}');
 
     for (final variant in model.variants) {
