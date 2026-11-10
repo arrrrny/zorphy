@@ -107,6 +107,69 @@ String replaceDollarTypesWithConcrete(String type) {
   return '${result}${isOuterNullable ? '?' : ''}';
 }
 
+/// Parsed shape of a `List<Map<...>>` field type (issue #148): the
+/// declared Map element type and whether the list itself is nullable.
+class ListMapFieldType {
+  final String elementType;
+  final bool isNullable;
+  const ListMapFieldType(this.elementType, this.isNullable);
+}
+
+/// Parses [type] (already dollar-stripped) as `List<Map<...>>` /
+/// `List<Map<...>>?`. Returns null for any other shape.
+///
+/// Only these composite list fields need the checked element-wise
+/// conversion: a hard list-level cast fails on raw JSON payloads, whose
+/// list arrives as `List<dynamic>` with `Map<String, dynamic>` elements
+/// (issue #148).
+ListMapFieldType? parseListMapFieldType(String type) {
+  var t = type.trim();
+  final isNullable = t.endsWith('?');
+  if (isNullable) t = t.substring(0, t.length - 1).trim();
+  if (!t.startsWith('List<') || !t.endsWith('>')) return null;
+  final element = t.substring('List<'.length, t.length - 1).trim();
+  if (element != 'Map' && !element.startsWith('Map<')) return null;
+  return ListMapFieldType(element, isNullable);
+}
+
+/// Emission for the cast applied when [expr] is assigned to a field of
+/// type [fieldType].
+///
+/// For `List<Map<...>>` fields (issue #148) emits json_serializable's
+/// checked element-wise conversion instead of a hard cast that throws a
+/// TypeError on raw JSON payloads, in two layers:
+///
+/// - A fast path keeps the value when its runtime type already matches
+///   the declared field type — the old hard cast's O(1),
+///   identity-preserving behavior for the common typed call path.
+/// - Otherwise each element is converted entry-wise to the declared Map
+///   element type (`Map<K, V>.from`): decoded JSON entries are
+///   `Map<String, dynamic>`, so a hard element cast
+///   `e as Map<String, String>` throws even when every value already
+///   carries the declared type. Entries with the declared runtime type
+///   pass through untouched; non-convertible entries still fail with
+///   the same TypeError class as the old cast.
+///
+/// Nullability is preserved: a nullable field yields
+/// `(v as List<dynamic>?)?.map(...)?.toList()`, passing null through
+/// (the `is` fast path accepts null via the nullable type test). Any
+/// other type keeps the plain hard cast.
+String fieldCastExpression(String expr, String fieldType) {
+  final listMap = parseListMapFieldType(fieldType);
+  if (listMap == null) return '$expr as $fieldType';
+  final outer = listMap.isNullable ? 'List<dynamic>?' : 'List<dynamic>';
+  final chain = listMap.isNullable ? '?.' : '.';
+  final element = listMap.elementType;
+  final elemExpr =
+      'e is $element ? e : $element.from(e as Map<dynamic, dynamic>)';
+  final checked =
+      '($expr as $outer)$chain map((e) => $elemExpr)$chain toList()';
+  // Parenthesized: the patch-merge arms embed this whole expression in
+  // the THEN branch of another conditional, and a conditional must not
+  // appear there unparenthesized.
+  return '($expr is $fieldType ? $expr : $checked)';
+}
+
 /// Dart enum members that collide with the implicit enum members and cannot be
 /// used as a constant name in an enum declaration (issue #313).
 const Set<String> _reservedEnumMemberNames = {'values', 'index', 'name'};

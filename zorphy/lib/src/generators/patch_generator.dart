@@ -101,8 +101,11 @@ class PatchGenerator extends ConcreteClassGenerator {
         final f = fields[i];
         final comma = i == fields.length - 1 ? '' : ',';
         if (interfaceFieldNames.contains(f.name)) {
+          final patchKey =
+              '_patchMap[$enumName.${helpers.enumMemberName(f.name)}]';
+          final castExpr = _patchFieldCastExpr(f, patchKey);
           bodyLines.add(
-            "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? ( (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] ) as ${f.type!.replaceAll(r'$', '')} : this.${f.name}$comma",
+            "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? $castExpr : this.${f.name}$comma",
           );
         } else {
           bodyLines.add('${f.name}: this.${f.name},');
@@ -145,8 +148,10 @@ class PatchGenerator extends ConcreteClassGenerator {
     for (var i = 0; i < fields.length; i++) {
       final f = fields[i];
       final comma = i == fields.length - 1 ? '' : ',';
+      final patchKey = '_patchMap[$enumName.${helpers.enumMemberName(f.name)}]';
+      final castExpr = _patchFieldCastExpr(f, patchKey);
       bodyLines.add(
-        "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? ( (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Function) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}](this.${f.name}) : (_patchMap[$enumName.${helpers.enumMemberName(f.name)}] is Patch) ? _patchMap[$enumName.${helpers.enumMemberName(f.name)}].applyTo(this.${f.name}) : _patchMap[$enumName.${helpers.enumMemberName(f.name)}] ) as ${f.type!.replaceAll(r'$', '')} : this.${f.name}$comma",
+        "${f.name}: _patchMap.containsKey($enumName.${helpers.enumMemberName(f.name)}) ? $castExpr : this.${f.name}$comma",
       );
     }
 
@@ -164,6 +169,25 @@ class PatchGenerator extends ConcreteClassGenerator {
       m.body = Code(bodyLines.join('\n'));
     });
   }
+
+  /// Cast expression for a patched field in the patch-merge arms: the
+  /// patch value runs through Function/Patch handling before the
+  /// field-type cast. Shared by both merge-arm builders (the
+  /// interface-scoped loop in [generateSpec] and
+  /// [_buildPatchWithMethod]) so the two arms stay in lockstep.
+  ///
+  /// The field-type cast itself is `helpers.fieldCastExpression`, which
+  /// emits the checked element-wise conversion for composite list
+  /// fields (List<Map<...>>, issue #148) — a hard list-level cast
+  /// throws a TypeError on raw JSON payloads (List<dynamic> with Map
+  /// elements).
+  String _patchFieldCastExpr(
+    dynamic f,
+    String patchKey,
+  ) => helpers.fieldCastExpression(
+    '( ($patchKey is Function) ? $patchKey(this.${f.name}) : ($patchKey is Patch) ? $patchKey.applyTo(this.${f.name}) : $patchKey )',
+    f.type!.replaceAll(r'$', ''),
+  );
 }
 
 /// Generates the Patch class for a class.
