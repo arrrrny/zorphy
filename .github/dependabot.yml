@@ -1,0 +1,20 @@
+# Dependabot for the pub ecosystem, weekly.
+#
+# One entry per published package: each carries its own committed
+# pubspec.lock, which is the reviewed, scannable resolution Dependabot diffs
+# against. `zorphy/example` is deliberately excluded — it is a local
+# integration fixture, not a published package.
+version: 2
+updates:
+  - package-ecosystem: "pub"
+    directory: "/zorphy"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pub"
+    directory: "/zorphy_annotation"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pub"
+    directory: "/zorphy_migrator"
+    schedule:
+      interval: "weekly"
