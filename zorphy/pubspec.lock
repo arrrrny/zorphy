@@ -165,10 +165,10 @@ packages:
     dependency: "direct main"
     description:
       name: dart_style
-      sha256: "3f88fc9c96c568d631356507355a2d1e983ee000c9ac008bdcb39b5bf53ce777"
+      sha256: a0e4f65339b31eb6a9e6a12e14b4682a48d46fbc54a82f4a702396fbdbac63a7
       url: "https://pub.dev"
     source: hosted
-    version: "3.1.12"
+    version: "3.1.14"
   dartx:
     dependency: "direct main"
     description:
