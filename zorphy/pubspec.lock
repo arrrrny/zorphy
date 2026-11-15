@@ -165,10 +165,10 @@ packages:
     dependency: "direct main"
     description:
       name: dart_style
-      sha256: "3f88fc9c96c568d631356507355a2d1e983ee000c9ac008bdcb39b5bf53ce777"
+      sha256: a0e4f65339b31eb6a9e6a12e14b4682a48d46fbc54a82f4a702396fbdbac63a7
       url: "https://pub.dev"
     source: hosted
-    version: "3.1.12"
+    version: "3.1.14"
   dartx:
     dependency: "direct main"
     description:
@@ -557,9 +557,9 @@ packages:
     dependency: "direct main"
     description:
       name: zorphy_annotation
-      sha256: efaacbd84d2a41efb7b06e2081c0f8149169d10b23aeaf930ff7fff4396801dd
+      sha256: "03167d93dc2248acaba1b63b46e6e4ac788a9ff46afb3ecde60daf5e662f042d"
       url: "https://pub.dev"
     source: hosted
-    version: "2.4.4"
+    version: "2.4.5"
 sdks:
   dart: ">=3.12.0 <4.0.0"
