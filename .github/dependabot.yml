@@ -1,20 +1,31 @@
 # Dependabot for the pub ecosystem, weekly.
 #
-# One entry per published package: each carries its own committed
+# One entry covering every pub package: each carries its own committed
 # pubspec.lock, which is the reviewed, scannable resolution Dependabot diffs
 # against. `zorphy/example` is deliberately excluded — it is a local
-# integration fixture, not a published package.
+# integration fixture (`publish_to: "none"`), not a package.
+#
+# `group-by: dependency-name` keeps one dependency's update in a single PR
+# across these directories instead of opening one near-identical PR per
+# directory: `collection` is declared at the same constraint in all three, and
+# `args`/`path` (zorphy + migrator) and `dartx`/`quiver`/`meta`
+# (zorphy + annotation) likewise.
+#
+# `zorphy_annotation` is ignored: `zorphy_migrator/pubspec.yaml` carries a
+# `dependency_overrides` path pin to the sibling directory, so a constraint
+# bump there cannot move the lockfile, and PUBLISH.md keeps the version synced
+# between `zorphy` and `zorphy_annotation` — `scripts/publish.sh` owns it.
 version: 2
 updates:
   - package-ecosystem: "pub"
-    directory: "/zorphy"
+    directories:
+      - "/zorphy"
+      - "/zorphy_annotation"
+      - "/zorphy_migrator"
     schedule:
       interval: "weekly"
-  - package-ecosystem: "pub"
-    directory: "/zorphy_annotation"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "pub"
-    directory: "/zorphy_migrator"
-    schedule:
-      interval: "weekly"
+    groups:
+      pub-shared:
+        group-by: dependency-name
+    ignore:
+      - dependency-name: "zorphy_annotation"
