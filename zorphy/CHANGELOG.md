@@ -1,3 +1,9 @@
+## [2.4.6] - 2026-11-15
+
+### Change
+
+- Maintenance release: no generator source changes; Dependabot dependency bumps — `analyzer` (constraint normalized to caret form `^14.0.0`, same `>=14.0.0 <15.0.0` range), `code_builder`, `dart_style`, `glob` (#152–#157)
+
 ## [2.4.5] - 2026-11-10
 
 ### Fix

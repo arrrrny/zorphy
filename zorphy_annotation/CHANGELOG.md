@@ -1,3 +1,14 @@
+## [2.4.6] - 2026-11-15
+
+### Change
+
+- Version synced with `zorphy` 2.4.6 (no annotation API changes — formatting only)
+
+### Style
+
+- Mechanical `dart format` of drifted sources, e.g. `query/filter.dart` (#150)
+- `meta` constraint normalized to caret form `^1.17.0` — same `>=1.17.0 <2.0.0` range
+
 ## [2.4.5] - 2026-11-10
 
 ### Change
