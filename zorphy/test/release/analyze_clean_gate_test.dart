@@ -89,6 +89,25 @@ abstract class \$Task {
   List<TaskStatus>? get history;
 }
 ''',
+  // arrrrny/zorphy#159: a sealed base with `explicitSubTypes` whose subtypes
+  // do not generate JSON must not emit the changeTo extension — its body
+  // round-trips through toJson/fromJson the subtypes do not have. With the fix
+  // in, the generated part analyzes clean, so this is a strict fixture.
+  'sealed_no_json': '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'sealed_no_json.zorphy.dart';
+
+@Zorphy(explicitSubTypes: [\$Circle])
+abstract class \$\$Shape {
+  double get area;
+}
+
+@Zorphy()
+abstract class \$Circle implements \$\$Shape {
+  double get radius;
+}
+''',
 };
 
 /// JSON-emitting fixtures. Their generated code calls `_$XToJson` /
@@ -124,27 +143,6 @@ abstract class \$CreditCard implements \$\$Payment {
 }
 ''',
 };
-
-/// Characterization of arrrrny/zorphy#159: a sealed base with
-/// `explicitSubTypes` emits the subtype `toJson`/`fromJson` dispatch even when
-/// JSON generation is off, so the generated part does not compile. Tracked as
-/// a defect, not a 2.5.0 change (2.5.0 keeps output byte-identical). When it
-/// is fixed, this fixture moves into [_fixtures] and the test below goes away.
-const _sealedNoJsonFixture = '''
-import 'package:zorphy_annotation/zorphy_annotation.dart';
-
-part 'sealed_no_json.zorphy.dart';
-
-@Zorphy(explicitSubTypes: [\$Circle])
-abstract class \$\$Shape {
-  double get area;
-}
-
-@Zorphy()
-abstract class \$Circle implements \$\$Shape {
-  double get radius;
-}
-''';
 
 /// Generates the `.zorphy.dart` part body for every `@Zorphy` class declared
 /// in the library at [libraryPath].
@@ -303,48 +301,6 @@ void main() {
               'symbols may be unresolved (a consumer build generates them); '
               'anything else is a zorphy defect. diagnostics:\n'
               '${diagnostics.join('\n')}',
-        );
-      },
-    );
-
-    // CHARACTERIZATION (arrrrny/zorphy#159): documents the shipped behavior
-    // of a sealed base whose subtypes do not generate JSON. It currently
-    // emits calls to `toJson`/`fromJson` the subtypes do not have. Keeping
-    // this assertion means the fix cannot land silently — whoever fixes #159
-    // moves the fixture into the strict group above and deletes this test.
-    test(
-      'sealed base without JSON still emits subtype toJson calls (#159)',
-      () async {
-        final path = '${fixtureDir.path}/sealed_no_json.dart';
-        File(path).writeAsStringSync(_sealedNoJsonFixture);
-        final outputs = await _generateLibrary(path);
-        File('${fixtureDir.path}/sealed_no_json.zorphy.dart').writeAsStringSync(
-          "part of 'sealed_no_json.dart';\n\n${outputs.values.join('\n\n')}",
-        );
-
-        final output = outputs.values.join('\n');
-        expect(
-          output,
-          contains('toJson()'),
-          reason:
-              'the #159 defect (subtype toJson dispatch without generateJson) '
-              'appears to be fixed — move this fixture into the strict group '
-              'above and delete this characterization test',
-        );
-        final diagnostics = await _diagnostics([path]);
-        final joined = diagnostics.join('\n');
-        // analyzer 14.6+ reports `undefined_instance_member_read` /
-        // `undefined_static_member_read`; analyzer 13.x reports
-        // `undefined_method`. Accept either so the characterization is
-        // version-independent.
-        expect(
-          joined,
-          anyOf(
-            contains('undefined_method'),
-            contains('undefined_instance_member_read'),
-            contains('undefined_static_member_read'),
-          ),
-          reason: 'expected the #159 toJson/fromJson error, got:\n$joined',
         );
       },
     );

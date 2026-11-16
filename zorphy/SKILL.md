@@ -374,7 +374,7 @@ abstract class $Account {
 ### Advanced: ChangeTo and CompareTo
 
 ```dart
-@Zorphy(explicitSubTypes: [$Circle, $Rectangle])
+@Zorphy(generateJson: true, explicitSubTypes: [$Circle, $Rectangle])
 abstract class $$Shape {
   String get name;
 }
@@ -383,6 +383,12 @@ abstract class $$Shape {
 ```dart
 final rectangle = circle.changeToRectangle(width: 10.0, height: 15.0);
 ```
+
+`changeTo` converts by round-tripping through JSON, so it is generated only when
+the classes it dispatches over generate JSON: `generateJson: true` on every
+declared subtype, and on the base too whenever the base is not sealed — a base
+that is not sealed needs `nonSealed: true` as well, or it has no `toJson()` for
+the switch's default case to call.
 
 ```dart
 @Zorphy(generateCompareTo: true, generateJson: true)

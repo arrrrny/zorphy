@@ -959,18 +959,18 @@ abstract class $Derived<T extends num> implements $$Base<T> {
 Use `explicitSubTypes` to enable cross-type operations:
 
 ```dart
-@Zorphy(explicitSubTypes: [$Dog, $Cat])
+@Zorphy(generateJson: true, explicitSubTypes: [$Dog, $Cat])
 abstract class $Pet {
   String get name;
   int get age;
 }
 
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Dog implements $Pet {
   String get breed;
 }
 
-@Zorphy()
+@Zorphy(generateJson: true)
 abstract class $Cat implements $Pet {
   double get whiskerLength;
 }
@@ -985,6 +985,13 @@ final dog = Dog(name: 'Buddy', age: 5, breed: 'Labrador');
 final cat = dog.changeToCat(whiskerLength: 3.5);
 // Cat(name: 'Buddy', age: 5, whiskerLength: 3.5)
 ```
+
+A `changeTo` body converts by round-tripping through JSON, so it needs a JSON
+surface to call: `generateJson: true` on every declared subtype, and on the base
+too whenever the base is not sealed — a base that is not sealed needs
+`nonSealed: true` as well, or it has no `toJson()` for the switch's default case
+to call. A hierarchy that does not generate JSON gets no `changeTo` methods
+rather than methods that reference `toJson`/`fromJson` nobody emitted.
 
 ### 7. CompareTo Feature
 

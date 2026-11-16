@@ -576,6 +576,16 @@ class ClassAnalyzer {
     return annot == null ? null : ConstantReader(annot);
   }
 
+  /// Whether [element]'s own `@Zorphy`/`@Zorphy2` annotation enables JSON
+  /// generation.
+  ///
+  /// `generateJson` is opt-in in every preset and is NOT inherited (only
+  /// `typeKey` is), so every class in a hierarchy decides for itself. A
+  /// generator that emits a call to another class's `toJson()`/`fromJson()`
+  /// has to ask that class instead of assuming the call resolves.
+  static bool generatesJson(ClassElement element) =>
+      _readSubtypeAnnotation(element)?.peek('generateJson')?.boolValue ?? false;
+
   /// Extract agent annotations (@AgentTool, @AgentRisk, @AgentInternal,
   /// @AgentExclude, @AgentToolParam) from the class and its fields.
   static AgentDirectiveInfo _extractAgentDirectiveInfo(
