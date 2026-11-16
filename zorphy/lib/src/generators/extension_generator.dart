@@ -1,5 +1,6 @@
 import 'package:code_builder/code_builder.dart';
 
+import '../analysis/class_analyzer.dart';
 import '../ast/ast.dart';
 import '../helpers.dart' as helpers;
 import 'base_generator.dart';
@@ -69,13 +70,40 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
 /// Generates changeTo extension methods for explicit subtypes.
 ///
 /// Produces a native [Extension] spec.
+///
+/// A `changeTo<Subtype>` body is a JSON round-trip: it collects the runtime
+/// subtype's `toJson()`, overlays the patch's `toJson()`, and rebuilds the
+/// target with `fromJson`. Those members exist only on a class generated with
+/// `generateJson: true`, so the extension is withheld unless the JSON surface
+/// it calls is really there (issue #159) — otherwise a hierarchy that never
+/// asked for JSON gets a part file that does not compile.
 class ChangeToExtensionGenerator extends UniversalGenerator {
   ChangeToExtensionGenerator();
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    return context.config.generateChangeTo &&
-        context.metadata.explicitSubtypes.isNotEmpty;
+    if (!context.config.generateChangeTo) return false;
+    final metadata = context.metadata;
+    if (metadata.explicitSubtypes.isEmpty) return false;
+    return _jsonSurfaceExists(context);
+  }
+
+  /// Whether every type the generated bodies call has a JSON surface.
+  ///
+  /// The switch dispatches on the *runtime* subtype, so each declared subtype
+  /// needs its own `toJson()` and `fromJson`. A non-sealed base is
+  /// instantiable itself, so its `switch` also carries a `_ => this.toJson()`
+  /// default that needs the base's own `toJson()`.
+  bool _jsonSurfaceExists(GenerationContext context) {
+    final metadata = context.metadata;
+    if (!metadata.isSealed && !context.config.generateJson) return false;
+    for (final subtype in metadata.explicitSubtypes) {
+      final element = metadata.allAnnotatedClasses[subtype.interfaceName];
+      // An unresolvable subtype is not evidence that its JSON surface exists.
+      if (element == null) return false;
+      if (!ClassAnalyzer.generatesJson(element)) return false;
+    }
+    return true;
   }
 
   @override
