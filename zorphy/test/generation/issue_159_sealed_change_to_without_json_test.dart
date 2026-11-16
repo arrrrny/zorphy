@@ -110,6 +110,44 @@ abstract class \$Circle implements \$\$Shape {
 }
 ''';
 
+/// The shape from the #161 review's major finding: the `$$` base declares a
+/// closed hierarchy whose subtype lives in ANOTHER library. Sealing is
+/// withheld there (issue #142), so the base is plain `abstract` — and a plain
+/// `abstract` base is still instantiable through its subtype switch, which
+/// carries a `_ => this.toJson()` default. A base that declares
+/// `explicitSubTypes` never gets a `toJson()` of its own: `JsonGenerator`
+/// emits one only for a `nonSealed` base, and `JsonExtensionGenerator` skips
+/// any class that declares subtypes. `generateJson: true` on both classes
+/// therefore does NOT give the switch's default case a `toJson()` to call, and
+/// the extension must be withheld rather than emitted broken.
+const _crossLibraryBaseSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+import 'cross_circle.dart';
+
+part 'cross_base.zorphy.dart';
+
+@Zorphy(generateJson: true, explicitSubTypes: [\$Circle])
+abstract class \$\$Shape {
+  double get area;
+}
+''';
+
+/// The remote half of [_crossLibraryBaseSource]'s hierarchy: a JSON-generating
+/// subtype that implements the base from its own library.
+const _crossLibrarySubtypeSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+import 'cross_base.dart';
+
+part 'cross_circle.zorphy.dart';
+
+@Zorphy(generateJson: true)
+abstract class \$Circle implements \$\$Shape {
+  double get radius;
+}
+''';
+
 /// Resolves every `@Zorphy` class in the library at [libraryPath] and returns
 /// the generated part bodies keyed by class name.
 Future<Map<String, String>> _generateLibrary(String libraryPath) async {
@@ -218,6 +256,13 @@ Future<List<String>> _diagnostics(
 }
 
 /// The diagnostics #159 is about: a call to a JSON member the class never got.
+///
+/// Deliberately narrow. The part file also references `_$XFromJson` /
+/// `_$XToJson`, which json_serializable emits in a LATER build step
+/// (`build.yaml`: `runs_before: ["json_serializable:json_serializable"]`), so a
+/// whole-part "no diagnostics at all" assertion is not available to a
+/// standalone Orchestrator pass — widen this only for missing-JSON-member
+/// codes.
 bool _isMissingJsonMember(String diagnostic) =>
     diagnostic.contains('undefined_instance_member_read') ||
     diagnostic.contains('undefined_static_member_read');
@@ -384,5 +429,86 @@ void main() {
         reason: 'diagnostics:\n${diagnostics.join('\n')}',
       );
     });
+  });
+
+  group('issue #159 — cross-library base whose sealing is withheld (#142)', () {
+    late Directory fixtureDir;
+    late String basePath;
+    late String baseOutput;
+    late List<String> diagnostics;
+
+    setUpAll(() async {
+      final root = Directory('test/.issue_159_cross_library_tmp').absolute.path;
+      fixtureDir = Directory(root)..createSync(recursive: true);
+      fixtureDir = fixtureDir.createTempSync('fixture_');
+
+      basePath = '${fixtureDir.path}/cross_base.dart';
+      final subtypePath = '${fixtureDir.path}/cross_circle.dart';
+      File(basePath).writeAsStringSync(_crossLibraryBaseSource);
+      File(subtypePath).writeAsStringSync(_crossLibrarySubtypeSource);
+
+      // The base first: its generated part must exist before the subtype
+      // library (which imports it) is resolved.
+      final baseOutputs = await _generateLibrary(basePath);
+      baseOutput = baseOutputs.values.join('\n\n');
+      _writePart(
+        fixtureDir,
+        'cross_base.dart',
+        'cross_base.zorphy.dart',
+        baseOutput,
+      );
+
+      final subtypeOutputs = await _generateLibrary(subtypePath);
+      _writePart(
+        fixtureDir,
+        'cross_circle.dart',
+        'cross_circle.zorphy.dart',
+        subtypeOutputs.values.join('\n\n'),
+      );
+
+      diagnostics = await _diagnostics(fixtureDir, basePath);
+    });
+
+    tearDownAll(() {
+      if (fixtureDir.existsSync()) fixtureDir.deleteSync(recursive: true);
+      final tmp = Directory('test/.issue_159_cross_library_tmp');
+      if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
+    });
+
+    test('the base is emitted abstract, not sealed', () {
+      expect(
+        baseOutput,
+        isNot(contains('sealed class Shape')),
+        reason:
+            'a subtype in another library means sealing buys nothing '
+            '(issue #142) and the base must stay implementable abroad',
+      );
+      expect(baseOutput, contains('abstract class Shape'));
+    });
+
+    test(
+      'changeTo is withheld — the base has no toJson for its default case',
+      () {
+        expect(
+          baseOutput,
+          isNot(contains('changeToCircle')),
+          reason:
+              'the switch would fall through to `_ => this.toJson()` on a base '
+              'that declared no toJson of its own (generateJson is not enough '
+              'without nonSealed) — the #159 failure mode',
+        );
+      },
+    );
+
+    test(
+      'generated cross-library hierarchy analyzes with zero diagnostics',
+      () {
+        expect(
+          diagnostics.where(_isMissingJsonMember),
+          isEmpty,
+          reason: 'diagnostics:\n${diagnostics.join('\n')}',
+        );
+      },
+    );
   });
 }
