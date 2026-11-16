@@ -84,10 +84,15 @@ jobs:
           # pubspec_overrides.yaml only supports `dependency_overrides`,
           # `resolution` and `workspace` keys — the pin must be nested under
           # `dependency_overrides:`, not written at the top level.
+          # `>` replaces the TRACKED zorphy/pubspec_overrides.yaml, so the
+          # zorphy_annotation path entry has to be repeated here (exactly as
+          # ci.yaml does): without it `dart pub get` resolves
+          # zorphy_annotation ^2.5.0 from pub.dev, where 2.5.0 is unpublished,
+          # and version solving fails (issue #164).
           if [ "${{ matrix.analyzer }}" = "14" ]; then
-            printf 'dependency_overrides:\n  analyzer: ^14.0.0\n  json_serializable:\n    git:\n      url: https://github.com/google/json_serializable.dart\n      path: json_serializable\n' > pubspec_overrides.yaml
+            printf 'dependency_overrides:\n  zorphy_annotation:\n    path: ../zorphy_annotation\n  analyzer: ^14.0.0\n  json_serializable:\n    git:\n      url: https://github.com/google/json_serializable.dart\n      path: json_serializable\n' > pubspec_overrides.yaml
           else
-            printf 'dependency_overrides:\n  analyzer: ^13.0.0\n' > pubspec_overrides.yaml
+            printf 'dependency_overrides:\n  zorphy_annotation:\n    path: ../zorphy_annotation\n  analyzer: ^13.0.0\n' > pubspec_overrides.yaml
           fi
           cat pubspec_overrides.yaml
 
