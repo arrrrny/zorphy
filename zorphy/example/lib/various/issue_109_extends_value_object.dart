@@ -35,8 +35,8 @@
 // subclass inherits the base's fields, copyWith, equality, etc.
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue_109_extends_value_object.zorphy.dart';
 part 'issue_109_extends_value_object.g.dart';
+part '../_br_/various/issue_109_extends_value_object.part.dart';
 
 // ── Scenario 1: value-object hierarchy via `extends` ─────────────────
 //

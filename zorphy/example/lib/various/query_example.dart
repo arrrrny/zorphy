@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy.dart';
 
-part 'query_example.zorphy.dart';
 part 'query_example.g.dart';
+part '../_br_/various/query_example.part.dart';
 
 /// Example entity with filter generation enabled
 @Zorphy(generateJson: true, generateFilter: true)

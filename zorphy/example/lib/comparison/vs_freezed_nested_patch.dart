@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'vs_freezed_nested_patch.zorphy.dart';
+part '../_br_/comparison/vs_freezed_nested_patch.part.dart';
 
 /// Example 3 — nested partial updates: zorphy's patch system.
 ///

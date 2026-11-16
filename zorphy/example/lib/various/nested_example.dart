@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'nested_example.zorphy.dart';
 part 'nested_example.g.dart';
+part '../_br_/various/nested_example.part.dart';
 
 /// Example demonstrating nested object support.
 ///

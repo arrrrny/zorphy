@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'basic_example.zorphy.dart';
+part '../_br_/various/basic_example.part.dart';
 
 /// Basic entity example showing the fundamental features of Zorphy.
 ///

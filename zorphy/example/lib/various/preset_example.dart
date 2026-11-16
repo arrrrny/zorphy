@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'preset_example.zorphy.dart';
+part '../_br_/various/preset_example.part.dart';
 
 /// Lean preset: only class, constructor, copyWith, ==/hashCode, toString.
 /// Must NOT emit patch, filter, compareTo, property helpers, field enum,

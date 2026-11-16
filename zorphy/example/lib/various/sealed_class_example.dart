@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'sealed_class_example.zorphy.dart';
 part 'sealed_class_example.g.dart';
+part '../_br_/various/sealed_class_example.part.dart';
 
 /// Example demonstrating sealed class hierarchies for polymorphism.
 ///

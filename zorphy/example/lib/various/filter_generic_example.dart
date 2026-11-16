@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'filter_generic_example.zorphy.dart';
+part '../_br_/various/filter_generic_example.part.dart';
 
 class Params {
   final String token;

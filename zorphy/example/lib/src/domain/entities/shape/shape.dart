@@ -2,8 +2,8 @@
 /// Generated at: 2026-02-06T20:58:38.399544
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
-part 'shape.zorphy.dart';
 part 'shape.g.dart';
+part '../../../../_br_/src/domain/entities/shape/shape.part.dart';
 
 /// Shape entity
 @Zorphy(

@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'zorphy2_alias_example.zorphy.dart';
+part '../_br_/various/zorphy2_alias_example.part.dart';
 
 /// Verifies the deprecated `@zorphy2` alias keeps working through the
 /// unified single-pass builder (2.0): it must behave exactly like

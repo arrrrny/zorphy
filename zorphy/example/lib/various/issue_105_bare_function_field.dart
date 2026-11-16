@@ -24,8 +24,8 @@
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue_105_bare_function_field.zorphy.dart';
 part 'issue_105_bare_function_field.g.dart';
+part '../_br_/various/issue_105_bare_function_field.part.dart';
 
 @Zorphy(kind: ZorphyKind.valueObject, generateJson: true)
 abstract class $ScriptHtmlTagAttributes {

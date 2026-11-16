@@ -23,6 +23,8 @@
 *.morphy.dart
 *.morphy2.dart
 *.zorphy.dart
+# zorphy 3.0.0 shared parts (build_runner `adds_to_library` output)
+_br_/
 *.zorphy2.dart
 n# Allow golden reference files for v2 pipeline
 !specs/

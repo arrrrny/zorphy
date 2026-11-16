@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue_131_copywithfield_example.zorphy.dart';
+part '../_br_/various/issue_131_copywithfield_example.part.dart';
 
 /// Fixture for issue #131: `copyWithField(Field<E, T> field, T value)`.
 ///

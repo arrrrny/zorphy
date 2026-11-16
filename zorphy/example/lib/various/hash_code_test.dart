@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
-part 'hash_code_test.zorphy.dart';
 part 'hash_code_test.g.dart';
+part '../_br_/various/hash_code_test.part.dart';
 
 @Zorphy(generateJson: true)
 abstract class $LargeClass {

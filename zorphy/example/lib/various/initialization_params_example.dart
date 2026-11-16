@@ -5,8 +5,8 @@ import 'converters/locale_converter.dart';
 import 'locale.dart';
 import 'params.dart';
 
-part 'initialization_params_example.zorphy.dart';
 part 'initialization_params_example.g.dart';
+part '../_br_/various/initialization_params_example.part.dart';
 
 @Zorphy(generateJson: true, generateFilter: true)
 abstract class $InitializationParamsExample {

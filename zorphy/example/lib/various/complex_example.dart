@@ -1,7 +1,7 @@
 // Complex example demonstrating polymorphism and self-reference with Zorphy
 import 'package:zorphy_annotation/zorphy_annotation.dart';
-part 'complex_example.zorphy.dart';
 part 'complex_example.g.dart';
+part '../_br_/various/complex_example.part.dart';
 
 // Sealed class example
 @Zorphy()

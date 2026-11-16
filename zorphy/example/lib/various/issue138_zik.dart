@@ -3,8 +3,8 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import 'issue138_endpoint.dart';
 import 'issue138_spark.dart';
 
-part 'issue138_zik.zorphy.dart';
 part 'issue138_zik.g.dart';
+part '../_br_/various/issue138_zik.part.dart';
 
 @Zorphy(generateJson: true)
 abstract class $Issue138Zik {

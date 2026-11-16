@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'enum_example.zorphy.dart';
 part 'enum_example.g.dart';
+part '../_br_/various/enum_example.part.dart';
 
 /// Enum definitions for the example
 enum Status { active, inactive, pending, suspended }

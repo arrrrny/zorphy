@@ -17,8 +17,8 @@
 // and json_serializable fails on `InvalidType`.
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'cross_entity_example.zorphy.dart';
 part 'cross_entity_example.g.dart';
+part '../_br_/various/cross_entity_example.part.dart';
 
 @Zorphy(generateJson: true)
 abstract class $ParentThing {

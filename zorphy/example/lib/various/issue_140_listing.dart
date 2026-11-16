@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue_140_listing.zorphy.dart';
+part '../_br_/various/issue_140_listing.part.dart';
 
 /// Fixture for issue #140: `copyWithField` emitted an invalid override in
 /// hierarchies deeper than 2 levels.

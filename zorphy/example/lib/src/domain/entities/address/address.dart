@@ -3,7 +3,7 @@
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'address.g.dart';
-part 'address.zorphy.dart';
+part '../../../../_br_/src/domain/entities/address/address.part.dart';
 
 /// Address entity
 @Zorphy(generateJson: true, generateCompareTo: true)

@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue138_spark.zorphy.dart';
+part '../_br_/various/issue138_spark.part.dart';
 
 @Zorphy(generateJson: true)
 abstract class $Issue138Spark {
