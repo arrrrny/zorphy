@@ -8,6 +8,11 @@ import 'package:yaml/yaml.dart';
 
 /// Parses the `environment: sdk` constraint from a `pubspec.yaml` file.
 VersionConstraint _sdkConstraintFor(String pubspecPath) {
+  expect(
+    File(pubspecPath).existsSync(),
+    isTrue,
+    reason: 'Missing $pubspecPath',
+  );
   final content = File(pubspecPath).readAsStringSync();
   final yaml = loadYaml(content) as YamlMap;
   final environment = yaml['environment'] as YamlMap?;
@@ -84,11 +89,15 @@ void main() {
       }
 
       // The locked analyzer on Dart 3.13+ is 14.7.0 (sdk: ^3.13.0); the
-      // 3.11-compatible analyzer 14.x release (14.1.0) in the cache declares
-      // sdk: ^3.11.0, admitting 3.11.0 and rejecting 3.10.9.
-      final analyzer141Path =
-          '${(byName['analyzer']!['rootUri'] as String).replaceAll(RegExp(r'analyzer-[0-9.]+$'), 'analyzer-14.1.0').replaceAll('file://', '')}/pubspec.yaml';
-      final analyzerFloorConstraint = _sdkConstraintFor(analyzer141Path);
+      // 3.11-compatible 14.x release a Dart 3.11 resolution picks inside
+      // `^14.0.0` is 14.1.0 (sdk: ^3.11.0). Its pubspec comes from a
+      // repository-owned fixture rather than the pub cache: published versions
+      // are immutable, while the cache is ambient — CI resolves ^14.0.0 to the
+      // newest 14.x and never downloads 14.1.0, so a cache lookup made this
+      // test pass or fail on machine state alone.
+      final analyzerFloorConstraint = _sdkConstraintFor(
+        'test/release/fixtures/analyzer-14.1.0.pubspec.yaml',
+      );
       expect(
         analyzerFloorConstraint.allows(Version(3, 11, 0)),
         isTrue,

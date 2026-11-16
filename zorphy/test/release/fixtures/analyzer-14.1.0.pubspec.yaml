@@ -1,0 +1,19 @@
+# Excerpt of the published `analyzer` 14.1.0 pubspec (from pub.dev):
+#
+#   name: analyzer
+#   version: 14.1.0
+#   environment:
+#     sdk: ^3.11.0
+#
+# 14.1.0 is the 3.11-compatible 14.x release a Dart 3.11 resolution picks
+# inside the declared `analyzer: ^14.0.0`, while the committed dev lock keeps
+# 14.7.0, which needs `^3.13.0`. The copy lives here instead of being read from
+# the pub cache because published versions are immutable (it cannot go stale),
+# whereas the cache is ambient state: CI resolves `^14.0.0` to the newest 14.x
+# and never downloads 14.1.0, so a cache lookup made
+# `sdk_floor_alignment_test.dart` pass or fail on the machine it ran on.
+
+name: analyzer
+version: 14.1.0
+environment:
+  sdk: ^3.11.0

@@ -3,5 +3,3 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.zorphy.dart"
     - "**/*.zorphy2.dart"
-    # Suppress invalid_dependency on local pubspec_overrides.yaml path overrides.
-    - "pubspec_overrides.yaml"

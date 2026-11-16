@@ -21,15 +21,17 @@ Map<String, String> _parseDependencies(
 }
 
 void main() {
-  group('2.4.6 dependency constraints regression', () {
+  group('2.5.0 dependency constraint pins', () {
     test(
-      'zorphy and zorphy_annotation preserve 2.4.6 dependency constraints',
+      'zorphy and zorphy_annotation pin the 2.5.0 dependency constraints',
       () {
         final zorphyYaml =
             loadYaml(File('pubspec.yaml').readAsStringSync()) as YamlMap;
-        final annotationYaml = loadYaml(
-          File('../zorphy_annotation/pubspec.yaml').readAsStringSync(),
-        ) as YamlMap;
+        final annotationYaml =
+            loadYaml(
+                  File('../zorphy_annotation/pubspec.yaml').readAsStringSync(),
+                )
+                as YamlMap;
 
         final zorphyDeps = _parseDependencies(zorphyYaml);
         final zorphyDevDeps = _parseDependencies(

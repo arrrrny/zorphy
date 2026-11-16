@@ -10,12 +10,14 @@ Run from the repository root (`/Users/arrrrny/Developer/zorphy`) unless noted. T
 ## 1. Lockfile is the tested baseline (zero drift)
 
 ```bash
-(cd zorphy_annotation && dart pub get)
-(cd zorphy && dart pub get --no-example)
-(cd zorphy_migrator && dart pub get)
+(cd zorphy_annotation && dart pub get) &&
+(cd zorphy && dart pub get --no-example) &&
+(cd zorphy_migrator && dart pub get) &&
 git diff --exit-code -- zorphy/pubspec.lock zorphy_annotation/pubspec.lock zorphy_migrator/pubspec.lock
 ```
-**Expected**: no diff (exit 0).
+**Expected**: no diff (exit 0). Each resolution is chained with `&&`, so a
+failed `dart pub get` stops the check instead of letting `git diff` report a
+clean tree.
 
 ## 2. Direct dependencies are current
 
