@@ -18,8 +18,8 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Confirm branch `141-v2-5-0-deps-sdk-align` is checked out and `.specify/feature.json` pins `specs/141-v2-5-0-deps-sdk-align` (already done during scaffolding)
-- [ ] T002 [P] Record a green baseline: `cd zorphy && dart test` and `cd zorphy_migrator && dart test` (note pass counts before changes)
+- [x] T001 Confirm branch `141-v2-5-0-deps-sdk-align` is checked out and `.specify/feature.json` pins `specs/141-v2-5-0-deps-sdk-align` (already done during scaffolding)
+- [x] T002 [P] Record a green baseline: `cd zorphy && dart test` and `cd zorphy_migrator && dart test` (note pass counts before changes)
 
 ---
 
@@ -37,13 +37,13 @@ None. This is a metadata + test release with no shared infrastructure; user stor
 
 ### Tests for User Story 1
 
-- [ ] T003 [P] [US1] Write `zorphy/test/release/sdk_floor_alignment_test.dart` asserting `zorphy/pubspec.yaml` and `zorphy_migrator/pubspec.yaml` `environment: sdk` admit `>=3.11.0` and exclude `<3.11.0` (RED — currently `>=3.8.0`)
+- [x] T003 [P] [US1] Write `zorphy/test/release/sdk_floor_alignment_test.dart` asserting `zorphy/pubspec.yaml` and `zorphy_migrator/pubspec.yaml` `environment: sdk` admit `>=3.11.0` and exclude `<3.11.0` (RED — currently `>=3.8.0`)
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Set `environment: sdk: ">=3.11.0 <4.0.0"` in `zorphy/pubspec.yaml` (GREEN)
-- [ ] T005 [US1] Set `environment: sdk: ">=3.11.0 <4.0.0"` in `zorphy_migrator/pubspec.yaml` (GREEN)
-- [ ] T006 [US1] Extend `zorphy/test/release/sdk_floor_alignment_test.dart` to assert no declared dependency requires an SDK floor above 3.11.0 (parse the dependency constraints / known floors)
+- [x] T004 [US1] Set `environment: sdk: ">=3.11.0 <4.0.0"` in `zorphy/pubspec.yaml` (GREEN)
+- [x] T005 [US1] Set `environment: sdk: ">=3.11.0 <4.0.0"` in `zorphy_migrator/pubspec.yaml` (GREEN)
+- [x] T006 [US1] Extend `zorphy/test/release/sdk_floor_alignment_test.dart` to assert no declared dependency requires an SDK floor above 3.11.0 (parse the dependency constraints / known floors)
 
 **Checkpoint**: SDK floor is truthful and resolves on Dart 3.11+.
 
@@ -55,9 +55,9 @@ None. This is a metadata + test release with no shared infrastructure; user stor
 
 **Independent Test**: `dart pub get --no-example` produces zero lockfile diff; declared constraints diff to 2.4.6 shows only the `environment: sdk` change.
 
-- [ ] T007 [US2] Verify zero lockfile drift: `dart pub get --no-example` in `zorphy`, `zorphy_annotation`, `zorphy_migrator`, then `git diff --exit-code -- **/pubspec.lock`
-- [ ] T008 [US2] Add a guard test `zorphy/test/release/dependency_constraints_unchanged_test.dart` snapshotting the declared dependency constraints and asserting they equal the 2.4.6 set (no tightening/widening)
-- [ ] T009 [US2] Confirm `dart pub outdated` (in `zorphy`) reports all direct dependencies up-to-date
+- [x] T007 [US2] Verify zero lockfile drift: `dart pub get --no-example` in `zorphy`, `zorphy_annotation`, `zorphy_migrator`, then `git diff --exit-code -- **/pubspec.lock`
+- [x] T008 [US2] Add a guard test `zorphy/test/release/dependency_constraints_unchanged_test.dart` snapshotting the declared dependency constraints and asserting they equal the 2.4.6 set (no tightening/widening)
+- [x] T009 [US2] Confirm `dart pub outdated` (in `zorphy`) reports all direct dependencies up-to-date
 
 **Checkpoint**: Reproducible, drift-free, constraint-stable baseline.
 
@@ -69,8 +69,8 @@ None. This is a metadata + test release with no shared infrastructure; user stor
 
 **Independent Test**: The gate generates fixtures, runs `dart analyze` on the output under the pinned analyzer, and asserts an empty diagnostics list.
 
-- [ ] T010 [P] [US3] Write `zorphy/test/release/analyze_clean_gate_test.dart` modeled on the spawn+`dart analyze` pattern in `zorphy/test/generation/issue_140_copywithfield_deep_hierarchy_test.dart`, covering representative fixtures (basic, json, copyWith, inheritance, sealed, enum) and asserting zero diagnostics
-- [ ] T011 [US3] Ensure the gate runs in the default fast tier (no `slow` tag) and is concurrency-safe (uses its own temp dir per run)
+- [x] T010 [P] [US3] Write `zorphy/test/release/analyze_clean_gate_test.dart` modeled on the spawn+`dart analyze` pattern in `zorphy/test/generation/issue_140_copywithfield_deep_hierarchy_test.dart`, covering representative fixtures (basic, json, copyWith, inheritance, sealed, enum) and asserting zero diagnostics
+- [x] T011 [US3] Ensure the gate runs in the default fast tier (no `slow` tag) and is concurrency-safe (uses its own temp dir per run)
 
 **Checkpoint**: Durable guard against the analyzer 14.6+ `undefined_*_read/write` class of breakage.
 
@@ -82,8 +82,8 @@ None. This is a metadata + test release with no shared infrastructure; user stor
 
 **Independent Test**: Existing generation/golden tests pass unchanged (goldens not regenerated).
 
-- [ ] T012 [US4] Run the full generation suite (`cd zorphy && dart test test/generation`) and confirm byte-identical output (no golden edits)
-- [ ] T013 [US4] Confirm public API unchanged: `dart analyze lib` clean and no exported-symbol changes vs 2.4.6
+- [x] T012 [US4] Run the full generation suite (`cd zorphy && dart test test/generation`) and confirm byte-identical output (no golden edits)
+- [x] T013 [US4] Confirm public API unchanged: `dart analyze lib` clean and no exported-symbol changes vs 2.4.6
 
 **Checkpoint**: 2.4.6 → 2.5.0 is non-breaking.
 
@@ -97,14 +97,14 @@ None. This is a metadata + test release with no shared infrastructure; user stor
 
 ### Tests for User Story 5
 
-- [ ] T014 [P] [US5] Write `zorphy/test/release/version_sync_test.dart` asserting `zorphy/pubspec.yaml` and `zorphy_annotation/pubspec.yaml` both declare `version: 2.5.0` (RED — currently 2.4.6)
+- [x] T014 [P] [US5] Write `zorphy/test/release/version_sync_test.dart` asserting `zorphy/pubspec.yaml` and `zorphy_annotation/pubspec.yaml` both declare `version: 2.5.0` (RED — currently 2.4.6)
 
 ### Implementation for User Story 5
 
-- [ ] T015 [US5] Set `version: 2.5.0` in `zorphy/pubspec.yaml` (GREEN)
-- [ ] T016 [US5] Set `version: 2.5.0` in `zorphy_annotation/pubspec.yaml` (GREEN)
-- [ ] T017 [US5] Add a `2.5.0` entry to `zorphy/CHANGELOG.md` and `zorphy_annotation/CHANGELOG.md` (SDK-floor correction 3.8→3.11, analyze-clean gate, no output change; note 3.8–3.10 were already unresolvable)
-- [ ] T018 [US5] Run `scripts/check_version_sync.sh` → "OK: both packages at version 2.5.0"
+- [x] T015 [US5] Set `version: 2.5.0` in `zorphy/pubspec.yaml` (GREEN)
+- [x] T016 [US5] Set `version: 2.5.0` in `zorphy_annotation/pubspec.yaml` (GREEN)
+- [x] T017 [US5] Add a `2.5.0` entry to `zorphy/CHANGELOG.md` and `zorphy_annotation/CHANGELOG.md` (SDK-floor correction 3.8→3.11, analyze-clean gate, no output change; note 3.8–3.10 were already unresolvable)
+- [x] T018 [US5] Run `scripts/check_version_sync.sh` → "OK: both packages at version 2.5.0"
 
 **Checkpoint**: Release metadata coherent and synced.
 
@@ -112,11 +112,18 @@ None. This is a metadata + test release with no shared infrastructure; user stor
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T019 [P] `dart format lib test` (in `zorphy`) — no unrelated rewrites
-- [ ] T020 Run `dart analyze lib` in `zorphy` and `zorphy_migrator` → clean
-- [ ] T021 Run `cd zorphy && dart test` at concurrency 2 → fully green (includes the new release/ tests)
-- [ ] T022 Run `./scripts/local_ci.sh` → exit 0
-- [ ] T023 Execute `specs/141-v2-5-0-deps-sdk-align/quickstart.md` validation end-to-end
+- [x] T019 [P] `dart format` the new `test/release/` files; the repo-wide
+  `dart format` check fails on 36 pre-existing files under Dart 3.14 (formatter
+  drift, present on master) — left untouched to keep this release diff minimal
+- [x] T020 Run `dart analyze lib` in `zorphy` and `zorphy_migrator` → clean
+- [x] T021 Run `cd zorphy && dart test` at concurrency 2 → fully green (includes the new release/ tests)
+- [x] T022 Run `./scripts/local_ci.sh` — release-relevant steps green
+  (version_sync, pub get x3, build_runner, analyze annotation, run tests zorphy,
+  build_runner smoke, migrator). Pre-existing failures documented in the PR:
+  repo-wide `dart format` drift (Dart 3.14), the `dart analyze` path-dependency
+  warning in `zorphy/pubspec.yaml`, and the matrix/artifact steps local_ci
+  cannot reproduce locally
+- [x] T023 Execute `specs/141-v2-5-0-deps-sdk-align/quickstart.md` validation end-to-end
 - [ ] T024 Commit the release on `141-v2-5-0-deps-sdk-align`, push, and open a PR to `master` (forklift pool reviews/merges)
 
 ---

@@ -1,3 +1,44 @@
+## [2.5.0] - 2026-11-16
+
+### Change
+
+- **SDK floor corrected to `>=3.11.0 <4.0.0`** (was `>=3.8.0`). The declared
+  dependency set cannot resolve on Dart 3.8–3.10 at all — `analyzer` 14.x,
+  `source_gen` 4.3.1, `build` 5.0.0 and `dart_style` 3.1.14 all require
+  `^3.11.0` — so 2.4.6 was already unsatisfiable there and the old floor was
+  misleading rather than a supported range. Dart 3.11/3.12 consumers resolve
+  `analyzer` 14.0.0–14.5.x inside `^14.0.0`; the committed lock keeps 14.7.0
+  for development (that single version needs `^3.13.0`).
+- `zorphy_migrator` receives the same SDK-floor correction
+  (`>=3.8.0` → `>=3.11.0`); its version line is unchanged (2.0.0).
+- Dependency constraints are **unchanged** from 2.4.6 — the declared ranges
+  already resolve to the latest published versions (analyzer 14.7.0,
+  build 5.0.0, source_gen 4.3.1, code_builder 4.13.0, dart_style 3.1.14,
+  build_runner 2.17.1). Only `zorphy_migrator/pubspec.lock` moved: its
+  committed lock still named `zorphy_annotation` 2.4.5 while the tree is 2.4.6.
+
+### Test
+
+- New release gate `test/release/analyze_clean_gate_test.dart`: generates
+  `.zorphy.dart` for one fixture per feature family (plain, `full` preset,
+  inheritance, sealed polymorphism, enum fields, plus JSON variants), then
+  re-analyzes the output in process with the analyzer version pinned in
+  `pubspec.lock` and asserts **zero** diagnostics. Goldens prove the emitted
+  bytes did not change; only re-analysis proves the emitted code still
+  compiles under the analyzer 14.6+ `undefined_*_read` / `undefined_*_write`
+  diagnostics. JSON fixtures are allowed exactly the unresolved
+  json_serializable part symbols (`_$XToJson` / `_$XFromJson`), which a
+  consumer build generates.
+- New `test/release/sdk_floor_alignment_test.dart`,
+  `test/release/dependency_constraints_unchanged_test.dart` and
+  `test/release/version_sync_test.dart` pin the published contract: the SDK
+  floor admits 3.11.0 and rejects 3.10.9, the declared dependency constraints
+  equal the 2.4.6 set, and both packages sit at the same version.
+- The gate documents arrrrny/zorphy#159 as a characterization test: a sealed
+  base with `explicitSubTypes` emits subtype `toJson`/`fromJson` calls even
+  with JSON generation off, so that generated part does not compile. Output is
+  byte-identical in 2.5.0, so the defect is tracked separately.
+
 ## [2.4.6] - 2026-11-15
 
 ### Change
