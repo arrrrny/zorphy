@@ -1,3 +1,14 @@
+## [2.5.0] - 2026-11-16
+
+### Change
+
+- Version synced with `zorphy` 2.5.0 (no annotation API changes).
+- No constraint changes: `zorphy_annotation` keeps its own `>=3.8.0` SDK floor
+  because its dependency set (collection, dartx, json_annotation, meta,
+  quiver) resolves there. Consumers of `zorphy` inherit `zorphy`'s
+  `>=3.11.0` floor, which is the binding minimum for the generator's
+  dependency set.
+
 ## [2.4.6] - 2026-11-15
 
 ### Change

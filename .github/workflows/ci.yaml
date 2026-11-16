@@ -151,9 +151,9 @@ jobs:
         working-directory: zorphy
         run: |
           if [ "${{ matrix.analyzer }}" = "14" ]; then
-            printf 'dependency_overrides:\n  analyzer: ^14.0.0\n  json_serializable:\n    git:\n      url: https://github.com/google/json_serializable.dart\n      path: json_serializable\n' > pubspec_overrides.yaml
+            printf 'dependency_overrides:\n  zorphy_annotation:\n    path: ../zorphy_annotation\n  analyzer: ^14.0.0\n  json_serializable:\n    git:\n      url: https://github.com/google/json_serializable.dart\n      path: json_serializable\n' > pubspec_overrides.yaml
           else
-            printf 'dependency_overrides:\n  analyzer: ^13.0.0\n' > pubspec_overrides.yaml
+            printf 'dependency_overrides:\n  zorphy_annotation:\n    path: ../zorphy_annotation\n  analyzer: ^13.0.0\n' > pubspec_overrides.yaml
           fi
           cat pubspec_overrides.yaml
       - name: Install dependencies
