@@ -16,26 +16,31 @@ echo "🔧 Switching to path references for development..."
 echo "📍 Working directory: $REPO_ROOT"
 echo ""
 
-# Update zorphy/pubspec.yaml to use hosted version reference and local path override
-echo "📝 Updating zorphy/pubspec.yaml..."
-cd zorphy
-
-# Ensure pubspec.yaml uses hosted constraint for zorphy_annotation and pubspec_overrides.yaml has local path
-perl -i -pe 'if (/^  zorphy_annotation: .+$/) { $_ = "  zorphy_annotation: ^2.5.0\n"; }' pubspec.yaml
-cat << 'EOF' > pubspec_overrides.yaml
+# Update zorphy/pubspec_overrides.yaml to use local path reference for zorphy_annotation
+# while preserving any existing overrides (such as analyzer pins)
+echo "📝 Updating zorphy/pubspec_overrides.yaml..."
+OVERRIDES_FILE="zorphy/pubspec_overrides.yaml"
+if [ -f "$OVERRIDES_FILE" ] && grep -q "^dependency_overrides:" "$OVERRIDES_FILE"; then
+  if grep -q "^  zorphy_annotation:" "$OVERRIDES_FILE"; then
+    perl -0777 -i -pe 's/  zorphy_annotation:\n(?:    .*\n)*/  zorphy_annotation:\n    path: ..\/zorphy_annotation\n/' "$OVERRIDES_FILE"
+  else
+    printf '  zorphy_annotation:\n    path: ../zorphy_annotation\n' >> "$OVERRIDES_FILE"
+  fi
+else
+  cat << 'EOF' > "$OVERRIDES_FILE"
 dependency_overrides:
   zorphy_annotation:
     path: ../zorphy_annotation
 EOF
+fi
 
 echo "  ✓ Updated zorphy_annotation to use local path in pubspec_overrides.yaml"
 echo ""
-
 cd "$REPO_ROOT"
 
 echo "✅ Successfully updated to path references for development!"
 echo ""
 echo "📦 Active Dependencies:"
-echo "   • zorphy → zorphy_annotation: ../zorphy_annotation"
+echo "   • zorphy → zorphy_annotation: ../zorphy_annotation (via pubspec_overrides.yaml)"
 echo ""
 echo "✨ All packages now use local path references!"

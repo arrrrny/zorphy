@@ -11,11 +11,13 @@
   for development (that single version needs `^3.13.0`).
 - `zorphy_migrator` receives the same SDK-floor correction
   (`>=3.8.0` → `>=3.11.0`); its version line is unchanged (2.0.0).
-- Dependency constraints are **unchanged** from 2.4.6 — the declared ranges
+- Third-party dependency constraints are **unchanged** from 2.4.6 — the declared ranges
   already resolve to the latest published versions (analyzer 14.7.0,
   build 5.0.0, source_gen 4.3.1, code_builder 4.13.0, dart_style 3.1.14,
-  build_runner 2.17.1). Only `zorphy_migrator/pubspec.lock` moved: its
-  committed lock still named `zorphy_annotation` 2.4.5 while the tree is 2.4.6.
+  build_runner 2.17.1). In `zorphy/pubspec.yaml`, `zorphy_annotation` is declared
+  as `^2.5.0` (with local development using `pubspec_overrides.yaml`). Only
+  `zorphy_migrator/pubspec.lock` moved: its committed lock still named
+  `zorphy_annotation` 2.4.5 while the tree is 2.4.6.
 
 ### Test
 

@@ -71,7 +71,9 @@ void main() {
           'build_runner': '^2.17.1',
           'json_serializable': '^6.14.0',
           'json_annotation': '^4.12.0',
+          'pub_semver': '^2.2.0',
           'test': '^1.31.1',
+          'yaml': '^3.1.3',
         };
 
         final expectedAnnotationDevDeps = <String, String>{};

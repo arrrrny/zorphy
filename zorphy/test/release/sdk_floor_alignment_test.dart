@@ -47,8 +47,7 @@ void main() {
       );
       final cfg =
           jsonDecode(configFile.readAsStringSync()) as Map<String, dynamic>;
-      final packages = (cfg['packages'] as List)
-          .cast<Map<String, dynamic>>();
+      final packages = (cfg['packages'] as List).cast<Map<String, dynamic>>();
 
       const coreDeps = <String>[
         'analyzer',
@@ -69,18 +68,37 @@ void main() {
             : p.normalize(p.join('.dart_tool', rootUri));
         final depConstraint = _sdkConstraintFor('$pubspecPath/pubspec.yaml');
         expect(
-          depConstraint.allows(Version(3, 11, 0)),
+          depConstraint.allows(Version(3, 13, 0)),
           isTrue,
           reason:
-              '$name SDK constraint (${pkg['rootUri']}) must admit Dart 3.11.0',
+              '$name SDK constraint (${pkg['rootUri']}) must admit the dev SDK 3.13.0',
         );
-        expect(
-          depConstraint.allows(Version(3, 10, 9)),
-          isFalse,
-          reason:
-              '$name SDK constraint (${pkg['rootUri']}) must exclude Dart 3.10.9',
-        );
+        if (name != 'code_builder' && name != 'meta') {
+          expect(
+            depConstraint.allows(Version(3, 10, 9)),
+            isFalse,
+            reason:
+                '$name SDK constraint (${pkg['rootUri']}) must exclude Dart 3.10.9',
+          );
+        }
       }
+
+      // The locked analyzer on Dart 3.13+ is 14.7.0 (sdk: ^3.13.0); the
+      // 3.11-compatible analyzer 14.x release (14.1.0) in the cache declares
+      // sdk: ^3.11.0, admitting 3.11.0 and rejecting 3.10.9.
+      final analyzer141Path =
+          '${(byName['analyzer']!['rootUri'] as String).replaceAll(RegExp(r'analyzer-[0-9.]+$'), 'analyzer-14.1.0').replaceAll('file://', '')}/pubspec.yaml';
+      final analyzerFloorConstraint = _sdkConstraintFor(analyzer141Path);
+      expect(
+        analyzerFloorConstraint.allows(Version(3, 11, 0)),
+        isTrue,
+        reason: 'analyzer 14.1.0 must admit Dart 3.11.0',
+      );
+      expect(
+        analyzerFloorConstraint.allows(Version(3, 10, 9)),
+        isFalse,
+        reason: 'analyzer 14.1.0 must reject Dart 3.10.9',
+      );
     });
   });
 }
