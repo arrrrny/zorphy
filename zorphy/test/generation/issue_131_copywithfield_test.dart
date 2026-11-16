@@ -3,7 +3,7 @@
 // Two layers:
 //
 //   1. Golden assertions against the regenerated fixture
-//      `example/lib/various/issue_131_copywithfield_example.zorphy.dart`
+//      `example/lib/_br_/various/issue_131_copywithfield_example.part.dart`
 //      (CI regenerates it with `dart run build_runner build` in
 //      zorphy/example before tests run).
 //
@@ -21,7 +21,7 @@ import 'package:test/test.dart';
 
 void main() {
   final fixture = File(
-    'example/lib/various/issue_131_copywithfield_example.zorphy.dart',
+    'example/lib/_br_/various/issue_131_copywithfield_example.part.dart',
   );
   final runner = File('example/tool/issue_131_behavior_check.dart');
   late String output;

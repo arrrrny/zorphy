@@ -28,7 +28,7 @@ import 'package:test/test.dart';
 /// `zorphy/example`) before tests run.
 void main() {
   final fixture = File(
-    'example/lib/various/issue_88_doc_comment_list_marker.zorphy.dart',
+    'example/lib/_br_/various/issue_88_doc_comment_list_marker.part.dart',
   );
 
   late String output;

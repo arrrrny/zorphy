@@ -16,7 +16,7 @@
 // Two layers, mirroring the issue_131 test shape:
 //
 //   1. Golden assertions against the regenerated fixture
-//      `example/lib/various/issue_148_list_map_cast_example.zorphy.dart`
+//      `example/lib/_br_/various/issue_148_list_map_cast_example.part.dart`
 //      (regenerate with `dart run build_runner build
 //      --delete-conflicting-outputs` in zorphy/example before tests
 //      run). Cast-expression expectations are compared against a
@@ -34,7 +34,7 @@ import 'package:test/test.dart';
 
 void main() {
   final fixture = File(
-    'example/lib/various/issue_148_list_map_cast_example.zorphy.dart',
+    'example/lib/_br_/various/issue_148_list_map_cast_example.part.dart',
   );
   final runner = File('example/tool/issue_148_behavior_check.dart');
   late String output;

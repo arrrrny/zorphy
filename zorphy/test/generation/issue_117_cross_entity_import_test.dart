@@ -38,7 +38,7 @@ import 'package:test/test.dart';
 /// `example/lib/various/issue117_ref/` and `example/lib/various/issue117_repro/`.
 void main() {
   final reproFixture = File(
-    'example/lib/various/issue117_repro/issue117_repro.zorphy.dart',
+    'example/lib/_br_/various/issue117_repro/issue117_repro.part.dart',
   );
 
   late String output;

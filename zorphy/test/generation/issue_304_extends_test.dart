@@ -34,7 +34,7 @@ import 'package:test/test.dart';
 /// which would require re-implementing all of Base's generated methods:
 /// copyWithBase, patchWithBase, ==, hashCode, toString, ...).
 void main() {
-  final fixture = File('example/lib/various/issue_304_extends.zorphy.dart');
+  final fixture = File('example/lib/_br_/various/issue_304_extends.part.dart');
   late String output;
 
   setUpAll(() {

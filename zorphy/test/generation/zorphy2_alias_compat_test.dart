@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 /// generate the same standard output as `@zorphy` classes, into the
 /// `.zorphy.dart` part file.
 void main() {
-  final fixture = File('example/lib/various/zorphy2_alias_example.zorphy.dart');
+  final fixture = File('example/lib/_br_/various/zorphy2_alias_example.part.dart');
   late String output;
 
   setUpAll(() {
