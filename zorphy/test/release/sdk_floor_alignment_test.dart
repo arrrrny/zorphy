@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -36,20 +38,49 @@ void main() {
       expect(constraint.allows(Version(3, 13, 0)), isTrue);
     });
 
-    test('direct dependencies support the 3.11.0 floor', () {
-      final yaml = loadYaml(File('pubspec.yaml').readAsStringSync()) as YamlMap;
-      final deps = yaml['dependencies'] as YamlMap;
+    test('resolved direct dependencies support the 3.11.0 floor', () {
+      final configFile = File('.dart_tool/package_config.json');
       expect(
-        deps.keys,
-        containsAll(<String>[
-          'analyzer',
-          'build',
-          'source_gen',
-          'dart_style',
-          'code_builder',
-          'meta',
-        ]),
+        configFile.existsSync(),
+        isTrue,
+        reason: 'Run dart pub get in zorphy/ first',
       );
+      final cfg =
+          jsonDecode(configFile.readAsStringSync()) as Map<String, dynamic>;
+      final packages = (cfg['packages'] as List)
+          .cast<Map<String, dynamic>>();
+
+      const coreDeps = <String>[
+        'analyzer',
+        'build',
+        'source_gen',
+        'dart_style',
+        'code_builder',
+        'meta',
+      ];
+
+      final byName = {for (final pkg in packages) pkg['name'] as String: pkg};
+      for (final name in coreDeps) {
+        final pkg = byName[name];
+        expect(pkg, isNotNull, reason: '$name must be a resolved dependency');
+        final rootUri = pkg!['rootUri'] as String;
+        final pubspecPath = rootUri.startsWith('file://')
+            ? Uri.parse(rootUri).toFilePath()
+            : p.normalize(p.join('.dart_tool', rootUri));
+        final depConstraint = _sdkConstraintFor('$pubspecPath/pubspec.yaml');
+        expect(
+          depConstraint.allows(Version(3, 11, 0)),
+          isTrue,
+          reason:
+              '$name SDK constraint (${pkg['rootUri']}) must admit Dart 3.11.0',
+        );
+        expect(
+          depConstraint.allows(Version(3, 10, 9)),
+          isFalse,
+          reason:
+              '$name SDK constraint (${pkg['rootUri']}) must exclude Dart 3.10.9',
+        );
+      }
     });
   });
 }

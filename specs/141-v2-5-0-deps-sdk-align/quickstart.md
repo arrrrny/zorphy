@@ -10,7 +10,9 @@ Run from the repository root (`/Users/arrrrny/Developer/zorphy`) unless noted. T
 ## 1. Lockfile is the tested baseline (zero drift)
 
 ```bash
-cd zorphy && dart pub get --no-example && cd ..
+(cd zorphy_annotation && dart pub get)
+(cd zorphy && dart pub get --no-example)
+(cd zorphy_migrator && dart pub get)
 git diff --exit-code -- zorphy/pubspec.lock zorphy_annotation/pubspec.lock zorphy_migrator/pubspec.lock
 ```
 **Expected**: no diff (exit 0).
@@ -18,22 +20,22 @@ git diff --exit-code -- zorphy/pubspec.lock zorphy_annotation/pubspec.lock zorph
 ## 2. Direct dependencies are current
 
 ```bash
-cd zorphy && dart pub outdated
+(cd zorphy && dart pub outdated)
 ```
 **Expected**: "direct dependencies: all up-to-date."
 
 ## 3. Core + migrator analyze clean
 
 ```bash
-cd zorphy && dart analyze lib
-cd ../zorphy_migrator && dart analyze lib
+(cd zorphy && dart analyze lib)
+(cd zorphy_migrator && dart analyze lib)
 ```
 **Expected**: "No issues found!" for both.
 
 ## 4. Full suite green (includes the new analyze-clean gate)
 
 ```bash
-cd zorphy && dart test
+(cd zorphy && dart test --concurrency=2)
 ```
 **Expected**: all tests pass. The analyze-clean gate generates `.zorphy.dart` for the standard fixtures, analyzes the output, and asserts zero diagnostics.
 
@@ -51,7 +53,7 @@ Covered by the golden/characterization tests in step 4 (they must pass with no g
 ## 7. Local CI gate
 
 ```bash
-./scripts/local_ci.sh
+RUNNER_TEMP="${TMPDIR:-/tmp}" ./scripts/local_ci.sh
 ```
 **Expected**: exit 0 (every executed step passes).
 

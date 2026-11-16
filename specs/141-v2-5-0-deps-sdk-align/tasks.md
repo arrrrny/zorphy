@@ -112,19 +112,12 @@ None. This is a metadata + test release with no shared infrastructure; user stor
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [x] T019 [P] `dart format` the new `test/release/` files; the repo-wide
-  `dart format` check fails on 36 pre-existing files under Dart 3.14 (formatter
-  drift, present on master) — left untouched to keep this release diff minimal
+- [x] T019 [P] `dart format` the new `test/release/` files and preserve `58f07bc` bare-checkout formatting on pre-existing files so `dart format --output=none --set-exit-if-changed .` passes on both local and CI runners
 - [x] T020 Run `dart analyze lib` in `zorphy` and `zorphy_migrator` → clean
-- [x] T021 Run `cd zorphy && dart test` at concurrency 2 → fully green (includes the new release/ tests)
-- [x] T022 Run `./scripts/local_ci.sh` — release-relevant steps green
-  (version_sync, pub get x3, build_runner, analyze annotation, run tests zorphy,
-  build_runner smoke, migrator). Pre-existing failures documented in the PR:
-  repo-wide `dart format` drift (Dart 3.14), the `dart analyze` path-dependency
-  warning in `zorphy/pubspec.yaml`, and the matrix/artifact steps local_ci
-  cannot reproduce locally
+- [x] T021 Run `cd zorphy && dart test --concurrency=2` → fully green (includes the new release/ tests)
+- [x] T022 Run `RUNNER_TEMP="${TMPDIR:-/tmp}" ./scripts/local_ci.sh` — every CI Gate step (`version_sync`, `format`, `prepare`, `analyze`, `test`, `build_runner_smoke`, `analyzer_compat (13)/(14)`, `migrator`) passes locally
 - [x] T023 Execute `specs/141-v2-5-0-deps-sdk-align/quickstart.md` validation end-to-end
-- [ ] T024 Commit the release on `141-v2-5-0-deps-sdk-align`, push, and open a PR to `master` (forklift pool reviews/merges)
+- [x] T024 Commit the release on `141-v2-5-0-deps-sdk-align`, push, and open a PR to `master` (forklift pool reviews/merges — PR #160)
 
 ---
 
