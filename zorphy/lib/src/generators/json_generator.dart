@@ -356,9 +356,9 @@ class JsonGenerator extends UniversalGenerator {
     }
 
     final className = metadata.cleanName;
-    final manualToJsonFields = _getManualToJsonFields(
-      metadata,
-    ).where((f) => !config.equalityExcludes.contains(f.name)).toList();
+    final manualToJsonFields = _getManualToJsonFields(metadata)
+        .where((f) => !config.equalityExcludes.contains(f.name))
+        .toList();
     final excludedJsonKeys = _excludedJsonKeys(metadata, config);
 
     // toJsonLean method
