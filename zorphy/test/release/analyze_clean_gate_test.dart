@@ -363,9 +363,8 @@ bool _isJsonPartSymbol(String diagnostic) {
       !diagnostic.contains('undefined_unqualified_name_read')) {
     return false;
   }
-  final match = RegExp(
-    r"Undefined (?:method|name|getter) '(_\$[A-Za-z0-9_]+)'",
-  ).firstMatch(diagnostic);
+  final match = RegExp(r"Undefined (?:method|name|getter) '(_\$[A-Za-z0-9_]+)'")
+      .firstMatch(diagnostic);
   final name = match?.group(1);
   if (name == null) return false;
   return name.endsWith('ToJson') || name.endsWith('FromJson');
