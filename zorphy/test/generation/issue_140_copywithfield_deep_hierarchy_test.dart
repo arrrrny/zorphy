@@ -74,9 +74,9 @@ Future<String> _generateFor(Directory fixtureDir, String className) async {
     ..writeAsStringSync(_hierarchySource);
   final collection = AnalysisContextCollection(includedPaths: [source.path]);
   final ctx = collection.contextFor(source.path);
-  final result = await ctx.currentSession.getResolvedUnit(
-    source.path,
-  ) as ResolvedUnitResult;
+  final result =
+      await ctx.currentSession.getResolvedUnit(source.path)
+          as ResolvedUnitResult;
   final element = result.libraryElement.getClass(className)!;
   final annotationReader = ConstantReader(
     _zorphyChecker.firstAnnotationOf(element)!,
@@ -124,8 +124,9 @@ Future<String> _generateFor(Directory fixtureDir, String className) async {
 /// `copyWithField` above an earlier method cannot shift the 120-char
 /// window and silently weaken the `@override` checks below.
 String _copyWithFieldDecl(String output) {
-  final match = RegExp(r'copyWithField<[A-Za-z_$][A-Za-z_$0-9]*>\(')
-      .firstMatch(output);
+  final match = RegExp(
+    r'copyWithField<[A-Za-z_$][A-Za-z_$0-9]*>\(',
+  ).firstMatch(output);
   expect(match, isNotNull, reason: 'no copyWithField signature emitted');
   final start = match!.start;
   final from = (start - 120).clamp(0, output.length);

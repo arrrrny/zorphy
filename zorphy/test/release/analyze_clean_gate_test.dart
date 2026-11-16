@@ -333,16 +333,19 @@ void main() {
         );
         final diagnostics = await _diagnostics([path]);
         final joined = diagnostics.join('\n');
-        for (final code in <String>[
-          'undefined_instance_member_read',
-          'undefined_static_member_read',
-        ]) {
-          expect(
-            joined,
-            contains(code),
-            reason: 'expected the #159 $code error, got:\n$joined',
-          );
-        }
+        // analyzer 14.6+ reports `undefined_instance_member_read` /
+        // `undefined_static_member_read`; analyzer 13.x reports
+        // `undefined_method`. Accept either so the characterization is
+        // version-independent.
+        expect(
+          joined,
+          anyOf(
+            contains('undefined_method'),
+            contains('undefined_instance_member_read'),
+            contains('undefined_static_member_read'),
+          ),
+          reason: 'expected the #159 toJson/fromJson error, got:\n$joined',
+        );
       },
     );
   });
@@ -350,10 +353,18 @@ void main() {
 
 /// Whether [diagnostic] is an unresolved reference to a json_serializable
 /// part symbol (`_$XToJson` / `_$XFromJson`), which no zorphy output defines.
+///
+/// Under analyzer 14.6+ these surface as `undefined_method`; under analyzer
+/// 13.x (still in the CI compat matrix and resolvable for Dart 3.11/3.12
+/// consumers) they surface as the pre-14.6 `undefined_getter`.
 bool _isJsonPartSymbol(String diagnostic) {
-  if (!diagnostic.contains('undefined_unqualified_name_read')) return false;
+  if (!diagnostic.contains('undefined_method') &&
+      !diagnostic.contains('undefined_getter') &&
+      !diagnostic.contains('undefined_unqualified_name_read')) {
+    return false;
+  }
   final match = RegExp(
-    r"Undefined name '(_\$[A-Za-z0-9_]+)'",
+    r"Undefined (?:method|name|getter) '(_\$[A-Za-z0-9_]+)'",
   ).firstMatch(diagnostic);
   final name = match?.group(1);
   if (name == null) return false;
