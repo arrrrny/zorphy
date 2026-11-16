@@ -358,13 +358,11 @@ void main() {
 /// 13.x (still in the CI compat matrix and resolvable for Dart 3.11/3.12
 /// consumers) they surface as the pre-14.6 `undefined_getter`.
 bool _isJsonPartSymbol(String diagnostic) {
-  if (!diagnostic.contains('undefined_method') &&
-      !diagnostic.contains('undefined_getter') &&
-      !diagnostic.contains('undefined_unqualified_name_read')) {
+  if (!diagnostic.contains('undefined_') &&
+      !diagnostic.contains("isn't defined")) {
     return false;
   }
-  final match = RegExp(r"Undefined (?:method|name|getter) '(_\$[A-Za-z0-9_]+)'")
-      .firstMatch(diagnostic);
+  final match = RegExp(r"'(_\$[A-Za-z0-9_]+)'").firstMatch(diagnostic);
   final name = match?.group(1);
   if (name == null) return false;
   return name.endsWith('ToJson') || name.endsWith('FromJson');
