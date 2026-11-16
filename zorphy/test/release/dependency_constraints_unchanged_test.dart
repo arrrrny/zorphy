@@ -45,6 +45,7 @@ void main() {
         );
 
         final expectedZorphyDeps = <String, String>{
+          'zorphy_annotation': '^2.5.0',
           'analyzer': '^14.0.0',
           'build': '>=4.0.4 <6.0.0',
           'source_gen': '^4.3.1',

@@ -3,3 +3,4 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.zorphy.dart"
     - "**/*.zorphy2.dart"
+    - "pubspec_overrides.yaml"

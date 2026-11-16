@@ -16,14 +16,19 @@ echo "🔧 Switching to path references for development..."
 echo "📍 Working directory: $REPO_ROOT"
 echo ""
 
-# Update zorphy/pubspec.yaml to use path reference for zorphy_annotation
+# Update zorphy/pubspec.yaml to use hosted version reference and local path override
 echo "📝 Updating zorphy/pubspec.yaml..."
 cd zorphy
 
-# Replace zorphy_annotation dependency from version to path
-perl -i -pe 'if (/^  zorphy_annotation: .+$/) { $_ = "  zorphy_annotation:\n    path: ../zorphy_annotation\n"; }' pubspec.yaml
+# Ensure pubspec.yaml uses hosted constraint for zorphy_annotation and pubspec_overrides.yaml has local path
+perl -i -pe 'if (/^  zorphy_annotation: .+$/) { $_ = "  zorphy_annotation: ^2.5.0\n"; }' pubspec.yaml
+cat << 'EOF' > pubspec_overrides.yaml
+dependency_overrides:
+  zorphy_annotation:
+    path: ../zorphy_annotation
+EOF
 
-echo "  ✓ Updated zorphy_annotation to use local path"
+echo "  ✓ Updated zorphy_annotation to use local path in pubspec_overrides.yaml"
 echo ""
 
 cd "$REPO_ROOT"
