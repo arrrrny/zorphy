@@ -1,3 +1,31 @@
+## [3.0.0] - 2026-11-17
+
+### Change
+
+- **BREAKING: generated output is now a shared part.** The builder declares
+  `adds_to_library: true` and emits one `<library>.part.dart` per library under
+  `lib/_br_/`, instead of a `<file>.zorphy.dart` beside every source file.
+  `build_runner` inserts the `part` directive itself, so a consumer writes no
+  directive for zorphy at all — a project with 71 annotated libraries goes from
+  71 generated files to 71 parts in one directory, and `import`/`part` churn in
+  diffs disappears. Consumers must run `build_runner build
+  --delete-conflicting-outputs` once and drop any hand-written
+  `part '*.zorphy.dart';` line. This is the breaking change of the major.
+- Removed the deprecated `zorphy2Builder` (`lib/builder2.dart`). `builder2`
+  had been a no-op alias since 2.0; `zorphy2Builder` now fails loudly instead
+  of resolving to nothing.
+- `zorphy_annotation` moves to 3.0.0 in lockstep (`check_version_sync.sh`); its
+  API is unchanged.
+- `zorphy_migrator` moves to 3.0.0 and gains `zorphy_migrator lean <path>`
+  (see its CHANGELOG).
+
+### Fix
+
+- `update<Type>At` no longer emits an always-redundant `as <Type>` cast: the
+  receiver is already `List<Type>`, so every consumer used to get an
+  `unnecessary_cast` warning. The example project masked this because it
+  excludes `lib/_br_/**` from analysis.
+
 ## [2.5.0] - 2026-11-16
 
 ### Change

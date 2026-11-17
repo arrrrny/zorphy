@@ -27,10 +27,48 @@ dart pub global activate zorphy_migrator
 zorphy_migrator migrate lib/ --dry-run                    # preview unified diff (default)
 zorphy_migrator migrate lib/ --apply --report MIGRATION.md
 zorphy_migrator migrate lib/ --apply --fail-on-manual     # CI: exit 1 if a human is needed
+
+zorphy_migrator lean . --dry-run                          # slim @Zorphy annotations
+zorphy_migrator lean . --apply --report LEAN.md
 ```
 
 Exit codes: `0` = clean migration, `1` = items need manual attention (or
 nothing to migrate was found), `2` = analysis error.
+
+## `lean` — pick a flavor from real usage
+
+`lean` is the other direction: the project already runs on zorphy, and the
+annotations ask for more than the code consumes. It rewrites each `@Zorphy`
+annotation to the smallest flavor that still covers everything the package
+actually uses, so the generated code shrinks without changing behaviour.
+
+```bash
+zorphy_migrator lean . --dry-run     # unified diff + per-class report
+zorphy_migrator lean . --apply       # rewrite in place, then re-run build_runner
+```
+
+How it decides, per annotated class:
+
+- **Dropped** when the class names no consumer: `FooPatch`, `FooFields`,
+  `copyWithFooFn` and the JSON factories are all named after their class, so
+  an absent name is proof the generated helper is dead, and the flag that
+  requests it is removed.
+- **Kept** when a consumer exists: a class referenced anywhere else in the
+  scanned tree is *live*, keeps the preset its author chose, and only loses
+  opt-in flags it can prove unused. `toJson` and `copyWithFn` are instance
+  calls with no class in the name, so they are never dropped from a live class.
+- **Untouched** arguments: anything that is not one of the four feature flags
+  (`autoId`, `kind`, `hidePublicConstructor`, …) is carried over verbatim.
+
+Scan scope and safety:
+
+- Generated files (`.g.dart`, `.zorphy.dart`, and the shared parts under
+  `lib/_br_/`) are excluded — scanning them would make every class look used.
+- Pointing at a package root also scans `test/` and `integration_test/`, since
+  a feature used only by a test still has to be generated.
+- One file that does not parse is reported and skipped, not fatal.
+- The scan is syntactic (no resolution), so `zik_zak`-sized trees finish in
+  seconds rather than minutes.
 
 ## Mapping
 

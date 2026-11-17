@@ -26,4 +26,5 @@ import 'src/shared_part_builder.dart';
 ///           dry_run: false
 ///           force: false
 /// ```
-Builder zorphyBuilder(BuilderOptions options) => zorphySharedPartBuilder(options);
+Builder zorphyBuilder(BuilderOptions options) =>
+    zorphySharedPartBuilder(options);

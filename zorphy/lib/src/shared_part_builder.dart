@@ -49,10 +49,7 @@ class _ZorphySharedPartBuilder extends Builder {
       buildStep.inputId,
       allowSyntaxErrors: true,
     );
-    final output = await _generator.generate(
-      LibraryReader(library),
-      buildStep,
-    );
+    final output = await _generator.generate(LibraryReader(library), buildStep);
     if (output.isEmpty) return;
 
     final sink = await buildStep.librarySourceSink;

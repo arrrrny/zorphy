@@ -1,3 +1,14 @@
+## [3.0.0] - 2026-11-17
+
+### Change
+
+- Version synced with `zorphy` 3.0.0. **No API change** — the 3.0.0 breaking
+  change is in the generator's output layout (shared parts under `lib/_br_/`),
+  not in these annotations.
+- `ZorphyPreset` semantics are unchanged; `lean` still means class,
+  constructor, `copyWith`, `==`/`hashCode`, `toString`, with every other
+  feature opt-in.
+
 ## [2.5.0] - 2026-11-16
 
 ### Change
