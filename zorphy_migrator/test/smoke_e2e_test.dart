@@ -9,7 +9,7 @@ import 'package:zorphy_migrator/src/cli.dart';
 /// (shared parts) with build_runner + dart analyze.
 void main() {
   test(
-    'smoke fixture migrates end-to-end and compiles against zorphy 2.0',
+    'smoke fixture migrates end-to-end and compiles against zorphy 3.0',
     () async {
       final root = Directory.systemTemp.createTempSync('zorphy_smoke');
       addTearDown(() => root.deleteSync(recursive: true));
@@ -36,9 +36,9 @@ environment:
   sdk: ">=3.8.0 <4.0.0"
 dependencies:
   freezed_annotation: ^3.1.0
-  zorphy_annotation: ^2.0.0
+  zorphy_annotation: ^3.0.0
 dev_dependencies:
-  zorphy: ^2.0.0
+  zorphy: ^3.0.0
   build_runner: ^2.17.1
   json_serializable: ^6.14.0
   json_annotation: ^4.12.0
@@ -83,13 +83,10 @@ dependency_overrides:
           .replaceAll("part 'input.freezed.dart';", "part 'models.g.dart';");
       File(p.join(libDir, 'models.dart')).writeAsStringSync(finalized);
 
-      // 4. Generate with zorphy 3.0 and analyze.
-      _run('dart', [
-        'run',
-        'build_runner',
-        'build',
-        '--delete-conflicting-outputs',
-      ], root.path);
+      // 4. Generate with zorphy 3.0 and analyze. `--delete-conflicting-outputs`
+      //    is deliberately absent: build_runner 2.17 removed it and only warns,
+      //    so it would not delete a stale `.zorphy.dart` if one were there.
+      _run('dart', ['run', 'build_runner', 'build'], root.path);
       expect(
         File(p.join(libDir, '_br_', 'models.part.dart')).existsSync(),
         isTrue,

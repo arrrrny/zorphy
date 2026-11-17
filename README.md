@@ -1369,8 +1369,14 @@ zorphy build --clean
   `adds_to_library: true`, so `build_runner` emits a single
   `<library>.part.dart` per annotated library and inserts the `part`
   directive itself. Delete any hand-written `part '*.zorphy.dart';` line and
-  rebuild with `--delete-conflicting-outputs`. (2.x wrote one
-  `<file>.zorphy.dart` beside every source file; that layout is gone.)
+  the 2.x `<file>.zorphy.dart` files, then rebuild. (2.x wrote one
+  `<file>.zorphy.dart` beside every source file; that layout is gone, and
+  build_runner 2.17 removed `--delete-conflicting-outputs` — passing it is
+  ignored with a warning, so the stale files are yours to delete.) Each
+  generated part carries `// ignore_for_file:` headers, so a consumer's own
+  `analysis_options.yaml` does not lint code it cannot edit; exclude
+  `lib/_br_/**` as well if you prefer to keep generated code out of analysis
+  altogether.
 
 ### Generated Enums
 
@@ -1404,11 +1410,13 @@ Zorphy is designed for easy migration from Morphy:
 
 If you get type not found errors, ensure:
 
-1. You've run `dart run build_runner build --delete-conflicting-outputs` (or
-   `zorphy build`) so the shared part under `lib/_br_/` is regenerated
-2. You removed any leftover `part 'filename.zorphy.dart';` line — 3.0 no
-   longer writes per-file generated libraries, and `build_runner` adds the
-   shared-part directive itself
+1. You've run `dart run build_runner build` (or `zorphy build`) so the shared
+   part under `lib/_br_/` is regenerated — no `--delete-conflicting-outputs`:
+   build_runner 2.17 removed that flag and only warns about it
+2. You removed any leftover `part 'filename.zorphy.dart';` line and any stale
+   `filename.zorphy.dart` from the 2.x layout — 3.0 no longer writes per-file
+   generated libraries, and `build_runner` adds the shared-part directive
+   itself
 3. The import includes `package:zorphy_annotation/zorphy_annotation.dart`
 
 ### Generic Type Issues

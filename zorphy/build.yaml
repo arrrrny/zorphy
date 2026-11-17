@@ -5,9 +5,14 @@ targets:
         enabled: true
 
 builders:
-  # Shared-part builder (since 3.0.0): one `.zorphy.part` per library via
-  # BuildStep.librarySourceSink instead of one `.zorphy.dart` per class.
-  # Falls back to a standalone part file when the sink is unavailable.
+  # Shared-part builder (since 3.0.0): one `<library>.part.dart` per library
+  # under `lib/_br_/`, emitted through BuildStep.librarySourceSink. There is no
+  # standalone-part fallback: the sink is non-null for a library input and
+  # throws UnsupportedError when `adds_to_library` is not declared.
+  # The `.zorphy.part` extension below is build_runner's logical output label
+  # for this builder, not a path on disk — the shared part is named by
+  # build_runner itself (`<library>.part.dart` under `lib/_br_/`), so nothing
+  # matching `*.zorphy.part` will ever exist in a built tree.
   # Handles both @Zorphy and @Zorphy2 annotations and resolves polymorphic
   # ordering internally (topological order over the implements $$Base graph).
   zorphy:

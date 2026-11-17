@@ -20,7 +20,9 @@
 - A file that fails to parse is reported and skipped instead of aborting the
   whole scan.
 - Version aligned with the `zorphy` 3.0.0 major; the migrator's own `migrate`
-  subcommand is unchanged.
+  subcommand is otherwise unchanged — its file collection now also covers
+  `test/`/`integration_test/` for a package-root target and skips generated
+  shared parts.
 
 ## [0.2.4] - 2026-09-18
 

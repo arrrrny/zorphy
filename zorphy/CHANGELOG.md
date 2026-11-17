@@ -8,9 +8,11 @@
   `build_runner` inserts the `part` directive itself, so a consumer writes no
   directive for zorphy at all — a project with 71 annotated libraries goes from
   71 generated files to 71 parts in one directory, and `import`/`part` churn in
-  diffs disappears. Consumers must run `build_runner build
-  --delete-conflicting-outputs` once and drop any hand-written
-  `part '*.zorphy.dart';` line. This is the breaking change of the major.
+  diffs disappears. Consumers must delete the 2.x `<file>.zorphy.dart` files
+  and drop any hand-written `part '*.zorphy.dart';` line, then run
+  `build_runner build`. (`--delete-conflicting-outputs` is no longer that
+  cleanup step: build_runner 2.17 removed the flag and only warns about it.)
+  This is the breaking change of the major.
 - Removed the deprecated `zorphy2Builder` (`lib/builder2.dart`). `builder2`
   had been a no-op alias since 2.0; `zorphy2Builder` now fails loudly instead
   of resolving to nothing.

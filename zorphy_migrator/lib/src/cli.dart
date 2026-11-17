@@ -21,6 +21,14 @@ class MigratorCli {
     r'\.(freezed|g|zorphy|zorphy2)\.dart$',
   );
 
+  /// A `part of` directive, wherever it sits in the file.
+  ///
+  /// `multiLine` is load-bearing: without it `^` anchors at the start of the
+  /// file only, so a part opening with a license header, a `// @dart=` line
+  /// or any other comment is not recognised — and a generated part names
+  /// every class in its library, which would make all of them look used.
+  static final _sharedPartPattern = RegExp(r'^\s*part\s+of\s', multiLine: true);
+
   Future<int> run(List<String> arguments) async {
     final parser = ArgParser()
       ..addFlag(
@@ -197,6 +205,23 @@ class MigratorCli {
       return exitAnalysisError;
     }
 
+    // Liveness is derived from the scanned tree and nowhere else, so a target
+    // that is not a package root is scanned with its consumers invisible:
+    // `test/` and `integration_test/` are only added for a target carrying
+    // its own pubspec.yaml, and a published package's real consumers live in
+    // other packages entirely. Say so — a silent `preset: lean` rewrite of a
+    // test-only-used class breaks the suite that proved it was used.
+    if (FileSystemEntity.typeSync(target) == FileSystemEntityType.directory &&
+        !File(p.join(target, 'pubspec.yaml')).existsSync()) {
+      stderr.writeln(
+        'WARNING: `$target` has no pubspec.yaml of its own, so it is scanned '
+        'in isolation — `test/`, `integration_test/` and any consumer outside '
+        'this tree are invisible, and a class only they use may be slimmed '
+        'past what they need. Point `lean` at a package root (or at an '
+        'application) for a complete picture.',
+      );
+    }
+
     final SymbolIndex symbols;
     final List<LeanProposal> proposals;
     final detector = LeanDetector();
@@ -341,10 +366,19 @@ class MigratorCli {
     // Shared parts (zorphy 3.0's `lib/_br_/<name>.part.dart`) are generated
     // code too, but no extension rule catches them — and scanning them makes
     // every class look used, because a generated part names all of them.
+    // A file that cannot even be read is left in the scan: dropping it would
+    // silently shrink the evidence `lean` decides on, and the read below
+    // then fails inside the caller's handled `Analysis error:` path instead
+    // of throwing from here, before anything has been printed.
     files.removeWhere((file) {
       if (file.split(Platform.pathSeparator).contains('_br_')) return true;
-      final head = File(file).readAsStringSync();
-      return RegExp(r'^\s*part\s+of\s').hasMatch(head);
+      final String head;
+      try {
+        head = File(file).readAsStringSync();
+      } on FileSystemException {
+        return false;
+      }
+      return _sharedPartPattern.hasMatch(head);
     });
     return files.toSet().toList()..sort();
   }
