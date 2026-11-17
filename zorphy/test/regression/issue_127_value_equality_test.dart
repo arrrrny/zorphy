@@ -39,7 +39,7 @@ import 'package:test/test.dart';
 
 void main() {
   final fixture = File(
-    'example/lib/various/issue127_value_equality_example.zorphy.dart',
+    'example/lib/_br_/various/issue127_value_equality_example.part.dart',
   );
   late String output;
 

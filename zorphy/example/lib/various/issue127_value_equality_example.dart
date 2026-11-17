@@ -31,8 +31,8 @@ library; // ignore: directives_ordering
 import 'package:uuid/uuid.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue127_value_equality_example.zorphy.dart';
 part 'issue127_value_equality_example.g.dart';
+part '../_br_/various/issue127_value_equality_example.part.dart';
 
 // 1. Back-compat default — autoId with no exclusion. The minted uuid
 //    is still in ==/hashCode/toJsonLean/compareTo (unchanged), and the

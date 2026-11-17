@@ -28,8 +28,8 @@
 // making `isA<BaseX>()` hold at runtime via inheritance.
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue_304_extends.zorphy.dart';
 part 'issue_304_extends.g.dart';
+part '../_br_/various/issue_304_extends.part.dart';
 
 // ── Scenario 1: $-prefixed source (NEW zfa CLI behavior) ──────────────
 

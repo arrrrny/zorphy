@@ -20,7 +20,9 @@ import 'package:test/test.dart';
 /// `required dynamic this.x` in the generated constructor — `dynamic` is
 /// implicitly nullable, so the `required` must be dropped.
 void main() {
-  final fixture = File('example/lib/various/cross_entity_example.zorphy.dart');
+  final fixture = File(
+    'example/lib/_br_/various/cross_entity_example.part.dart',
+  );
 
   late String output;
 

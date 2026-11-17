@@ -36,7 +36,7 @@ import 'package:test/test.dart';
 /// — producing proper Dart inheritance on the generated concrete class.
 void main() {
   final fixture = File(
-    'example/lib/various/issue_109_extends_value_object.zorphy.dart',
+    'example/lib/_br_/various/issue_109_extends_value_object.part.dart',
   );
   late String output;
 

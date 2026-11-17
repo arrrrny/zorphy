@@ -16,7 +16,7 @@
 // with NO stray  /  tokens, and the build succeeds.
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue_88_doc_comment_list_marker.zorphy.dart';
+part '../_br_/various/issue_88_doc_comment_list_marker.part.dart';
 
 @Zorphy(generateJson: true)
 abstract class $Bar {

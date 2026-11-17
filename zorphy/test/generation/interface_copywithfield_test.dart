@@ -11,7 +11,7 @@ import 'package:test/test.dart';
 
 void main() {
   final fixture = File(
-    'example/lib/various/interface_copywithfield_example.zorphy.dart',
+    'example/lib/_br_/various/interface_copywithfield_example.part.dart',
   );
 
   setUpAll(() {

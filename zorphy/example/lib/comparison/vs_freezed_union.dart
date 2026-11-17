@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'vs_freezed_union.zorphy.dart';
 part 'vs_freezed_union.g.dart';
+part '../_br_/comparison/vs_freezed_union.part.dart';
 
 /// Example 2 — a sealed union in zorphy.
 ///

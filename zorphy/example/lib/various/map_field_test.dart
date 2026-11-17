@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'map_field_test.zorphy.dart';
 part 'map_field_test.g.dart';
+part '../_br_/various/map_field_test.part.dart';
 
 /// Regression test for typed Map field deserialization.
 ///

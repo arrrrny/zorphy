@@ -3,8 +3,8 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../car/car.dart';
 import '../truck/truck.dart';
 
-part 'vehicle.zorphy.dart';
 part 'vehicle.g.dart';
+part '../../../../_br_/src/domain/entities/vehicle/vehicle.part.dart';
 
 /// A concrete base class with explicitSubTypes.
 /// Can be instantiated directly AND has polymorphic subtypes.

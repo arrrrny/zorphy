@@ -7,8 +7,8 @@
 // `CheckedFromJsonException` instead of falling back.
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue_2054_unknown_enum_value.zorphy.dart';
 part 'issue_2054_unknown_enum_value.g.dart';
+part '../_br_/various/issue_2054_unknown_enum_value.part.dart';
 
 enum ParserType2054 { element, list, detail, empty }
 

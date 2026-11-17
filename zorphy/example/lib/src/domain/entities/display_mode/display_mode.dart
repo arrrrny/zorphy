@@ -3,8 +3,8 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import 'immersive_mode.dart';
 import 'default_mode.dart';
 
-part 'display_mode.zorphy.dart';
 part 'display_mode.g.dart';
+part '../../../../_br_/src/domain/entities/display_mode/display_mode.part.dart';
 
 /// Polymorphic base for Android TWA display modes.
 ///

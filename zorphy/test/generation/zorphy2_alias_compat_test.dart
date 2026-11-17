@@ -5,16 +5,18 @@ import 'package:test/test.dart';
 /// Verifies the deprecated `@zorphy2`/`@Zorphy2` alias keeps working
 /// through the unified single-pass builder: alias-annotated classes must
 /// generate the same standard output as `@zorphy` classes, into the
-/// `.zorphy.dart` part file.
+/// library's shared part under `lib/_br_/`.
 void main() {
-  final fixture = File('example/lib/various/zorphy2_alias_example.zorphy.dart');
+  final fixture = File(
+    'example/lib/_br_/various/zorphy2_alias_example.part.dart',
+  );
   late String output;
 
   setUpAll(() {
     if (!fixture.existsSync()) {
       fail(
         'Fixture not generated. Run: cd example && '
-        'dart run build_runner build --delete-conflicting-outputs',
+        'dart run build_runner build',
       );
     }
     output = fixture.readAsStringSync();

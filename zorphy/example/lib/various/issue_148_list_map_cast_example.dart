@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue_148_list_map_cast_example.zorphy.dart';
 part 'issue_148_list_map_cast_example.g.dart';
+part '../_br_/various/issue_148_list_map_cast_example.part.dart';
 
 /// Fixture for issue #148: composite list fields must not be hard-cast at
 /// the generated cast sites.

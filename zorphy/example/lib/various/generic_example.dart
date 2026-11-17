@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'generic_example.zorphy.dart';
 part 'generic_example.g.dart';
+part '../_br_/various/generic_example.part.dart';
 
 /// Example demonstrating generic type parameter support.
 ///

@@ -1,7 +1,7 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'vs_freezed_simple.zorphy.dart';
 part 'vs_freezed_simple.g.dart';
+part '../_br_/comparison/vs_freezed_simple.part.dart';
 
 /// Example 1 — a simple data class in zorphy.
 ///

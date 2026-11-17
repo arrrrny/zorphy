@@ -21,8 +21,8 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 import '../issue117_ref/issue117_ref.dart';
 
-part 'issue117_repro.zorphy.dart';
 part 'issue117_repro.g.dart';
+part '../../_br_/various/issue117_repro/issue117_repro.part.dart';
 
 /// Issue117Repro entity — cross-entity reference (issue #117 fixture)
 @Zorphy(generateJson: true, generateCompareTo: true)

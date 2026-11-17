@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'filter_non_generic_example.zorphy.dart';
+part '../_br_/various/filter_non_generic_example.part.dart';
 
 @Zorphy(generateFilter: true)
 abstract class $SimpleFilterEntity {

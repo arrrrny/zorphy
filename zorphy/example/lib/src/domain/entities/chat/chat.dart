@@ -3,8 +3,8 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../chat_message/chat_message.dart';
 import '../user_message/user_message.dart';
 
-part 'chat.zorphy.dart';
 part 'chat.g.dart';
+part '../../../../_br_/src/domain/entities/chat/chat.part.dart';
 
 @Zorphy(generateJson: true)
 abstract class $Chat {

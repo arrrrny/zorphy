@@ -5,7 +5,7 @@
 // Two layers, following the issue_131 pattern:
 //
 //   1. Golden assertions against the regenerated fixture
-//      `example/lib/various/issue_2054_unknown_enum_value.zorphy.dart`
+//      `example/lib/_br_/various/issue_2054_unknown_enum_value.part.dart`
 //      (CI regenerates it in zorphy/example before tests run).
 //
 //   2. Behavioral checks executed in the example package context via
@@ -19,7 +19,7 @@ import 'package:test/test.dart';
 
 void main() {
   final fixture = File(
-    'example/lib/various/issue_2054_unknown_enum_value.zorphy.dart',
+    'example/lib/_br_/various/issue_2054_unknown_enum_value.part.dart',
   );
   late String output;
 

@@ -5,8 +5,8 @@
 // CLI-generated shape (FieldNormalizer prepends the $ prefix).
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'issue117_ref.zorphy.dart';
 part 'issue117_ref.g.dart';
+part '../../_br_/various/issue117_ref/issue117_ref.part.dart';
 
 @Zorphy(generateJson: true, generateCompareTo: true)
 abstract class $Issue117Ref {

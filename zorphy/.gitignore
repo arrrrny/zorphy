@@ -21,6 +21,8 @@
 #.vscode/
 
 *.zorphy.dart
+# zorphy 3.0.0 shared parts (build_runner `adds_to_library` output)
+_br_/
 *.morphy2.dart
 *.g.dart
 

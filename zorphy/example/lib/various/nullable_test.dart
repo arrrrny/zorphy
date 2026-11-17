@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
-part 'nullable_test.zorphy.dart';
 part 'nullable_test.g.dart';
+part '../_br_/various/nullable_test.part.dart';
 
 @Zorphy(generateJson: true)
 abstract class $ErrorLog {

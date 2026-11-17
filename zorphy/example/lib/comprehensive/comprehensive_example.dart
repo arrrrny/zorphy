@@ -6,8 +6,8 @@ library;
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'comprehensive_example.zorphy.dart';
 part 'comprehensive_example.g.dart';
+part '../_br_/comprehensive/comprehensive_example.part.dart';
 
 // =============================================================================
 // FEATURE 1: Basic Class Definition

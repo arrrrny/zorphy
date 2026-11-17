@@ -1,5 +1,5 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
-part 'compare_test.zorphy.dart';
+part '../_br_/various/compare_test.part.dart';
 
 @Zorphy(generateCompareTo: true)
 abstract class $Person {

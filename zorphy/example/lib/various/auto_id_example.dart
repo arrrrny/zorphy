@@ -1,8 +1,8 @@
 import 'package:uuid/uuid.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'auto_id_example.zorphy.dart';
 part 'auto_id_example.g.dart';
+part '../_br_/various/auto_id_example.part.dart';
 
 /// Entity with an auto-generated `id` field.
 ///

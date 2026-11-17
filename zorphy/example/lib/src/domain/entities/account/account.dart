@@ -5,8 +5,8 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 import '../../../../comprehensive/comprehensive_example.dart';
 
-part 'account.zorphy.dart';
 part 'account.g.dart';
+part '../../../../_br_/src/domain/entities/account/account.part.dart';
 
 /// Account entity
 @Zorphy(generateJson: true, generateCompareTo: true)

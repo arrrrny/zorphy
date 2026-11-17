@@ -3,7 +3,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../file_attachment/file_attachment.dart';
 import '../link_attachment/link_attachment.dart';
 
-part 'attachment.zorphy.dart';
+part '../../../../_br_/src/domain/entities/attachment/attachment.part.dart';
 
 @Zorphy(
   generateJson: true,

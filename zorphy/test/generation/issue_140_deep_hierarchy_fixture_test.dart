@@ -1,5 +1,5 @@
 // Golden test for issue #140 against the regenerated example fixture
-// `example/lib/various/issue_140_listing.zorphy.dart` (CI regenerates it
+// `example/lib/_br_/various/issue_140_listing.part.dart` (CI regenerates it
 // with `dart run build_runner build` in zorphy/example before tests run).
 //
 // The fixture is a three-level polymorphic hierarchy ($ListingOffer ->
@@ -16,7 +16,7 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 void main() {
-  final fixture = File('example/lib/various/issue_140_listing.zorphy.dart');
+  final fixture = File('example/lib/_br_/various/issue_140_listing.part.dart');
 
   setUpAll(() {
     if (!fixture.existsSync()) {

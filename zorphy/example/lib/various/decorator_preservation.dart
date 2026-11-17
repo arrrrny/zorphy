@@ -6,8 +6,8 @@
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'decorator_preservation.zorphy.dart';
 part 'decorator_preservation.g.dart';
+part '../_br_/various/decorator_preservation.part.dart';
 
 // ────────────────────────────────────────────────────────────────────
 // Custom decorators (user-authored, not part of zorphy)

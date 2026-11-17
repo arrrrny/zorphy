@@ -16,7 +16,7 @@ import 'package:test/test.dart';
 void main() {
   test('generated code uses \$enumDecode for enum fields, not .fromJson', () {
     final exampleFile = File(
-      '${Directory.current.path}/example/lib/comprehensive/comprehensive_example.zorphy.dart',
+      '${Directory.current.path}/example/lib/_br_/comprehensive/comprehensive_example.part.dart',
     );
     if (!exampleFile.existsSync()) {
       // Example outputs may not be generated in all environments; skip gracefully.

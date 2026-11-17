@@ -12,7 +12,7 @@ import 'package:test/test.dart';
 
 void main() {
   final generatedFile = File(
-    'example/lib/various/decorator_preservation.zorphy.dart',
+    'example/lib/_br_/various/decorator_preservation.part.dart',
   );
 
   late String output;

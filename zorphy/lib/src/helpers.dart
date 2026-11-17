@@ -331,7 +331,7 @@ String getPatchClass(
             );
             lines.add("      if (index >= 0 && index < updatedList.length) {");
             lines.add(
-              "        updatedList[index] = patch($elementPatchType()).applyTo(updatedList[index] as ${elementTypeWithoutDollars.replaceAll("?", "")});",
+              "        updatedList[index] = patch($elementPatchType()).applyTo(updatedList[index]);",
             );
             lines.add("      }");
             lines.add("      return updatedList;");

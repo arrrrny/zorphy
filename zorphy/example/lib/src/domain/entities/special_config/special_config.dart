@@ -3,7 +3,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../base_config/base_config.dart';
 import '../advanced_options/advanced_options.dart';
 
-part 'special_config.zorphy.dart';
+part '../../../../_br_/src/domain/entities/special_config/special_config.part.dart';
 
 /// A config that overrides options with a more specific type.
 @zorphy

@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'options.zorphy.dart';
+part '../../../../_br_/src/domain/entities/options/options.part.dart';
 
 @zorphy
 abstract class $Options {

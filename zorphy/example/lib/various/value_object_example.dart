@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'value_object_example.zorphy.dart';
+part '../_br_/various/value_object_example.part.dart';
 
 /// Value object example — an immutable composition type with no identity.
 ///

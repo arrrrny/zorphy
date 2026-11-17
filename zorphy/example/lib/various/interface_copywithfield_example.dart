@@ -1,6 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part 'interface_copywithfield_example.zorphy.dart';
+part '../_br_/various/interface_copywithfield_example.part.dart';
 
 /// Fixture for interface-scoped copyWithField: verifies that entities
 /// implementing an interface get a `copyWith{InterfaceName}Field` method

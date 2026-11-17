@@ -3,8 +3,8 @@ import 'package:zorphy/zorphy.dart';
 import 'converters/locale_converter.dart';
 import 'locale.dart';
 
-part 'test_debug.zorphy.dart';
 part 'test_debug.g.dart';
+part '../_br_/various/test_debug.part.dart';
 
 @Zorphy(generateJson: true, generateFilter: true)
 abstract class $TestDebug {

@@ -5,7 +5,7 @@ import '../attachment/attachment.dart';
 import '../enums/index.dart';
 import '../user_message/user_message.dart';
 
-part 'chat_message.zorphy.dart';
+part '../../../../_br_/src/domain/entities/chat_message/chat_message.part.dart';
 
 @Zorphy(
   generateJson: true,

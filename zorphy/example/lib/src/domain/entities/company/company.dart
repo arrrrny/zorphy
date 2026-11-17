@@ -5,8 +5,8 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 import '../user/user.dart';
 
-part 'company.zorphy.dart';
 part 'company.g.dart';
+part '../../../../_br_/src/domain/entities/company/company.part.dart';
 
 /// Company entity
 @Zorphy(generateJson: true, generateCompareTo: true)
