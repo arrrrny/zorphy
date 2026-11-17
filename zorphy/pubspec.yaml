@@ -17,13 +17,13 @@ dependencies:
   quiver: ^3.2.2
   path: ^1.9.1
   collection: ^1.19.1
-  # `built_collection` 5.1.2 -> 6.0.0 is held, and NOT by this constraint:
-  # code_builder 4.13.0 and build_daemon 4.1.7 already allow >=5.1.1 <7.0.0, so
-  # waiting on code_builder upstream would never release it. The sole blocker is
-  # built_value 8.13.0 (`built_collection: ^5.0.0`), reached here via
-  # code_builder/build_runner/build_daemon. Decision (issue #158): wait for
-  # built_value to widen rather than pin 6.x, which would make the graph
-  # unsatisfiable. Tracking: google/built_value.dart#1405.
+  # `built_collection` 6.0.0 is reached through a development-only git override
+  # on `built_value`, because 8.13.0 still pins `^5.0.0` and is the sole
+  # blocker: code_builder 4.13.0, build_runner 2.17.1 and build_daemon 4.1.7 all
+  # already allow >=5.1.1 <7.0.0, so waiting on code_builder would never release
+  # it. The widening is proposed in google/built_value.dart#1406; drop the
+  # `built_value` block from pubspec_overrides.yaml once a release carries it.
+  # Nothing here changes for consumers — pub ignores that file.
   code_builder: ^4.10.0
   dart_style: ^3.1.1
   args: ^2.6.0
