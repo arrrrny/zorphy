@@ -97,12 +97,12 @@ String _emitClass(Class spec) {
 }
 
 void main() {
-  group('Issue #105 — bare Function/Function? callback fields on value-object', () {
-    final generator = ClassDeclarationGenerator();
+  group(
+    'Issue #105 — bare Function/Function? callback fields on value-object',
+    () {
+      final generator = ClassDeclarationGenerator();
 
-    test(
-      'exact issue repro: ScriptHtmlTagAttributes with onLoad/onError as Function?',
-      () {
+      test('exact issue repro: ScriptHtmlTagAttributes with onLoad/onError as Function?', () {
         // Mirrors the CLI invocation from the issue:
         //   zfa entity create -n ScriptHtmlTagAttributes \
         //     --kind=value_object \
@@ -166,156 +166,156 @@ void main() {
           r'@JsonKey\([^)]*\)\s*\n\s*final String\? id;',
         );
         expect(idJsonKeyPattern.hasMatch(emitted), isFalse);
-      },
-    );
+      });
 
-    test('bare non-nullable `Function` is also detected', () {
-      // Some callers want a non-nullable callback slot:
-      //   --field "onReady:!Function"
-      // The CLI writes `Function get onReady;` and the analyzer resolves
-      // the type to `Function` (no `?`). This must also be detected —
-      // json_serializable cannot serialize a non-nullable `Function`
-      // field any more than a nullable one.
-      final meta = _concreteMeta(
-        name: 'Foo',
-        fields: [
-          NameTypeClassComment('id', 'String', 'Foo'),
-          NameTypeClassComment('onReady', 'Function', 'Foo'),
-        ],
-      );
-      final specs = generator.generateSpec(
-        GenerationContext(metadata: meta, config: _jsonConfig()),
-      );
-      final emitted = _emitClass(specs.first as Class);
+      test('bare non-nullable `Function` is also detected', () {
+        // Some callers want a non-nullable callback slot:
+        //   --field "onReady:!Function"
+        // The CLI writes `Function get onReady;` and the analyzer resolves
+        // the type to `Function` (no `?`). This must also be detected —
+        // json_serializable cannot serialize a non-nullable `Function`
+        // field any more than a nullable one.
+        final meta = _concreteMeta(
+          name: 'Foo',
+          fields: [
+            NameTypeClassComment('id', 'String', 'Foo'),
+            NameTypeClassComment('onReady', 'Function', 'Foo'),
+          ],
+        );
+        final specs = generator.generateSpec(
+          GenerationContext(metadata: meta, config: _jsonConfig()),
+        );
+        final emitted = _emitClass(specs.first as Class);
 
-      expect(
-        emitted,
-        contains('@JsonKey(includeFromJson: false, includeToJson: false)'),
-      );
-      expect(emitted, contains('final Function onReady;'));
-    });
-
-    test('bare `Function` nested in generics is detected', () {
-      // Edge case: `List<Function>` and `Map<String, Function?>` should
-      // also be treated as function-typed for the purposes of JSON
-      // serialization — json_serializable cannot synthesize a serializer
-      // for them either (the inner Function type is what breaks it).
-      final meta = _concreteMeta(
-        name: 'Foo',
-        fields: [
-          NameTypeClassComment('id', 'String', 'Foo'),
-          NameTypeClassComment('callbacks', 'List<Function>', 'Foo'),
-          NameTypeClassComment(
-            'namedCallbacks',
-            'Map<String, Function?>',
-            'Foo',
-          ),
-        ],
-      );
-      final specs = generator.generateSpec(
-        GenerationContext(metadata: meta, config: _jsonConfig()),
-      );
-      final emitted = _emitClass(specs.first as Class);
-
-      final skipKeyMatches = RegExp(
-        r'@JsonKey\(includeFromJson: false, includeToJson: false\)',
-      ).allMatches(emitted);
-      expect(skipKeyMatches, hasLength(2));
-    });
-
-    test('class names containing `Function` substring are NOT detected', () {
-      // Regression guard: the word-boundary regex must NOT match class
-      // names like `MyFunction`, `FunctionRef`, `FunctionLikeBuilder`,
-      // etc. These are plain reference types and json_serializable
-      // handles them normally (or fails for other reasons, but not with
-      // the skip-JsonKey path).
-      final meta = _concreteMeta(
-        name: 'Foo',
-        fields: [
-          NameTypeClassComment('id', 'String', 'Foo'),
-          NameTypeClassComment('handler', 'MyFunction', 'Foo'),
-          NameTypeClassComment('ref', 'FunctionRef', 'Foo'),
-          NameTypeClassComment('builder', 'FunctionLikeBuilder', 'Foo'),
-        ],
-      );
-      final specs = generator.generateSpec(
-        GenerationContext(metadata: meta, config: _jsonConfig()),
-      );
-      final emitted = _emitClass(specs.first as Class);
-
-      // No skip-serialization JsonKey should be emitted for any of
-      // these — they are plain (non-function) types.
-      expect(
-        emitted,
-        isNot(
+        expect(
+          emitted,
           contains('@JsonKey(includeFromJson: false, includeToJson: false)'),
-        ),
-      );
-    });
+        );
+        expect(emitted, contains('final Function onReady;'));
+      });
 
-    test('mixed callback + data fields: only callbacks get the JsonKey', () {
-      // Realistic value-object with both data fields and callback
-      // fields. The generator must annotate ONLY the callback fields.
-      final meta = _concreteMeta(
-        name: 'BrowserMenuItem',
-        fields: [
-          NameTypeClassComment('id', 'String', 'BrowserMenuItem'),
-          NameTypeClassComment('label', 'String', 'BrowserMenuItem'),
-          NameTypeClassComment('icon', 'String?', 'BrowserMenuItem'),
-          NameTypeClassComment('onTap', 'Function?', 'BrowserMenuItem'),
-          NameTypeClassComment(
-            'onLongPress',
-            'void Function()?',
-            'BrowserMenuItem',
+      test('bare `Function` nested in generics is detected', () {
+        // Edge case: `List<Function>` and `Map<String, Function?>` should
+        // also be treated as function-typed for the purposes of JSON
+        // serialization — json_serializable cannot synthesize a serializer
+        // for them either (the inner Function type is what breaks it).
+        final meta = _concreteMeta(
+          name: 'Foo',
+          fields: [
+            NameTypeClassComment('id', 'String', 'Foo'),
+            NameTypeClassComment('callbacks', 'List<Function>', 'Foo'),
+            NameTypeClassComment(
+              'namedCallbacks',
+              'Map<String, Function?>',
+              'Foo',
+            ),
+          ],
+        );
+        final specs = generator.generateSpec(
+          GenerationContext(metadata: meta, config: _jsonConfig()),
+        );
+        final emitted = _emitClass(specs.first as Class);
+
+        final skipKeyMatches = RegExp(
+          r'@JsonKey\(includeFromJson: false, includeToJson: false\)',
+        ).allMatches(emitted);
+        expect(skipKeyMatches, hasLength(2));
+      });
+
+      test('class names containing `Function` substring are NOT detected', () {
+        // Regression guard: the word-boundary regex must NOT match class
+        // names like `MyFunction`, `FunctionRef`, `FunctionLikeBuilder`,
+        // etc. These are plain reference types and json_serializable
+        // handles them normally (or fails for other reasons, but not with
+        // the skip-JsonKey path).
+        final meta = _concreteMeta(
+          name: 'Foo',
+          fields: [
+            NameTypeClassComment('id', 'String', 'Foo'),
+            NameTypeClassComment('handler', 'MyFunction', 'Foo'),
+            NameTypeClassComment('ref', 'FunctionRef', 'Foo'),
+            NameTypeClassComment('builder', 'FunctionLikeBuilder', 'Foo'),
+          ],
+        );
+        final specs = generator.generateSpec(
+          GenerationContext(metadata: meta, config: _jsonConfig()),
+        );
+        final emitted = _emitClass(specs.first as Class);
+
+        // No skip-serialization JsonKey should be emitted for any of
+        // these — they are plain (non-function) types.
+        expect(
+          emitted,
+          isNot(
+            contains('@JsonKey(includeFromJson: false, includeToJson: false)'),
           ),
-        ],
-      );
-      final specs = generator.generateSpec(
-        GenerationContext(metadata: meta, config: _jsonConfig()),
-      );
-      final emitted = _emitClass(specs.first as Class);
+        );
+      });
 
-      // Exactly two skip-JsonKey annotations — one per callback field
-      // (the bare `Function?` and the fully-typed `void Function()?`).
-      final skipKeyMatches = RegExp(
-        r'@JsonKey\(includeFromJson: false, includeToJson: false\)',
-      ).allMatches(emitted);
-      expect(skipKeyMatches, hasLength(2));
+      test('mixed callback + data fields: only callbacks get the JsonKey', () {
+        // Realistic value-object with both data fields and callback
+        // fields. The generator must annotate ONLY the callback fields.
+        final meta = _concreteMeta(
+          name: 'BrowserMenuItem',
+          fields: [
+            NameTypeClassComment('id', 'String', 'BrowserMenuItem'),
+            NameTypeClassComment('label', 'String', 'BrowserMenuItem'),
+            NameTypeClassComment('icon', 'String?', 'BrowserMenuItem'),
+            NameTypeClassComment('onTap', 'Function?', 'BrowserMenuItem'),
+            NameTypeClassComment(
+              'onLongPress',
+              'void Function()?',
+              'BrowserMenuItem',
+            ),
+          ],
+        );
+        final specs = generator.generateSpec(
+          GenerationContext(metadata: meta, config: _jsonConfig()),
+        );
+        final emitted = _emitClass(specs.first as Class);
 
-      // Data fields are emitted without the skip-JsonKey.
-      expect(emitted, contains('final String id;'));
-      expect(emitted, contains('final String label;'));
-      expect(emitted, contains('final String? icon;'));
-    });
+        // Exactly two skip-JsonKey annotations — one per callback field
+        // (the bare `Function?` and the fully-typed `void Function()?`).
+        final skipKeyMatches = RegExp(
+          r'@JsonKey\(includeFromJson: false, includeToJson: false\)',
+        ).allMatches(emitted);
+        expect(skipKeyMatches, hasLength(2));
 
-    test('user-provided @JsonKey on bare Function field is augmented', () {
-      // If the user provides their own @JsonKey (e.g. with a custom
-      // wire name) on a bare `Function?` field but doesn't set
-      // includeFromJson/includeToJson, we must still add those —
-      // otherwise json_serializable will still try to generate a
-      // serializer for the bare Function type and fail.
-      final meta = _concreteMeta(
-        name: 'Foo',
-        fields: [
-          NameTypeClassComment(
-            'onLoad',
-            'Function?',
-            'Foo',
-            jsonKeyInfo: const JsonKeyInfo(name: 'on_load'),
+        // Data fields are emitted without the skip-JsonKey.
+        expect(emitted, contains('final String id;'));
+        expect(emitted, contains('final String label;'));
+        expect(emitted, contains('final String? icon;'));
+      });
+
+      test('user-provided @JsonKey on bare Function field is augmented', () {
+        // If the user provides their own @JsonKey (e.g. with a custom
+        // wire name) on a bare `Function?` field but doesn't set
+        // includeFromJson/includeToJson, we must still add those —
+        // otherwise json_serializable will still try to generate a
+        // serializer for the bare Function type and fail.
+        final meta = _concreteMeta(
+          name: 'Foo',
+          fields: [
+            NameTypeClassComment(
+              'onLoad',
+              'Function?',
+              'Foo',
+              jsonKeyInfo: const JsonKeyInfo(name: 'on_load'),
+            ),
+          ],
+        );
+        final specs = generator.generateSpec(
+          GenerationContext(metadata: meta, config: _jsonConfig()),
+        );
+        final emitted = _emitClass(specs.first as Class);
+
+        expect(
+          emitted,
+          contains(
+            "@JsonKey(name: 'on_load', includeFromJson: false, includeToJson: false)",
           ),
-        ],
-      );
-      final specs = generator.generateSpec(
-        GenerationContext(metadata: meta, config: _jsonConfig()),
-      );
-      final emitted = _emitClass(specs.first as Class);
-
-      expect(
-        emitted,
-        contains(
-          "@JsonKey(name: 'on_load', includeFromJson: false, includeToJson: false)",
-        ),
-      );
-    });
-  });
+        );
+      });
+    },
+  );
 }

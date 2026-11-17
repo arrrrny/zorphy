@@ -98,64 +98,57 @@ void main() {
   group('Issue #89 — function-typed getters (callback fields)', () {
     final generator = ClassDeclarationGenerator();
 
-    test(
-      'function-typed getter emits @JsonKey(includeFromJson/includeToJson: false)',
-      () {
-        // The exact repro from the issue:
-        //   @Zorphy(kind: ZorphyKind.valueObject, generateJson: true)
-        //   abstract class $Foo {
-        //     String get id;
-        //     void Function(WebUri? url)? get onClick;
-        //   }
-        //
-        // Before the fix: emitted `final void Function(WebUri? url)? onClick;`
-        // with no @JsonKey, causing json_serializable to fail with
-        // "Could not generate `fromJson` code for `onClick`."
-        //
-        // After the fix: emitted with @JsonKey(includeFromJson: false,
-        // includeToJson: false) so json_serializable skips it.
-        //
-        // NOTE: isGetterOnly defaults to false here because the analyzer
-        // sets isGetterOnly=false for abstract getters declared in `$Foo`
-        // (verified end-to-end: `String get name;` in `$Person` becomes
-        // `final String name;` in concrete `Person` — see compare_test).
-        final meta = _concreteMeta(
-          name: 'Foo',
-          fields: [
-            NameTypeClassComment('id', 'String', 'Foo'),
-            NameTypeClassComment(
-              'onClick',
-              'void Function(WebUri? url)?',
-              'Foo',
-            ),
-          ],
-        );
-        final specs = generator.generateSpec(
-          GenerationContext(metadata: meta, config: _jsonConfig()),
-        );
-        expect(specs, hasLength(1));
-        final emitted = _emitClass(specs.first as Class);
+    test('function-typed getter emits @JsonKey(includeFromJson/includeToJson: false)', () {
+      // The exact repro from the issue:
+      //   @Zorphy(kind: ZorphyKind.valueObject, generateJson: true)
+      //   abstract class $Foo {
+      //     String get id;
+      //     void Function(WebUri? url)? get onClick;
+      //   }
+      //
+      // Before the fix: emitted `final void Function(WebUri? url)? onClick;`
+      // with no @JsonKey, causing json_serializable to fail with
+      // "Could not generate `fromJson` code for `onClick`."
+      //
+      // After the fix: emitted with @JsonKey(includeFromJson: false,
+      // includeToJson: false) so json_serializable skips it.
+      //
+      // NOTE: isGetterOnly defaults to false here because the analyzer
+      // sets isGetterOnly=false for abstract getters declared in `$Foo`
+      // (verified end-to-end: `String get name;` in `$Person` becomes
+      // `final String name;` in concrete `Person` — see compare_test).
+      final meta = _concreteMeta(
+        name: 'Foo',
+        fields: [
+          NameTypeClassComment('id', 'String', 'Foo'),
+          NameTypeClassComment('onClick', 'void Function(WebUri? url)?', 'Foo'),
+        ],
+      );
+      final specs = generator.generateSpec(
+        GenerationContext(metadata: meta, config: _jsonConfig()),
+      );
+      expect(specs, hasLength(1));
+      final emitted = _emitClass(specs.first as Class);
 
-        // The function-typed field MUST carry the skip-serialization
-        // JsonKey annotation.
-        expect(
-          emitted,
-          contains('@JsonKey(includeFromJson: false, includeToJson: false)'),
-        );
-        // The field declaration itself is preserved (so the $Foo
-        // interface contract is still satisfied).
-        expect(emitted, contains('final void Function(WebUri? url)? onClick;'));
-        // Non-function-typed fields are NOT annotated with the
-        // skip-serialization JsonKey (no behavior change for them).
-        expect(emitted, contains('final String id;'));
-        // The id field should NOT have a JsonKey annotation at all
-        // (since the user didn't provide one and it's not function-typed).
-        final idJsonKeyPattern = RegExp(
-          r'@JsonKey\([^)]*\)\s*\n\s*final String id;',
-        );
-        expect(idJsonKeyPattern.hasMatch(emitted), isFalse);
-      },
-    );
+      // The function-typed field MUST carry the skip-serialization
+      // JsonKey annotation.
+      expect(
+        emitted,
+        contains('@JsonKey(includeFromJson: false, includeToJson: false)'),
+      );
+      // The field declaration itself is preserved (so the $Foo
+      // interface contract is still satisfied).
+      expect(emitted, contains('final void Function(WebUri? url)? onClick;'));
+      // Non-function-typed fields are NOT annotated with the
+      // skip-serialization JsonKey (no behavior change for them).
+      expect(emitted, contains('final String id;'));
+      // The id field should NOT have a JsonKey annotation at all
+      // (since the user didn't provide one and it's not function-typed).
+      final idJsonKeyPattern = RegExp(
+        r'@JsonKey\([^)]*\)\s*\n\s*final String id;',
+      );
+      expect(idJsonKeyPattern.hasMatch(emitted), isFalse);
+    });
 
     test('multiple function-typed fields all get the annotation', () {
       // Mirrors the issue's "Impact" list: ChromeSafariBrowserActionButton
@@ -189,39 +182,36 @@ void main() {
       expect(matches, hasLength(2));
     });
 
-    test(
-      'user-provided @JsonKey without includeFromJson is augmented for function-typed fields',
-      () {
-        // If the user provides their own @JsonKey (e.g. with a custom
-        // name) but doesn't set includeFromJson/includeToJson, we still
-        // need to add those — otherwise json_serializable will still try
-        // to generate a serializer for the function type.
-        final meta = _concreteMeta(
-          name: 'Foo',
-          fields: [
-            NameTypeClassComment(
-              'onClick',
-              'void Function(WebUri? url)?',
-              'Foo',
-              jsonKeyInfo: const JsonKeyInfo(name: 'on_click'),
-            ),
-          ],
-        );
-        final specs = generator.generateSpec(
-          GenerationContext(metadata: meta, config: _jsonConfig()),
-        );
-        final emitted = _emitClass(specs.first as Class);
-
-        // The emitted JsonKey must include BOTH the user-provided name
-        // AND the auto-added includeFromJson/includeToJson: false.
-        expect(
-          emitted,
-          contains(
-            "@JsonKey(name: 'on_click', includeFromJson: false, includeToJson: false)",
+    test('user-provided @JsonKey without includeFromJson is augmented for function-typed fields', () {
+      // If the user provides their own @JsonKey (e.g. with a custom
+      // name) but doesn't set includeFromJson/includeToJson, we still
+      // need to add those — otherwise json_serializable will still try
+      // to generate a serializer for the function type.
+      final meta = _concreteMeta(
+        name: 'Foo',
+        fields: [
+          NameTypeClassComment(
+            'onClick',
+            'void Function(WebUri? url)?',
+            'Foo',
+            jsonKeyInfo: const JsonKeyInfo(name: 'on_click'),
           ),
-        );
-      },
-    );
+        ],
+      );
+      final specs = generator.generateSpec(
+        GenerationContext(metadata: meta, config: _jsonConfig()),
+      );
+      final emitted = _emitClass(specs.first as Class);
+
+      // The emitted JsonKey must include BOTH the user-provided name
+      // AND the auto-added includeFromJson/includeToJson: false.
+      expect(
+        emitted,
+        contains(
+          "@JsonKey(name: 'on_click', includeFromJson: false, includeToJson: false)",
+        ),
+      );
+    });
 
     test(
       'user-provided @JsonKey with includeFromJson: false is left alone',
