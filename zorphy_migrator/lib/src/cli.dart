@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 
 import 'exchangeable_detector.dart';
 import 'freezed_detector.dart';
+import 'lean_detector.dart';
 import 'mapping.dart';
 import 'model.dart';
 import 'report.dart';
@@ -43,14 +44,32 @@ class MigratorCli {
       return exitAnalysisError;
     }
 
-    if (args['help'] as bool ||
-        args.rest.length < 2 ||
-        args.rest.first != 'migrate') {
+    if (args['help'] as bool) {
       stdout.writeln(
-        'Usage: zorphy_migrator migrate <path> [--dry-run] [--apply] '
-        '[--report <file>] [--fail-on-manual]',
+        'Usage:\n'
+        '  zorphy_migrator migrate <path> [--dry-run] [--apply] '
+        '[--report <file>] [--fail-on-manual]\n'
+        '  zorphy_migrator lean <path> [--dry-run] [--apply] '
+        '[--report <file>]',
       );
-      return args['help'] as bool ? exitClean : exitAnalysisError;
+      return exitClean;
+    }
+
+    if (args.rest.length < 2 ||
+        (args.rest.first != 'migrate' && args.rest.first != 'lean')) {
+      stderr.writeln(
+        'Usage: zorphy_migrator <migrate|lean> <path> [--dry-run] [--apply] '
+        '[--report <file>]',
+      );
+      return exitAnalysisError;
+    }
+
+    if (args.rest.first == 'lean') {
+      return _runLean(
+        args.rest[1],
+        apply: args['apply'] as bool,
+        reportPath: args['report'] as String?,
+      );
     }
 
     final target = args.rest[1];
@@ -163,6 +182,129 @@ class MigratorCli {
     return exitClean;
   }
 
+  /// Scans [target] and proposes a leaner `@Zorphy` annotation for every
+  /// class whose generated helpers go unused.
+  ///
+  /// Dry-run by default: prints a unified diff. `--apply` rewrites in place.
+  Future<int> _runLean(
+    String target, {
+    required bool apply,
+    required String? reportPath,
+  }) async {
+    final files = _collectDartFiles(target);
+    if (files.isEmpty) {
+      stderr.writeln('No Dart files found under $target');
+      return exitAnalysisError;
+    }
+
+    final SymbolIndex symbols;
+    final List<LeanProposal> proposals;
+    final detector = LeanDetector();
+    try {
+      symbols = await LeanDetector.collectSymbols(files);
+      proposals = await detector.detect(files, symbols: symbols);
+    } catch (e) {
+      stderr.writeln('Analysis error: $e');
+      return exitAnalysisError;
+    }
+
+    if (detector.skippedFiles.isNotEmpty) {
+      stderr.writeln(
+        'WARNING: ${detector.skippedFiles.length} file(s) could not be parsed '
+        'and were left untouched:\n'
+        '${detector.skippedFiles.map((f) => '  $f').join('\n')}',
+      );
+    }
+
+    if (proposals.isEmpty) {
+      stderr.writeln(
+        'WARNING: no @Zorphy or @Zorphy2 classes found under $target — '
+        'nothing to slim. Is this the right directory?',
+      );
+      return exitClean;
+    }
+
+    final rewriter = Rewriter();
+    final byFile = <String, List<LeanProposal>>{};
+    for (final proposal in proposals) {
+      byFile
+          .putIfAbsent(p.normalize(proposal.filePath), () => [])
+          .add(proposal);
+    }
+
+    final diffs = StringBuffer();
+    var changed = 0;
+    for (final entry in byFile.entries) {
+      final replacements = leanReplacements(entry.value);
+      if (replacements.isEmpty) continue;
+      changed += replacements.length;
+
+      final source = await File(entry.key).readAsString();
+      final revised = rewriter.applySpans(source, replacements);
+      if (apply) {
+        await File(entry.key).writeAsString(revised);
+      } else {
+        diffs.write(
+          rewriter.unifiedDiff(source, revised, p.relative(entry.key)),
+        );
+      }
+    }
+
+    if (!apply && diffs.isNotEmpty) stdout.write(diffs);
+
+    final shrinkable = proposals.where((p) => !p.alreadyLean).toList();
+    final buffer = StringBuffer()
+      ..writeln('# Zorphy lean-flavor report')
+      ..writeln()
+      ..writeln('Target: `$target`')
+      ..writeln('Annotated classes scanned: ${proposals.length}')
+      ..writeln('Classes that can slim down: ${shrinkable.length}');
+    if (detector.skippedFiles.isNotEmpty) {
+      buffer
+        ..writeln()
+        ..writeln(
+          'Files left untouched (parse errors): ${detector.skippedFiles.length}',
+        );
+      for (final file in detector.skippedFiles) {
+        buffer.writeln('- `$file`');
+      }
+    }
+    buffer
+      ..writeln()
+      ..writeln('| Class | File | Unused features dropped |')
+      ..writeln('|---|---|---|');
+    for (final proposal in shrinkable) {
+      final names =
+          proposal.declared
+              .difference(proposal.used)
+              .map((f) => f.annotationField)
+              .toList()
+            ..sort();
+      buffer.writeln(
+        '| `${proposal.className}` | `${p.relative(proposal.filePath, from: target)}` | '
+        '${names.isEmpty ? '—' : names.join(', ')} |',
+      );
+    }
+    final report = buffer.toString();
+
+    if (reportPath != null) {
+      await File(reportPath).writeAsString(report);
+      stdout.writeln('Report written to $reportPath');
+    } else {
+      stdout.writeln();
+      stdout.write(report);
+    }
+
+    stdout.writeln(
+      apply
+          ? 'Applied $changed annotation rewrite(s). Re-run build_runner to '
+                'regenerate.'
+          : 'Dry run — $changed annotation(s) would change. Re-run with '
+                '--apply to write.',
+    );
+    return exitClean;
+  }
+
   List<String> _collectDartFiles(String target) {
     final entity = FileSystemEntity.typeSync(target);
     final files = <String>[];
@@ -177,13 +319,33 @@ class MigratorCli {
       final f = File(target);
       if (f.path.endsWith('.dart') && !skip(f)) files.add(f.absolute.path);
     } else if (entity == FileSystemEntityType.directory) {
-      for (final e in Directory(target).listSync(recursive: true)) {
-        if (e is File && e.path.endsWith('.dart') && !skip(e)) {
-          files.add(e.absolute.path);
+      // A package root's tests and integration tests consume generated
+      // helpers too: a feature used only there still has to be generated, or
+      // the suite stops compiling. Anything else is scanned as given. The set
+      // keeps the root walk and the extra dirs from double-counting a file.
+      final roots = <String>{target};
+      if (File(p.join(target, 'pubspec.yaml')).existsSync()) {
+        for (final extra in ['test', 'integration_test']) {
+          final dir = p.join(target, extra);
+          if (Directory(dir).existsSync()) roots.add(dir);
+        }
+      }
+      for (final root in roots) {
+        for (final e in Directory(root).listSync(recursive: true)) {
+          if (e is File && e.path.endsWith('.dart') && !skip(e)) {
+            files.add(e.absolute.path);
+          }
         }
       }
     }
-    files.sort();
-    return files;
+    // Shared parts (zorphy 3.0's `lib/_br_/<name>.part.dart`) are generated
+    // code too, but no extension rule catches them — and scanning them makes
+    // every class look used, because a generated part names all of them.
+    files.removeWhere((file) {
+      if (file.split(Platform.pathSeparator).contains('_br_')) return true;
+      final head = File(file).readAsStringSync();
+      return RegExp(r'^\s*part\s+of\s').hasMatch(head);
+    });
+    return files.toSet().toList()..sort();
   }
 }

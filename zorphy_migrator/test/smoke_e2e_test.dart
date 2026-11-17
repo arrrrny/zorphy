@@ -5,8 +5,8 @@ import 'package:test/test.dart';
 import 'package:zorphy_migrator/src/cli.dart';
 
 /// End-to-end smoke test: a realistic 11-class freezed project (including
-/// a union) is migrated, then the output is compiled against zorphy 2.0
-/// with build_runner + dart analyze.
+/// a union) is migrated, then the output is generated against zorphy 3.0
+/// (shared parts) with build_runner + dart analyze.
 void main() {
   test(
     'smoke fixture migrates end-to-end and compiles against zorphy 2.0',
@@ -39,7 +39,7 @@ dependencies:
   zorphy_annotation: ^2.0.0
 dev_dependencies:
   zorphy: ^2.0.0
-  build_runner: ^2.15.2
+  build_runner: ^2.17.1
   json_serializable: ^6.14.0
   json_annotation: ^4.12.0
 dependency_overrides:
@@ -72,20 +72,18 @@ dependency_overrides:
       expect(report, contains('Converted classes (11)'));
       expect(report, contains('Needs manual attention (0)'));
 
-      // 3. Post-migration steps a user would do: swap the import, fix the
-      //    part directives, drop the freezed dep.
+      // 3. Post-migration steps a user would do: swap the import and point the
+      //    json_serializable part at its output. The zorphy part directive is
+      //    not hand-written: the shared-part builder inserts it.
       final finalized = migrated
           .replaceAll(
             "import 'package:freezed_annotation/freezed_annotation.dart';",
             "import 'package:zorphy_annotation/zorphy_annotation.dart';",
           )
-          .replaceAll(
-            "part 'input.freezed.dart';",
-            "part 'models.zorphy.dart';\npart 'models.g.dart';",
-          );
+          .replaceAll("part 'input.freezed.dart';", "part 'models.g.dart';");
       File(p.join(libDir, 'models.dart')).writeAsStringSync(finalized);
 
-      // 4. Generate with zorphy 2.0 and analyze.
+      // 4. Generate with zorphy 3.0 and analyze.
       _run('dart', [
         'run',
         'build_runner',
@@ -93,9 +91,19 @@ dependency_overrides:
         '--delete-conflicting-outputs',
       ], root.path);
       expect(
-        File(p.join(libDir, 'models.zorphy.dart')).existsSync(),
+        File(p.join(libDir, '_br_', 'models.part.dart')).existsSync(),
         isTrue,
-        reason: 'zorphy 2.0 should generate models.zorphy.dart',
+        reason: 'zorphy 3.0 should generate lib/_br_/models.part.dart',
+      );
+      expect(
+        File(p.join(libDir, 'models.zorphy.dart')).existsSync(),
+        isFalse,
+        reason: 'zorphy 3.0 must not emit a per-file .zorphy.dart',
+      );
+      expect(
+        File(p.join(libDir, 'models.dart')).readAsStringSync(),
+        contains("_br_/models.part.dart'"),
+        reason: 'build_runner should insert the shared-part directive',
       );
       _run('dart', ['analyze'], root.path);
     },
