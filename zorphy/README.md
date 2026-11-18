@@ -988,9 +988,11 @@ final cat = dog.changeToCat(whiskerLength: 3.5);
 
 A `changeTo` body converts by round-tripping through JSON, so it needs a JSON
 surface to call: `generateJson: true` on every declared subtype, and on the base
-too whenever the base is not sealed — a base that is not sealed needs
-`nonSealed: true` as well, or it has no `toJson()` for the switch's default case
-to call. A hierarchy that does not generate JSON gets no `changeTo` methods
+too whenever the base is not sealed — the base declares a `toJson()` when it is
+marked `nonSealed: true`, or when it is a concrete class listed in a parent's
+`explicitSubTypes` (its `toJson()` comes from the discriminator path). A base
+that is neither has no `toJson()` for the switch's default case to call. A
+hierarchy that does not generate JSON gets no `changeTo` methods
 rather than methods that reference `toJson`/`fromJson` nobody emitted.
 
 ### 7. CompareTo Feature

@@ -386,9 +386,11 @@ final rectangle = circle.changeToRectangle(width: 10.0, height: 15.0);
 
 `changeTo` converts by round-tripping through JSON, so it is generated only when
 the classes it dispatches over generate JSON: `generateJson: true` on every
-declared subtype, and on the base too whenever the base is not sealed — a base
-that is not sealed needs `nonSealed: true` as well, or it has no `toJson()` for
-the switch's default case to call.
+declared subtype, and on the base too whenever the base is not sealed — the
+base declares a `toJson()` when it is marked `nonSealed: true`, or when it is a
+concrete class listed in a parent's `explicitSubTypes` (its `toJson()` comes
+from the discriminator path). A base that is neither has no `toJson()` for the
+switch's default case to call.
 
 ```dart
 @Zorphy(generateCompareTo: true, generateJson: true)

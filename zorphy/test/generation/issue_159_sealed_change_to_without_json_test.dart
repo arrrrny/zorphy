@@ -148,6 +148,43 @@ abstract class \$Circle implements \$\$Shape {
 }
 ''';
 
+/// The nested-hierarchy shape from the PR #171 review's major finding: a
+/// CONCRETE intermediate base. `$Car` is listed in the root's
+/// `explicitSubTypes` (so it is non-abstract) and declares its own
+/// `explicitSubTypes` (so it is an intermediate base of a nested hierarchy).
+/// `JsonGenerator` emits its `toJson()` through the discriminator path
+/// (`!isAbstract && isInParentExplicitSubtypes`), and that is the `toJson()`
+/// the `_ => this.toJson()` default in its `changeTo` extension calls —
+/// whatever `nonSealed` says. The stricter `nonSealed`-only gate rejected
+/// `changeTo` here, breaking every existing call site; the gate must follow
+/// the emitted surface.
+const _nestedConcreteBaseSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'nested_concrete_base.zorphy.dart';
+
+@Zorphy(explicitSubTypes: [\$Car])
+abstract class \$\$Vehicle {
+  String get name;
+}
+
+@Zorphy(generateJson: true, explicitSubTypes: [\$Sedan, \$Truck])
+class \$Car implements \$\$Vehicle {
+  final String name;
+  Car({required this.name});
+}
+
+@Zorphy(generateJson: true)
+abstract class \$Sedan implements \$Car {
+  int get doors;
+}
+
+@Zorphy(generateJson: true)
+abstract class \$Truck implements \$Car {
+  double get payloadTons;
+}
+''';
+
 /// Resolves every `@Zorphy` class in the library at [libraryPath] and returns
 /// the generated part bodies keyed by class name.
 Future<Map<String, String>> _generateLibrary(String libraryPath) async {
@@ -502,6 +539,65 @@ void main() {
 
     test(
       'generated cross-library hierarchy analyzes with zero diagnostics',
+      () {
+        expect(
+          diagnostics.where(_isMissingJsonMember),
+          isEmpty,
+          reason: 'diagnostics:\n${diagnostics.join('\n')}',
+        );
+      },
+    );
+  });
+
+  group('issue #159 — nested hierarchy keeps changeTo on a concrete '
+      'intermediate base', () {
+    late Directory fixtureDir;
+    late String libraryPath;
+    late Map<String, String> outputs;
+    late List<String> diagnostics;
+
+    setUpAll(() async {
+      final root = Directory('test/.issue_159_nested_tmp').absolute.path;
+      fixtureDir = Directory(root)..createSync(recursive: true);
+      fixtureDir = fixtureDir.createTempSync('fixture_');
+
+      libraryPath = '${fixtureDir.path}/nested_concrete_base.dart';
+      File(libraryPath).writeAsStringSync(_nestedConcreteBaseSource);
+
+      outputs = await _generateLibrary(libraryPath);
+      _writePart(
+        fixtureDir,
+        'nested_concrete_base.dart',
+        'nested_concrete_base.zorphy.dart',
+        outputs.values.join('\n\n'),
+      );
+
+      diagnostics = await _diagnostics(fixtureDir, libraryPath);
+    });
+
+    tearDownAll(() {
+      if (fixtureDir.existsSync()) fixtureDir.deleteSync(recursive: true);
+      final tmp = Directory('test/.issue_159_nested_tmp');
+      if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
+    });
+
+    test('concrete intermediate base keeps its changeTo extensions', () {
+      final car = outputs['\$Car'] ?? '';
+      expect(
+        car,
+        contains('changeToSedan'),
+        reason:
+            '`\$Car` is concrete and listed in \$\$Vehicle\'s '
+            'explicitSubTypes, so JsonGenerator emits its toJson() through the '
+            'discriminator path regardless of nonSealed — the changeTo '
+            'extension its switch default calls must survive',
+      );
+      expect(car, contains('changeToTruck'));
+      expect(car, contains('_ => this.toJson()'));
+    });
+
+    test(
+      'generated nested-hierarchy library analyzes with zero diagnostics',
       () {
         expect(
           diagnostics.where(_isMissingJsonMember),

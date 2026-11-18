@@ -112,18 +112,25 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
   /// A `sealed` base needs no default: its switch is exhaustive over the
   /// declared subtypes. Any other base is not — a plain `$` base, an undeclared
   /// closure, or a subtype declared in another library (#142, where sealing is
-  /// deliberately withheld) — and its default calls `toJson()` on the base,
-  /// which `JsonGenerator` emits only for a `nonSealed` base. A base that
-  /// declares `explicitSubTypes` never gets one from `JsonExtensionGenerator`,
-  /// whose `shouldGenerate` skips any class that declares subtypes. So the
-  /// base case exists exactly when JSON is on AND the base is `nonSealed`.
+  /// deliberately withheld) — and its default calls `toJson()` on the base.
+  /// The base declares one exactly when `JsonGenerator` emits it: either the
+  /// base is `nonSealed` (the polymorphic `toJson()` branch), or it is a
+  /// concrete intermediate base — non-abstract, listed in a parent's
+  /// `explicitSubTypes` — whose `toJson()` comes from the discriminator path
+  /// (`_addToJsonWithDiscriminator`). A base that declares its OWN
+  /// `explicitSubTypes` never gets one from `JsonExtensionGenerator`, whose
+  /// `shouldGenerate` skips any class that declares subtypes. So the base case
+  /// exists when JSON is on AND (`nonSealed` OR a concrete member of a
+  /// parent's declared hierarchy).
   ///
   /// The gate and the emitter both read this, so a base without a `toJson()`
   /// can neither pass the gate nor get a default case that calls it.
   static bool _hasBaseCase(GenerationContext context) =>
       !context.metadata.isSealed &&
       context.config.generateJson &&
-      context.metadata.nonSealed;
+      (context.metadata.nonSealed ||
+          (context.metadata.isInParentExplicitSubtypes &&
+              !context.metadata.isAbstract));
 
   @override
   List<Spec> generateSpec(GenerationContext context) {
