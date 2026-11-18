@@ -222,9 +222,8 @@ class LeanDetector {
 
       final declared = <LeanFeature>{
         for (final feature in LeanFeature.values)
-          if (RegExp(
-            '${feature.annotationField}\\s*:\\s*true',
-          ).hasMatch(source.substring(annotation.offset, annotation.end)))
+          if (RegExp('${feature.annotationField}\\s*:\\s*true')
+              .hasMatch(source.substring(annotation.offset, annotation.end)))
             feature,
       };
 

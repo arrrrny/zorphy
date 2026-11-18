@@ -10,12 +10,13 @@ import 'package:zorphy_migrator/src/lean_detector.dart';
 void main() {
   final fixtureDir = p.join('test', 'fixtures', 'lean');
 
-  List<String> fixtureFiles() => Directory(fixtureDir)
-      .listSync()
-      .whereType<File>()
-      .where((f) => f.path.endsWith('.dart'))
-      .map((f) => f.absolute.path)
-      .toList();
+  List<String> fixtureFiles() =>
+      Directory(fixtureDir)
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart'))
+          .map((f) => f.absolute.path)
+          .toList();
 
   late SymbolIndex symbols;
   late List<LeanProposal> proposals;
