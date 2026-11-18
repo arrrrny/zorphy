@@ -1,3 +1,19 @@
+## [2.5.0] - 2026-11-18
+
+### Change
+
+- First published release. The package existed in the repo but had never been
+  on pub.dev: `dart pub publish` refused it twice over -- a package with
+  `dependency_overrides` in its `pubspec.yaml` is rejected outright, and so is
+  one with no LICENSE file. The local `zorphy_annotation` path override now
+  lives in `pubspec_overrides.yaml` (a development-only file pub ignores), and
+  the MIT LICENSE ships with the archive.
+- `tool/probe.dart` is gone -- a scratch script that hard-coded
+  `/tmp/mig_scratch` and was being published inside the archive.
+- Version aligned with the zorphy 2.5.0 release, and the `zorphy_annotation`
+  constraint moves to `^2.5.0`.
+- The `migrate` subcommand itself is unchanged from 2.0.0.
+
 ## [0.2.4] - 2026-09-18
 
 ### Change
