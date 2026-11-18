@@ -1,5 +1,6 @@
 import 'package:code_builder/code_builder.dart';
 
+import '../analysis/class_analyzer.dart';
 import '../ast/ast.dart';
 import '../helpers.dart' as helpers;
 import 'base_generator.dart';
@@ -69,14 +70,67 @@ class CompareToExtensionGenerator extends ConcreteClassGenerator {
 /// Generates changeTo extension methods for explicit subtypes.
 ///
 /// Produces a native [Extension] spec.
+///
+/// A `changeTo<Subtype>` body is a JSON round-trip: it collects the runtime
+/// subtype's `toJson()`, overlays the patch's `toJson()`, and rebuilds the
+/// target with `fromJson`. Those members exist only on a class generated with
+/// `generateJson: true`, so the extension is withheld unless the JSON surface
+/// it calls is really there (issue #159) — otherwise a hierarchy that never
+/// asked for JSON gets a part file that does not compile.
 class ChangeToExtensionGenerator extends UniversalGenerator {
   ChangeToExtensionGenerator();
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    return context.config.generateChangeTo &&
-        context.metadata.explicitSubtypes.isNotEmpty;
+    if (!context.config.generateChangeTo) return false;
+    final metadata = context.metadata;
+    if (metadata.explicitSubtypes.isEmpty) return false;
+    return _jsonSurfaceExists(context);
   }
+
+  /// Whether every type the generated bodies call has a JSON surface.
+  ///
+  /// The switch dispatches on the *runtime* subtype, so each declared subtype
+  /// needs its own `toJson()` and `fromJson`. A base that is not sealed also
+  /// needs its own `toJson()`, because its `switch` carries a
+  /// `_ => this.toJson()` default — see [_hasBaseCase].
+  bool _jsonSurfaceExists(GenerationContext context) {
+    final metadata = context.metadata;
+    if (!metadata.isSealed && !_hasBaseCase(context)) return false;
+    for (final subtype in metadata.explicitSubtypes) {
+      final element = metadata.allAnnotatedClasses[subtype.interfaceName];
+      // An unresolvable subtype is not evidence that its JSON surface exists.
+      if (element == null) return false;
+      if (!ClassAnalyzer.generatesJson(element)) return false;
+    }
+    return true;
+  }
+
+  /// Whether the generated `switch` carries a `_ => this.toJson()` default —
+  /// and the base declares the `toJson()` that default calls.
+  ///
+  /// A `sealed` base needs no default: its switch is exhaustive over the
+  /// declared subtypes. Any other base is not — a plain `$` base, an undeclared
+  /// closure, or a subtype declared in another library (#142, where sealing is
+  /// deliberately withheld) — and its default calls `toJson()` on the base.
+  /// The base declares one exactly when `JsonGenerator` emits it: either the
+  /// base is `nonSealed` (the polymorphic `toJson()` branch), or it is a
+  /// concrete intermediate base — non-abstract, listed in a parent's
+  /// `explicitSubTypes` — whose `toJson()` comes from the discriminator path
+  /// (`_addToJsonWithDiscriminator`). A base that declares its OWN
+  /// `explicitSubTypes` never gets one from `JsonExtensionGenerator`, whose
+  /// `shouldGenerate` skips any class that declares subtypes. So the base case
+  /// exists when JSON is on AND (`nonSealed` OR a concrete member of a
+  /// parent's declared hierarchy).
+  ///
+  /// The gate and the emitter both read this, so a base without a `toJson()`
+  /// can neither pass the gate nor get a default case that calls it.
+  static bool _hasBaseCase(GenerationContext context) =>
+      !context.metadata.isSealed &&
+      context.config.generateJson &&
+      (context.metadata.nonSealed ||
+          (context.metadata.isInParentExplicitSubtypes &&
+              !context.metadata.isAbstract));
 
   @override
   List<Spec> generateSpec(GenerationContext context) {
@@ -91,7 +145,7 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
         sourceClassName: metadata.cleanName,
         explicitSubTypes: metadata.explicitSubtypes,
         knownClasses: knownClasses,
-        isSealed: metadata.isSealed,
+        baseCase: _hasBaseCase(context),
       ),
     ];
   }
@@ -101,7 +155,7 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
     required String sourceClassName,
     required List<dynamic> explicitSubTypes,
     required List<String> knownClasses,
-    required bool isSealed,
+    required bool baseCase,
   }) {
     final sourceClassNameTrimmed = sourceClassName.replaceAll(r'\$', '');
     final methods = <Method>[];
@@ -219,8 +273,11 @@ class ChangeToExtensionGenerator extends UniversalGenerator {
       // For non-sealed polymorphic bases the base class itself is
       // instantiable, so `switch (this)` over the base type must also cover
       // the base case — otherwise the switch is non-exhaustive ("doesn't
-      // match 'X()'"). A wildcard default keeps it exhaustive.
-      if (!isSealed) {
+      // match 'X()'"). A wildcard default keeps it exhaustive. `shouldGenerate`
+      // has already refused the extension when that default would call a
+      // `toJson()` the base never declared, so this is the same predicate the
+      // gate reads, not a second guess at it.
+      if (baseCase) {
         subtypeCases.add('_ => this.toJson()');
       }
       body.add('final _json = Map<String, dynamic>.from(');
