@@ -216,8 +216,9 @@ void _writePart(
   String partName,
   String generated,
 ) {
-  File('${fixtureDir.path}/$partName')
-      .writeAsStringSync("part of '$libraryName';\n\n$generated");
+  File(
+    '${fixtureDir.path}/$partName',
+  ).writeAsStringSync("part of '$libraryName';\n\n$generated");
 }
 
 /// Every diagnostic the analyzer reports for the library at [libraryPath]
