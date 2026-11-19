@@ -1,3 +1,12 @@
+## [2.5.1] - 2026-11-19
+
+### Change
+
+- Version synced with `zorphy` 2.5.1 (no annotation API changes). The 2.5.1
+  generator fix (arrrrny/zorphy#159 — `changeTo` withheld when the JSON surface
+  it calls is absent) is generator-side only; no annotation code moved and no
+  constraint changed.
+
 ## [2.5.0] - 2026-11-16
 
 ### Change

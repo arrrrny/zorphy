@@ -1,3 +1,30 @@
+## [2.5.1] - 2026-11-19
+
+### Fix
+
+- **Sealed base with `explicitSubTypes` no longer emits subtype `toJson`/`fromJson`
+  dispatch when JSON generation is off** (arrrrny/zorphy#159, backported from
+  `master` via #161/#171). A `changeTo<Subtype>` body round-trips through JSON, so
+  `ChangeToExtensionGenerator` now gates on the JSON surface its own body calls:
+  every declared subtype must generate JSON (`generateJson: true` is opt-in in
+  every preset and is not inherited), and a base that carries the switch's
+  `_ => this.toJson()` default needs its own `toJson()` too — a base that is not
+  sealed must be `nonSealed` as well, or it has none. A JSON-less hierarchy gets
+  no `changeTo` methods rather than methods that reference members nobody
+  emitted; a hierarchy that generates JSON keeps them, including concrete
+  intermediate bases whose own `toJson()` exists (the #171 fixes round).
+- Cross-library hierarchies (sealing withheld, #142) are covered: a base whose
+  only subtype lives abroad is emitted abstract, so it needs its own nonSealed
+  JSON surface before `changeTo` is emitted.
+- `test/release/analyze_clean_gate_test.dart` promotes the #159 fixture from the
+  characterization test (deleted) into the strict zero-diagnostics group, and
+  `test/generation/issue_159_sealed_change_to_without_json_test.dart` pins the
+  regression across four shapes (no-JSON, with-JSON, subtypes-only-JSON,
+  cross-library).
+- Canonical `dart format` under Dart 3.14.0 stable across files last formatted
+  on the 2.5.0 line under an older dart_style (arrrrny/zorphy#170) — pure
+  reflow, no semantic change.
+
 ## [2.5.0] - 2026-11-16
 
 ### Change
