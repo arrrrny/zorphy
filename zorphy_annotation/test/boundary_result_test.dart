@@ -105,6 +105,27 @@ void main() {
     test('BoundaryErr differs when targetType differs', () {
       expect(_nonConstErr(), isNot(equals(_nonConstErr(targetType: 'num'))));
     });
+
+    test('BoundaryOk equality is symmetric across type arguments', () {
+      final okNum = BoundaryOk<num>(1);
+      final okInt = BoundaryOk<int>(1);
+      expect(okNum == okInt, isFalse);
+      expect(okInt == okNum, isFalse);
+      expect({okNum, okInt}, hasLength(2));
+      expect(okInt, equals(BoundaryOk<int>(1)));
+    });
+
+    test('BoundaryErr equality is symmetric across type arguments', () {
+      final errNum = BoundaryErr<num>(
+        targetType: 'int',
+        violations: [_nonConstViolation()],
+      );
+      final errInt = _nonConstErr();
+      expect(errNum == errInt, isFalse);
+      expect(errInt == errNum, isFalse);
+      expect({errNum, errInt}, hasLength(2));
+      expect(errInt, equals(_nonConstErr()));
+    });
   });
 
   group('fold', () {

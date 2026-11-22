@@ -93,9 +93,18 @@ final class BoundaryOk<T> extends ZorphyBoundaryResult<T> {
   /// A collection-typed [value] therefore compares by identity, which is what
   /// `T`'s `==` says; deep-comparing an arbitrary decoded payload is the
   /// caller's choice.
+  ///
+  /// The [runtimeType] check is what keeps `==` symmetric across type
+  /// arguments: `is BoundaryOk<T>` is directional under Dart's covariant
+  /// generics, so `BoundaryOk<num>(1) == BoundaryOk<int>(1)` would be `true`
+  /// while the reverse is `false`. With it, two results are equal only when
+  /// they carry the same `T`, in either operand order.
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is BoundaryOk<T> && value == other.value;
+      identical(this, other) ||
+      other is BoundaryOk<T> &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
 
   @override
   int get hashCode => Object.hash(BoundaryOk, value);
@@ -122,10 +131,14 @@ final class BoundaryErr<T> extends ZorphyBoundaryResult<T> {
   static const ListEquality<FieldViolation> _violationsEquality =
       ListEquality<FieldViolation>();
 
+  /// Equality is symmetric across type arguments via the [runtimeType] check:
+  /// `BoundaryErr<num>` and `BoundaryErr<int>` are never equal, whichever
+  /// operand order a caller writes.
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is BoundaryErr<T> &&
+          runtimeType == other.runtimeType &&
           targetType == other.targetType &&
           _violationsEquality.equals(violations, other.violations);
 
