@@ -67,7 +67,7 @@ abstract class \$InteractiveUiNode implements \$UiNode {
 }
 
 @ZorphyState()
-abstract class \$ZfaButtonNode implements \$InteractiveUiNode {
+class \$ZfaButtonNode implements \$InteractiveUiNode {
   String get label;
 }
 ''';
@@ -133,7 +133,7 @@ abstract class \$Money {
 }
 
 @ZorphyValue()
-abstract class \$Usd implements \$Money {
+class \$Usd implements \$Money {
   int get cents;
 }
 ''',
@@ -161,12 +161,12 @@ abstract class \$Shape {
 }
 
 @ZorphyValue()
-abstract class \$Circle implements \$Shape {
+class \$Circle implements \$Shape {
   double get area;
 }
 
 @ZorphyValue()
-abstract class \$Square implements \$Shape {
+class \$Square implements \$Shape {
   double get area;
 }
 ''',
@@ -195,7 +195,7 @@ abstract class \$Square implements \$Shape {
         '''
 part 'base_node.zorphy.dart';
 
-@ZorphyState()
+@ZorphyEntity(principalKey: #id)
 abstract class \$UiNode {
   String get id;
 }
@@ -208,8 +208,8 @@ import 'base_node.dart';
 
 part 'button_node.zorphy.dart';
 
-@ZorphyState()
-abstract class \$ZfaButtonNode implements \$UiNode {
+@ZorphyEntity()
+class \$ZfaButtonNode implements \$UiNode {
   String get label;
 }
 ''',
@@ -243,6 +243,19 @@ abstract class \$ZfaButtonNode implements \$UiNode {
         'ZfaButtonNode',
       ]);
       expect(rootNode.directSubTypes.single.cleanName, 'ZfaButtonNode');
+
+      // The cross-library child must carry the root's inherited values, not
+      // just its name — the shape the name-only assertions used to let pass
+      // (finding: cross-library children never received inherited values).
+      final leaf = rootNode.allConcreteLeaves.single;
+      expect(leaf.principalKey, 'id');
+      expect(leaf.discriminatorKey, 'kind');
+      expect(ir.nodeFor(r'$ZfaButtonNode'), isNotNull);
+
+      // `superTypes` must reference the resolved root node, not a stub —
+      // checking the clean name proves it resolved to the real ancestor.
+      expect(leaf.superTypes.map((n) => n.cleanName), ['UiNode']);
+      expect(leaf.superTypes.single.principalKey, 'id');
     });
   });
 
@@ -261,12 +274,12 @@ abstract class \$AsyncStatus {
 }
 
 @ZorphyValue()
-abstract class \$Loading {
+class \$Loading {
   String get kind;
 }
 
 @ZorphyValue()
-abstract class \$Ready {
+class \$Ready {
   String get kind;
   String get value;
 }
@@ -297,7 +310,7 @@ abstract class \$Status {
 }
 
 @ZorphyValue()
-abstract class \$Loading implements \$Status {
+class \$Loading implements \$Status {
   String get kind;
 }
 ''',
@@ -314,7 +327,7 @@ abstract class \$Status {
 }
 
 @ZorphyValue()
-abstract class \$Loading {
+class \$Loading {
   String get kind;
 }
 ''',
@@ -349,7 +362,7 @@ abstract class \$Product {
 }
 
 @ZorphyEntity()
-abstract class \$Book implements \$Product {
+class \$Book implements \$Product {
   String get title;
 }
 ''',
@@ -443,7 +456,7 @@ abstract class \$Command {
 }
 
 @ZorphyIntent(replaySafe: true)
-abstract class \$Undo implements \$Command {
+class \$Undo implements \$Command {
   String get target;
 }
 ''',
@@ -471,7 +484,7 @@ abstract class \$Money {
 }
 
 @ZorphyEntity(principalKey: #id)
-abstract class \$Price implements \$Money {
+class \$Price implements \$Money {
   String get id;
 }
 ''',
@@ -500,12 +513,12 @@ abstract class \$Root {
 }
 
 @ZorphyValue()
-abstract class \$AB implements \$Root {
+class \$AB implements \$Root {
   String get kind;
 }
 
 @ZorphyValue()
-abstract class \$aB implements \$Root {
+class \$aB implements \$Root {
   String get kind;
 }
 ''',
@@ -533,7 +546,7 @@ abstract class \$Node {
 }
 
 @ZorphyState()
-abstract class \$Leaf implements \$Node {
+class \$Leaf implements \$Node {
   String get label;
 }
 ''',

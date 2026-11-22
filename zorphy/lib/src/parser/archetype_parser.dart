@@ -93,12 +93,18 @@ final class ArchetypeDeclaration {
   /// `replaySafe` for a `@ZorphyIntent`, `null` for every other archetype.
   final bool? replaySafe;
 
+  /// The explicit subtypes declared on the annotation (`List<Type>`), lowered
+  /// to class elements. These are the subtypes the generator cannot infer from
+  /// the same library — the cross-library escape hatch.
+  final List<ClassElement> explicitSubTypes;
+
   const ArchetypeDeclaration({
     required this.archetype,
     required this.principalKey,
     required this.isUnion,
     required this.discriminator,
     required this.replaySafe,
+    required this.explicitSubTypes,
   });
 
   /// The lowered archetype kind.
@@ -145,7 +151,22 @@ final class ArchetypeParser {
       isUnion: identical(archetype, ZorphyArchetype.union),
       discriminator: reader.peek('discriminator')?.stringValue ?? 'kind',
       replaySafe: reader.peek('replaySafe')?.boolValue,
+      explicitSubTypes: _readExplicitSubTypes(reader),
     );
+  }
+
+  /// Reads the `explicitSubTypes` (`List<Type>`) of an annotation into class
+  /// elements, or an empty list when unset. Each entry must name a class.
+  static List<ClassElement> _readExplicitSubTypes(ConstantReader reader) {
+    final list = reader.peek('explicitSubTypes');
+    if (list == null || list.isNull) return const <ClassElement>[];
+    final types = <ClassElement>[];
+    for (final value in list.listValue) {
+      final type = value.toTypeValue();
+      final element = type?.element;
+      if (element is ClassElement) types.add(element);
+    }
+    return types;
   }
 
   /// The `@ZorphyUnion` factory targets of [element], as class elements.

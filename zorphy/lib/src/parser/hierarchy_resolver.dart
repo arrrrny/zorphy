@@ -19,6 +19,7 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 
+import '../cli/utils/naming_utils.dart';
 import 'archetype_parser.dart';
 import 'polymorphic_ir.dart';
 
@@ -45,14 +46,13 @@ final class HierarchyResolver {
 
   /// Resolves the hierarchy [element] heads, as its own graph.
   static PolymorphicIr resolveClass(ClassElement element) =>
-      resolveLibrary(element.library);
+      resolveLibraries([element.library]);
 
   /// Resolves a set of libraries as ONE graph, so a subtype declared in a
   /// second library joins the root declared in the first (the cross-library
   /// shape issue #142 established must keep working).
   static PolymorphicIr resolveLibraries(Iterable<LibraryElement> libraries) {
     final declarations = <ClassElement, _Declaration>{};
-    final unionRoots = <ClassElement>{};
     final unionVariants = <ClassElement, ClassElement>{};
 
     for (final library in libraries) {
@@ -68,7 +68,6 @@ final class HierarchyResolver {
         );
         if (!declaration.isUnion) continue;
 
-        unionRoots.add(element);
         for (final variant in ArchetypeParser.unionVariants(element)) {
           unionVariants.putIfAbsent(variant, () => element);
           // A union variant IS a leaf of the union's hierarchy even when the
@@ -85,6 +84,7 @@ final class HierarchyResolver {
                   isUnion: false,
                   discriminator: declaration.discriminator,
                   replaySafe: null,
+                  explicitSubTypes: const <ClassElement>[],
                 ),
                 isSyntheticLeaf: true,
               ),
@@ -102,9 +102,16 @@ final class HierarchyResolver {
     // of the graph rather than out of a second walk.
     final parents = <ClassElement, ClassElement>{};
     final children = <ClassElement, List<ClassElement>>{};
+    // Records every parent that was requested for a child but refused because
+    // the child already had one — a union variant that also `implements`
+    // another root is the case that matters (finding: silently dropped edge).
+    final refusedParents = <ClassElement, ClassElement>{};
     void link(ClassElement child, ClassElement parent) {
       if (identical(child, parent)) return;
-      if (parents.containsKey(child)) return;
+      if (parents.containsKey(child)) {
+        refusedParents.putIfAbsent(child, () => parents[child]!);
+        return;
+      }
       parents[child] = parent;
       children.putIfAbsent(parent, () => <ClassElement>[]).add(child);
     }
@@ -116,7 +123,8 @@ final class HierarchyResolver {
     // Union factory targets are leaves of their union ROOT even though the
     // target class may not implement it, so the edge is added explicitly. A
     // variant that already declares its own `implements $OtherRoot` keeps
-    // that parent: `link` refuses a second one.
+    // that parent — the refused second edge is reported as a diagnostic
+    // rather than dropped silently.
     for (final entry in unionVariants.entries) {
       link(entry.key, entry.value);
     }
@@ -130,18 +138,23 @@ final class HierarchyResolver {
     // child's own subtree is resolved before its parent's leaf list is
     // assembled.
     final wired = <ClassElement, _Declaration>{};
+    // The wired children of each element, kept as declarations so Phase 3
+    // can carry the real `ClassElement` down instead of re-deriving it from
+    // a name string (which cannot see another library's classes).
+    final wiredChildren = <ClassElement, List<_Declaration>>{};
 
     _Declaration wire(ClassElement element) {
       final existing = wired[element];
       if (existing != null) return existing;
 
       final definition = declarations[element]!;
-      final wiredChildren = <_Declaration>[
+      final wiredChildrenList = <_Declaration>[
         for (final child in children[element] ?? const <ClassElement>[])
           wire(child),
       ];
+      wiredChildren[element] = wiredChildrenList;
       final leaves = <ZorphyNodeIr>[
-        for (final child in wiredChildren)
+        for (final child in wiredChildrenList)
           if (child.node.isConcreteLeaf)
             child.node
           else
@@ -149,15 +162,16 @@ final class HierarchyResolver {
       ];
 
       final node = definition.node.copyWith(
-        superTypes: _transitiveSupertypes(element, parents, declarations),
+        superTypes: _transitiveStubs(element, parents, declarations),
         directSubTypes: List.unmodifiable([
-          for (final child in wiredChildren) child.node,
+          for (final child in wiredChildrenList) child.node,
         ]),
         allConcreteLeaves: List.unmodifiable(leaves),
         isSealedRoot: !parents.containsKey(element),
         isAbstractIntermediate:
-            parents.containsKey(element) && wiredChildren.isNotEmpty,
-        isConcreteLeaf: wiredChildren.isEmpty,
+            parents.containsKey(element) && wiredChildrenList.isNotEmpty,
+        isConcreteLeaf:
+            wiredChildrenList.isEmpty && !definition.element.isAbstract,
       );
       final result = _Declaration(element, node);
       wired[element] = result;
@@ -168,13 +182,30 @@ final class HierarchyResolver {
       for (final element in roots) wire(element),
     ];
 
-    // Phase 3 — inheritance resolution, top-down from each root: identity,
-    // wire key and replay baseline flow down, and a leaf's explicit value
-    // wins over what it inherits.
+    // Phase 3 — inheritance resolution. Two passes:
+    //   3a resolves each subtree bottom-up (children before parent), so a
+    //      parent's leaf list is built from already-resolved children.
+    //   3b walks each root top-down to (a) rewrite `superTypes` from the
+    //      fully-resolved ancestor nodes and (b) stamp `root` on every
+    //      node — neither can be done in 3a because the parent/root node is
+    //      not resolved until after its children.
     final diagnostics = <ZorphyDiagnostic>[];
     final resolved = <ClassElement, _Declaration>{};
     for (final root in wiredRoots) {
-      _resolveInheritance(root, null, null, null, diagnostics, resolved);
+      _resolveSubtree(
+        root,
+        null,
+        null,
+        null,
+        parents,
+        wiredChildren,
+        unionVariants,
+        diagnostics,
+        resolved,
+      );
+    }
+    for (final root in wiredRoots) {
+      _finalizeNode(root.element, null, parents, resolved);
     }
 
     final resolvedRoots = <ZorphyNodeIr>[
@@ -186,10 +217,32 @@ final class HierarchyResolver {
       _checkDuplicateDiscriminators(root, diagnostics);
     }
 
+    // A union variant that also declares its own `implements` parent was
+    // refused its union edge in Phase 1 — report it rather than letting the
+    // union silently lose a declared variant.
+    for (final entry in refusedParents.entries) {
+      final unionRoot = unionVariants[entry.key];
+      if (unionRoot == null) continue;
+      diagnostics.add(
+        ZorphyDiagnostic(
+          code: ZorphyDiagnosticCode.e002MixedArchetypes,
+          nodeName: _cleanName(unionRoot.name ?? ''),
+          message:
+              '${_cleanName(entry.key.name)} is a variant of '
+              '${_cleanName(unionRoot.name ?? '')} but also implements '
+              '${_cleanName(entry.value.name ?? '')}; the union edge is '
+              'dropped',
+        ),
+      );
+    }
+
+    // `nodes` is keyed by qualified name so two libraries may declare
+    // same-named classes without one silently winning (finding: keying by
+    // `className` collapsed them).
     return PolymorphicIr(
       nodes: Map.unmodifiable({
         for (final declaration in resolved.values)
-          declaration.node.className: declaration.node,
+          _qualifiedName(declaration.element): declaration.node,
       }),
       roots: List.unmodifiable(resolvedRoots),
       diagnostics: List.unmodifiable(diagnostics),
@@ -242,7 +295,11 @@ final class HierarchyResolver {
 
   /// Every declared ancestor of [element], nearest first — the transitive
   /// `$Parent` chain the issue calls `superTypes`.
-  static List<ZorphyNodeIr> _transitiveSupertypes(
+  ///
+  /// Phase 2 builds these from the PRE-wiring stub nodes so the E001/E002
+  /// checks have a `superTypes` to inspect; Phase 3a overwrites them with
+  /// the fully-resolved ancestor nodes (finding: superTypes carried stubs).
+  static List<ZorphyNodeIr> _transitiveStubs(
     ClassElement element,
     Map<ClassElement, ClassElement> parents,
     Map<ClassElement, _Declaration> declarations,
@@ -259,16 +316,42 @@ final class HierarchyResolver {
     return List.unmodifiable(result);
   }
 
-  /// Resolves [declaration] and its subtree into [resolved].
+  /// Every declared ancestor of [element], nearest first — the transitive
+  /// `$Parent` chain the issue calls `superTypes`.
+  ///
+  /// Only the ELEMENTS are collected here; the nodes are resolved in Phase 3
+  /// so a caller reading `node.superTypes` sees the fully-resolved ancestor
+  /// nodes, not the pre-wiring stubs (finding: superTypes carried stubs).
+  static List<ClassElement> _transitiveSupertypeElements(
+    ClassElement element,
+    Map<ClassElement, ClassElement> parents,
+  ) {
+    final result = <ClassElement>[];
+    final seen = <ClassElement>{element};
+    var current = parents[element];
+    while (current != null && seen.add(current)) {
+      result.add(current);
+      current = parents[current];
+    }
+    return List.unmodifiable(result);
+  }
+
+  /// Phase 3a — resolves [declaration] and its subtree bottom-up into
+  /// [resolved].
   ///
   /// [inheritedPrincipalKey], [inheritedReplaySafe] and
   /// [inheritedDiscriminatorKey] are what the walk carries DOWN; the node's
-  /// own value wins where it has one.
-  static void _resolveInheritance(
+  /// own value wins where it has one. `root` is stamped in a separate
+  /// top-down pass (Phase 3b) because the root's final node is not built
+  /// until its children resolve here.
+  static void _resolveSubtree(
     _Declaration declaration,
     String? inheritedPrincipalKey,
     bool? inheritedReplaySafe,
     String? inheritedDiscriminatorKey,
+    Map<ClassElement, ClassElement> parents,
+    Map<ClassElement, List<_Declaration>> wiredChildren,
+    Map<ClassElement, ClassElement> unionVariants,
     List<ZorphyDiagnostic> diagnostics,
     Map<ClassElement, _Declaration> resolved,
   ) {
@@ -330,50 +413,122 @@ final class HierarchyResolver {
       }
     }
 
+    // Resolve each child first (bottom-up), from its wired declaration — the
+    // element is already in hand, so a subtype in another library is found
+    // without a name scan (finding: cross-library children never resolved).
     final resolvedChildren = <ZorphyNodeIr>[];
-    for (final child in node.directSubTypes) {
-      final childElement = _elementNamed(child.className, declaration.element);
-      if (childElement == null) {
-        resolvedChildren.add(child);
-        continue;
-      }
-      _resolveInheritance(
-        _Declaration(childElement, child),
+    for (final child in wiredChildren[declaration.element] ??
+        const <_Declaration>[]) {
+      _resolveSubtree(
+        child,
         principalKey,
         replaySafe,
         discriminatorKey,
+        parents,
+        wiredChildren,
+        unionVariants,
         diagnostics,
         resolved,
       );
-      resolvedChildren.add(resolved[childElement]!.node);
+      resolvedChildren.add(resolved[child.element]!.node);
     }
+
+    // `superTypes` is rewritten from the RESOLVED ancestor map, so a caller
+    // reading `node.superTypes.first.allConcreteLeaves` sees the real leaf
+    // list rather than a stub (finding: superTypes carried pre-wiring stubs).
+    final resolvedSuperTypes = <ZorphyNodeIr>[
+      for (final superElement in _transitiveSupertypeElements(
+        declaration.element,
+        parents,
+      ))
+        if (resolved[superElement] != null) resolved[superElement]!.node,
+    ];
 
     final leaves = <ZorphyNodeIr>[
       for (final child in resolvedChildren)
         if (child.isConcreteLeaf) child else ...child.allConcreteLeaves,
     ];
+
     resolved[declaration.element] = _Declaration(
       declaration.element,
       node.copyWith(
         discriminatorKey: discriminatorKey,
         principalKey: principalKey,
         replaySafe: replaySafe,
+        superTypes: List.unmodifiable(resolvedSuperTypes),
         directSubTypes: List.unmodifiable(resolvedChildren),
         allConcreteLeaves: List.unmodifiable(leaves),
+        // `isSyntheticLeaf` is decided by membership in the union variant set,
+        // so declaration order cannot flip it (finding: order-dependent flag).
+        isSyntheticLeaf: unionVariants.containsKey(declaration.element),
       ),
     );
   }
 
-  /// The element a wired child node came from.
+  /// Phase 3b — walks [element]'s subtree top-down, finalizing each node:
+  ///  - rewrites `superTypes` from the fully-resolved ancestor nodes (now
+  ///    available because 3a resolved the whole tree), and
+  ///  - stamps `root` (the root's own node, or `null` on the root itself).
   ///
-  /// A child node's identity within one graph is its class name, and the
-  /// resolver only wires children it built itself — from the parent's own
-  /// library or one of the libraries being resolved. The lookup therefore
-  /// prefers the parent's library and falls back to the parent's enclosing
-  /// package.
-  static ClassElement? _elementNamed(String className, ClassElement parent) {
-    for (final element in parent.library.classes) {
-      if (element.name == className) return element;
+  /// After recursing into children, the node is rebuilt once more so its
+  /// `directSubTypes` reference the FINALIZED child nodes (each child's
+  /// `superTypes` now points at this node's first-pass version — the
+  /// immutable `copyWith` cannot make both sides `identical` at once, and
+  /// the second rebuild is the authoritative one for the parent's edges).
+  static void _finalizeNode(
+    ClassElement element,
+    ZorphyNodeIr? root,
+    Map<ClassElement, ClassElement> parents,
+    Map<ClassElement, _Declaration> resolved,
+  ) {
+    final declaration = resolved[element];
+    if (declaration == null) return;
+    final node = declaration.node;
+
+    // Rewrite `superTypes` from the resolved ancestor nodes.
+    final resolvedSuperTypes = <ZorphyNodeIr>[
+      for (final superElement in _transitiveSupertypeElements(element, parents))
+        if (resolved[superElement] != null) resolved[superElement]!.node,
+    ];
+
+    final stamped = node.copyWith(
+      superTypes: List.unmodifiable(resolvedSuperTypes),
+      root: root,
+    );
+    resolved[element] = _Declaration(element, stamped);
+
+    // Recurse into children, passing this node as their `root`.
+    final finalizedChildren = <ZorphyNodeIr>[];
+    for (final child in node.directSubTypes) {
+      final childElement = _elementForChild(child, resolved);
+      if (childElement == null) {
+        finalizedChildren.add(child);
+        continue;
+      }
+      _finalizeNode(childElement, stamped, parents, resolved);
+      finalizedChildren.add(resolved[childElement]!.node);
+    }
+
+    // Rebuild once more so `directSubTypes` references the finalized children.
+    final finalNode = stamped.copyWith(
+      directSubTypes: List.unmodifiable(finalizedChildren),
+      allConcreteLeaves: List.unmodifiable(<ZorphyNodeIr>[
+        for (final child in finalizedChildren)
+          if (child.isConcreteLeaf) child else ...child.allConcreteLeaves,
+      ]),
+    );
+    resolved[element] = _Declaration(element, finalNode);
+  }
+
+  /// The element whose resolved node is [child], found by className.
+  static ClassElement? _elementForChild(
+    ZorphyNodeIr child,
+    Map<ClassElement, _Declaration> resolved,
+  ) {
+    for (final declaration in resolved.values) {
+      if (declaration.node.className == child.className) {
+        return declaration.element;
+      }
     }
     return null;
   }
@@ -427,6 +582,17 @@ final class HierarchyResolver {
     walk(root);
   }
 
+  /// A stable key for [element] that survives two libraries declaring the
+  /// same class name: `libraryUri#ClassName`.
+  static String _qualifiedName(ClassElement element) {
+    final name = element.name ?? '';
+    final uri = element.library.uri.toString();
+    return '$uri#$name';
+  }
+
+  static String _cleanName(String? name) =>
+      (name ?? '').replaceAll(r'$', '');
+
   static String _archetypeLabel(ArchetypeKind kind) => switch (kind) {
     ArchetypeKind.entity => 'Entity',
     ArchetypeKind.state => 'State',
@@ -435,11 +601,8 @@ final class HierarchyResolver {
   };
 }
 
-/// PascalCase / camelCase to snake_case, matching `NamingUtils.toSnakeCase`
-/// (`ZfaButtonNode` -> `zfa_button_node`, `AB` -> `a_b`).
-String snakeCaseName(String name) {
-  return name.replaceAllMapped(RegExp(r'[A-Z]'), (match) {
-    final char = match.group(0)!;
-    return match.start == 0 ? char.toLowerCase() : '_${char.toLowerCase()}';
-  });
-}
+/// PascalCase / camelCase to snake_case, delegating to
+/// `NamingUtils.toSnakeCase` so the resolver and the CLI share ONE source of
+/// truth for the wire value (`ZfaButtonNode` -> `zfa_button_node`,
+/// `Ui_Node` -> `ui_node`).
+String snakeCaseName(String name) => NamingUtils.toSnakeCase(name);

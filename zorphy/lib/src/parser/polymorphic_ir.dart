@@ -15,6 +15,10 @@
 /// `HierarchyResolver`. Emission lives in the `code_builder` layer.
 library;
 
+/// Sentinel for `copyWith`'s nullable parameters: lets `null` mean "clear to
+/// null" rather than "keep the current value".
+const Object _unset = Object();
+
 /// The archetype a node was declared with.
 enum ArchetypeKind {
   /// `@ZorphyEntity` — an aggregate/event root with its own identity.
@@ -166,17 +170,23 @@ final class ZorphyNodeIr {
   /// A copy with the named fields replaced, used by the resolver while it
   /// wires a tree up. Nodes are otherwise immutable, so a resolved IR is a
   /// value a caller can cache without a later mutation changing it.
+  ///
+  /// [principalKey] and [replaySafe] use a sentinel so `null` can mean
+  /// "clear to null" rather than "keep": a node that moves out of an
+  /// entity/intent hierarchy must be able to drop its inherited key (finding:
+  /// `x ?? this.x` made clearing impossible).
   ZorphyNodeIr copyWith({
     List<ZorphyNodeIr>? superTypes,
     List<ZorphyNodeIr>? directSubTypes,
     List<ZorphyNodeIr>? allConcreteLeaves,
     String? discriminatorKey,
-    String? principalKey,
-    bool? replaySafe,
+    Object? principalKey = _unset,
+    Object? replaySafe = _unset,
     ZorphyNodeIr? root,
     bool? isSealedRoot,
     bool? isAbstractIntermediate,
     bool? isConcreteLeaf,
+    bool? isSyntheticLeaf,
   }) {
     return ZorphyNodeIr(
       className: className,
@@ -191,9 +201,13 @@ final class ZorphyNodeIr {
       allConcreteLeaves: allConcreteLeaves ?? this.allConcreteLeaves,
       discriminatorKey: discriminatorKey ?? this.discriminatorKey,
       discriminatorValue: discriminatorValue,
-      principalKey: principalKey ?? this.principalKey,
-      replaySafe: replaySafe ?? this.replaySafe,
-      isSyntheticLeaf: isSyntheticLeaf,
+      principalKey: identical(principalKey, _unset)
+          ? this.principalKey
+          : principalKey as String?,
+      replaySafe: identical(replaySafe, _unset)
+          ? this.replaySafe
+          : replaySafe as bool?,
+      isSyntheticLeaf: isSyntheticLeaf ?? this.isSyntheticLeaf,
       root: root ?? this.root,
     );
   }
@@ -205,8 +219,10 @@ final class ZorphyNodeIr {
 
 /// The parsed polymorphic graph of one library (or library set).
 final class PolymorphicIr {
-  /// Every node in the graph, keyed by [ZorphyNodeIr.className] so a caller
-  /// can address `$InteractiveUiNode` directly.
+  /// Every node in the graph, keyed by qualified name
+  /// (`libraryUri#ClassName`) so two libraries may declare same-named
+  /// classes without one silently winning. A caller that knows the class
+  /// name can still reach a node through [nodeFor].
   final Map<String, ZorphyNodeIr> nodes;
 
   /// The hierarchy roots, in declaration order.
@@ -243,5 +259,17 @@ final class PolymorphicIr {
   }
 
   /// The node declared as [className] (prefixes included), or `null`.
-  ZorphyNodeIr? nodeFor(String className) => nodes[className];
+  ///
+  /// The map is keyed by qualified name, so a bare class name is resolved by
+  /// a scan — unique in a single-library graph, and the first match in a
+  /// multi-library one. Callers that need a specific library's node should
+  /// key by `libraryUri#ClassName` directly.
+  ZorphyNodeIr? nodeFor(String className) {
+    final direct = nodes[className];
+    if (direct != null) return direct;
+    for (final node in nodes.values) {
+      if (node.className == className) return node;
+    }
+    return null;
+  }
 }
