@@ -32,8 +32,10 @@ void main() {
       );
       File(p.join(root.path, 'pubspec.yaml')).writeAsStringSync('''
 name: smoke_project
+# Matches the floor `zorphy` / `zorphy_annotation` declare (>=3.11.0): the
+# depth-first stack this fixture generates for only resolves there.
 environment:
-  sdk: ">=3.8.0 <4.0.0"
+  sdk: ">=3.11.0 <4.0.0"
 dependencies:
   freezed_annotation: ^3.1.0
   zorphy_annotation: ^3.0.0

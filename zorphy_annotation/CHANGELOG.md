@@ -1,3 +1,38 @@
+## [Unreleased]
+
+### Added
+
+- The five v3 archetypes, all zero-toggle: `ZorphyEntity` (`principalKey`),
+  `ZorphyState`, `ZorphyUnion`, `ZorphyIntent` (`replaySafe`, required) and
+  `ZorphyValue`, plus the marker interfaces `ZorphyEntityBase<Id>`,
+  `ZorphyStateBase`, `ZorphyUnionBase`, `ZorphyIntentBase`, `ZorphyValueBase`
+  and the shared `ZorphyPolymorphicBase` (#175, #176). A class is annotated
+  with exactly one archetype; polymorphism is declared through `discriminator`
+  (default `'kind'`) and `explicitSubTypes`.
+- `ZorphyMock` — a field-level seed hint, not a toggle — and
+  `ZorphyMockPresets`, the reserved `preset` names (`email`, `uuid`, `price`,
+  `url`) as constants so a consumer and the generator share one closed set.
+
+### Changed
+
+- `ZorphyNamedConstructor` moved to `src/annotations.dart` — the library URI
+  the generator resolves it from — so the move is source-compatible.
+- SDK floor raised to `>=3.11.0` to match what the tracked lockfile resolves
+  and what `zorphy` / `zorphy_migrator` already declare. `dartx` dropped: it
+  had no reference in this package. The package also gains its first dev
+  dependency, `test`, for the archetype suite in `test/annotations_test.dart`
+  (previously its tests ran from the `zorphy` package only).
+
+### Deprecated
+
+- The pre-v3 surface (`@Zorphy`, `@Zorphy2`, `@ZValueObject`, `ZorphyPreset`,
+  `ZorphyKind`, the `generate*` flags, `ZorphyX`, and the
+  `getGenericToJsonFn` / `getFromJsonToGenericFn` runtime helpers) is kept and
+  exported for source compatibility: `zorphy` resolves this package by path
+  and reads its annotations from this library URI, and `zorphy_migrator` emits
+  `@Zorphy(...)` text. It is removed once the generator is ported onto the
+  archetypes (#177, #178, #181, #187).
+
 ## [3.0.0] - 2026-11-17
 
 ### Change
@@ -8,21 +43,6 @@
 - `ZorphyPreset` semantics are unchanged; `lean` still means class,
   constructor, `copyWith`, `==`/`hashCode`, `toString`, with every other
   feature opt-in.
-
-### Added
-
-- The v3 zero-toggle polymorphic archetypes (ISSUE-001, foundation for #175):
-  `ZorphyEntity`, `ZorphyState`, `ZorphyUnion`, `ZorphyIntent`, `ZorphyValue`,
-  and the field-level `ZorphyMock` seed hint, plus the marker interfaces
-  `ZorphyEntityBase<Id>`, `ZorphyStateBase`, `ZorphyUnionBase`,
-  `ZorphyIntentBase`, `ZorphyValueBase` and the shared `ZorphyPolymorphicBase`.
-  A class is annotated with exactly one archetype; polymorphism is declared
-  through `discriminator`/`explicitSubTypes`, with no `generate*` toggles.
-- `ZorphyMockPresets` — the reserved `preset` names (`email`, `uuid`, `price`,
-  `url`) as constants, so a consumer and the generator share one closed set.
-
-No dependency or SDK-floor change: the package keeps its `>=3.8.0` floor and
-its empty `dev_dependencies` (its tests run from the `zorphy` package).
 
 ## [2.5.0] - 2026-11-16
 

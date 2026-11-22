@@ -61,7 +61,6 @@ void main() {
 
         final expectedAnnotationDeps = <String, String>{
           'collection': '^1.19.1',
-          'dartx': '^1.2.0',
           'json_annotation': '^4.12.0',
           'meta': '^1.17.0',
           'quiver': '^3.2.2',
@@ -76,7 +75,9 @@ void main() {
           'yaml': '^3.1.3',
         };
 
-        final expectedAnnotationDevDeps = <String, String>{};
+        // issue #176 added the first dev dependency this package has: the v3
+        // archetype test suite needs `package:test` to run.
+        final expectedAnnotationDevDeps = <String, String>{'test': '^1.33.0'};
 
         expect(zorphyDeps, expectedZorphyDeps);
         expect(zorphyDevDeps, expectedZorphyDevDeps);

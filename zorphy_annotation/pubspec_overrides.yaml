@@ -1,0 +1,10 @@
+dependency_overrides:
+  # Dev-only caps (pub ignores this file for consumers). `analyzer`, `web` and
+  # `frontend_server_client` all arrive transitively through `test`, and their
+  # current releases require Dart ^3.13.0 — which would make the tracked
+  # lockfile record a floor above the >=3.11.0 this package and `zorphy`
+  # declare. Held at the versions that support 3.11, the committed lock stays
+  # resolvable on the declared floor.
+  analyzer: ">=14.0.0 <14.6.0"
+  web: ">=1.1.0 <1.1.2"
+  frontend_server_client: ">=4.0.0 <4.2.0"

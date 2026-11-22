@@ -1,6 +1,30 @@
+/// Legacy annotation surface, kept for source compatibility.
+///
+/// The v3 archetypes in `archetypes.dart` (`ZorphyEntity`, `ZorphyState`,
+/// `ZorphyUnion`, `ZorphyIntent`, `ZorphyValue`) are the annotation API of
+/// record, and every one of them is zero-toggle: the generated surface is
+/// unconditional.
+///
+/// This library still carries the pre-v3 surface — `@Zorphy`, `@Zorphy2`,
+/// `@ZValueObject`, `ZorphyPreset`, `ZorphyKind` and the `generate*` flags —
+/// because the generator in this repository (`zorphy`) reads its annotations
+/// from this exact library URI
+/// (`package:zorphy_annotation/src/annotations.dart#Zorphy`) and because
+/// `zorphy_migrator` emits `@Zorphy(...)` / `preset: ZorphyPreset.lean` into
+/// migrated projects. Removing it here would break both siblings on their
+/// next `pub get`, since they resolve this package by path.
+///
+/// Everything in this library is scheduled for removal once the generator is
+/// ported onto the v3 archetypes (#177, #178, #181, #187); new code should
+/// annotate with the archetypes instead.
+library;
+
 import 'package:collection/collection.dart';
 
 /// Controls how much code zorphy generates for an annotated class.
+///
+/// Legacy: the v3 archetypes generate the same surface unconditionally, so
+/// this enum exists only for the pre-v3 `@Zorphy` surface.
 ///
 /// - [lean]: only the essentials — class, constructor, `copyWith`,
 ///   `==`/`hashCode`, `toString`. No patch API, filter descriptors,
@@ -77,7 +101,7 @@ const ZValueObject = Zorphy(kind: ZorphyKind.valueObject);
 ///
 /// Example:
 /// ```dart
-/// @ZValueObject
+/// @ZorphyValue()
 /// @ZorphyNamedConstructor(name: 'world', body: r'assert(!name.startsWith("WINDOW-ID-"));')
 /// abstract class $ContentWorld {
 ///   String get name;

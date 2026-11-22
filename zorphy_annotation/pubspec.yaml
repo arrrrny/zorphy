@@ -4,11 +4,12 @@ version: 3.0.0
 homepage: https://github.com/arrrrny/zorphy
 
 environment:
-  sdk: ">=3.8.0 <4.0.0"
+  sdk: ">=3.11.0 <4.0.0"
 
 dependencies:
   collection: ^1.19.1
-  dartx: ^1.2.0
   json_annotation: ^4.12.0
   meta: ^1.17.0
   quiver: ^3.2.2
+dev_dependencies:
+  test: ^1.33.0
