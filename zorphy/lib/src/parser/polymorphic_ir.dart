@@ -1,0 +1,247 @@
+/// The unified polymorphic IR for Zorphy v3.0.0 (ISSUE-002, #177).
+///
+/// Every parsed declaration — annotated with `@ZorphyEntity`,
+/// `@ZorphyState`, `@ZorphyUnion`, `@ZorphyIntent` or `@ZorphyValue` — lowers
+/// to exactly one [ZorphyNodeIr]. A polymorphic hierarchy is the tree of those
+/// nodes: one [PolymorphicIr] per library set, with one or more sealed roots.
+///
+/// `@ZorphyUnion` does NOT get a representation of its own: its factory
+/// variants lower into the same [ZorphyNodeIr] shape as an `implements
+/// $Parent` hierarchy, so every downstream emitter reads one structure. The
+/// issue's acceptance criterion — "both forms produce identical
+/// `PolymorphicIr` structures" — is a property of this file.
+///
+/// Nothing here emits code or mutates elements: the IR is pure data, built by
+/// `HierarchyResolver`. Emission lives in the `code_builder` layer.
+library;
+
+/// The archetype a node was declared with.
+enum ArchetypeKind {
+  /// `@ZorphyEntity` — an aggregate/event root with its own identity.
+  entity,
+
+  /// `@ZorphyState` — a mutable/composed state node.
+  state,
+
+  /// `@ZorphyIntent` — a replay-safe command/intent envelope.
+  intent,
+
+  /// `@ZorphyValue` — an immutable value object with no identity.
+  ///
+  /// `@ZorphyUnion` lowers to this archetype: a union is a closed set of
+  /// value variants, and it carries no principal key.
+  value,
+}
+
+/// The compile-time diagnostics the parser reports (issue #177 §2).
+///
+/// Each code is a named, stable contract: the emitter layer maps it to an
+/// `InvalidGenerationSourceError` and its message is built by
+/// [ZorphyDiagnostic.render].
+enum ZorphyDiagnosticCode {
+  /// `ZORPHY_E001` — root `@ZorphyEntity` missing `principalKey`, or the named
+  /// field is missing / nullable / not a `String` or `int`.
+  e001MissingPrincipalKey,
+
+  /// `ZORPHY_E002` — a subtype mixes incompatible archetypes (e.g. a
+  /// `@ZorphyEntity` implementing a `@ZorphyValue`).
+  e002MixedArchetypes,
+
+  /// `ZORPHY_E003` — two nodes in one hierarchy share a `discriminatorValue`.
+  e003DuplicateDiscriminator,
+}
+
+/// One diagnostic raised while resolving a hierarchy.
+final class ZorphyDiagnostic {
+  /// The stable code (`ZORPHY_E001`..`ZORPHY_E003`).
+  final ZorphyDiagnosticCode code;
+
+  /// The `$`-prefixed class name the diagnostic is about.
+  final String nodeName;
+
+  /// Human-readable detail, with no trailing period.
+  final String message;
+
+  const ZorphyDiagnostic({
+    required this.code,
+    required this.nodeName,
+    required this.message,
+  });
+
+  /// The wire code (`ZORPHY_E001`, ...), stable across releases.
+  String get codeName => switch (code) {
+    ZorphyDiagnosticCode.e001MissingPrincipalKey => 'ZORPHY_E001',
+    ZorphyDiagnosticCode.e002MixedArchetypes => 'ZORPHY_E002',
+    ZorphyDiagnosticCode.e003DuplicateDiscriminator => 'ZORPHY_E003',
+  };
+
+  /// Whether this diagnostic blocks generation.
+  ///
+  /// All three codes do today; the getter exists so a future advisory code
+  /// does not have to change every caller.
+  bool get isError => true;
+
+  /// `ZORPHY_E001: $Product — message`
+  String render() => '$codeName: $nodeName — $message';
+
+  @override
+  String toString() => render();
+}
+
+/// One node of a polymorphic hierarchy.
+///
+/// A node keeps BOTH names: [className] is the declared identifier
+/// (`$UiNode`, `$$UiNode`), and [cleanName] is the generated class name
+/// (`UiNode`) — the same split `ClassMetadata` uses, so emitters read the
+/// field they need without re-deriving it.
+final class ZorphyNodeIr {
+  /// The declared class name, `$`/`$$` prefixes included.
+  final String className;
+
+  /// The generated class name, prefixes stripped.
+  final String cleanName;
+
+  /// Which archetype the declaration carried.
+  final ArchetypeKind archetype;
+
+  /// Whether this node is the root of its hierarchy.
+  final bool isSealedRoot;
+
+  /// Whether this node sits between a root and a leaf.
+  final bool isAbstractIntermediate;
+
+  /// Whether this node can be instantiated (no subtype below it).
+  final bool isConcreteLeaf;
+
+  /// The transitive `$Parent` interfaces, nearest first.
+  final List<ZorphyNodeIr> superTypes;
+
+  /// The nodes that name this one in their `implements` clause.
+  final List<ZorphyNodeIr> directSubTypes;
+
+  /// Every instantiating node below this one, depth-first.
+  final List<ZorphyNodeIr> allConcreteLeaves;
+
+  /// The wire field carrying the subtype tag (`ZorphyEntity.discriminator`).
+  ///
+  /// Owned by the hierarchy ROOT and inherited by every node below it: a
+  /// hierarchy that dispatched on two different keys could never round-trip.
+  final String discriminatorKey;
+
+  /// This node's wire value in [discriminatorKey], snake_case by default.
+  final String discriminatorValue;
+
+  /// The inherited identity field name, or `null` outside an entity
+  /// hierarchy.
+  final String? principalKey;
+
+  /// The replay-safety decision for this node, `null` outside an intent
+  /// hierarchy.
+  final bool? replaySafe;
+
+  /// Whether this node was lowered from a `@ZorphyUnion` factory variant.
+  final bool isSyntheticLeaf;
+
+  /// The root of this node's hierarchy; unset on the root itself.
+  final ZorphyNodeIr? root;
+
+  const ZorphyNodeIr({
+    required this.className,
+    required this.cleanName,
+    required this.archetype,
+    required this.isSealedRoot,
+    required this.isAbstractIntermediate,
+    required this.isConcreteLeaf,
+    required this.superTypes,
+    required this.directSubTypes,
+    required this.allConcreteLeaves,
+    required this.discriminatorKey,
+    required this.discriminatorValue,
+    this.principalKey,
+    this.replaySafe,
+    this.isSyntheticLeaf = false,
+    this.root,
+  });
+
+  /// A copy with the named fields replaced, used by the resolver while it
+  /// wires a tree up. Nodes are otherwise immutable, so a resolved IR is a
+  /// value a caller can cache without a later mutation changing it.
+  ZorphyNodeIr copyWith({
+    List<ZorphyNodeIr>? superTypes,
+    List<ZorphyNodeIr>? directSubTypes,
+    List<ZorphyNodeIr>? allConcreteLeaves,
+    String? discriminatorKey,
+    String? principalKey,
+    bool? replaySafe,
+    ZorphyNodeIr? root,
+    bool? isSealedRoot,
+    bool? isAbstractIntermediate,
+    bool? isConcreteLeaf,
+  }) {
+    return ZorphyNodeIr(
+      className: className,
+      cleanName: cleanName,
+      archetype: archetype,
+      isSealedRoot: isSealedRoot ?? this.isSealedRoot,
+      isAbstractIntermediate:
+          isAbstractIntermediate ?? this.isAbstractIntermediate,
+      isConcreteLeaf: isConcreteLeaf ?? this.isConcreteLeaf,
+      superTypes: superTypes ?? this.superTypes,
+      directSubTypes: directSubTypes ?? this.directSubTypes,
+      allConcreteLeaves: allConcreteLeaves ?? this.allConcreteLeaves,
+      discriminatorKey: discriminatorKey ?? this.discriminatorKey,
+      discriminatorValue: discriminatorValue,
+      principalKey: principalKey ?? this.principalKey,
+      replaySafe: replaySafe ?? this.replaySafe,
+      isSyntheticLeaf: isSyntheticLeaf,
+      root: root ?? this.root,
+    );
+  }
+
+  @override
+  String toString() =>
+      '${archetype.name}:$cleanName($discriminatorKey=$discriminatorValue)';
+}
+
+/// The parsed polymorphic graph of one library (or library set).
+final class PolymorphicIr {
+  /// Every node in the graph, keyed by [ZorphyNodeIr.className] so a caller
+  /// can address `$InteractiveUiNode` directly.
+  final Map<String, ZorphyNodeIr> nodes;
+
+  /// The hierarchy roots, in declaration order.
+  final List<ZorphyNodeIr> roots;
+
+  /// Every diagnostic found while resolving, in discovery order.
+  final List<ZorphyDiagnostic> diagnostics;
+
+  const PolymorphicIr({
+    required this.nodes,
+    required this.roots,
+    required this.diagnostics,
+  });
+
+  /// An empty graph — a library with no archetype annotations.
+  static const PolymorphicIr empty = PolymorphicIr(
+    nodes: {},
+    roots: [],
+    diagnostics: [],
+  );
+
+  /// Whether any diagnostic would block generation.
+  bool get hasErrors => diagnostics.any((d) => d.isError);
+
+  /// The ROOT node whose clean name is [cleanName], or `null`.
+  ///
+  /// Matching on the clean name is what the issue's fixtures describe
+  /// (`rootFor('UiNode')`), and it is unambiguous inside one hierarchy.
+  ZorphyNodeIr? rootFor(String cleanName) {
+    for (final root in roots) {
+      if (root.cleanName == cleanName) return root;
+    }
+    return null;
+  }
+
+  /// The node declared as [className] (prefixes included), or `null`.
+  ZorphyNodeIr? nodeFor(String className) => nodes[className];
+}
