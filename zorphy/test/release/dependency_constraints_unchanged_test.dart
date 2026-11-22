@@ -77,9 +77,7 @@ void main() {
 
         // issue #176 added the first dev dependency this package has: the v3
         // archetype test suite needs `package:test` to run.
-        final expectedAnnotationDevDeps = <String, String>{
-          'test': '^1.33.0',
-        };
+        final expectedAnnotationDevDeps = <String, String>{'test': '^1.33.0'};
 
         expect(zorphyDeps, expectedZorphyDeps);
         expect(zorphyDevDeps, expectedZorphyDevDeps);
