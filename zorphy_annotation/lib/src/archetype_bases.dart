@@ -1,43 +1,36 @@
-/// Marker base for every v3 archetype that supports polymorphism.
+/// Marker base interfaces for the v3.0.0 zero-toggle polymorphic archetypes.
 ///
-/// An archetype that carries a `discriminator` and (optionally) an
-/// `explicitSubTypes` list implements this interface, so a tool can ask
-/// "is this annotation polymorphic?" without naming each archetype.
-abstract class ZorphyPolymorphicBase {
-  /// The JSON key the base's `fromJson` dispatches on.
-  String get discriminator;
-
-  /// The subtype set declared on the base, empty when the hierarchy is
-  /// open-ended or resolved structurally.
-  List<Type> get explicitSubTypes => const [];
-}
-
-/// Marker base for [`ZorphyEntity`] — an aggregate/event root with its own
-/// identity.
+/// These interfaces carry no behaviour — they exist so generated code and
+/// consumer code can constrain a type parameter to "any subtype of a given
+/// archetype family" at compile time (e.g. `T extends ZorphyEntityBase<Object>`).
 ///
-/// [Id] is the type of the principal key: `Symbol?` on the annotation
-/// itself, the key field's type on a model.
-abstract class ZorphyEntityBase<Id> implements ZorphyPolymorphicBase {
-  /// The principal key symbol, `null` on a subtype that inherits it.
-  Id? get principalKey;
-}
+/// They are the type-level half of the v3 polymorphism model; the annotation
+/// classes that drive generation live in `archetypes.dart`.
+library;
 
-/// Marker base for [`ZorphyState`] — a state machine / view-model type.
-abstract class ZorphyStateBase implements ZorphyPolymorphicBase {}
-
-/// Marker base for [`ZorphyUnion`] — a closed set of variants with no
-/// fields of its own.
+/// Base marker implemented by every polymorphic root/subtype in an
+/// `@ZorphyEntity` hierarchy.
 ///
-/// A union declares its variant set as its `implements` clause, so it
-/// carries the discriminator and no subtype list — only the FULL
-/// polymorphic surface is its contract.
-abstract class ZorphyUnionBase implements ZorphyPolymorphicBase {}
+/// [Id] is the principal-key type: the type of the field named by
+/// [ZorphyEntity.principalKey] on the root, inherited by every subtype.
+abstract interface class ZorphyEntityBase<Id>
+    implements ZorphyPolymorphicBase {}
 
-/// Marker base for [`ZorphyIntent`] — a command with replay semantics.
-abstract class ZorphyIntentBase implements ZorphyPolymorphicBase {
-  /// Whether replaying this intent is safe.
-  bool get replaySafe;
-}
+/// Base marker implemented by every class in a `@ZorphyState` hierarchy.
+abstract interface class ZorphyStateBase implements ZorphyPolymorphicBase {}
 
-/// Marker base for [`ZorphyValue`] — an immutable value with no identity.
-abstract class ZorphyValueBase implements ZorphyPolymorphicBase {}
+/// Base marker implemented by every member of a `@ZorphyUnion` hierarchy.
+abstract interface class ZorphyUnionBase implements ZorphyPolymorphicBase {}
+
+/// Base marker implemented by every class in a `@ZorphyIntent` hierarchy.
+abstract interface class ZorphyIntentBase implements ZorphyPolymorphicBase {}
+
+/// Base marker implemented by every class in a `@ZorphyValue` hierarchy.
+abstract interface class ZorphyValueBase implements ZorphyPolymorphicBase {}
+
+/// Common super-marker shared by all five archetype families.
+///
+/// A type parameter bounded by `ZorphyPolymorphicBase` accepts a subtype from
+/// any archetype family, which is what generic patch/lens/codec helpers bound
+/// themselves to.
+abstract interface class ZorphyPolymorphicBase {}

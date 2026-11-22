@@ -1,54 +1,40 @@
-import 'archetype_bases.dart';
+/// Zero-toggle polymorphic archetype annotations for Zorphy v3.0.0.
+///
+/// v3 drops every preset (`ZorphyPreset`) and every `generate*` boolean toggle.
+/// Instead a class is annotated with exactly ONE archetype that names what the
+/// class IS, and polymorphism is expressed declaratively through
+/// [discriminator] and [explicitSubTypes] — there are no feature flags to get
+/// out of sync.
+///
+/// The five archetypes:
+/// - [ZorphyEntity] — an aggregate/event root with its own identity
+///   ([principalKey]); subtypes inherit the key.
+/// - [ZorphyState] — a mutable/composed state node in a sealed hierarchy.
+/// - [ZorphyUnion] — a closed discriminated union of sibling variants.
+/// - [ZorphyIntent] — a replay-safe command/intent envelope.
+/// - [ZorphyValue] — an immutable value object (no identity).
+library;
 
-/// A Zorphy archetype: an aggregate or event root with its own identity.
+/// An aggregate/event root with its own identity.
 ///
-/// Zero codegen toggles — every member of the generated surface
-/// (copyWith, equality, patch, filters, JSON) is unconditional. What
-/// varies per archetype is the SEMANTICS, never the feature set.
-///
-/// `discriminator` and `explicitSubTypes` make the archetype polymorphic:
-/// a base declaring subtypes emits the dispatching `fromJson`/`toJson` and
-/// the `changeTo<Subtype>` conversions; the subtypes inherit the
-/// discriminator from their base.
-///
-/// ```dart
-/// @ZorphyEntity(principalKey: #id)
-/// abstract class $User {
-///   String get id;
-///   String get name;
-/// }
-///
-/// @ZorphyEntity(principalKey: #id, explicitSubTypes: [$Admin])
-/// abstract class $$Account {
-///   String get id;
-/// }
-///
-/// @ZorphyEntity(principalKey: #id, discriminator: 'accountType')
-/// abstract class $Admin implements $$Account {
-///   String get id;
-///   List<String> get scopes;
-/// }
-/// ```
-final class ZorphyEntity implements ZorphyEntityBase<Symbol?> {
-  /// The principal key of the root entity — the symbol of the identity
-  /// field (`#id`, `#userId`, …). Optional on the annotation; required at
-  /// generation time for a root entity, and inherited by its subtypes,
-  /// which never repeat it. That is why the field is nullable and not
-  /// `required`: a subtype's `null` means "inherit from my base", while a
-  /// root that leaves it `null` fails generation rather than silently
-  /// producing an entity with no identity.
+/// [principalKey] names the id-bearing field (a `Symbol` of the field name, as
+/// `#id`). It is required on the ROOT of an entity hierarchy and inherited by
+/// every subtype. [discriminator] is the wire field that distinguishes sibling
+/// subtypes, and [explicitSubTypes] lists subtypes the generator cannot infer
+/// from the same-library sealed declarations (e.g. subtypes in another library).
+final class ZorphyEntity {
+  /// The principal-key field of the root entity, as a field `Symbol` (`#id`).
+  ///
+  /// Required on the root; inherited by subtypes. `null` on a subtype means
+  /// "inherit from the root".
   final Symbol? principalKey;
 
-  /// The JSON key the base's `fromJson` dispatches on. Subtypes inherit
-  /// the base's value.
-  @override
+  /// The wire field carrying the subtype tag during polymorphic dispatch.
   final String discriminator;
 
-  /// The subtype set of this base, as `$`-prefixed abstract classes.
-  @override
+  /// Subtypes the generator cannot infer from same-library declarations.
   final List<Type> explicitSubTypes;
 
-  /// Creates an entity archetype annotation.
   const ZorphyEntity({
     this.principalKey,
     this.discriminator = 'kind',
@@ -56,66 +42,42 @@ final class ZorphyEntity implements ZorphyEntityBase<Symbol?> {
   });
 }
 
-/// A Zorphy archetype for state: a view-model / state-machine type.
-///
-/// Same unconditional generated surface as [ZorphyEntity], minus the
-/// principal key — a state has no identity of its own.
-final class ZorphyState implements ZorphyStateBase {
-  /// The JSON key the base's `fromJson` dispatches on.
-  @override
+/// A mutable/composed state node in a (possibly sealed) hierarchy.
+final class ZorphyState {
+  /// The wire field carrying the subtype tag during polymorphic dispatch.
   final String discriminator;
 
-  /// The subtype set of this base, as `$`-prefixed abstract classes.
-  @override
+  /// Subtypes the generator cannot infer from same-library declarations.
   final List<Type> explicitSubTypes;
 
-  /// Creates a state archetype annotation.
   const ZorphyState({
     this.discriminator = 'kind',
     this.explicitSubTypes = const [],
   });
 }
 
-/// A Zorphy archetype for unions: a closed set of variants.
-///
-/// The archetype of a `$$` base whose subtypes are its variants — it
-/// carries the discriminator but no subtype list, because the variant set
-/// IS the class's `implements` clause.
-final class ZorphyUnion implements ZorphyUnionBase {
-  /// The JSON key the base's `fromJson` dispatches on.
-  @override
+/// A closed discriminated union of sibling variants.
+final class ZorphyUnion {
+  /// The wire field carrying the variant tag during polymorphic dispatch.
   final String discriminator;
 
-  /// A union declares its variant set as its `implements` clause, so this
-  /// is always empty.
-  @override
-  final List<Type> explicitSubTypes = const [];
-
-  /// Creates a union archetype annotation.
   const ZorphyUnion({this.discriminator = 'kind'});
 }
 
-/// A Zorphy archetype for intents: commands, events, messages.
-///
-/// [replaySafe] is REQUIRED — there is no default, so every intent states
-/// whether replaying it is safe. A leaf subtype that needs different
-/// semantics overrides it on its own annotation.
-final class ZorphyIntent implements ZorphyIntentBase {
-  /// Whether replaying this intent is safe. No default by design: an
-  /// intent's replay semantics is the one thing that must never be
-  /// guessed for it.
-  @override
+/// A command/intent envelope whose payloads are replayed across a boundary.
+final class ZorphyIntent {
+  /// Whether replaying this intent is side-effect-safe.
+  ///
+  /// REQUIRED — there is no default, so every intent must make the replay-safety
+  /// decision explicit. Leaf subtypes may override it.
   final bool replaySafe;
 
-  /// The JSON key the base's `fromJson` dispatches on.
-  @override
+  /// The wire field carrying the subtype tag during polymorphic dispatch.
   final String discriminator;
 
-  /// The subtype set of this base, as `$`-prefixed abstract classes.
-  @override
+  /// Subtypes the generator cannot infer from same-library declarations.
   final List<Type> explicitSubTypes;
 
-  /// Creates an intent archetype annotation.
   const ZorphyIntent({
     required this.replaySafe,
     this.discriminator = 'kind',
@@ -123,48 +85,59 @@ final class ZorphyIntent implements ZorphyIntentBase {
   });
 }
 
-/// A Zorphy archetype for values: immutable types with no identity.
-final class ZorphyValue implements ZorphyValueBase {
-  /// The JSON key the base's `fromJson` dispatches on.
-  @override
+/// An immutable value object with no identity of its own.
+final class ZorphyValue {
+  /// The wire field carrying the subtype tag during polymorphic dispatch.
   final String discriminator;
 
-  /// The subtype set of this base, as `$`-prefixed abstract classes.
-  @override
+  /// Subtypes the generator cannot infer from same-library declarations.
   final List<Type> explicitSubTypes;
 
-  /// Creates a value archetype annotation.
   const ZorphyValue({
     this.discriminator = 'kind',
     this.explicitSubTypes = const [],
   });
 }
 
-/// Field-level seed hint for generated mock/sample data.
+/// Field-level mock-data seed hint for mock-first generation.
 ///
-/// NOT a codegen toggle: it never changes what is generated, only the
-/// values a mock factory seeds. [preset] names a well-known shape
-/// (`'email'`, `'uuid'`, `'price'`, `'url'`); [example] carries a literal
-/// value to use verbatim.
-///
-/// ```dart
-/// @ZorphyValue()
-/// abstract class $Customer {
-///   @ZorphyMock(preset: 'email')
-///   String get email;
-///
-///   @ZorphyMock(example: 'EUR')
-///   String get currency;
-/// }
-/// ```
+/// Unlike the five archetypes, [ZorphyMock] annotates a FIELD, not a class: it
+/// tells the mock generator what trusted seed to synthesize for that field.
+/// [preset] is one of the constants in [ZorphyMockPresets] (other values are
+/// passed through to the consumer's own seed registry); [example] is a literal
+/// fallback used verbatim when no preset matches.
 final class ZorphyMock {
-  /// The seed shape: `'email'`, `'uuid'`, `'price'`, `'url'`, … `null`
-  /// when [example] carries the seed instead.
+  /// A named seed hint; see [ZorphyMockPresets] for the reserved names.
+  ///
+  /// The field stays a [String] rather than an enum so a consumer can register
+  /// its own seeds. [ZorphyMockPresets.all] is the closed set the generator can
+  /// warn on: a value outside it is a consumer-defined preset, not a typo it
+  /// can reject on its own.
   final String? preset;
 
-  /// A literal value the mock factory uses verbatim.
+  /// A literal example value used verbatim as the seed when no preset applies.
   final Object? example;
 
-  /// Creates a field-level mock hint.
   const ZorphyMock({this.preset, this.example});
+}
+
+/// The reserved [ZorphyMock.preset] names understood by the generator.
+///
+/// These are the presets every consumer gets without registering anything; any
+/// other value is passed through to the consumer's own seed registry.
+abstract final class ZorphyMockPresets {
+  /// A syntactically valid email address.
+  static const String email = 'email';
+
+  /// A unique identifier string.
+  static const String uuid = 'uuid';
+
+  /// A monetary amount.
+  static const String price = 'price';
+
+  /// An absolute URL.
+  static const String url = 'url';
+
+  /// Every reserved preset name, for the generator's typo warning.
+  static const List<String> all = <String>[email, uuid, price, url];
 }

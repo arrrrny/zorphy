@@ -3,6 +3,8 @@
 // for `@Zorphy`, and that must keep resolving while the generator is ported
 // onto the archetypes (#177, #178, #181, #187).
 export 'src/annotations.dart';
+export 'src/archetypes.dart';
+export 'src/archetype_bases.dart';
 export 'src/opt.dart';
 export 'src/List_E.dart';
 export 'src/patch.dart';

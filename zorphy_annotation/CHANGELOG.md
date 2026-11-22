@@ -4,10 +4,14 @@
 
 - The five v3 archetypes, all zero-toggle: `ZorphyEntity` (`principalKey`),
   `ZorphyState`, `ZorphyUnion`, `ZorphyIntent` (`replaySafe`, required) and
-  `ZorphyValue`, plus their marker bases in `archetype_bases.dart`. Each
-  supports polymorphism through `discriminator` (default `'kind'`) and
-  `explicitSubTypes`. `ZorphyMock` is a field-level seed hint, not a toggle.
-  (#176)
+  `ZorphyValue`, plus the marker interfaces `ZorphyEntityBase<Id>`,
+  `ZorphyStateBase`, `ZorphyUnionBase`, `ZorphyIntentBase`, `ZorphyValueBase`
+  and the shared `ZorphyPolymorphicBase` (#175, #176). A class is annotated
+  with exactly one archetype; polymorphism is declared through `discriminator`
+  (default `'kind'`) and `explicitSubTypes`.
+- `ZorphyMock` — a field-level seed hint, not a toggle — and
+  `ZorphyMockPresets`, the reserved `preset` names (`email`, `uuid`, `price`,
+  `url`) as constants so a consumer and the generator share one closed set.
 
 ### Changed
 
@@ -15,7 +19,9 @@
   the generator resolves it from — so the move is source-compatible.
 - SDK floor raised to `>=3.11.0` to match what the tracked lockfile resolves
   and what `zorphy` / `zorphy_migrator` already declare. `dartx` dropped: it
-  had no reference in this package.
+  had no reference in this package. The package also gains its first dev
+  dependency, `test`, for the archetype suite in `test/annotations_test.dart`
+  (previously its tests ran from the `zorphy` package only).
 
 ### Deprecated
 
