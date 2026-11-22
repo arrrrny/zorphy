@@ -1,4 +1,6 @@
 export 'src/annotations.dart';
+export 'src/archetypes.dart';
+export 'src/archetype_bases.dart';
 export 'src/opt.dart';
 export 'src/List_E.dart';
 export 'src/patch.dart';
