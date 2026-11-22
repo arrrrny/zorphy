@@ -441,3 +441,50 @@ lib/src/domain/entities/
     ├── index.dart
     └── user_status.dart
 ```
+
+## v3 polymorphic archetypes (3.0.0+)
+
+The `@Zorphy(...)` surface above is the v2 API. v3 replaces every preset and
+every `generate*` toggle with five zero-toggle archetypes: `@ZorphyEntity`,
+`@ZorphyState`, `@ZorphyUnion`, `@ZorphyIntent` and `@ZorphyValue`. A class
+carries exactly one, and polymorphism is declared by `implements $Parent`
+rather than by `explicitSubTypes`.
+
+```dart
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+@ZorphyEntity(principalKey: #id)
+abstract class $Notification {
+  String get id;
+  DateTime get createdAt;
+}
+
+@ZorphyEntity()
+class $OrderNotification implements $Notification {
+  String get orderId;
+}
+```
+
+`PolymorphicClassEmitter` (ISSUE-003, #178) emits the class shape of one such
+hierarchy from the resolved `PolymorphicIr`:
+
+- a `sealed class` root and every `sealed class` intermediate, implementing the
+  archetype marker base — `ZorphyEntityBase<Id>` (with `Id` taken from the
+  principal-key field's real type) or `ZorphyValueBase`;
+- a `final class` leaf that `extends` its NEAREST sealed ancestor, so it is a
+  subtype of every level above it;
+- the inherited `principalKey` getter, emitted ONCE on the root; subtypes reach
+  it through `extends`, so do not redeclare it;
+- `const <Leaf>.fromTrusted({required this.id, ...})`, assigning collection
+  references directly — no `toList()`, no `List.unmodifiable` — so a caller
+  that already owns a list pays no copy;
+- `copyWith`, where an omitted argument keeps the current value and an explicit
+  `null` CLEARS a nullable field (through a library-level `_sentinel`).
+
+Field data is passed alongside the IR (`Map<String, List<PolymorphicField>>`
+keyed by the node's `$`-prefixed class name), because the IR itself carries
+names, hierarchy links and the principal key but no fields.
+
+`ZorphyEntityBase<Id>` and its siblings are MARKERS: they declare no members.
+A generated `principalKey` getter is therefore the archetype's documented
+contract, not an `@override`.
