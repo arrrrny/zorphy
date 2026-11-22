@@ -1,3 +1,32 @@
+## [Unreleased]
+
+### Added
+
+- The five v3 archetypes, all zero-toggle: `ZorphyEntity` (`principalKey`),
+  `ZorphyState`, `ZorphyUnion`, `ZorphyIntent` (`replaySafe`, required) and
+  `ZorphyValue`, plus their marker bases in `archetype_bases.dart`. Each
+  supports polymorphism through `discriminator` (default `'kind'`) and
+  `explicitSubTypes`. `ZorphyMock` is a field-level seed hint, not a toggle.
+  (#176)
+
+### Changed
+
+- `ZorphyNamedConstructor` moved to `src/annotations.dart` — the library URI
+  the generator resolves it from — so the move is source-compatible.
+- SDK floor raised to `>=3.11.0` to match what the tracked lockfile resolves
+  and what `zorphy` / `zorphy_migrator` already declare. `dartx` dropped: it
+  had no reference in this package.
+
+### Deprecated
+
+- The pre-v3 surface (`@Zorphy`, `@Zorphy2`, `@ZValueObject`, `ZorphyPreset`,
+  `ZorphyKind`, the `generate*` flags, `ZorphyX`, and the
+  `getGenericToJsonFn` / `getFromJsonToGenericFn` runtime helpers) is kept and
+  exported for source compatibility: `zorphy` resolves this package by path
+  and reads its annotations from this library URI, and `zorphy_migrator` emits
+  `@Zorphy(...)` text. It is removed once the generator is ported onto the
+  archetypes (#177, #178, #181, #187).
+
 ## [3.0.0] - 2026-11-17
 
 ### Change

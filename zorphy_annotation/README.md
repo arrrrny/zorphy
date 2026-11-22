@@ -50,20 +50,32 @@ dev_dependencies:
 
 ### 1. Define Your Entity
 
-Use the `@Zorphy()` annotation on an abstract class:
+Pick the archetype that matches the semantics of the type — `@ZorphyEntity`,
+`@ZorphyState`, `@ZorphyUnion`, `@ZorphyIntent` or `@ZorphyValue`:
 
 ```dart
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part 'user.zorphy.dart';
 
-@Zorphy()
+@ZorphyEntity(principalKey: #id)
 abstract class $User {
+  String get id;
   String get name;
   int get age;
   String? get email;
 }
 ```
+
+Every archetype generates the same unconditional surface (`copyWith`,
+`==`/`hashCode`, `toString`, patching, filters, and JSON), so what you pick
+changes the SEMANTICS, never the feature set. An `@ZorphyEntity` root must
+name its `principalKey`; a subtype inherits it and leaves it unset.
+
+> The pre-v3 `@Zorphy()` / `@Zorphy2()` / `@ZValueObject` annotations and the
+> `generate*` flags are still exported for source compatibility while the
+> generator is ported onto the archetypes (#177, #178, #181, #187). New code
+> should use the archetypes above.
 
 ### 2. Run Code Generation
 
@@ -95,19 +107,53 @@ print(user == sameUser); // true
 
 ## 📚 Annotation Options
 
-The `@Zorphy()` annotation supports various configuration options:
+The v3 archetypes are zero-toggle: the generated surface is unconditional, so
+there is no `generateJson` / `generatePatch` / `generateCompareTo` flag to
+set. What each archetype accepts is only what its semantics needs.
 
-### `generateJson` (bool, default: false)
+### `principalKey` (`ZorphyEntity` only, `Symbol?`)
 
-Enable JSON serialization with `toJson()` and `fromJson()` methods.
+The identity field of the entity root, e.g. `#id`. Required at generation time
+for a root; inherited by subtypes, which leave it unset.
 
 ```dart
-@Zorphy(generateJson: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $Product {
   String get id;
   String get name;
   double get price;
 }
+```
+
+### `discriminator` (all archetypes, `String`, default `'kind'`)
+
+The JSON key the base's `fromJson` dispatches on.
+
+### `explicitSubTypes` (all but `ZorphyUnion`, `List<Type>`, default `[]`)
+
+The subtype set declared on a polymorphic base, as `$`-prefixed abstract
+classes. `ZorphyUnion` takes its variant set from the `implements` clause, so
+it has no such parameter.
+
+### `replaySafe` (`ZorphyIntent` only, `bool`, required)
+
+Whether replaying the intent is safe. No default by design.
+
+### `@ZorphyMock` (field annotation, not a toggle)
+
+A seed hint for generated mock data — never changes what is generated.
+
+```dart
+@ZorphyMock(preset: 'email')
+String get email;
+```
+
+### Legacy options (deprecated)
+
+The pre-v3 `@Zorphy()` options below — `generateJson`, `generateCompareTo`,
+`generateCopyWithFn`, `explicitSubTypes` on `@Zorphy`, `defaultFieldValue` —
+still work through the compatibility surface, because the current generator
+reads `@Zorphy`. They are removed with it (#177, #178, #181, #187).
 
 final product = Product(id: '1', name: 'Laptop', price: 999.99);
 final json = product.toJson();

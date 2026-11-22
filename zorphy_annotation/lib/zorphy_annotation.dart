@@ -19,14 +19,20 @@
 ///
 /// @ZorphyEntity(principalKey: #id)
 /// abstract class $User {
+///   String get id;
 ///   String get name;
 ///   int get age;
 /// }
 /// ```
 library zorphy_annotation;
 
-// Export all annotations
+// Export all annotations.
+//
+// `src/annotations.dart` is the legacy (pre-v3) annotation surface, exported
+// again so the generator and `zorphy_migrator` keep compiling while they are
+// ported onto the archetypes (#177, #178, #181, #187).
 export 'zorphy.dart';
+export 'src/annotations.dart';
 export 'src/archetype_bases.dart';
 export 'src/archetypes.dart';
 export 'src/merge_mode.dart';
