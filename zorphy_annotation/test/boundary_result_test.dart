@@ -57,6 +57,54 @@ void main() {
       expect(v.expected, 'double');
       expect(v.actual, 'String ("free")');
     });
+
+    test('has value equality on a non-const construction', () {
+      final a = _nonConstViolation();
+      final b = _nonConstViolation();
+      expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('differs from a violation with another pointer', () {
+      expect(
+        _nonConstViolation(),
+        isNot(equals(_nonConstViolation(path: '/other'))),
+      );
+    });
+  });
+
+  group('value equality', () {
+    test('BoundaryOk compares by value (non-const)', () {
+      final a = BoundaryOk<List<int>>([1, 2]);
+      expect(a, isNot(equals(BoundaryOk<List<int>>([1, 2]))));
+      expect(a, equals(BoundaryOk<List<int>>(a.value)));
+      final b = BoundaryOk<List<int>>(a.value);
+      expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('BoundaryErr compares by targetType and violations (non-const)', () {
+      final a = _nonConstErr();
+      final b = _nonConstErr();
+      expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
+      expect({a, b}, hasLength(1));
+    });
+
+    test('BoundaryErr differs when the violation list differs', () {
+      expect(
+        _nonConstErr(),
+        isNot(
+          equals(
+            _nonConstErr(violations: [_nonConstViolation(path: '/elsewhere')]),
+          ),
+        ),
+      );
+    });
+
+    test('BoundaryErr differs when targetType differs', () {
+      expect(_nonConstErr(), isNot(equals(_nonConstErr(targetType: 'num'))));
+    });
   });
 
   group('fold', () {
@@ -128,5 +176,54 @@ void main() {
         ),
       );
     });
+
+    test('reads as a sentence when there are no field violations', () {
+      final err = BoundaryErr<int>(
+        targetType: 'int',
+        violations: <FieldViolation>[],
+      );
+      expect(err.violations, isEmpty);
+      expect(
+        () => err.getOrThrow(),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('target type int'),
+              contains('with no field violations.'),
+              isNot(contains('0 violations')),
+            ),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('identity through a runtime decode path', () {
+    test('a non-const BoundaryOk carries the value', () {
+      final value = [1, 2, 3];
+      final ok = BoundaryOk<List<int>>(value);
+      expect(ok.isOk, isTrue);
+      expect(ok.valueOrNull, same(value));
+      expect(ok.getOrThrow(), same(value));
+    });
+
+    test('a non-const BoundaryErr folds through the error arm', () {
+      final err = _nonConstErr();
+      final out = err.fold<int>((_) => -1, (e) => e.violations.length);
+      expect(out, 1);
+    });
   });
 }
+
+FieldViolation _nonConstViolation({String path = '/a'}) =>
+    FieldViolation(path: path, expected: 'int', actual: 'String');
+
+BoundaryErr<int> _nonConstErr({
+  String targetType = 'int',
+  List<FieldViolation>? violations,
+}) => BoundaryErr<int>(
+  targetType: targetType,
+  violations: violations ?? [_nonConstViolation()],
+);

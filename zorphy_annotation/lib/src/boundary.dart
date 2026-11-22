@@ -13,6 +13,8 @@
 /// ```
 library;
 
+import 'package:collection/collection.dart';
+
 /// The outcome of decoding untrusted data against an expected type [T].
 ///
 /// Sealed: the only shapes are [BoundaryOk] (success) and [BoundaryErr]
@@ -21,6 +23,10 @@ sealed class ZorphyBoundaryResult<T> {
   const ZorphyBoundaryResult();
 
   /// Whether this result is a successful [BoundaryOk].
+  ///
+  /// The check is safe because the hierarchy is sealed: no other variant can
+  /// masquerade as a [BoundaryOk], so a third variant cannot be added without
+  /// revisiting this getter.
   bool get isOk => this is BoundaryOk<T>;
 
   /// The decoded value when [isOk], otherwise `null`.
@@ -36,26 +42,28 @@ sealed class ZorphyBoundaryResult<T> {
   R fold<R>(R Function(T value) onOk, R Function(BoundaryErr<T> error) onErr) =>
       switch (this) {
         BoundaryOk<T>(:final value) => onOk(value),
-        BoundaryErr<T>() => onErr(this as BoundaryErr<T>),
+        final BoundaryErr<T> err => onErr(err),
       };
 
   /// Returns the decoded value, or throws a [StateError] describing the
   /// violations when this is a [BoundaryErr].
   ///
-  /// The thrown message names the target type, the violation count and each
-  /// offending JSON pointer, so a boundary failure is diagnosable from the
-  /// log alone.
+  /// The thrown message names the target type and each offending JSON
+  /// pointer, plus the violation count when there is at least one violation,
+  /// so a boundary failure is diagnosable from the log alone.
   T getOrThrow() => switch (this) {
     BoundaryOk<T>(:final value) => value,
-    BoundaryErr<T>() => throw StateError(
-      _describeError(this as BoundaryErr<T>),
-    ),
+    final BoundaryErr<T> err => throw StateError(_describeError(err)),
   };
 
   static String _describeError<T>(BoundaryErr<T> error) {
     final buffer = StringBuffer()
       ..write('Boundary decode failed for target type ')
-      ..write(error.targetType)
+      ..write(error.targetType);
+    if (error.violations.isEmpty) {
+      return (buffer..write(' with no field violations.')).toString();
+    }
+    buffer
       ..write(' with ')
       ..write(error.violations.length)
       ..write(error.violations.length == 1 ? ' violation:' : ' violations:');
@@ -79,12 +87,29 @@ final class BoundaryOk<T> extends ZorphyBoundaryResult<T> {
   final T value;
 
   const BoundaryOk(this.value);
+
+  /// Value equality on [value], using `T`'s own `==`.
+  ///
+  /// A collection-typed [value] therefore compares by identity, which is what
+  /// `T`'s `==` says; deep-comparing an arbitrary decoded payload is the
+  /// caller's choice.
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is BoundaryOk<T> && value == other.value;
+
+  @override
+  int get hashCode => Object.hash(BoundaryOk, value);
 }
 
 /// A failed boundary decode.
 ///
 /// [targetType] names the type the wire data was being decoded into, and
 /// [violations] lists every field that did not match its expected shape.
+///
+/// Value equality: two errors with the same [targetType] and an equal
+/// [violations] list are `==`, so a decoded error can be diffed or used as a
+/// map key. An error with no violations is legal — it models a decode failure
+/// with no per-field detail.
 final class BoundaryErr<T> extends ZorphyBoundaryResult<T> {
   /// The type the wire data was being decoded into.
   final String targetType;
@@ -93,6 +118,20 @@ final class BoundaryErr<T> extends ZorphyBoundaryResult<T> {
   final List<FieldViolation> violations;
 
   const BoundaryErr({required this.targetType, required this.violations});
+
+  static const ListEquality<FieldViolation> _violationsEquality =
+      ListEquality<FieldViolation>();
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BoundaryErr<T> &&
+          targetType == other.targetType &&
+          _violationsEquality.equals(violations, other.violations);
+
+  @override
+  int get hashCode =>
+      Object.hash(targetType, _violationsEquality.hash(violations));
 }
 
 /// A single field-level decode failure at a trust boundary.
@@ -111,4 +150,15 @@ final class FieldViolation {
     required this.expected,
     required this.actual,
   });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FieldViolation &&
+          path == other.path &&
+          expected == other.expected &&
+          actual == other.actual;
+
+  @override
+  int get hashCode => Object.hash(path, expected, actual);
 }
