@@ -9,6 +9,21 @@
   constructor, `copyWith`, `==`/`hashCode`, `toString`, with every other
   feature opt-in.
 
+### Added
+
+- The v3 zero-toggle polymorphic archetypes (ISSUE-001, foundation for #175):
+  `ZorphyEntity`, `ZorphyState`, `ZorphyUnion`, `ZorphyIntent`, `ZorphyValue`,
+  and the field-level `ZorphyMock` seed hint, plus the marker interfaces
+  `ZorphyEntityBase<Id>`, `ZorphyStateBase`, `ZorphyUnionBase`,
+  `ZorphyIntentBase`, `ZorphyValueBase` and the shared `ZorphyPolymorphicBase`.
+  A class is annotated with exactly one archetype; polymorphism is declared
+  through `discriminator`/`explicitSubTypes`, with no `generate*` toggles.
+- `ZorphyMockPresets` — the reserved `preset` names (`email`, `uuid`, `price`,
+  `url`) as constants, so a consumer and the generator share one closed set.
+
+No dependency or SDK-floor change: the package keeps its `>=3.8.0` floor and
+its empty `dev_dependencies` (its tests run from the `zorphy` package).
+
 ## [2.5.0] - 2026-11-16
 
 ### Change

@@ -61,9 +61,7 @@ void main() {
   });
 
   group('ZorphyIntent', () {
-    test('replaySafe is required — no default', () {
-      // A const ZorphyIntent without replaySafe must not compile; we assert the
-      // runtime surface instead: both values are representable and distinct.
+    test('replaySafe is representable in both states', () {
       const safe = ZorphyIntent(replaySafe: true);
       const unsafe = ZorphyIntent(replaySafe: false);
       expect(safe.replaySafe, isTrue);
@@ -108,7 +106,7 @@ void main() {
     });
 
     test('named preset', () {
-      const m = ZorphyMock(preset: 'email');
+      const m = ZorphyMock(preset: ZorphyMockPresets.email);
       expect(m.preset, 'email');
     });
 
@@ -116,19 +114,10 @@ void main() {
       const m = ZorphyMock(example: 'seed-42');
       expect(m.example, 'seed-42');
     });
-  });
 
-  group('zero-toggle guarantee', () {
-    test('no archetype exposes a generate* boolean toggle', () {
-      // v3 dropped every preset and feature flag. These expressions only
-      // compile if the toggle parameters no longer exist on the archetypes;
-      // the test passing is the proof the surface is zero-toggle.
-      const ZorphyEntity().discriminator;
-      const ZorphyState().discriminator;
-      const ZorphyUnion().discriminator;
-      const ZorphyIntent(replaySafe: true).discriminator;
-      const ZorphyValue().discriminator;
-      expect(true, isTrue);
+    test('every reserved preset is a distinct documented name', () {
+      expect(ZorphyMockPresets.all, ['email', 'uuid', 'price', 'url']);
+      expect(ZorphyMockPresets.all.toSet(), hasLength(4));
     });
   });
 
@@ -136,16 +125,16 @@ void main() {
     test(
       'a subtype can implement its archetype base and the common marker',
       () {
-        _EntityImpl e = _EntityImpl();
-        ZorphyEntityBase<Object> asEntity = e;
-        ZorphyPolymorphicBase asPoly = e;
+        final e = _EntityImpl();
+        final ZorphyEntityBase<Object> asEntity = e;
+        final ZorphyPolymorphicBase asPoly = e;
         expect(asEntity, same(e));
         expect(asPoly, same(e));
 
-        ZorphyStateBase s = _StateImpl();
-        ZorphyUnionBase u = _UnionImpl();
-        ZorphyIntentBase i = _IntentImpl();
-        ZorphyValueBase v = _ValueImpl();
+        final ZorphyStateBase s = _StateImpl();
+        final ZorphyUnionBase u = _UnionImpl();
+        final ZorphyIntentBase i = _IntentImpl();
+        final ZorphyValueBase v = _ValueImpl();
         expect(s, isA<ZorphyStateBase>());
         expect(u, isA<ZorphyPolymorphicBase>());
         expect(i, isA<ZorphyPolymorphicBase>());

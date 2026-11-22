@@ -103,15 +103,41 @@ final class ZorphyValue {
 ///
 /// Unlike the five archetypes, [ZorphyMock] annotates a FIELD, not a class: it
 /// tells the mock generator what trusted seed to synthesize for that field.
-/// [preset] is one of `'email'`, `'uuid'`, `'price'`, `'url'` (other values are
+/// [preset] is one of the constants in [ZorphyMockPresets] (other values are
 /// passed through to the consumer's own seed registry); [example] is a literal
 /// fallback used verbatim when no preset matches.
 final class ZorphyMock {
-  /// A named seed hint: `'email'`, `'uuid'`, `'price'`, or `'url'`.
+  /// A named seed hint; see [ZorphyMockPresets] for the reserved names.
+  ///
+  /// The field stays a [String] rather than an enum so a consumer can register
+  /// its own seeds. [ZorphyMockPresets.all] is the closed set the generator can
+  /// warn on: a value outside it is a consumer-defined preset, not a typo it
+  /// can reject on its own.
   final String? preset;
 
   /// A literal example value used verbatim as the seed when no preset applies.
   final Object? example;
 
   const ZorphyMock({this.preset, this.example});
+}
+
+/// The reserved [ZorphyMock.preset] names understood by the generator.
+///
+/// These are the presets every consumer gets without registering anything; any
+/// other value is passed through to the consumer's own seed registry.
+abstract final class ZorphyMockPresets {
+  /// A syntactically valid email address.
+  static const String email = 'email';
+
+  /// A unique identifier string.
+  static const String uuid = 'uuid';
+
+  /// A monetary amount.
+  static const String price = 'price';
+
+  /// An absolute URL.
+  static const String url = 'url';
+
+  /// Every reserved preset name, for the generator's typo warning.
+  static const List<String> all = <String>[email, uuid, price, url];
 }
