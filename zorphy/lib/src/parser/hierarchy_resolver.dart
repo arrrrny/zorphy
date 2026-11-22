@@ -417,8 +417,8 @@ final class HierarchyResolver {
     // element is already in hand, so a subtype in another library is found
     // without a name scan (finding: cross-library children never resolved).
     final resolvedChildren = <ZorphyNodeIr>[];
-    for (final child in wiredChildren[declaration.element] ??
-        const <_Declaration>[]) {
+    for (final child
+        in wiredChildren[declaration.element] ?? const <_Declaration>[]) {
       _resolveSubtree(
         child,
         principalKey,
@@ -590,8 +590,7 @@ final class HierarchyResolver {
     return '$uri#$name';
   }
 
-  static String _cleanName(String? name) =>
-      (name ?? '').replaceAll(r'$', '');
+  static String _cleanName(String? name) => (name ?? '').replaceAll(r'$', '');
 
   static String _archetypeLabel(ArchetypeKind kind) => switch (kind) {
     ArchetypeKind.entity => 'Entity',
