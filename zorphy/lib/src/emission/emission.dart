@@ -7,3 +7,4 @@
 library;
 
 export 'emitter.dart';
+export 'polymorphic_class_emitter.dart';
