@@ -2,6 +2,7 @@ import 'package:code_builder/code_builder.dart';
 
 import '../ast/ast.dart';
 import '../emission/patch_emitter.dart';
+import '../emission/polymorphic_patch_emitter.dart';
 import '../helpers.dart' as helpers;
 import 'base_generator.dart';
 
@@ -200,6 +201,11 @@ class PatchClassGenerator extends ConcreteClassGenerator {
   @override
   bool shouldGenerate(GenerationContext context) {
     if (!context.config.generatePatch) return false;
+    // A sealed root DOES get a patch — the polymorphic one (ISSUE-009), which
+    // is what lets a heterogeneous collection be updated without downcasting.
+    if (context.metadata.isSealed) {
+      return context.metadata.explicitSubtypes.isNotEmpty;
+    }
     // NonSealed abstract bases need Patch because parent entities
     // reference them in their own Patch generation (withXxxPatch methods).
     if (context.metadata.isAbstract && !context.metadata.nonSealed)
@@ -215,6 +221,26 @@ class PatchClassGenerator extends ConcreteClassGenerator {
         .map((k) => k.replaceAll(r'$', ''))
         .toList();
     final genericTypeNames = metadata.generics.map((g) => g.name).toList();
+
+    // Sealed roots: the polymorphic patch surface (ISSUE-009) — a sealed
+    // `<Root>Patch` plus the `<Root>SharedPatch` its `.shared(...)` factory
+    // builds, dispatching shared-field updates across every concrete subtype.
+    if (metadata.isSealed) {
+      final subtypeNames = {
+        for (final subtype in metadata.explicitSubtypes)
+          subtype.interfaceName.replaceAll(r'$', ''),
+        for (final subtype in metadata.polymorphicSubtypes)
+          subtype.interfaceName.replaceAll(r'$', ''),
+      }.toList();
+      if (subtypeNames.isEmpty) return [];
+      final emitted = PolymorphicPatchEmitter().emitRoot(
+        rootName: metadata.cleanName,
+        fields: metadata.allFields,
+        subtypeNames: subtypeNames,
+      );
+      if (emitted.trim().isEmpty) return [];
+      return [Code(emitted)];
+    }
 
     // Abstract nonSealed bases: emit minimal abstract Patch stub (data holder
     // only, no applyTo). The full Patch with applyTo is for concrete classes.
