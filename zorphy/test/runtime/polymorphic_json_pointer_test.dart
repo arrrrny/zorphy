@@ -78,18 +78,105 @@ abstract class \$ProductUiState {
 }
 ''';
 
-/// Generates every `@Zorphy` class of the fixture library.
-Future<Map<String, String>> _generateHierarchy(Directory fixtureDir) async {
-  final source = File('${fixtureDir.path}/ui_node.dart')
-    ..writeAsStringSync(_hierarchy);
-  final collection = AnalysisContextCollection(includedPaths: [source.path]);
+/// A SEALED root with its own fields — the shape that reaches
+/// `_coversEverySubtype`, `_emit`'s writerless-root branch and the
+/// inherited-field writer coverage all at once.
+///
+/// `$$` roots never generate a `copyWith` of their own, so `/id` used to be
+/// dropped from the table entirely, and each subtype-only field used to drop
+/// the `default:` that kept its switch exhaustive.
+const _sealedSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'sealed.zorphy.dart';
+
+@Zorphy(explicitSubTypes: [\$LeafA, \$LeafB])
+abstract class \$\$Root {
+  String get id;
+}
+
+@Zorphy()
+abstract class \$LeafA implements \$\$Root {
+  String get onlyOnA;
+}
+
+@Zorphy()
+abstract class \$LeafB implements \$\$Root {
+  String get other;
+}
+''';
+
+/// A generic annotated class: a static member cannot reference `T`, so the
+/// resolver must be declined rather than emitted.
+const _genericSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'generic.zorphy.dart';
+
+@Zorphy()
+abstract class \$Box<T> {
+  T get value;
+}
+''';
+
+/// A subtype-only field whose type is ANOTHER annotated class, and a nested
+/// type whose own resolver is declined because it generates no `copyWith`.
+const _nestedSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'nested.zorphy.dart';
+
+@Zorphy(explicitSubTypes: [\$EditNode, \$TextNode])
+abstract class \$\$UiNode {
+  String get contractId;
+}
+
+@Zorphy()
+abstract class \$EditNode implements \$\$UiNode {
+  \$Draft get draft;
+}
+
+@Zorphy()
+abstract class \$TextNode implements \$\$UiNode {
+  String get text;
+}
+
+@Zorphy()
+abstract class \$Draft {
+  String get title;
+}
+
+@Zorphy(generateCopyWith: false)
+abstract class \$Frozen {
+  String get label;
+}
+
+@Zorphy()
+abstract class \$Holder {
+  Frozen get frozen;
+}
+''';
+
+/// Generates every `@Zorphy` class of ONE fixture library and returns the
+/// emitted source per class, keyed by clean class name.
+Future<Map<String, String>> _generateHierarchy(Directory fixtureDir) =>
+    _generate(fixtureDir, 'ui_node', _hierarchy);
+
+Future<Map<String, String>> _generate(
+  Directory fixtureDir,
+  String libraryName,
+  String source,
+) async {
+  final sourceFile = File('${fixtureDir.path}/$libraryName.dart')
+    ..writeAsStringSync(source);
+  final collection = AnalysisContextCollection(includedPaths: [sourceFile.path]);
   final outputs = <String, String>{};
   try {
     final result =
         await collection
-                .contextFor(source.path)
+                .contextFor(sourceFile.path)
                 .currentSession
-                .getResolvedUnit(source.path)
+                .getResolvedUnit(sourceFile.path)
             as ResolvedUnitResult;
     final graph = ClassGraph.fromLibraryClasses(
       result.libraryElement.classes.toList(),
@@ -314,18 +401,149 @@ void main() {
       // `value as String` casts are unavoidable in this API shape and are
       // suppressed fleet-wide, so the fixture carries the same headers or the
       // gate would fail on a diagnostic no real consumer ever sees.
-      final part = StringBuffer()
-        ..writeln('// ignore_for_file: UNNECESSARY_CAST')
-        ..writeln('// ignore_for_file: type=lint')
-        ..writeln('part of \'ui_node.dart\';');
-      for (final output in outputs.values) {
-        part.writeln(output);
-      }
-      File(
-        '${fixtureDir.path}/ui_node.zorphy.dart',
-      ).writeAsStringSync(part.toString());
-      final diagnostics = await _diagnostics('${fixtureDir.path}/ui_node.dart');
+      final diagnostics = await _analyzeFixture(
+        fixtureDir,
+        'ui_node',
+        outputs,
+      );
       expect(diagnostics, isEmpty, reason: diagnostics.join('\n'));
     });
+
+    // The shapes below are the ones a non-sealed, non-generic fixture cannot
+    // reach. Each asserts on ALL diagnostics, never a filtered subset: the
+    // #159 gate filters by diagnostic code, which is exactly how a
+    // `non_exhaustive_switch_statement` used to sail through it.
+    for (final entry in {
+      'a sealed root with explicit subtypes': (
+        'sealed',
+        _sealedSource,
+        ['Root', 'LeafA', 'LeafB'],
+      ),
+      'a generic annotated class': ('generic', _genericSource, ['Box']),
+      'subtype-only and resolverless nested types': (
+        'nested',
+        _nestedSource,
+        ['UiNode', 'EditNode', 'TextNode', 'Draft', 'Frozen', 'Holder'],
+      ),
+    }.entries) {
+      test('${entry.key} emits parts that analyze clean', () async {
+        final (libraryName, source, classes) = entry.value;
+        final dir = Directory('${fixtureDir.path}/${libraryName}_fixture')
+          ..createSync(recursive: true);
+        final generated = await _generate(dir, libraryName, source);
+        expect(
+          generated.keys,
+          containsAll(classes),
+          reason: 'every class of the fixture must generate',
+        );
+        final diagnostics = await _analyzeFixture(
+          dir,
+          libraryName,
+          generated,
+        );
+        expect(diagnostics, isEmpty, reason: diagnostics.join('\n'));
+      });
+    }
   });
+
+  group('resolvePath — shapes the flat fixture cannot reach', () {
+    late Map<String, String> sealed;
+    late Map<String, String> generic;
+    late Map<String, String> nested;
+
+    setUpAll(() async {
+      sealed = await _generate(
+        Directory('${fixtureDir.path}/sealed_shape')..createSync(recursive: true),
+        'sealed',
+        _sealedSource,
+      );
+      generic = await _generate(
+        Directory('${fixtureDir.path}/generic_shape')
+          ..createSync(recursive: true),
+        'generic',
+        _genericSource,
+      );
+      nested = await _generate(
+        Directory('${fixtureDir.path}/nested_shape')..createSync(recursive: true),
+        'nested',
+        _nestedSource,
+      );
+    });
+
+    test('a sealed root still resolves its OWN fields', () {
+      // `$$Root` never generates `copyWith`, so `/id` used to be dropped from
+      // the table and `Root.resolvePath('/id')` answered null for a pointer
+      // every Root demonstrably carries. The write dispatches to the concrete
+      // subtypes that DID generate a writer.
+      final root = sealed['Root']!;
+      expect(root, contains("'/id' =>"));
+      expect(root, matches(RegExp(r"'/id' => [\s\S]{0,400}?case LeafA _node:")));
+      expect(root, matches(RegExp(r"'/id' => [\s\S]{0,400}?case LeafB _node:")));
+    });
+
+    test('a subtype-only field keeps its fallback and never drops an arm', () {
+      // `onlyOnA` covers one of two subtypes, so the `default:` that answers
+      // null (read) / the receiver (write) must stay — dropping it was four
+      // `non_exhaustive_switch_statement` errors.
+      final root = sealed['Root']!;
+      expect(
+        root,
+        matches(RegExp(r"'/onlyOnA' => [\s\S]{0,400}?default:\s*return null;")),
+      );
+      expect(
+        root,
+        matches(RegExp(r"'/onlyOnA' => [\s\S]{0,600}?default:\s*return root;")),
+      );
+      // The shared field is covered by both leaves, so its switch must NOT
+      // carry a dead default (`unreachable_switch_default`).
+      expect(
+        root,
+        isNot(matches(RegExp(r"'/id' => [\s\S]{0,400}?default:"))),
+      );
+    });
+
+    test('a generic class emits no resolver at all', () {
+      // A static member cannot reference the class's type parameters
+      // (`type_parameter_referenced_by_static`), so emitting one is a compile
+      // error for every consumer of a generic model.
+      expect(generic['Box'], isNot(contains('resolvePath')));
+    });
+
+    test('a subtype-only nested field casts with the concrete type', () {
+      // The raw analyzer type is `$Draft`, which is an interface, not a value
+      // type: `copyWith(draft: value as $Draft)` does not compile.
+      final node = nested['UiNode']!;
+      expect(node, contains('as Draft'));
+      expect(node, isNot(contains('as \$Draft')));
+      expect(node, isNot(contains('ZorphyLens<UiNode, \$Draft>')));
+    });
+
+    test('a nested type without a resolver is not called statically', () {
+      // `Frozen` generates no `copyWith`, so its own `resolvePath` was
+      // declined — a `Frozen.resolvePath(remainder)` here would reference a
+      // member that does not exist.
+      final holder = nested['Holder']!;
+      expect(holder, isNot(contains('Frozen.resolvePath')));
+      expect(holder, contains("'/frozen' =>"));
+    });
+  });
+}
+
+/// Writes [outputs] into [libraryName]'s shared part and returns every
+/// analyzer diagnostic for that library.
+Future<List<String>> _analyzeFixture(
+  Directory dir,
+  String libraryName,
+  Map<String, String> outputs,
+) async {
+  final part = StringBuffer()
+    ..writeln('// ignore_for_file: UNNECESSARY_CAST')
+    ..writeln('// ignore_for_file: type=lint')
+    ..writeln("part of '$libraryName.dart';");
+  for (final output in outputs.values) {
+    part.writeln(output);
+  }
+  File('${dir.path}/$libraryName.zorphy.dart')
+      .writeAsStringSync(part.toString());
+  return _diagnostics('${dir.path}/$libraryName.dart');
 }
