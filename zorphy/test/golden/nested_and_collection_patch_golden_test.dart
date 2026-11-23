@@ -108,6 +108,27 @@ void main() {
       expect(emitted, contains('PatchNested<Address, AddressPatch>'));
     });
 
+    test('a nullable collection keeps the whole-value transition', () {
+      // A delta needs two non-null collections to diff, and `invert` takes
+      // the non-nullable collection, so a null on either side is carried
+      // verbatim. The repo's analyze-clean gate caught this regression when
+      // a nullable `List<TaskStatus>?` field was diffed unconditionally.
+      final nullable = PatchEmitter().emit(
+        className: 'Task',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('history', 'List<String>?', ''),
+          NameTypeClassComment('index', 'Map<String, int>?', ''),
+        ],
+      );
+      expect(nullable, contains('previous.history != null &&'));
+      expect(nullable, contains('previous.history!'));
+      expect(nullable, contains('before.history != null'));
+      expect(nullable, contains('before.history!'));
+      expect(nullable, contains('previous.index != null &&'));
+      expect(nullable, contains('before.index != null'));
+    });
+
     test('invert captures the prior collection state', () {
       expect(emitted, contains('ListPatchDelta.diff<String>('));
       expect(emitted, contains('before.tags'));

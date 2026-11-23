@@ -336,12 +336,16 @@ class PatchEmitter {
               );
             }
           case _FieldShapeKind.list:
+            // A nullable field's prior value may be null, and `invert` takes
+            // the non-nullable collection; the else arm below restores the
+            // raw prior value (including null) wholesale.
             b.statements.add(
               Code(
-                'if ($patchMapName[$key] is ListPatchDelta<${shape.valueType}>) '
+                'if ($patchMapName[$key] is ListPatchDelta<${shape.valueType}>'
+                '${shape.isNullable ? ' && before.$member != null' : ''}) '
                 'undo.$patchMapName[$key] = '
                 '($patchMapName[$key] as ListPatchDelta<${shape.valueType}>)'
-                '.invert(before.$member);',
+                '.invert(before.$member${shape.isNullable ? '!' : ''});',
               ),
             );
             b.statements.add(
@@ -355,10 +359,11 @@ class PatchEmitter {
             b.statements.add(
               Code(
                 'if ($patchMapName[$key] '
-                'is MapPatchDelta<${shape.valueType}>) '
+                'is MapPatchDelta<${shape.valueType}>'
+                '${shape.isNullable ? ' && before.$member != null' : ''}) '
                 'undo.$patchMapName[$key] = '
                 '($patchMapName[$key] as MapPatchDelta<${shape.valueType}>)'
-                '.invert(before.$member);',
+                '.invert(before.$member${shape.isNullable ? '!' : ''});',
               ),
             );
             b.statements.add(
@@ -493,6 +498,38 @@ class PatchEmitter {
                 '(${member}Delta);',
               ),
             );
+          case _FieldShapeKind.list when shape.isNullable:
+            b.statements.add(
+              Code(
+                'if (previous.$member != null && next.$member != null) {',
+              ),
+            );
+            b.statements.add(
+              Code(
+                '  final ${member}Delta = '
+                'ListPatchDelta.diff<${shape.valueType}>('
+                'previous.$member!, next.$member!);',
+              ),
+            );
+            b.statements.add(
+              Code(
+                '  if (${member}Delta.isNotEmpty) '
+                'changes.$patchMapName[$key] = ${member}Delta;',
+              ),
+            );
+            b.statements.add(const Code('}'));
+            b.statements.add(
+              Code(
+                'if (previous.$member == null || next.$member == null) {',
+              ),
+            );
+            b.statements.add(
+              Code(
+                '  if (previous.$member != next.$member) '
+                'changes.$patchMapName[$key] = next.$member;',
+              ),
+            );
+            b.statements.add(const Code('}'));
           case _FieldShapeKind.list:
             b.statements.add(
               Code(
@@ -507,6 +544,37 @@ class PatchEmitter {
                 'changes.$patchMapName[$key] = ${member}Delta;',
               ),
             );
+          case _FieldShapeKind.map when shape.isNullable:
+            b.statements.add(
+              Code(
+                'if (previous.$member != null && next.$member != null) {',
+              ),
+            );
+            b.statements.add(
+              Code(
+                '  final ${member}Delta = MapPatchDelta.diff<${shape.valueType}>('
+                'previous.$member!, next.$member!);',
+              ),
+            );
+            b.statements.add(
+              Code(
+                '  if (${member}Delta.isNotEmpty) '
+                'changes.$patchMapName[$key] = ${member}Delta;',
+              ),
+            );
+            b.statements.add(const Code('}'));
+            b.statements.add(
+              Code(
+                'if (previous.$member == null || next.$member == null) {',
+              ),
+            );
+            b.statements.add(
+              Code(
+                '  if (previous.$member != next.$member) '
+                'changes.$patchMapName[$key] = next.$member;',
+              ),
+            );
+            b.statements.add(const Code('}'));
           case _FieldShapeKind.map:
             final args = shape.valueType;
             b.statements.add(
