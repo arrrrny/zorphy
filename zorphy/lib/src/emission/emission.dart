@@ -6,4 +6,5 @@
 /// [ZorphyEmitter].
 library;
 
+export 'boundary_codec_emitter.dart';
 export 'emitter.dart';
