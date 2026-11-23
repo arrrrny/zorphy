@@ -67,6 +67,11 @@ class Orchestrator {
 
     // ChangeTo extension (conditional, has explicit subtypes)
     ChangeToExtensionGenerator(),
+
+    // Typed lens surface (issue #185) — `<Name>Lenses` accessor class plus the
+    // `static const lenses` registry, conditional on a concrete, non-generic
+    // class that has copyWith to write through.
+    LensGenerator(),
   ];
 
   /// Shared emitter instance (page width 80 — Dart style guide default).
@@ -310,6 +315,9 @@ class Orchestrator {
         }
         if (memberCode.method != null) {
           c.methods.add(memberCode.method!);
+        }
+        if (memberCode.field != null) {
+          c.fields.add(memberCode.field!);
         }
       }
     });

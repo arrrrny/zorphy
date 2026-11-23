@@ -8,6 +8,7 @@ export 'src/archetype_bases.dart';
 export 'src/opt.dart';
 export 'src/List_E.dart';
 export 'src/patch.dart';
+export 'src/lens.dart';
 
 export 'package:quiver/core.dart' show hashObjects;
 export 'package:json_annotation/json_annotation.dart';
