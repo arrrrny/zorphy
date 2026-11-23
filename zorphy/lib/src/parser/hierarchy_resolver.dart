@@ -271,7 +271,57 @@ final class HierarchyResolver {
       principalKey: declaration.principalKey,
       replaySafe: declaration.replaySafe,
       isSyntheticLeaf: isSyntheticLeaf,
+      fields: _declaredFields(element),
     );
+  }
+
+  /// The fields [element] declares itself, in declaration order.
+  ///
+  /// Getters are the shape every archetype fixture uses (`String get id;`);
+  /// real fields are read too so an annotated class that mixes both forms
+  /// still round-trips. A declaration that inherits its payload from a
+  /// supertype declares nothing here, and the leaf walk asks the ancestors —
+  /// which is why this list is the node's OWN fields only.
+  static List<ZorphyFieldIr> _declaredFields(ClassElement element) {
+    final fields = <ZorphyFieldIr>[];
+    final seen = <String>{};
+    for (final getter in element.getters) {
+      if (getter.isStatic) continue;
+      final name = getter.name ?? '';
+      if (name.isEmpty || !seen.add(name)) continue;
+      final type = getter.returnType;
+      fields.add(
+        ZorphyFieldIr(
+          name: name,
+          type: _typeText(type),
+          isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+        ),
+      );
+    }
+    for (final field in element.fields) {
+      if (field.isStatic) continue;
+      final name = field.name ?? '';
+      if (name.isEmpty || !seen.add(name)) continue;
+      final type = field.type;
+      fields.add(
+        ZorphyFieldIr(
+          name: name,
+          type: _typeText(type),
+          isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+        ),
+      );
+    }
+    return List.unmodifiable(fields);
+  }
+
+  /// A field type as source text, WITHOUT a trailing `?`.
+  ///
+  /// [DartType.getDisplayString] carries the nullability suffix itself; the
+  /// IR keeps nullability in [ZorphyFieldIr.isNullable] so the emitter decides
+  /// where the `?` goes (a type argument's `?` is not the field's).
+  static String _typeText(DartType type) {
+    final text = type.getDisplayString();
+    return text.endsWith('?') ? text.substring(0, text.length - 1) : text;
   }
 
   /// The `$Parent` an [element] implements, as a declared class, or `null`.

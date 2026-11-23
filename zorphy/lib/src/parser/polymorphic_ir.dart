@@ -92,6 +92,31 @@ final class ZorphyDiagnostic {
   String toString() => render();
 }
 
+/// One field a node declares (`String get productId;`).
+///
+/// [type] is the field's type as written, so the emitter can declare the
+/// generated property and its constructor parameter with the same text a
+/// consumer already writes in the abstract declaration.
+final class ZorphyFieldIr {
+  /// The field name, without any `get`/`set` keyword.
+  final String name;
+
+  /// The declared type, as source text (`String`, `List<int>`, ...).
+  final String type;
+
+  /// Whether the declared type is nullable (`String?`).
+  final bool isNullable;
+
+  const ZorphyFieldIr({
+    required this.name,
+    required this.type,
+    this.isNullable = false,
+  });
+
+  @override
+  String toString() => '$type${isNullable ? '?' : ''} $name';
+}
+
 /// One node of a polymorphic hierarchy.
 ///
 /// A node keeps BOTH names: [className] is the declared identifier
@@ -149,6 +174,14 @@ final class ZorphyNodeIr {
   /// The root of this node's hierarchy; unset on the root itself.
   final ZorphyNodeIr? root;
 
+  /// The fields this node DECLARES itself (`String get productId;`), in
+  /// declaration order.
+  ///
+  /// Inherited fields are NOT copied down: an intent leaf's payload is its
+  /// whole `superTypes` chain walked root-first plus its own [fields], which
+  /// is what keeps one field declared twice from appearing twice.
+  final List<ZorphyFieldIr> fields;
+
   const ZorphyNodeIr({
     required this.className,
     required this.cleanName,
@@ -165,6 +198,7 @@ final class ZorphyNodeIr {
     this.replaySafe,
     this.isSyntheticLeaf = false,
     this.root,
+    this.fields = const [],
   });
 
   /// A copy with the named fields replaced, used by the resolver while it
@@ -187,6 +221,7 @@ final class ZorphyNodeIr {
     bool? isAbstractIntermediate,
     bool? isConcreteLeaf,
     bool? isSyntheticLeaf,
+    List<ZorphyFieldIr>? fields,
   }) {
     return ZorphyNodeIr(
       className: className,
@@ -209,6 +244,7 @@ final class ZorphyNodeIr {
           : replaySafe as bool?,
       isSyntheticLeaf: isSyntheticLeaf ?? this.isSyntheticLeaf,
       root: root ?? this.root,
+      fields: fields ?? this.fields,
     );
   }
 
