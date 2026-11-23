@@ -159,6 +159,82 @@ abstract class \$Holder {
 
 /// Generates every `@Zorphy` class of ONE fixture library and returns the
 /// emitted source per class, keyed by clean class name.
+/// Finding fixtures from the post-fix review round on #206.
+///
+/// `_nullableSource` pins the explicit-null write: `copyWith` is
+/// `field ?? this.field`, so only the generated Patch can clear a nullable
+/// field. `_genericSubtypeSource` pins a GENERIC subtype of a nongeneric root:
+/// its `T`-typed field cannot be named from a static member, so the segment
+/// must not be advertised at all. `_siblingNestedSource` pins two siblings
+/// typing the SAME segment differently, which must dispatch on the runtime
+/// subtype rather than on whichever sibling was visited first.
+const _nullableSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'nullable.zorphy.dart';
+
+@Zorphy()
+abstract class \$Note {
+  String get id;
+  String? get note;
+}
+''';
+
+const _genericSubtypeSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'generic_subtype.zorphy.dart';
+
+@Zorphy(explicitSubTypes: [\$Leaf])
+abstract class \$\$Root {
+  String get id;
+}
+
+@Zorphy()
+abstract class \$Leaf<T> implements \$\$Root {
+  T get value;
+}
+''';
+
+/// A composite list field: the pointer setter must use the repo's checked
+/// element-wise conversion (issue #148), never a hard `value as List<Map<…>>`.
+const _compositeListSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'composite_list.zorphy.dart';
+
+@Zorphy()
+abstract class \$TaggedResult {
+  List<Map<String, String>> get tags;
+}
+''';
+
+const _siblingNestedSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'sibling_nested.zorphy.dart';
+
+@Zorphy(explicitSubTypes: [\$PlainNode, \$DraftNode])
+abstract class \$\$Node {
+  String get id;
+}
+
+@Zorphy()
+abstract class \$PlainNode implements \$\$Node {
+  String get payload;
+}
+
+@Zorphy()
+abstract class \$DraftNode implements \$\$Node {
+  \$Draft get payload;
+}
+
+@Zorphy()
+abstract class \$Draft {
+  String get title;
+}
+''';
+
 Future<Map<String, String>> _generateHierarchy(Directory fixtureDir) =>
     _generate(fixtureDir, 'ui_node', _hierarchy);
 
@@ -169,7 +245,9 @@ Future<Map<String, String>> _generate(
 ) async {
   final sourceFile = File('${fixtureDir.path}/$libraryName.dart')
     ..writeAsStringSync(source);
-  final collection = AnalysisContextCollection(includedPaths: [sourceFile.path]);
+  final collection = AnalysisContextCollection(
+    includedPaths: [sourceFile.path],
+  );
   final outputs = <String, String>{};
   try {
     final result =
@@ -401,11 +479,7 @@ void main() {
       // `value as String` casts are unavoidable in this API shape and are
       // suppressed fleet-wide, so the fixture carries the same headers or the
       // gate would fail on a diagnostic no real consumer ever sees.
-      final diagnostics = await _analyzeFixture(
-        fixtureDir,
-        'ui_node',
-        outputs,
-      );
+      final diagnostics = await _analyzeFixture(fixtureDir, 'ui_node', outputs);
       expect(diagnostics, isEmpty, reason: diagnostics.join('\n'));
     });
 
@@ -436,11 +510,7 @@ void main() {
           containsAll(classes),
           reason: 'every class of the fixture must generate',
         );
-        final diagnostics = await _analyzeFixture(
-          dir,
-          libraryName,
-          generated,
-        );
+        final diagnostics = await _analyzeFixture(dir, libraryName, generated);
         expect(diagnostics, isEmpty, reason: diagnostics.join('\n'));
       });
     }
@@ -453,7 +523,8 @@ void main() {
 
     setUpAll(() async {
       sealed = await _generate(
-        Directory('${fixtureDir.path}/sealed_shape')..createSync(recursive: true),
+        Directory('${fixtureDir.path}/sealed_shape')
+          ..createSync(recursive: true),
         'sealed',
         _sealedSource,
       );
@@ -464,7 +535,8 @@ void main() {
         _genericSource,
       );
       nested = await _generate(
-        Directory('${fixtureDir.path}/nested_shape')..createSync(recursive: true),
+        Directory('${fixtureDir.path}/nested_shape')
+          ..createSync(recursive: true),
         'nested',
         _nestedSource,
       );
@@ -477,8 +549,14 @@ void main() {
       // subtypes that DID generate a writer.
       final root = sealed['Root']!;
       expect(root, contains("'/id' =>"));
-      expect(root, matches(RegExp(r"'/id' => [\s\S]{0,400}?case LeafA _node:")));
-      expect(root, matches(RegExp(r"'/id' => [\s\S]{0,400}?case LeafB _node:")));
+      expect(
+        root,
+        matches(RegExp(r"'/id' => [\s\S]{0,400}?case LeafA _node:")),
+      );
+      expect(
+        root,
+        matches(RegExp(r"'/id' => [\s\S]{0,400}?case LeafB _node:")),
+      );
     });
 
     test('a subtype-only field keeps its fallback and never drops an arm', () {
@@ -496,10 +574,7 @@ void main() {
       );
       // The shared field is covered by both leaves, so its switch must NOT
       // carry a dead default (`unreachable_switch_default`).
-      expect(
-        root,
-        isNot(matches(RegExp(r"'/id' => [\s\S]{0,400}?default:"))),
-      );
+      expect(root, isNot(matches(RegExp(r"'/id' => [\s\S]{0,400}?default:"))));
     });
 
     test('a generic class emits no resolver at all', () {
@@ -527,6 +602,155 @@ void main() {
       expect(holder, contains("'/frozen' =>"));
     });
   });
+
+  // The post-fix review round on #206. Each finding is pinned by the EXACT
+  // emission its fix produces, so a regression fails here instead of at a
+  // consumer's `dart analyze`.
+  group('resolvePath — post-fix review findings', () {
+    late Map<String, String> nullable;
+    late Map<String, String> genericSubtype;
+    late Map<String, String> siblingNested;
+    late Map<String, String> taggedList;
+
+    setUpAll(() async {
+      nullable = await _generate(
+        Directory('${fixtureDir.path}/nullable_shape')
+          ..createSync(recursive: true),
+        'nullable',
+        _nullableSource,
+      );
+      genericSubtype = await _generate(
+        Directory('${fixtureDir.path}/generic_subtype_shape')
+          ..createSync(recursive: true),
+        'generic_subtype',
+        _genericSubtypeSource,
+      );
+      siblingNested = await _generate(
+        Directory('${fixtureDir.path}/sibling_nested_shape')
+          ..createSync(recursive: true),
+        'sibling_nested',
+        _siblingNestedSource,
+      );
+      taggedList = await _generate(
+        Directory('${fixtureDir.path}/composite_list_shape')
+          ..createSync(recursive: true),
+        'composite_list',
+        _compositeListSource,
+      );
+    });
+
+    test('a nullable field writes an explicit null through the Patch', () {
+      // `copyWith` is `note: note ?? this.note`, which can never clear the
+      // field; the generated Patch gates on `containsKey`, so it can.
+      final note = nullable['Note']!;
+      expect(
+        note,
+        matches(
+          RegExp(
+            r'if \(value == null\) \{\s*return root\.patchWithNote\('
+            r'NotePatch\(\)\.\.withNote\(null\)\);',
+          ),
+        ),
+        reason: 'an explicit null must reach the null-capable writer',
+      );
+      // The ordinary write is still present for every non-null value, and it
+      // casts with the PROMOTED type — null is already gone above.
+      expect(
+        _resolvePathBody(note),
+        contains('return root.copyWith(note: value as String);'),
+      );
+    });
+
+    test('a composite list field casts element-wise, never hard', () {
+      // A raw `jsonDecode` payload arrives as `List<dynamic>`, so a hard
+      // `value as List<Map<…>>` throws a TypeError (issue #148). The checked
+      // conversion is the repo's sanctioned shape, and with a null branch
+      // above it must use the NON-nullable form — a nullable `is` test on an
+      // `Object?` parameter does not promote, so the then-branch would stay
+      // `Object?` and fail to compile.
+      // Scoped to `resolvePath`: the class also carries the pre-existing
+      // `copyWithField`, whose nullable conversion legitimately stays
+      // null-aware and would mask the setter's own shape.
+      final tagged = _resolvePathBody(taggedList['TaggedResult']!);
+      expect(tagged, isNot(contains('value as List<Map')));
+      expect(
+        tagged,
+        matches(RegExp(r'value is List<Map<String, String>>\s*\? value')),
+        reason: 'the fast path must carry the promoted (non-null) type',
+      );
+      expect(
+        tagged,
+        contains('Map<String, String>.from'),
+        reason: 'entries are converted element-wise, not cast',
+      );
+    });
+
+    test('a generic subtype contributes no type-parameter arm', () {
+      // A static member cannot name `T`, so `_node.copyWith(value: value as T)`
+      // was `cast_to_non_type`. The segment is not advertised for that subtype;
+      // the shared field still resolves.
+      final root = genericSubtype['Root']!;
+      expect(root, isNot(contains('as T')));
+      expect(root, isNot(contains("'/value' =>")));
+      expect(root, contains("'/id' =>"));
+    });
+
+    test('siblings typing one segment differently dispatch on the subtype', () {
+      // `PlainNode.payload` is a `String` and `DraftNode.payload` is a `$Draft`,
+      // so the delegation target is only knowable from the runtime subtype.
+      final node = siblingNested['Node']!;
+      expect(node, contains('Draft.resolvePath(remainder)'));
+      expect(
+        node,
+        matches(
+          RegExp(r'case DraftNode _node:\s*final nested = Draft\.resolvePath'),
+        ),
+        reason: 'only the Draft-bearing sibling may delegate',
+      );
+      expect(
+        node,
+        isNot(matches(RegExp(r'case PlainNode _node:\s*final nested = '))),
+        reason: 'the String-bearing sibling must not delegate',
+      );
+    });
+
+    test('every post-fix fixture emits parts that analyze clean', () async {
+      for (final entry in {
+        'nullable': ('nullable', _nullableSource, nullable),
+        'generic subtype': (
+          'generic_subtype',
+          _genericSubtypeSource,
+          genericSubtype,
+        ),
+        'sibling nested': (
+          'sibling_nested',
+          _siblingNestedSource,
+          siblingNested,
+        ),
+        'composite list': ('composite_list', _compositeListSource, taggedList),
+      }.entries) {
+        final (libraryName, source, outputs) = entry.value;
+        final dir = Directory('${fixtureDir.path}/${libraryName}_verify')
+          ..createSync(recursive: true);
+        await _generate(dir, libraryName, source);
+        final diagnostics = await _analyzeFixture(dir, libraryName, outputs);
+        expect(diagnostics, isEmpty, reason: diagnostics.join('\n'));
+      }
+    });
+  });
+}
+
+/// The `resolvePath` method body of one generated class, so an assertion can
+/// name the pointer table without matching the class's other members (the
+/// pre-existing `copyWithField` legitimately keeps a null-aware conversion).
+///
+/// The body is taken from the method's first line to the LAST closing brace
+/// before the class ends — a nested `}` at two-space indent appears inside the
+/// closures, so the first one is not the boundary.
+String _resolvePathBody(String classOutput) {
+  final start = classOutput.indexOf('resolvePath(String pointer)');
+  if (start < 0) return '';
+  return classOutput.substring(start);
 }
 
 /// Writes [outputs] into [libraryName]'s shared part and returns every
@@ -543,7 +767,8 @@ Future<List<String>> _analyzeFixture(
   for (final output in outputs.values) {
     part.writeln(output);
   }
-  File('${dir.path}/$libraryName.zorphy.dart')
-      .writeAsStringSync(part.toString());
+  File(
+    '${dir.path}/$libraryName.zorphy.dart',
+  ).writeAsStringSync(part.toString());
   return _diagnostics('${dir.path}/$libraryName.dart');
 }
