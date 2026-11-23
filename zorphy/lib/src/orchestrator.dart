@@ -68,6 +68,10 @@ class Orchestrator {
     // ChangeTo extension (conditional, has explicit subtypes)
     ChangeToExtensionGenerator(),
 
+    // JSON-Pointer resolver (issue #186): the polymorphic O(depth)
+    // `resolvePath` switch table, emitted on every class with fields.
+    JsonPointerGenerator(),
+
     // Typed lens surface (issue #185) — `<Name>Lenses` accessor class plus the
     // `static const lenses` registry, conditional on a concrete, non-generic
     // class that has copyWith to write through.
