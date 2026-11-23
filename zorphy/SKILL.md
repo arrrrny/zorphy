@@ -358,6 +358,36 @@ abstract class $Post implements $Timestamped, $Identified {
 }
 ```
 
+### JSON-Pointer Resolution
+
+Every generated class exposes a static resolver (issue #186):
+
+```dart
+static ZorphyLens<T, Object?>? resolvePath(String pointer)
+```
+
+It resolves a JSON Pointer to a typed lens, one `switch` step per segment —
+O(depth), no regex, no `dart:mirrors`, AOT-safe:
+
+```dart
+// A field on this class
+final title = Post.resolvePath('/title');
+final renamed = title?.set(post, 'New title');
+
+// A nested class's field delegates to that class's own table
+final city = User.resolvePath('/address/city');
+
+// A segment only SOME subtype carries still resolves, and its lens
+// answers null on a node that does not have the field
+final enabled = UiNode.resolvePath('/enabled'); // null-safe dispatch
+```
+
+- A pointer this class does not carry answers `null`.
+- Nullable fields accept the explicit `null` write (`lens.set(root, null)`),
+  which routes through the generated `Patch` because `copyWith` cannot
+  distinguish "omitted" from "set to null".
+- A generic class gets no resolver: a static member cannot reference `T`.
+
 ### Enums
 
 ```dart
