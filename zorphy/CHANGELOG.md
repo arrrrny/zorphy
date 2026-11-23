@@ -1,3 +1,20 @@
+## [Unreleased]
+
+### Added
+
+- Generated `<Name>Patch` classes now carry the v3 patch algebra (#182):
+  `static diff(previous, next)` (O(1) and allocation-free when the two are
+  `identical`), `apply(target)` (returns `target` itself when the patch is
+  empty), `compose(next)` (coalesces bursts left-to-right),
+  `invert(before)` (captures prior values for undo), `isEmpty`, and
+  `toWire()` (field-name keyed). Emission lives in
+  `lib/src/emission/patch_emitter.dart` and is built entirely from
+  `package:code_builder` specs — no presets, no toggles, no string assembly.
+  The legacy fluent `with*` builders and cross-entity helpers are unchanged.
+- `PatchBase` gained a const `PatchBase.empty()` constructor so a generated
+  patch can expose `const <Name>Patch.empty()` alongside its mutable default
+  constructor (#182).
+
 ## [3.0.0] - 2026-11-17
 
 ### Change

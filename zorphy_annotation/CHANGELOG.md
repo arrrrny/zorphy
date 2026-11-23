@@ -2,6 +2,11 @@
 
 ### Added
 
+- `PatchBase` is const-constructible through `PatchBase.empty()`, which backs
+  the generated `<Name>Patch.empty()` constructor: the empty patch is the
+  allocation-free neutral element of `compose` and `apply` returns its target
+  unchanged (#182).
+
 - The v3 patch algebra: `ZorphyPatch<T>` (`isEmpty` / `isNotEmpty`, `apply`,
   `compose`, `invert`, `toWire`) with its laws documented on the interface,
   plus the field-level shapes it composes with — `PatchValue<V>`

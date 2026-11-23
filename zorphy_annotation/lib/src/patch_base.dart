@@ -2,7 +2,26 @@ import 'patch.dart';
 
 abstract class PatchBase<TEntity, TEnum extends Enum>
     implements Patch<TEntity> {
-  final Map<TEnum, dynamic> patchMap = {};
+  /// Creates a patch holding [patchMap], or a fresh mutable map when it is
+  /// omitted.
+  ///
+  /// The no-argument form is what the fluent `with*` builders mutate, so it
+  /// allocates per instance. A patch that is meant to be constant — the empty
+  /// patch, which must be the O(1) neutral element of `compose` — is built
+  /// through [PatchBase.empty] instead.
+  PatchBase([Map<TEnum, dynamic>? patchMap])
+    : patchMap = patchMap ?? <TEnum, dynamic>{};
+
+  /// Creates a patch over a shared `const` empty map.
+  ///
+  /// Const-constructible and allocation-free: the map is the canonical empty
+  /// one, so `isEmpty` is `true` for the whole life of the patch and no
+  /// mutation is possible. Generated patches expose it as their `.empty`
+  /// constructor.
+  const PatchBase.empty() : patchMap = const <Never, Never>{};
+
+  /// The field-keyed changes this patch carries.
+  final Map<TEnum, dynamic> patchMap;
 
   Map<TEnum, dynamic> toPatch() => Map.from(patchMap);
 

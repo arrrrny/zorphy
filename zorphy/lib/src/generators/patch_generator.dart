@@ -1,6 +1,7 @@
 import 'package:code_builder/code_builder.dart';
 
 import '../ast/ast.dart';
+import '../emission/patch_emitter.dart';
 import '../helpers.dart' as helpers;
 import 'base_generator.dart';
 
@@ -250,11 +251,11 @@ class PatchClassGenerator extends ConcreteClassGenerator {
       return [stub];
     }
 
-    final code = helpers.getPatchClass(
-      metadata.allFields,
-      metadata.cleanName,
-      knownClasses,
-      genericTypeNames,
+    final code = PatchEmitter().emit(
+      className: metadata.cleanName,
+      fields: metadata.allFields,
+      knownClasses: knownClasses,
+      genericTypeNames: genericTypeNames,
     );
     if (code.trim().isEmpty) return [];
     return [Code(code)];
