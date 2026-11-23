@@ -1,7 +1,16 @@
 import 'patch.dart';
 
+/// The base every generated `<Name>Patch` extends (ISSUE-007).
+///
+/// It implements both patch surfaces: the legacy [Patch] entry point the
+/// original `patchWith` resolves a carried field through, and the v3
+/// [ZorphyPatch] algebra (`isEmpty` / `apply` / `compose` / `invert` /
+/// `toWire`) the generated class fills in. Implementing [ZorphyPatch] here is
+/// what lets a generated patch stand in for the `SubPatch` bound of
+/// [PatchNested] — a nested field carries its sub-entity's own generated patch,
+/// so that patch has to BE a [ZorphyPatch] of the sub-entity (ISSUE-008).
 abstract class PatchBase<TEntity, TEnum extends Enum>
-    implements Patch<TEntity> {
+    implements Patch<TEntity>, ZorphyPatch<TEntity> {
   /// Creates a patch holding [patchMap], or a fresh mutable map when it is
   /// omitted.
   ///
@@ -22,6 +31,14 @@ abstract class PatchBase<TEntity, TEnum extends Enum>
 
   /// The field-keyed changes this patch carries.
   final Map<TEnum, dynamic> patchMap;
+
+  /// Whether this patch carries at least one change.
+  ///
+  /// [ZorphyPatch] gives this a body, but `implements` does not inherit it, so
+  /// the concrete generated patch would otherwise have to restate a one-line
+  /// negation of [isEmpty].
+  @override
+  bool get isNotEmpty => !isEmpty;
 
   Map<TEnum, dynamic> toPatch() => Map.from(patchMap);
 
