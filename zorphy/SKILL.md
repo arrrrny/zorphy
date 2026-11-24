@@ -27,16 +27,25 @@ author: zorphy
 
 ## Quick Start
 
-CLI:
+CLI (from a project that depends on `zorphy_annotation` and lists `zorphy` under `dev_dependencies` — `dart run zorphy`
+alone only resolves inside the `zorphy` package itself):
 
 ```bash
-dart run zorphy create --name User --output lib/src/domain/entities
+dart run zorphy:zorphy_cli create --name User --output lib/src/domain/entities
 ```
 
-MCP:
+MCP — this repo's server registers `create_entity`; `arrrrny/zuraffa`'s server
+registers `zuraffa_entity_create`. Arguments are a JSON object, not CLI flags,
+and both write under the fixed `lib/src/domain/entities` path:
 
-```bash
-mcp__zuraffa__generate --name User --output lib/src/domain/entities --generate_json true
+```jsonc
+// zorphy MCP server
+{ "name": "create_entity",
+  "arguments": { "name": "User", "generateJson": true } }
+
+// zuraffa MCP server
+{ "name": "zuraffa_entity_create",
+  "arguments": { "name": "User", "json": true } }
 ```
 
 ## Workflow
