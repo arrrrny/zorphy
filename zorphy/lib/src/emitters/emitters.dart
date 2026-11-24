@@ -7,5 +7,6 @@
 library;
 
 export 'hierarchy_emitter.dart';
+export 'mock_fixture_emitter.dart';
 export 'morphing_emitter.dart';
 export 'polymorphic_class_emitter.dart';

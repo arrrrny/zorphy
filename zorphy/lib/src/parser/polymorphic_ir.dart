@@ -198,6 +198,17 @@ final class ZorphyNodeIr {
   /// match a root-first reading of this comment.
   final List<ZorphyFieldIr> fields;
 
+  /// The declaration's type parameters, bounds included (`T extends num`),
+  /// empty for a non-generic node.
+  ///
+  /// The analyzer keeps these OFF [className] (`element.name` is the bare
+  /// `$Box`), so an emitter that must know whether a node is generic cannot
+  /// infer it from the name — it has to read this field. `PolymorphicIr`
+  /// carries them per node for exactly that reason: an emitter that can only
+  /// produce source for a non-generic class fails closed here instead of
+  /// emitting `class Box<T>MockData`.
+  final List<String> typeParameters;
+
   const ZorphyNodeIr({
     required this.className,
     required this.cleanName,
@@ -215,6 +226,7 @@ final class ZorphyNodeIr {
     this.isSyntheticLeaf = false,
     this.root,
     this.fields = const [],
+    this.typeParameters = const [],
   });
 
   /// A copy with the named fields replaced, used by the resolver while it
@@ -238,6 +250,7 @@ final class ZorphyNodeIr {
     bool? isConcreteLeaf,
     bool? isSyntheticLeaf,
     List<ZorphyFieldIr>? fields,
+    List<String>? typeParameters,
   }) {
     return ZorphyNodeIr(
       className: className,
@@ -261,6 +274,7 @@ final class ZorphyNodeIr {
       isSyntheticLeaf: isSyntheticLeaf ?? this.isSyntheticLeaf,
       root: root ?? this.root,
       fields: fields ?? this.fields,
+      typeParameters: typeParameters ?? this.typeParameters,
     );
   }
 
