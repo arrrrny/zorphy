@@ -98,7 +98,7 @@ Future<Map<String, String>> _generate(String libraryPath) async {
 }
 
 void main() {
-  late Directory dir;
+  Directory? dir;
 
   setUpAll(() async {
     // A non-dot directory inside the package tree so `dart run` resolves the
@@ -107,9 +107,10 @@ void main() {
     final base = Directory('test/lens_null_runtime_tmp').absolute
       ..createSync(recursive: true);
     dir = base.createTempSync('fixture_');
+    final fixtureDir = dir!;
     // Write the source classes first so the analyzer can resolve them, then
     // generate, then append a `main()` that exercises the lens.
-    final libFile = File('${dir.path}/lens_null_fixture.dart')
+    final libFile = File('${fixtureDir.path}/lens_null_fixture.dart')
       ..writeAsStringSync(_fixtureSource);
     final generated = await _generate(libFile.path);
     expect(
@@ -118,7 +119,7 @@ void main() {
       reason: 'the fixture class must generate; got ${generated.keys}',
     );
     // The generated part: every class's output concatenated.
-    File('${dir.path}/lens_null_fixture.zorphy.dart').writeAsStringSync(
+    File('${fixtureDir.path}/lens_null_fixture.zorphy.dart').writeAsStringSync(
       "part of 'lens_null_fixture.dart';\n\n${generated.values.join('\n\n')}",
     );
     // A runnable library: the source classes + the part directive + a `main()`
@@ -143,8 +144,20 @@ void main() {
   });
 
   tearDownAll(() {
+    // Delete only THIS invocation's directory. The shared parent
+    // (`test/lens_null_runtime_tmp`) is created by every invocation, so
+    // removing it here would delete a concurrent run's fixture out from under
+    // it — the second `dart run` then fails with "source has disappeared".
+    // `dir` is null-safe only via `existsSync`, so a setup that failed before
+    // the assignment cleans nothing rather than throwing.
+    final fixture = dir;
+    if (fixture != null && fixture.existsSync()) {
+      fixture.deleteSync(recursive: true);
+    }
     final tmp = Directory('test/lens_null_runtime_tmp');
-    if (tmp.existsSync()) tmp.deleteSync(recursive: true);
+    if (tmp.existsSync() && tmp.listSync().isEmpty) {
+      tmp.deleteSync(recursive: true);
+    }
   });
 
   test(
@@ -152,7 +165,7 @@ void main() {
     () async {
       final result = await Process.run('dart', [
         'run',
-        '${dir.path}/lens_null_fixture.dart',
+        '${dir!.path}/lens_null_fixture.dart',
       ], workingDirectory: Directory.current.path);
       final stdout = '${result.stdout}\n${result.stderr}';
       expect(stdout, contains('ALL CHECKS PASSED'), reason: stdout);

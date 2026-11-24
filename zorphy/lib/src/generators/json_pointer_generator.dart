@@ -50,6 +50,12 @@ class JsonPointerGenerator extends UniversalGenerator {
     'package:zorphy_annotation/src/annotations.dart#Zorphy',
   );
 
+  /// The legacy-annotation twin of [_zorphyChecker]. `ClassGraph` registers a
+  /// class carrying EITHER annotation, so metadata lookups must too.
+  static const _zorphy2Checker = TypeChecker.fromUrl(
+    'package:zorphy_annotation/src/annotations.dart#Zorphy2',
+  );
+
   /// Per-class writer answers, so the emission pass does not re-analyse the
   /// hierarchy it just walked.
   ///
@@ -76,6 +82,10 @@ class JsonPointerGenerator extends UniversalGenerator {
   /// The annotated classes of the library currently being generated.
   Map<String, ClassElement> _annotatedClasses = const {};
 
+  /// Per-class `{self} ∪ allSupertypes` clean names, used to tell a receiver's
+  /// own arm (read-only, no `copyWith`) from a strict-subtype arm.
+  final Map<String, Set<String>> _ancestorNames = {};
+
   @override
   bool shouldGenerate(GenerationContext context) {
     // A static member cannot reference the class's type parameters
@@ -83,6 +93,13 @@ class JsonPointerGenerator extends UniversalGenerator {
     // either, so a generic model gets no resolver at all — the same decline
     // [LensGenerator] makes for the lens registry.
     if (context.metadata.generics.isNotEmpty) return false;
+    // A model may already declare `resolvePath` itself. Emitting the static
+    // entry point then makes the part uncompilable (`conflicting_static_and_
+    // instance` / duplicate member) even if nobody calls it, and every caller
+    // that delegates to this class's resolver would reference it too — so the
+    // surface is withheld here rather than emitted broken (CodeRabbit finding
+    // on json_pointer_generator.dart:286).
+    if (_declaresOwnResolver(context.metadata)) return false;
     // The instance caches below are populated here and reused by the emission
     // pass (`_metadataFor` / `_annotatedClasses`), which is only correct
     // because this is the first call for the class being generated.
@@ -97,6 +114,17 @@ class JsonPointerGenerator extends UniversalGenerator {
     // — and they inherit its fields, so a shared field is still writable.
     return fields.any((f) => _writerArms(f).isNotEmpty);
   }
+
+  /// Whether the model already declares a member named `resolvePath`.
+  ///
+  /// The generated entry point is a STATIC method, so a model member of the
+  /// same name is a conflict the analyzer rejects outright. A model that owns
+  /// the name keeps it; the resolver (and every static delegation to it) is
+  /// skipped.
+  static bool _declaresOwnResolver(ClassMetadata metadata) => metadata
+      .classElement
+      .children
+      .any((member) => member.name == 'resolvePath');
 
   /// Whether this class's own generated surface carries a writer the lens `set`
   /// can route through.
@@ -131,9 +159,13 @@ class JsonPointerGenerator extends UniversalGenerator {
 
     String? nestedOf(String typeName) {
       final base = typeName.replaceAll('?', '').split('<').first;
-      return annotated.containsKey(base) || annotated.containsKey('\$$base')
-          ? base
-          : null;
+      // `_annotatedElement` tries every spelling the graph may use, so a
+      // `$$Root`-declared field (normalized to `Root` by the type helpers) is
+      // recognised as nested — looking for only `Root`/`$Root` missed the
+      // `$$Root` key and made `/root/id` answer null even when
+      // `Root.resolvePath('/id')` existed (CodeRabbit finding on
+      // json_pointer_generator.dart:136).
+      return _annotatedElement(base) == null ? null : base;
     }
 
     final byName = <String, _PointerField>{};
@@ -372,11 +404,14 @@ class JsonPointerGenerator extends UniversalGenerator {
       // and [ZorphyLens.then] composes it directly — but only when a SINGLE
       // nested type names the target. A legal covariant redeclaration records
       // more than one, and the base-typed arm would shadow the narrowing
-      // subtypes, so such a field is resolved as a plain segment (see
-      // [_isNested]) rather than delegated. Reaching the empty here would mean
-      // [_isNested] and this method disagree.
+      // subtypes, so such a field cannot use a single static target — but it
+      // must NOT lose its nested path either: `Node.resolvePath('/payload/title')`
+      // answering null for a hierarchy that demonstrably carries it is the
+      // gap reported on PR #201 (CodeRabbit finding on
+      // json_pointer_generator.dart:827). It dispatches per runtime subtype
+      // instead, most-derived arm first.
       final typeName = _fieldTypeName(field);
-      if (typeName == null) return '';
+      if (typeName == null) return _covariantNestedDispatch(className, field);
       return 'final nested = $typeName.resolvePath(remainder);\n'
           'if (nested == null) return null;\n'
           'return ZorphyLens<$className, ${field.type}>('
@@ -423,6 +458,138 @@ class JsonPointerGenerator extends UniversalGenerator {
         if (_targetEmitsResolver(target)) target,
   }.toList();
 
+  /// The nested delegation for a field VISIBLE on this class whose declarers
+  /// name DIFFERENT nested types (a covariant redeclaration).
+  ///
+  /// A single static target would be wrong for one of the declarers — the
+  /// base-typed arm shadows the narrowing subtype — so the target is chosen
+  /// from the receiver's runtime subtype. Arms are ordered MOST-DERIVED first
+  /// so `$Child`'s narrowed target wins over the base's, and the class's own
+  /// type closes the switch.
+  ///
+  /// Without this the field resolved only as a plain segment, so
+  /// `Node.resolvePath('/payload/title')` answered null even though every
+  /// concrete node carries a `payload` whose own resolver handles `title`
+  /// (CodeRabbit finding on json_pointer_generator.dart:827).
+  String _covariantNestedDispatch(String className, _PointerField field) {
+    final all = field.nestedTargets.entries
+        .where((entry) => _targetEmitsResolver(entry.value))
+        .toList();
+    if (all.isEmpty) return '';
+
+    // The generating class (and any ancestor of it) supplies the FALLBACK: a
+    // sealed root carries no `copyWith`, so its arm can read through its own
+    // target but never write. Only strict subtypes become `case` arms — naming
+    // the receiver's own type there makes the switch cover every instance and
+    // leaves `default:` unreachable (and `_node.copyWith` unresolvable).
+    final own = all.where((e) => _isSelfOrAncestorOf(e.key, className));
+    final derived = all.where((e) => !_isSelfOrAncestorOf(e.key, className));
+    final fallback = own.isEmpty ? null : own.first;
+
+    // Most-derived first, so a subtype is matched before its ancestor.
+    final derivedSorted = derived.toList()
+      ..sort((a, b) {
+        final aIsSubOfB = a.key.allSupertypes.any((t) => t.element == b.key);
+        final bIsSubOfA = b.key.allSupertypes.any((t) => t.element == a.key);
+        if (aIsSubOfB) return -1;
+        if (bIsSubOfA) return 1;
+        return 0;
+      });
+
+    // `if` chains, not a `switch`: a sealed root whose declared subtypes are
+    // ALL covered makes a switch exhaustive, and the `default:` that carries
+    // the receiver's own arm then reports `unreachable_switch_default`.
+    final readArms = <String>[];
+    final writeArms = <String>[];
+    for (final entry in derivedSorted) {
+      final targetType = entry.value.replaceAll(r'$', '');
+      final armType = helpers.replaceDollarTypesWithConcrete(
+        field.types[entry.key] ?? field.type,
+      );
+      final cleanName = _cleanName(entry.key.name ?? entry.key.displayName);
+      final nullable = armType.trim().endsWith('?');
+      // `root is X` promotes `root`, so the arm reads and writes the real
+      // subtype without an explicit cast local.
+      readArms.add(
+        '        if (root is $cleanName) {\n'
+        '          final nested = $targetType.resolvePath(remainder);\n'
+        '          if (nested == null) return null;\n'
+        '${nullable ? '          final parent = root.${field.name};\n'
+                  '          if (parent == null) return null;\n'
+                  '          return nested.get(parent);' : '          return nested.get(root.${field.name});'}\n'
+        '        }',
+      );
+      writeArms.add(
+        '        if (root is $cleanName) {\n'
+        '          final nested = $targetType.resolvePath(remainder);\n'
+        '          if (nested == null) return root;\n'
+        '${nullable ? '          final parent = root.${field.name};\n'
+                  '          if (parent == null) return root;\n'
+                  '          return root.copyWith('
+                  '${field.name}: nested.set(parent, value));' : '          return root.copyWith('
+                  '${field.name}: nested.set(root.${field.name}, value));'}\n'
+        '        }',
+      );
+    }
+
+    final fallbackTarget = fallback?.value.replaceAll(r'$', '');
+    final fallbackType = fallback == null
+        ? null
+        : helpers.replaceDollarTypesWithConcrete(
+            field.types[fallback.key] ?? field.type,
+          );
+    final fallbackNullable = (fallbackType ?? '').trim().endsWith('?');
+    final fallbackRead = fallbackTarget == null
+        ? 'return null;'
+        : 'final nested = $fallbackTarget.resolvePath(remainder);\n'
+              '        if (nested == null) return null;\n'
+              '${fallbackNullable ? 'final parent = root.${field.name};\n'
+                        '        if (parent == null) return null;\n'
+                        '        return nested.get(parent);' : 'return nested.get(root.${field.name});'}';
+    // The receiver is the sealed root or an ancestor: it has no writer, so a
+    // write to its own arm answers the root unchanged rather than calling a
+    // `copyWith` it does not carry.
+    const fallbackWrite = 'return root;';
+
+    return 'return ZorphyLens<$className, Object?>(\n'
+        '      path: pointer,\n'
+        '      get: (root) {\n'
+        '${readArms.join('\n')}\n'
+        '        $fallbackRead\n'
+        '      },\n'
+        '      set: (root, value) {\n'
+        '${writeArms.join('\n')}\n'
+        '        $fallbackWrite\n'
+        '      },\n'
+        '    );';
+  }
+
+  /// Whether [element] is the class named [className] or one of its ancestors.
+  ///
+  /// The set is computed once per generation from the generating class's own
+  /// supertype chain, so an arm can be classified as "the receiver itself"
+  /// (read-only: a sealed root has no `copyWith`) or "a strict subtype" (a real
+  /// `case` arm).
+  bool _isSelfOrAncestorOf(ClassElement element, String className) =>
+      _selfOrAncestorNames(className)
+          .contains(_cleanName(element.name ?? element.displayName));
+
+  /// The clean names of [className] and every class it extends/implements.
+  Set<String> _selfOrAncestorNames(String className) {
+    final cached = _ancestorNames[className];
+    if (cached != null) return cached;
+    final element = _annotatedElement(className);
+    final names = <String>{className};
+    if (element != null) {
+      for (final supertype in element.allSupertypes) {
+        final name = supertype.element.name;
+        if (name != null) names.add(_cleanName(name));
+      }
+    }
+    _ancestorNames[className] = names;
+    return names;
+  }
+
   /// The composition for a subtype-only field whose declarers name DIFFERENT
   /// nested types.
   ///
@@ -443,11 +610,22 @@ class JsonPointerGenerator extends UniversalGenerator {
         final target = field.nestedTargets[element];
         if (target == null || !_targetEmitsResolver(target)) continue;
         final name = (element.name ?? element.displayName).replaceAll(r'$', '');
+        final targetType = helpers.replaceDollarTypesWithConcrete(
+          field.types[element] ?? field.type,
+        );
+        // A declarer whose own type is nullable guards the read: `nested.get`
+        // needs a non-null parent, and passing `DraftB?` to a lens typed
+        // `DraftB` does not compile (CodeRabbit finding on lens.dart:821).
+        final parent = '_node.${field.name}';
+        final nullable = targetType.trim().endsWith('?');
         arms.add(
           'case $name _node:\n'
           '${indent}  final nested = ${target.replaceAll(r'$', '')}'
           '.resolvePath(remainder);\n'
-          '${indent}  return nested?.get(_node.${field.name});',
+          '${indent}  if (nested == null) return null;\n'
+          '${nullable ? '${indent}  final parent = $parent;\n'
+                    '${indent}  if (parent == null) return null;\n'
+                    '${indent}  return nested.get(parent);' : '${indent}  return nested.get($parent);'}',
         );
       }
       arms.add('default:\n${indent}  return null;');
@@ -456,20 +634,31 @@ class JsonPointerGenerator extends UniversalGenerator {
 
     String writes(String indent) {
       final arms = <String>[];
-      for (final element in _readerArms(field)) {
+      // [_writerArms], not [_readerArms]: `_readerArms` prunes to the OUTERMOST
+      // declarer, so a writable leaf under a writerless intermediate declarer
+      // (`Mid` declares `Draft payload` with no `copyWith`, `Leaf` implements
+      // it and is writable) was pruned away and every write on a `Leaf` root
+      // fell to `default: return root;` — silently dropping the update while
+      // `get` on the same pointer still answered through the `Mid` arm.
+      for (final element in _writerArms(field)) {
         final target = field.nestedTargets[element];
         if (target == null || !_targetEmitsResolver(target)) continue;
         final name = (element.name ?? element.displayName).replaceAll(r'$', '');
-        // Only a declarer that generated `copyWith` can write; the field is
-        // inherited there, so the arm is keyed on the writer, not the reader.
-        if (!_subtypeHasWriter(element)) continue;
+        final targetType = helpers.replaceDollarTypesWithConcrete(
+          field.types[element] ?? field.type,
+        );
+        final parent = '_node.${field.name}';
+        final nullable = targetType.trim().endsWith('?');
         arms.add(
           'case $name _node:\n'
           '${indent}  final nested = ${target.replaceAll(r'$', '')}'
           '.resolvePath(remainder);\n'
           '${indent}  if (nested == null) return root;\n'
-          '${indent}  return _node.copyWith('
-          '${field.name}: nested.set(_node.${field.name}, value));',
+          '${nullable ? '${indent}  final parent = $parent;\n'
+                    '${indent}  if (parent == null) return root;\n'
+                    '${indent}  return _node.copyWith('
+                    '${field.name}: nested.set(parent, value));' : '${indent}  return _node.copyWith('
+                    '${field.name}: nested.set($parent, value));'}',
         );
       }
       arms.add('default:\n${indent}  return root;');
@@ -477,7 +666,20 @@ class JsonPointerGenerator extends UniversalGenerator {
     }
 
     const rootIndent = '    ';
-    return 'return ZorphyLens<$className, Object?>(\n'
+    // An unknown remainder must answer `null`, exactly like a direct unknown
+    // pointer does. Returning a lens whose `get` is always null and whose `set`
+    // returns the root unchanged contradicts that — `/payload/notAField` is not
+    // a path this hierarchy carries (CodeRabbit finding on
+    // json_pointer_generator.dart:481). The probe asks each delegable target's
+    // own resolver, so a path that resolves on at least one arm keeps its lens.
+    final probes = <String>[
+      for (final target in _delegableTargets(field))
+        '${target.replaceAll(r'$', '')}.resolvePath(remainder) != null',
+    ];
+    final guard = probes.isEmpty
+        ? ''
+        : 'if (!(${probes.join(' || ')})) return null;\n';
+    return '${guard}return ZorphyLens<$className, Object?>(\n'
         'path: pointer,\n'
         'get: (root) {\n'
         '${reads(rootIndent)}\n'
@@ -594,11 +796,30 @@ class JsonPointerGenerator extends UniversalGenerator {
     return answer;
   }
 
+  /// Whether [element]'s generated class carries the Patch surface.
+  ///
+  /// The null-write branch calls `patchWith<Writer>(<Writer>Patch()…)`, so it
+  /// must be gated on the WRITER's own configuration — a root's
+  /// `generatePatch` says nothing about a subtype that overrode the preset.
+  bool _subtypeGeneratesPatch(ClassElement element) {
+    final metadata = _metadataFor(element);
+    if (metadata == null) return false;
+    return _configFor(metadata).generatePatch;
+  }
+
   /// Analyses [element] into the metadata the generator pipeline uses.
   ClassMetadata? _metadataFor(ClassElement element) {
     final cached = _metadataCache[element];
     if (cached != null) return cached;
-    final annotation = _zorphyChecker.firstAnnotationOf(element);
+    // The SAME lookup the class graph registers with: `ClassGraph` treats a
+    // class as annotated when either `@Zorphy` or `@Zorphy2` is present, so a
+    // `@Zorphy2` class reached `_targetEmitsResolver` with no metadata and was
+    // reported as resolver-less — its nested pointer answered null even though
+    // it emits a `resolvePath` (CodeRabbit finding on
+    // json_pointer_generator.dart:602).
+    final annotation =
+        _zorphyChecker.firstAnnotationOf(element) ??
+        _zorphy2Checker.firstAnnotationOf(element);
     if (annotation == null) return null;
     final reader = ConstantReader(annotation);
     final metadata = ClassAnalyzer.analyze(
@@ -639,7 +860,8 @@ class JsonPointerGenerator extends UniversalGenerator {
       GenerationConfig.fromAnnotationOptions(
         AnnotationParser.parse(
           ConstantReader(
-            _zorphyChecker.firstAnnotationOf(metadata.classElement),
+            _zorphyChecker.firstAnnotationOf(metadata.classElement) ??
+                _zorphy2Checker.firstAnnotationOf(metadata.classElement),
           ),
         ),
         outputExtension: '.zorphy.dart',
@@ -718,8 +940,14 @@ class JsonPointerGenerator extends UniversalGenerator {
       final name = (element.name ?? element.displayName).replaceAll(r'$', '');
       final type = field.types[element] ?? field.type;
       final writer = _cleanName(element.name ?? element.displayName);
+      // Patch availability is a property of the WRITER, not of the class whose
+      // table this is: `$$Root` may use the standard preset while `Leaf` sets
+      // `generatePatch: false`, and emitting `LeafPatch()`/`patchWithLeaf(…)`
+      // there references members that do not exist. Asking the root's config
+      // made both directions wrong (CodeRabbit finding on
+      // json_pointer_generator.dart:722).
       final hasNullBranch =
-          _isNullableType(type) && context.config.generatePatch;
+          _isNullableType(type) && _subtypeGeneratesPatch(element);
       arms.add('case $name _node:');
       // A nullable field's write must be null-capable here too: the arm's own
       // `copyWith` has the same `??` ambiguity the direct setter had.
@@ -818,21 +1046,58 @@ class JsonPointerGenerator extends UniversalGenerator {
   /// sibling whose own type is a plain `String` contributes no arm rather than
   /// vetoing the delegation for a sibling that does name a class.
   bool _isNested(_PointerField field) {
-    if (field.nestedTargets.isEmpty || field.type.endsWith('?')) return false;
+    if (field.nestedTargets.isEmpty) return false;
+    // Nullability is a per-DECLARER property, never a merged one: with
+    // `DraftA payload` on one sibling and `DraftB? payload` on another, a
+    // single `field.type` test admits both arms when the non-nullable one was
+    // collected first — and the nullable arm then hands `DraftB?` to a lens
+    // that requires `DraftB`. Each arm guards itself (see
+    // [_multiTargetComposition]); only a field whose every declarer is
+    // nullable is rejected outright, because then no arm could read it
+    // unconditionally (CodeRabbit finding on lens.dart:821).
+    final declarerTypes = field.types.values
+        .map(helpers.replaceDollarTypesWithConcrete)
+        .toList();
+    final everyDeclarerNullable =
+        declarerTypes.isNotEmpty &&
+        declarerTypes.every((type) => type.trim().endsWith('?'));
+    if (everyDeclarerNullable) return false;
     // A field VISIBLE on this class delegates through [ZorphyLens.then] with a
     // single static target. A legal covariant redeclaration records more than
-    // one, and the base-typed arm would shadow the narrowing subtypes — so such
-    // a field is resolved as a plain segment rather than delegated, which keeps
-    // the build from crashing on `.single` (see [_fieldTypeName]).
-    if (field.isVisibleHere && field.nestedClass == null) return false;
+    // one, and a single base-typed arm would shadow the narrowing subtypes — so
+    // it dispatches per runtime subtype instead of taking the `then` path. It
+    // must still be ADMITTED here, or the nested path disappears entirely
+    // (`Node.resolvePath('/payload/title')` answering null for a hierarchy that
+    // carries it: CodeRabbit finding on json_pointer_generator.dart:827).
+    if (field.isVisibleHere && field.nestedClass == null) {
+      return field.nestedTargets.entries.any(
+        (entry) => _targetEmitsResolver(entry.value),
+      );
+    }
     return field.nestedTargets.entries.any(
       (entry) => _targetEmitsResolver(entry.value),
     );
   }
 
+  /// The annotated class registered under any spelling [target] may take.
+  ///
+  /// The graph keys a class by its DECLARED name, so the same model can be
+  /// `Root`, `$Root` or `$$Root` depending on how it was annotated; the type
+  /// helpers normalize all three to `Root`. Every lookup goes through here so
+  /// discovery (`nestedOf`) and eligibility ([_targetEmitsResolver]) agree —
+  /// they used to try different spellings, which made a `$$Root`-typed field
+  /// resolvable in one and not the other.
+  ClassElement? _annotatedElement(String target) {
+    for (final candidate in [target, '\$$target', '\$\$$target']) {
+      final element = _annotatedClasses[candidate];
+      if (element != null) return element;
+    }
+    return null;
+  }
+
   /// Whether [target] actually emits a `resolvePath` of its own.
   bool _targetEmitsResolver(String target) {
-    final element = _annotatedClasses[target] ?? _annotatedClasses['\$$target'];
+    final element = _annotatedElement(target);
     if (element == null) return false;
     final metadata = _metadataFor(element);
     if (metadata == null) return false;
@@ -847,6 +1112,10 @@ class JsonPointerGenerator extends UniversalGenerator {
   /// caches with another class's fields, which is why it is not a plain call.
   bool _emitsResolver(GenerationContext context) {
     if (context.metadata.generics.isNotEmpty) return false;
+    // Mirrors [shouldGenerate]'s own-resolver guard: a class that keeps its own
+    // `resolvePath` member emits no static one, so delegating to it would
+    // reference a member that does not exist.
+    if (_declaresOwnResolver(context.metadata)) return false;
     final previousAnnotated = _annotatedClasses;
     final List<_PointerField> fields;
     try {

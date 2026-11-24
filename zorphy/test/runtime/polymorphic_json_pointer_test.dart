@@ -768,6 +768,21 @@ void main() {
       );
       // The root still resolves its own nested segment rather than dropping it.
       expect(covariant['Node'], contains("'/payload' =>"));
+      // A covariant redeclaration must keep the NESTED paths reachable: the
+      // root's own target answers `/payload/title`, and the narrowed subtype's
+      // answers the child-only `/payload/extra`. Dropping the delegation left
+      // both answering null for a hierarchy that demonstrably carries them
+      // (CodeRabbit finding on json_pointer_generator.dart:827).
+      expect(
+        covariant['Node'],
+        contains('DraftA.resolvePath(remainder)'),
+        reason: 'the root arm must delegate /payload/<field> to its own target',
+      );
+      expect(
+        covariant['Node'],
+        contains('DraftB.resolvePath(remainder)'),
+        reason: 'the narrowed subtype arm must delegate to ITS target',
+      );
       final diagnostics = await _analyzeFixture(
         dir,
         'covariant_nested',

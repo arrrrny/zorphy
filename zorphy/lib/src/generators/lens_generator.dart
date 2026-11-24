@@ -86,6 +86,13 @@ class LensGenerator extends ConcreteClassGenerator {
     final taken = <String>{
       for (final field in metadata.allFields)
         if (field.name != null) field.name as String,
+      // A named constructor occupies the same namespace as a static member:
+      // `@ZorphyNamedConstructor` on `lenses` would emit both
+      // `Model.lenses(...)` and `static const lenses`, which Dart rejects
+      // (`conflicting_static_and_instance`) even though no field holds the
+      // name (CodeRabbit finding on lens_generator.dart:89).
+      for (final constructor in metadata.namedConstructors)
+        if ((constructor.name as String).isNotEmpty) constructor.name as String,
     };
     for (final candidate in const ['lenses', 'lensesView', r'$$lenses']) {
       if (!taken.contains(candidate)) return candidate;
@@ -200,7 +207,14 @@ class LensGenerator extends ConcreteClassGenerator {
             // the null through the generated Patch, whose `containsKey` gate can
             // express it (mirrors JsonPointerGenerator._setter). Gated on
             // generatePatch — without a Patch there is no null-capable writer.
-            final hasNullBranch = field.type.endsWith('?') && generatePatch;
+            //
+            // `dynamic` is included: it accepts `null` as a value, so a lens
+            // typed `dynamic` must be able to clear it — the bare `?` test
+            // excluded it and left `set(root, null)` silently keeping the old
+            // value (CodeRabbit finding on lens_generator.dart:203).
+            final hasNullBranch =
+                (field.type.endsWith('?') || field.type.trim() == 'dynamic') &&
+                generatePatch;
             if (hasNullBranch) {
               m.lambda = false;
               m.body = Code(
