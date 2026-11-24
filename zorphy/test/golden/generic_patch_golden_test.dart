@@ -28,7 +28,7 @@ const _goldenPath = 'test/runtime/fixtures/progress_box_patch.golden.txt';
 /// A generic entity carrying one field per case the review named: a generic
 /// scalar (`T?`), a plain scalar, and a concrete known-class reference whose
 /// name merely contains the generic parameter (`Token` ⊃ `T`).
-List<NameTypeClassComment> _progressBoxFields() => [
+List<NameTypeClassComment> progressBoxFields() => [
   NameTypeClassComment('value', 'T?', ''),
   NameTypeClassComment('label', 'String', ''),
   NameTypeClassComment('token', 'Token', ''),
@@ -36,7 +36,7 @@ List<NameTypeClassComment> _progressBoxFields() => [
 
 String _emit() => PatchEmitter().emit(
   className: 'ProgressBox',
-  fields: _progressBoxFields(),
+  fields: progressBoxFields(),
   knownClasses: const ['Token'],
   genericTypeNames: const ['T'],
 );
