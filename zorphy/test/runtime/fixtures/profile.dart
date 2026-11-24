@@ -330,6 +330,9 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
             before.address,
           );
     }
+    if (patchMap.containsKey(Profile$.address) &&
+        addressCarried is! PatchNested)
+      undo.patchMap[Profile$.address] = before.address;
     if (patchMap[Profile$.tags] is ListPatchDelta<String>)
       undo.patchMap[Profile$.tags] =
           (patchMap[Profile$.tags] as ListPatchDelta<String>).invert(
@@ -401,7 +404,9 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
     if (patchMap.containsKey(Profile$.displayName))
       wire['displayName'] = patchMap[Profile$.displayName];
     if (patchMap.containsKey(Profile$.address))
-      wire['address'] = patchMap[Profile$.address];
+      wire['address'] = patchMap[Profile$.address] is PatchNested
+          ? (patchMap[Profile$.address] as PatchNested).toWire()
+          : patchMap[Profile$.address];
     if (patchMap.containsKey(Profile$.tags))
       wire['tags'] = patchMap[Profile$.tags] is ListPatchDelta<String>
           ? (patchMap[Profile$.tags] as ListPatchDelta<String>).toWire()
@@ -411,7 +416,10 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
           ? (patchMap[Profile$.scores] as MapPatchDelta<String, int>).toWire()
           : patchMap[Profile$.scores];
     if (patchMap.containsKey(Profile$.previousAddress))
-      wire['previousAddress'] = patchMap[Profile$.previousAddress];
+      wire['previousAddress'] =
+          patchMap[Profile$.previousAddress] is PatchNested
+          ? (patchMap[Profile$.previousAddress] as PatchNested).toWire()
+          : patchMap[Profile$.previousAddress];
     return wire;
   }
 

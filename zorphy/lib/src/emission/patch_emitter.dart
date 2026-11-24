@@ -326,15 +326,19 @@ class PatchEmitter {
               ),
             );
             b.statements.add(const Code('}'));
-            if (shape.isNullable) {
-              b.statements.add(
-                Code(
-                  'if ($patchMapName.containsKey($key) && '
-                  '${member}Carried is! PatchNested) '
-                  'undo.$patchMapName[$key] = before.$member;',
-                ),
-              );
-            }
+            // A fluent `with*` builder writes a raw value, a sub-patch or a
+            // function into the map — none of which is a `PatchNested` — so
+            // the inverse restores the prior value wholesale, exactly as the
+            // list / map arms below do. Without this fallback a patch built
+            // from the public `withX`/`withXPatch`/`withXPatchFunc` builders
+            // and then inverted silently drops the field (issue #207 review).
+            b.statements.add(
+              Code(
+                'if ($patchMapName.containsKey($key) && '
+                '${member}Carried is! PatchNested) '
+                'undo.$patchMapName[$key] = before.$member;',
+              ),
+            );
           case _FieldShapeKind.list:
             // A nullable field's prior value may be null, and `invert` takes
             // the non-nullable collection; the else arm below restores the
@@ -631,8 +635,11 @@ class PatchEmitter {
           genericTypeNames: genericTypeNames,
         );
         // A collection field carries either a delta (from `diff`) or a raw
-        // collection (from the fluent `with*` builder), so the wire arm is
-        // narrowed rather than blind-cast.
+        // collection (from the fluent `with*` builder), and a nested field
+        // carries either a `PatchNested` (from `diff`) or a raw sub-value (from
+        // the fluent builder), so each arm is narrowed rather than blind-cast.
+        // Both unwrap to plain JSON so a wire map never carries an opaque patch
+        // object.
         final wireValue = switch (shape.kind) {
           _FieldShapeKind.list =>
             '$patchMapName[$key] is ListPatchDelta<${shape.valueType}>'
@@ -642,6 +649,10 @@ class PatchEmitter {
             '$patchMapName[$key] is MapPatchDelta<${shape.valueType}>'
                 ' ? ($patchMapName[$key] as MapPatchDelta<${shape.valueType}>)'
                 '.toWire() : $patchMapName[$key]',
+          _FieldShapeKind.nested =>
+            '$patchMapName[$key] is PatchNested'
+                ' ? ($patchMapName[$key] as PatchNested).toWire()'
+                ' : $patchMapName[$key]',
           _ => '$patchMapName[$key]',
         };
         b.statements.add(
@@ -935,15 +946,11 @@ class PatchEmitter {
       );
     }
 
-    // A nested Zorphy field: the `$`-prefixed abstract form or a concrete
-    // class the caller knows, and never a function or a type variable.
-    final isZorphy =
-        !field.isEnum &&
-        !type.contains('Function') &&
-        !genericTypeNames.contains(type) &&
-        !genericTypeNames.any(type.contains) &&
-        (type.startsWith(r'$') || knownClasses.contains(type));
-    if (isZorphy) {
+    // A nested Zorphy field: route the test through the single `_isZorphyType`
+    // helper the fluent-builder emission already uses, so the two call sites
+    // cannot drift. `type` is `$`-stripped above (as the helper's other callers
+    // pass it), so a concrete class the caller knows is what matches here.
+    if (_isZorphyType(type, field, knownClasses, genericTypeNames)) {
       final bare = _baseName(type);
       return _FieldShape(
         kind: _FieldShapeKind.nested,

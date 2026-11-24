@@ -133,6 +133,57 @@ void main() {
       final patch = ProfilePatch.diff(previous, next);
       expect(patch.apply(previous).previousAddress, next.previousAddress);
     });
+
+    test('invert restores a fluent-built non-nullable nested value', () {
+      const originalAddress = Address(street: 'Main', city: 'Springfield');
+      final before = Profile(
+        id: 'p1',
+        displayName: 'ada',
+        address: originalAddress,
+        tags: const [],
+        scores: const {},
+      );
+      // The always-emitted `withAddress` builder carries a RAW value, not a
+      // PatchNested — inverting must still restore the prior value (the
+      // non-nullable nested arm needs the same `is! PatchNested` fallback the
+      // list / map arms have).
+      final patch = ProfilePatch().withAddress(
+        const Address(street: 'Elm', city: 'Ogdenville'),
+      );
+      final patched = patch.apply(before);
+      expect(
+        patched.address,
+        const Address(street: 'Elm', city: 'Ogdenville'),
+      );
+      expect(
+        patch.invert(before).apply(patched).address,
+        originalAddress,
+        reason: 'invert restores the original nested value',
+      );
+    });
+
+    test('invert restores a fluent-built sub-patch nested value', () {
+      const originalAddress = Address(street: 'Main', city: 'Springfield');
+      final before = Profile(
+        id: 'p1',
+        displayName: 'ada',
+        address: originalAddress,
+        tags: const [],
+        scores: const {},
+      );
+      // `withAddressPatch` carries an AddressPatch (a Patch, but not a
+      // PatchNested); the fallback must still restore the prior value.
+      final patch = ProfilePatch().withAddressPatch(
+        AddressPatch()..withStreet('Elm'),
+      );
+      final patched = patch.apply(before);
+      expect(patched.address.street, 'Elm');
+      expect(
+        patch.invert(before).apply(patched).address,
+        originalAddress,
+        reason: 'invert restores the original nested value',
+      );
+    });
   });
 
   group('collection deltas', () {
@@ -214,6 +265,26 @@ void main() {
           <String, Object?>{'op': 'append', 'item': 'y'},
         ],
       });
+    });
+
+    test('a nested change renders the sub-patch on the wire, not an object', () {
+      final previous = Profile(
+        id: 'p1',
+        displayName: 'ada',
+        address: const Address(street: 'Main', city: 'Springfield'),
+        tags: const [],
+        scores: const {},
+      );
+      final wire = ProfilePatch.diff(
+        previous,
+        previous.copyWith(
+          address: const Address(street: 'Elm', city: 'Springfield'),
+        ),
+      ).toWire();
+
+      // A nested field unwraps to its inner toWire map — plain JSON, never a
+      // live PatchNested object.
+      expect(wire['address'], <String, Object?>{'street': 'Elm'});
     });
   });
 
