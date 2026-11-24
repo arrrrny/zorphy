@@ -8,6 +8,8 @@ environment:
 
 dependencies:
   collection: ^1.19.1
+  # `ZorphyIntentDigest` hashes the canonical intent payload (issue #189).
+  crypto: ^3.0.7
   json_annotation: ^4.12.0
   meta: ^1.17.0
   quiver: ^3.2.2
