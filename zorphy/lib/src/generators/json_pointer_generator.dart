@@ -269,9 +269,9 @@ class JsonPointerGenerator extends UniversalGenerator {
   static bool _mentionsTypeParameter(ClassElement element, String type) {
     final parameters = _typeParametersOf(element);
     if (parameters.isEmpty) return false;
-    final identifiers = RegExp(
-      r'[A-Za-z_$][A-Za-z0-9_$]*',
-    ).allMatches(type).map((match) => match.group(0)!);
+    final identifiers = RegExp(r'[A-Za-z_$][A-Za-z0-9_$]*')
+        .allMatches(type)
+        .map((match) => match.group(0)!);
     return identifiers.any(parameters.contains);
   }
 

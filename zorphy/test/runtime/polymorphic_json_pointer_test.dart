@@ -835,18 +835,7 @@ Future<List<String>> _analyzeFixture(
   for (final output in outputs.values) {
     part.writeln(output);
   }
-  File(
-    '${dir.path}/$libraryName.zorphy.dart',
-  ).writeAsStringSync(part.toString());
-  final diagnostics = await _diagnostics('${dir.path}/$libraryName.dart');
-  if (diagnostics.isNotEmpty) {
-    // TEMP DIAGNOSTIC (merge task 2753e4cd): CI reports two crossed
-    // argument_type_not_assignable diagnostics for the sibling fixture that
-    // this host cannot reproduce on either analyzer major. Dump the exact part
-    // CI analyzed so the emission can be read instead of guessed.
-    stderr.writeln('=== PART DUMP $libraryName BEGIN ===');
-    stderr.writeln(part.toString());
-    stderr.writeln('=== PART DUMP $libraryName END ===');
-  }
-  return diagnostics;
+  File('${dir.path}/$libraryName.zorphy.dart')
+      .writeAsStringSync(part.toString());
+  return _diagnostics('${dir.path}/$libraryName.dart');
 }

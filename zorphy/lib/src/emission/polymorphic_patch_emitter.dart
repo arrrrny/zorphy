@@ -3,6 +3,7 @@ import 'package:code_builder/code_builder.dart';
 import '../ast/ast.dart';
 import '../common/NameType.dart';
 import '../emission/emitter.dart';
+import '../helpers.dart' as helpers;
 
 /// Emits the polymorphic patch surface for a sealed hierarchy (ISSUE-009).
 ///
@@ -96,6 +97,7 @@ class PolymorphicPatchEmitter {
     required String rootName,
     required List<NameTypeClassComment> fields,
     required List<String> subtypeNames,
+    Map<String, Map<String, String>> subtypeFieldTypes = const {},
   }) {
     _requireSubtypes(subtypeNames);
     return _emit([
@@ -108,6 +110,7 @@ class PolymorphicPatchEmitter {
         rootName: rootName,
         fields: fields,
         subtypeNames: subtypeNames,
+        subtypeFieldTypes: subtypeFieldTypes,
       ),
     ]);
   }
@@ -216,6 +219,7 @@ class PolymorphicPatchEmitter {
     required String rootName,
     required List<NameTypeClassComment> fields,
     required List<String> subtypeNames,
+    Map<String, Map<String, String>> subtypeFieldTypes = const {},
   }) {
     _requireSubtypes(subtypeNames);
     final root = _clean(rootName);
@@ -242,7 +246,9 @@ class PolymorphicPatchEmitter {
 
       c.methods.add(_isEmptyGetter(fields));
       c.methods.add(_isNotEmptyGetter());
-      c.methods.add(_sharedApplyMethod(root, fields, subtypeNames));
+      c.methods.add(
+        _sharedApplyMethod(root, fields, subtypeNames, subtypeFieldTypes),
+      );
       c.methods.add(_concreteComposeMethod(root, fields, sharedName));
       c.methods.add(
         _concreteInvertMethod(
@@ -313,11 +319,23 @@ class PolymorphicPatchEmitter {
 
   // ── shared member builders ──────────────────────────────────────────────
 
+  /// The field's type as a CONCRETE, `$`-free spelling.
+  ///
+  /// `metadata.allFields` carries the interface's own declaration, so a nested
+  /// value type arrives as `$DraftA`. A `PatchValue<$DraftA>` does not compile
+  /// — `$`-classes are interfaces with no concrete getter — and its
+  /// `valueOrNull` would be `$DraftA?`, so `apply` could not hand it to the
+  /// concrete `copyWith(payload: …)` (`argument_type_not_assignable`, seen on
+  /// the covariant_nested fixture). The generators that consume these specs
+  /// all work in the concrete space, so the patch surface must too.
+  static String _concreteType(String? type) =>
+      helpers.replaceDollarTypesWithConcrete(type ?? '');
+
   Method _patchValueGetter(NameTypeClassComment field) => Method((m) {
     m
       ..name = _memberName(field.name)
       ..type = MethodType.getter
-      ..returns = referType('PatchValue<${field.type}>');
+      ..returns = referType('PatchValue<${_concreteType(field.type)}>');
   });
 
   Field _patchValueField(
@@ -327,7 +345,7 @@ class PolymorphicPatchEmitter {
     f
       ..name = _memberName(field.name)
       ..modifier = FieldModifier.final$
-      ..type = referType('PatchValue<${field.type}>');
+      ..type = referType('PatchValue<${_concreteType(field.type)}>');
     if (overridesRoot) f.annotations.add(refer('override'));
   });
 
@@ -336,7 +354,7 @@ class PolymorphicPatchEmitter {
       ..name = _memberName(field.name)
       ..named = true
       ..defaultTo = const Code('const PatchValue.unchanged()')
-      ..type = referType('PatchValue<${field.type}>');
+      ..type = referType('PatchValue<${_concreteType(field.type)}>');
   });
 
   Code _fieldInitializer(NameTypeClassComment field) {
@@ -425,6 +443,7 @@ class PolymorphicPatchEmitter {
     String root,
     List<NameTypeClassComment> fields,
     List<String> subtypeNames,
+    Map<String, Map<String, String>> subtypeFieldTypes,
   ) => Method((m) {
     m
       ..name = applyMethodName
@@ -447,11 +466,25 @@ class PolymorphicPatchEmitter {
       // emits roots alone, and #142 withholds sealing across libraries — so the
       // dispatch must survive a subtype patch that does not exist.
       lines.add('if (target is $subtype) {');
-      lines.add(
-        'return target.copyWith('
-        '${fields.map((f) => '${_memberName(f.name)}: ${_memberName(f.name)}.isUnchanged ? target.${_memberName(f.name)} : ${_memberName(f.name)}.valueOrNull').join(', ')}'
-        ');',
-      );
+      // The patch carries the ROOT's declaration of each shared field, so a
+      // covariant redeclaration (`$$Node.payload: $DraftA`,
+      // `$Child.payload: $DraftB`) makes `valueOrNull` a `DraftA?` while this
+      // arm's `copyWith(payload: …)` expects `DraftB?`. The subtype is known
+      // HERE, so the narrowed type — when the subtype declares its own — is
+      // what the write must cast to.
+      lines.add('return target.copyWith(');
+      for (final f in fields) {
+        final name = _memberName(f.name);
+        final narrowed = subtypeFieldTypes[subtype]?[f.name];
+        final value = '${name}.valueOrNull';
+        final written = narrowed == null
+            ? value
+            : '$value as ${_concreteType(narrowed)}';
+        lines.add(
+          '  $name: $name.isUnchanged ? target.$name : $written,',
+        );
+      }
+      lines.add(');');
       lines.add('}');
     }
     lines.add(
