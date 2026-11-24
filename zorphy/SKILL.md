@@ -360,11 +360,15 @@ abstract class $Post implements $Timestamped, $Identified {
 
 ### JSON-Pointer Resolution
 
-Every generated class exposes a static resolver (issue #186):
+A generated class with at least one writable field exposes a static resolver
+(issue #186):
 
 ```dart
-static ZorphyLens<T, Object?>? resolvePath(String pointer)
+static ZorphyLens<Post, Object?>? resolvePath(String pointer)
 ```
+
+`Post` is the concrete class — the generator emits each class's own name, so no
+type parameter ever appears here.
 
 It resolves a JSON Pointer to a typed lens, one `switch` step per segment —
 O(depth), no regex, no `dart:mirrors`, AOT-safe:
@@ -375,6 +379,7 @@ final title = Post.resolvePath('/title');
 final renamed = title?.set(post, 'New title');
 
 // A nested class's field delegates to that class's own table
+// (the parent field must be non-nullable)
 final city = User.resolvePath('/address/city');
 
 // A segment only SOME subtype carries still resolves, and its lens
@@ -383,10 +388,17 @@ final enabled = UiNode.resolvePath('/enabled'); // null-safe dispatch
 ```
 
 - A pointer this class does not carry answers `null`.
-- Nullable fields accept the explicit `null` write (`lens.set(root, null)`),
-  which routes through the generated `Patch` because `copyWith` cannot
-  distinguish "omitted" from "set to null".
-- A generic class gets no resolver: a static member cannot reference `T`.
+- Nested delegation needs a **non-nullable** parent: a nullable
+  `Address? get address` has nothing to delegate to, so `/address/city`
+  answers `null` instead of composing a lens.
+- A nullable field accepts the explicit `null` write (`lens.set(root, null)`)
+  only when the preset generates `Patch` — `standard` and `full` do, while
+  `lean` sets `generatePatch: false`. With no null branch the write falls
+  through to `copyWith`'s `field ?? this.field` and keeps the old value.
+- A class gets no resolver when it is generic (a static member cannot
+  reference `T`), carries no writable field at all, or lives in a hierarchy
+  where no class generated `copyWith` (e.g. a sealed root whose subtypes are
+  all abstract without `generateCopyWithFn`).
 
 ### Enums
 
