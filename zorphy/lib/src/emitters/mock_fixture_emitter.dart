@@ -1,10 +1,14 @@
-/// Emits `<Name>MockData` trusted seed builders (ISSUE-015, #190).
+/// Emits `<Name>MockData` trusted seed builders (ISSUE-015, #190) and
+/// `<Name>WireFixtures` boundary test fixtures (ISSUE-016, #191).
 ///
 /// A mock-first consumer seeds a `ZfaStore` backend, a golden fixture, or a
 /// screenshot harness from generated data instead of hand-writing it. This
 /// emitter produces that data as a `<Name>MockData` class per node, built
 /// entirely from `package:code_builder` specs and formatted by
 /// [ZorphyEmitter] — no preset, no `generate*` toggle, per the issue's §5 gate.
+///
+/// It also emits `<Name>WireFixtures` for `@ZorphyEntity` and `@ZorphyIntent`,
+/// providing `validMap({int seed = 0})` and `corruptMaps()`.
 ///
 /// The emitted surface, straight from the issue's §2:
 ///
@@ -145,6 +149,9 @@ final class MockFixtureEmitter {
     void walk(ZorphyNodeIr node) {
       if (node.typeParameters.isNotEmpty) return;
       specs.add(_classSpec(node, mockSeeds));
+      if (_supportsWireFixtures(node)) {
+        specs.add(_wireFixturesClassSpec(node));
+      }
       for (final child in node.directSubTypes) {
         walk(child);
       }
@@ -169,7 +176,11 @@ final class MockFixtureEmitter {
     Map<String, ZorphyMock> mockSeeds = const {},
   }) {
     if (node.typeParameters.isNotEmpty) return '';
-    return _emitter.emitSpecs([_classSpec(node, mockSeeds)]);
+    final specs = <Spec>[_classSpec(node, mockSeeds)];
+    if (_supportsWireFixtures(node)) {
+      specs.add(_wireFixturesClassSpec(node));
+    }
+    return _emitter.emitSpecs(specs);
   }
 
   /// The `<Name>MockData` class of [node].
@@ -746,6 +757,122 @@ final class MockFixtureEmitter {
             RegExp('[A-Za-z0-9]').hasMatch(char) ? char.toLowerCase() : '-',
       )
       .join();
+
+  static bool _supportsWireFixtures(ZorphyNodeIr node) =>
+      node.archetype == ArchetypeKind.entity ||
+      node.archetype == ArchetypeKind.intent;
+
+  /// The `<Name>WireFixtures` class name for [node].
+  static String wireFixturesName(ZorphyNodeIr node) =>
+      '${node.cleanName}WireFixtures';
+
+  /// The `<Name>WireFixtures` class of [node].
+  Class _wireFixturesClassSpec(ZorphyNodeIr node) {
+    return Class((c) {
+      c.name = wireFixturesName(node);
+      c.constructors.add(Constructor((k) => k.name = '_'));
+
+      c.methods.add(
+        Method((m) {
+          m
+            ..name = 'validMap'
+            ..static = true
+            ..returns = refer('Map<String, Object?>')
+            ..optionalParameters.add(_seedParameter())
+            ..body = Code(
+              'return ${mockDataName(node)}.single(seed: seed).toWire();',
+            );
+        }),
+      );
+
+      c.methods.add(
+        Method((m) {
+          m
+            ..name = 'corruptMaps'
+            ..static = true
+            ..returns = refer('List<Map<String, Object?>>')
+            ..body = _corruptMapsBody(node);
+        }),
+      );
+    });
+  }
+
+  static Code _corruptMapsBody(ZorphyNodeIr node) {
+    final leaves = [
+      for (final leaf in leavesOf(node))
+        if (leaf.typeParameters.isEmpty) leaf,
+    ];
+    final isDispatch = leaves.isNotEmpty && !node.isConcreteLeaf;
+
+    final statements = <Code>[
+      const Code('final base = validMap();'),
+      const Code('final maps = <Map<String, Object?>>[];'),
+    ];
+
+    // A node's `fromWire` validates the discriminator IFF it is a dispatch
+    // node (`!node.isConcreteLeaf`) — exactly the split the boundary codec
+    // makes (`_dispatchFromWireBody` vs `_leafFromWireBody`). A concrete
+    // leaf's `fromWire` never reads the tag, so a missing/unknown tag would
+    // still decode and break §5's "100% of corruptMaps return BoundaryErr"
+    // gate; the corruption is emitted only where the decoder checks it.
+    final isPolymorphicRoot = !node.isConcreteLeaf;
+
+    if (isPolymorphicRoot && node.discriminatorKey.isNotEmpty) {
+      final key = node.discriminatorKey;
+      statements.add(
+        Code(
+          "maps.add(Map<String, Object?>.of(base)..remove('$key')); // missing discriminator",
+        ),
+      );
+      statements.add(
+        Code(
+          "maps.add(Map<String, Object?>.of(base)..[ '$key' ] = '__unknown_discriminator__'); // unknown discriminator",
+        ),
+      );
+    }
+
+    final targetNode = isDispatch && leaves.isNotEmpty ? leaves.first : node;
+    final payload = payloadFields(targetNode);
+    for (final field in payload) {
+      if (!field.isNullable) {
+        statements.add(
+          Code(
+            "maps.add(Map<String, Object?>.of(base)..remove('${field.name}'));",
+          ),
+        );
+      }
+      final corruptVal = _corruptValueForType(field.type);
+      statements.add(
+        Code(
+          "maps.add(Map<String, Object?>.of(base)..[ '${field.name}' ] = $corruptVal);",
+        ),
+      );
+    }
+
+    statements.add(const Code('return maps;'));
+    return Block.of(statements);
+  }
+
+  static String _corruptValueForType(String declaredType) {
+    final type = declaredType.replaceAll('?', '').trim();
+    if (type == 'String') {
+      return '12345';
+    } else if (type == 'int') {
+      return "'not-an-int'";
+    } else if (type == 'double' || type == 'num') {
+      return "'not-a-number'";
+    } else if (type == 'bool') {
+      return "'not-a-bool'";
+    } else if (type == 'DateTime') {
+      return "'not-a-datetime'";
+    } else if (type.startsWith('List') || type.startsWith('Set')) {
+      return "'not-a-list'";
+    } else if (type.startsWith('Map')) {
+      return "'not-a-map'";
+    } else {
+      return '12345';
+    }
+  }
 
   /// A stable per-field offset so two fields of the same type do not collide.
   ///
