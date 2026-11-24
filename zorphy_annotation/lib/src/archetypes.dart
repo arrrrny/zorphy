@@ -107,8 +107,11 @@ final class ZorphyValue {
 /// model two commands or two states as one node, which is what polymorphic
 /// subtypes and `AsyncSlice<T>` exist to replace.
 ///
-/// It is a diagnostic on the resolved IR (`ZORPHY_LINT_NO_BOOL_FLAGS`), not
-/// yet a `build_runner` failure — see `zorphy/lib/src/lints/no_bool_flags_lint.dart`.
+/// It is a diagnostic on the resolved IR (`ZORPHY_LINT_NO_BOOL_FLAGS`), and
+/// since #223 the production generator enforces it: `ZorphyGenerator` resolves
+/// the library's `PolymorphicIr` and throws `InvalidGenerationSourceError` on
+/// any diagnostic, so a flagged boolean fails the real `build_runner` run —
+/// see `zorphy/lib/src/lints/no_bool_flags_lint.dart`.
 ///
 /// A boolean that is genuinely part of the domain — `Product.inStock`,
 /// `InteractiveUiNode.enabled` — is not a flag and must be able to say so.

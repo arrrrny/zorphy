@@ -140,9 +140,11 @@ void main() {
         readAt: readAt,
       );
 
-      final applied = NotificationPatch.shared(
-        id: const PatchValue.set('o2'),
-      ).apply(original) as OrderNotification;
+      final applied =
+          NotificationPatch.shared(
+                id: const PatchValue.set('o2'),
+              ).apply(original)
+              as OrderNotification;
 
       expect(applied.id, 'o2');
       expect(
@@ -188,6 +190,33 @@ void main() {
         isTrue,
         reason: 'the v3 contract requires an empty patch to return the target',
       );
+    });
+
+    test(
+      'a fluent builder returns a new patch and leaves the source empty',
+      () {
+        // ISSUE-0223: the builders MockFixtureEmitter.samplePatch() chains are
+        // copy-with, not mutation — the patches are immutable values.
+        final source = OrderNotificationPatch();
+        final built = source.withItemCount(7).withId('o9');
+
+        expect(source.isEmpty, isTrue, reason: 'the source patch is untouched');
+        expect(built, isNot(same(source)));
+
+        final applied = built.apply(OrderNotification(id: 'o1', itemCount: 1));
+        expect(applied.itemCount, 7);
+        expect(applied.id, 'o9');
+      },
+    );
+
+    test('a fluent builder carries earlier sets through the chain', () {
+      final built = OrderNotificationPatch()
+          .withItemCount(7)
+          .withReadAt(DateTime.utc(2026, 11, 24));
+
+      final applied = built.apply(OrderNotification(id: 'o1', itemCount: 1));
+      expect(applied.itemCount, 7);
+      expect(applied.readAt, DateTime.utc(2026, 11, 24));
     });
   });
 }

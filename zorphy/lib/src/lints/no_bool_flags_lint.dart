@@ -17,14 +17,11 @@
 ///
 /// **Where the rejection actually happens.** `HierarchyResolver` runs the rule
 /// and appends its hits to [PolymorphicIr.diagnostics] (phase 4c), and every
-/// diagnostic there is an error ([ZorphyDiagnostic.isError]). The v3 IR
-/// pipeline is not yet the path `build_runner` calls — `ZorphyGenerator`, the
-/// builder's entrypoint, drives `Orchestrator`'s v2 pipeline and never resolves
-/// a [PolymorphicIr] — so today the rule reports through `diagnostics` (and
-/// [NoBoolFlagsLint.enforce], which a v3 caller must call itself) rather than
-/// failing a real `build_runner` run. Wiring `enforce` into the generator is
-/// the remaining half of #180; until then the wording here and in `SKILL.md`
-/// says "reports", not "blocks the build".
+/// diagnostic there is an error ([ZorphyDiagnostic.isError]). Since #223 the
+/// v3 IR pipeline IS the path `build_runner` calls: `ZorphyGenerator` resolves
+/// the library's [PolymorphicIr] and throws `InvalidGenerationSourceError` on
+/// any diagnostic, so a flagged boolean fails the real `build_runner` run.
+/// [NoBoolFlagsLint.enforce] remains for a caller that wants the lint alone.
 ///
 /// The escape hatch is `@ZorphyDomainBool()`: a genuine domain boolean
 /// (`Product.inStock`, `InteractiveUiNode.enabled`) is not a flag, and its
@@ -146,13 +143,11 @@ final class NoBoolFlagsLint {
   /// Throws an actionable [InvalidGenerationSourceError] when [ir] violates
   /// the rule, and returns normally otherwise.
   ///
-  /// This is the FAIL-the-build entry point: a v3 caller that owns a
-  /// [PolymorphicIr] calls it before emitting, so a flagged hierarchy stops
-  /// generation instead of producing a node whose booleans are meaningless.
-  /// It has no production caller in this package today — the v3 IR pipeline
-  /// is not the path `build_runner` drives (see the library doc) — so the
-  /// `build_runner` path reports nothing yet rather than failing. Call it from
-  /// any new v3 entrypoint; do not describe it as already wired.
+  /// This is the FAIL-the-build entry point for a caller that wants the lint
+  /// alone. The production `build_runner` path does not call it: since #223
+  /// `ZorphyGenerator` enforces the rule through the IR diagnostics (the
+  /// resolver appends the hits in phase 4c, and the generator throws on any
+  /// diagnostic), which covers this lint alongside ZORPHY_E001..E005.
   static void enforce(PolymorphicIr ir) {
     final hits = check(ir);
     if (hits.isEmpty) return;

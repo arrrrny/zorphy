@@ -121,11 +121,10 @@ String _compact(String source) => source.replaceAll(RegExp(r'\s+'), '');
 
 /// The emitter's source with comment lines removed, so the acceptance gate
 /// reads CODE and not the prose that names the forbidden construct.
-String _emitterCode() =>
-    File('lib/src/emission/boundary_codec_emitter.dart')
-        .readAsLinesSync()
-        .where((line) => !line.trimLeft().startsWith('//'))
-        .join('\n');
+String _emitterCode() => File('lib/src/emission/boundary_codec_emitter.dart')
+    .readAsLinesSync()
+    .where((line) => !line.trimLeft().startsWith('//'))
+    .join('\n');
 
 void main() {
   group('golden: dispatch node', () {
@@ -455,6 +454,81 @@ void main() {
       // The only public knobs are a constructor name; a `bool` parameter on
       // a public member would be a toggle by another spelling.
       expect(RegExp(r'\bbool\s+\w+\s*[,)=]').hasMatch(code), isFalse);
+    });
+  });
+
+  group('ISSUE-0223 usedHelperSpecs — only the called helpers are emitted', () {
+    test('a String-only library gets describe + as, nothing else', () {
+      final fixture = _notification();
+      final helpers = BoundaryCodecEmitter.usedHelperSpecs(
+        [fixture.order],
+        const {
+          r'$OrderNotification': [
+            BoundaryField(name: 'id', type: 'String'),
+            BoundaryField(name: 'note', type: 'String?'),
+          ],
+        },
+      );
+      final names = helpers.map((m) => m.name).toList();
+
+      expect(names, contains('_boundaryDescribe'));
+      expect(names, contains('_boundaryAs'));
+      expect(names, isNot(contains('_boundaryList')));
+      expect(names, isNot(contains('_boundaryDouble')));
+      expect(names, isNot(contains('_boundaryDateTime')));
+      expect(names, isNot(contains('_boundaryObject')));
+      expect(names, isNot(contains('_boundaryPrefix')));
+    });
+
+    test('field shapes pull in exactly their own helpers', () {
+      final fixture = _notification();
+      final helpers = BoundaryCodecEmitter.usedHelperSpecs(
+        [fixture.order],
+        const {
+          r'$OrderNotification': [
+            BoundaryField(name: 'id', type: 'String'),
+            BoundaryField(name: 'createdAt', type: 'DateTime'),
+            BoundaryField(name: 'price', type: 'double'),
+            BoundaryField(name: 'tags', type: 'List<String>'),
+          ],
+        },
+      );
+      final names = helpers.map((m) => m.name).toList();
+
+      expect(names, contains('_boundaryDateTime'));
+      expect(names, contains('_boundaryDouble'));
+      expect(names, contains('_boundaryList'));
+      expect(names, isNot(contains('_boundaryObject')));
+      expect(names, isNot(contains('_boundaryPrefix')));
+    });
+
+    test('a collection of nodes recurses: object + prefix helpers', () {
+      final fixture = _notification();
+      final helpers = BoundaryCodecEmitter.usedHelperSpecs(
+        [fixture.order],
+        const {
+          r'$OrderNotification': [
+            BoundaryField(name: 'lines', type: 'List<OrderLine>'),
+          ],
+        },
+        additionalNodes: const {'OrderLine'},
+      );
+      final names = helpers.map((m) => m.name).toList();
+
+      expect(names, contains('_boundaryList'));
+      expect(names, contains('_boundaryObject'));
+      expect(names, contains('_boundaryPrefix'));
+    });
+
+    test('a dispatch node keeps describe even with no fields at all', () {
+      final fixture = _notification();
+      final helpers = BoundaryCodecEmitter.usedHelperSpecs([
+        fixture.root,
+      ], const {});
+      final names = helpers.map((m) => m.name).toList();
+
+      expect(names, contains('_boundaryDescribe'));
+      expect(names, isNot(contains('_boundaryAs')));
     });
   });
 }

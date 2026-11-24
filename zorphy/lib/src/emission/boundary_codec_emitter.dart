@@ -200,6 +200,57 @@ class BoundaryCodecEmitter {
     _dateTimeHelper(),
   ];
 
+  /// The subset of [helperSpecs] the codecs of [nodes] actually call.
+  ///
+  /// An unreferenced helper is an `unused_element` warning in the consuming
+  /// library's analysis, so the composition (#223) emits exactly the used
+  /// set — computed with the same classification the codecs were built with,
+  /// so the two can never drift apart. [helperSpecs] stays the full set for a
+  /// caller that composes its own library by hand.
+  static List<Method> usedHelperSpecs(
+    Iterable<ZorphyNodeIr> nodes,
+    Map<String, List<BoundaryField>> fields, {
+    Set<String> additionalNodes = const {},
+  }) {
+    const emitter = BoundaryCodecEmitter();
+    final shapes = <_Shape>{};
+    final elementShapes = <_Shape>{};
+    var hasDispatch = false;
+    for (final node in nodes) {
+      if (!node.isConcreteLeaf) hasDispatch = true;
+      final known = emitter._known(node, additionalNodes);
+      for (final field in fields[node.className] ?? const <BoundaryField>[]) {
+        final type = emitter._classify(field, known);
+        shapes.add(type.shape);
+        // `elementShape` defaults to scalar for a non-collection field, so it
+        // only names a real decode path for a list/map.
+        if (type.shape == _Shape.list || type.shape == _Shape.map) {
+          elementShapes.add(type.elementShape);
+        }
+      }
+    }
+
+    bool uses(_Shape shape) =>
+        shapes.contains(shape) || elementShapes.contains(shape);
+
+    return [
+      // Every typed helper reports a mismatch through `_boundaryDescribe`,
+      // and a dispatch node's unknown-tag error does too.
+      if (shapes.isNotEmpty || hasDispatch) _describeHelper(),
+      if (uses(_Shape.node)) _prefixHelper(),
+      // A nested collection element decodes through the reified `is` test,
+      // exactly like a scalar field.
+      if (uses(_Shape.scalar) ||
+          elementShapes.contains(_Shape.list) ||
+          elementShapes.contains(_Shape.map))
+        _asHelper(),
+      if (shapes.contains(_Shape.map) || uses(_Shape.node)) _objectHelper(),
+      if (shapes.contains(_Shape.list)) _listHelper(),
+      if (uses(_Shape.number)) _doubleHelper(),
+      if (uses(_Shape.dateTime)) _dateTimeHelper(),
+    ];
+  }
+
   /// Every concrete leaf at or below [node], depth-first.
   static List<ZorphyNodeIr> leavesOf(ZorphyNodeIr node) {
     final out = <ZorphyNodeIr>[];

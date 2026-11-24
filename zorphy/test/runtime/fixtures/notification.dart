@@ -356,6 +356,30 @@ final class OrderNotificationPatch extends NotificationPatch {
 
   final PatchValue<int> itemCount;
 
+  OrderNotificationPatch withId(String value) {
+    return OrderNotificationPatch(
+      id: PatchValue.set(value),
+      readAt: readAt,
+      itemCount: itemCount,
+    );
+  }
+
+  OrderNotificationPatch withReadAt(DateTime? value) {
+    return OrderNotificationPatch(
+      id: id,
+      readAt: PatchValue.set(value),
+      itemCount: itemCount,
+    );
+  }
+
+  OrderNotificationPatch withItemCount(int value) {
+    return OrderNotificationPatch(
+      id: id,
+      readAt: readAt,
+      itemCount: PatchValue.set(value),
+    );
+  }
+
   @override
   bool get isEmpty {
     return id.isUnchanged && readAt.isUnchanged && itemCount.isUnchanged;
@@ -528,6 +552,30 @@ final class PriceDropNotificationPatch extends NotificationPatch {
   final PatchValue<DateTime?> readAt;
 
   final PatchValue<double> newPrice;
+
+  PriceDropNotificationPatch withId(String value) {
+    return PriceDropNotificationPatch(
+      id: PatchValue.set(value),
+      readAt: readAt,
+      newPrice: newPrice,
+    );
+  }
+
+  PriceDropNotificationPatch withReadAt(DateTime? value) {
+    return PriceDropNotificationPatch(
+      id: id,
+      readAt: PatchValue.set(value),
+      newPrice: newPrice,
+    );
+  }
+
+  PriceDropNotificationPatch withNewPrice(double value) {
+    return PriceDropNotificationPatch(
+      id: id,
+      readAt: readAt,
+      newPrice: PatchValue.set(value),
+    );
+  }
 
   @override
   bool get isEmpty {

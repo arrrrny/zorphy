@@ -131,23 +131,45 @@ final class PolymorphicClassEmitter {
   /// Every node of the hierarchy is emitted in depth-first pre-order: the root
   /// first, then each subtree — the order a reader expects and the order a
   /// deterministic golden test needs.
+  ///
+  /// [extraMethods] is keyed by `className` too: members another emitter owns
+  /// (the boundary codec's `fromWire`/`toWire`, #223) that must live INSIDE
+  /// the emitted classes. They are appended after the value methods, on both
+  /// the leaf and the dispatch branches.
+  ///
+  /// [includeSentinelDeclarations] prepends the library-private [_sentinel]
+  /// declarations. They are ONE-per-library: a caller composing SEVERAL
+  /// hierarchies into one part passes `true` for the first and `false` for
+  /// the rest, or the duplicate declarations are a compile error (#223).
   String emit({
     required ZorphyNodeIr root,
     required Map<String, List<PolymorphicField>> fields,
+    Map<String, List<Method>> extraMethods = const {},
+    bool includeSentinelDeclarations = true,
   }) {
     final specs = <Spec>[];
     // The parent comes from the TRAVERSAL, not from `node.superTypes`: the
     // hierarchy the emitter is walking is the authority on "nearest sealed
     // ancestor", and a caller's superTypes list may be a subset of it.
     void walk(ZorphyNodeIr node, List<ZorphyNodeIr> ancestors) {
-      specs.add(_classSpec(node, fields, ancestors));
+      specs.add(
+        _classSpec(
+          node,
+          fields,
+          ancestors,
+          extraMethods: extraMethods[node.className] ?? const [],
+        ),
+      );
       for (final child in node.directSubTypes) {
         walk(child, [node, ...ancestors]);
       }
     }
 
     walk(root, const []);
-    return _emitter.emitSpecs([..._sentinelDeclarations(), ...specs]);
+    return _emitter.emitSpecs([
+      if (includeSentinelDeclarations) ..._sentinelDeclarations(),
+      ...specs,
+    ]);
   }
 
   /// Emits a single node, without its subtree or its ancestors.
@@ -178,8 +200,9 @@ final class PolymorphicClassEmitter {
   Class _classSpec(
     ZorphyNodeIr node,
     Map<String, List<PolymorphicField>> fields,
-    List<ZorphyNodeIr> ancestors,
-  ) {
+    List<ZorphyNodeIr> ancestors, {
+    List<Method> extraMethods = const [],
+  }) {
     final ownFields = fields[node.className] ?? const <PolymorphicField>[];
     // A leaf redeclares its inherited fields (`@override final String id;`),
     // so its field list is the union of its own and every ancestor's, nearest
@@ -294,6 +317,11 @@ final class PolymorphicClassEmitter {
           }),
         );
       }
+
+      // Members owned by another emitter (the boundary codec's
+      // `fromWire`/`toWire`, #223) land inside this class, after the value
+      // methods — a dispatch node and a leaf both carry them.
+      c.methods.addAll(extraMethods);
     });
   }
 

@@ -268,5 +268,140 @@ void main() {
         reason: 'regenerate $_fixturePath if the emission changed on purpose',
       );
     });
+
+    test('subtype patches carry the fluent builders samplePatch builds', () {
+      // ISSUE-0223: MockFixtureEmitter.samplePatch() builds through
+      // `with<Name>` builders, so every concrete patch carries them.
+      final emitted = PolymorphicPatchEmitter().emitSubtypePatch(
+        subtypeName: 'OrderNotification',
+        rootName: 'Notification',
+        fields: orderFields(),
+        sharedFields: const ['id', 'readAt'],
+      );
+
+      expect(emitted, contains('OrderNotificationPatch withId(String value)'));
+      expect(
+        emitted,
+        contains('OrderNotificationPatch withItemCount(int value)'),
+      );
+      expect(
+        emitted,
+        contains('OrderNotificationPatch withReadAt(DateTime? value)'),
+      );
+      expect(
+        emitted,
+        contains('itemCount: PatchValue.set(value)'),
+        reason: 'the builder sets its own field and carries the rest over',
+      );
+    });
   });
+
+  group('ISSUE-0223 PolymorphicPatchEmitter — standalone entity patch', () {
+    test('emits one concrete ZorphyPatch-implementing class', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Product',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('name', 'String', ''),
+        ],
+      );
+
+      expect(
+        emitted,
+        contains('final class ProductPatch implements ZorphyPatch<Product>'),
+      );
+      expect(
+        emitted,
+        isNot(contains('extends')),
+        reason: 'a standalone entity has no root patch to extend',
+      );
+      expect(emitted, contains('ProductPatch withName(String value)'));
+      expect(emitted, contains('Product apply(covariant Product target)'));
+      expect(
+        emitted,
+        contains('ProductPatch compose(ZorphyPatch<Product> next)'),
+        reason:
+            'the parameter stays the interface type so the kind guard is not '
+            'dead code',
+      );
+    });
+
+    test('the standalone emission compiles against the annotation library', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Product',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('name', 'String', ''),
+        ],
+      );
+      final result = _analyzeEmitted(emitted, _standaloneFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+  });
+}
+
+/// The minimal entity surface a standalone patch applies to.
+const _standaloneFixture = r'''
+final class Product {
+  const Product({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  Product copyWith({String? id, String? name}) {
+    return Product(id: id ?? this.id, name: name ?? this.name);
+  }
+}
+''';
+
+/// Analyzes [emitted] spliced after [fixture] in a throwaway package that
+/// depends on the real `zorphy_annotation` — the same probe the mock-data
+/// compile suite uses, because a `contains(...)` assertion cannot see a type
+/// error inside the generated code.
+({int exitCode, String output}) _analyzeEmitted(
+  String emitted,
+  String fixture,
+) {
+  final annotationRoot = Directory.current.parent.uri
+      .resolve('zorphy_annotation/')
+      .toFilePath();
+  final probeParent = Directory('test/.poly_patch_compile_$pid')
+    ..createSync(recursive: true);
+  final probe = probeParent.createTempSync('issue_223_');
+  addTearDown(() => probe.deleteSync(recursive: true));
+
+  File('${probe.path}/pubspec.yaml').writeAsStringSync(
+    'name: poly_patch_probe\n'
+    'environment:\n'
+    '  sdk: ">=3.11.0 <4.0.0"\n'
+    'dependencies:\n'
+    '  zorphy_annotation:\n'
+    '    path: $annotationRoot\n',
+  );
+  Directory('${probe.path}/lib').createSync();
+  File('${probe.path}/lib/emitted.dart').writeAsStringSync(
+    "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n"
+    '$fixture\n'
+    '$emitted',
+  );
+
+  final pubGet = Process.runSync('dart', [
+    'pub',
+    'get',
+  ], workingDirectory: probe.path);
+  if (pubGet.exitCode != 0) {
+    return (
+      exitCode: pubGet.exitCode,
+      output: 'dart pub get failed:\n${pubGet.stdout}\n${pubGet.stderr}',
+    );
+  }
+  final analyze = Process.runSync('dart', [
+    'analyze',
+    '--no-fatal-warnings',
+    'lib/emitted.dart',
+  ], workingDirectory: probe.path);
+  return (
+    exitCode: analyze.exitCode,
+    output: '${analyze.stdout}\n${analyze.stderr}',
+  );
 }
