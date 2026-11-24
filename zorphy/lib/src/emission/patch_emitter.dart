@@ -674,11 +674,19 @@ class PatchEmitter {
     final capitalized =
         member.substring(0, 1).toUpperCase() + member.substring(1);
     final type = (field.type ?? 'dynamic').replaceAll(r'$', '');
-    final parameterType =
-        (type.endsWith('?') ||
-            type == 'dynamic' ||
-            type.startsWith('dynamic<') ||
-            type.startsWith('dynamic '))
+    // A generic-typed field keeps the legacy `dynamic` parameter: the emitted
+    // patch is the one place the type variable may not resolve to the entity's
+    // own parameter, and `PatchBase`'s map is `Map<TEnum, dynamic>` anyway, so
+    // narrowing it to `T?` was a silent behaviour change for a generic entity
+    // (review of #203).
+    final declaredNonNullable =
+        type.endsWith('?') ||
+        type == 'dynamic' ||
+        type.startsWith('dynamic<') ||
+        type.startsWith('dynamic ');
+    final parameterType = _isGenericType(type, genericTypeNames)
+        ? 'dynamic'
+        : declaredNonNullable
         ? type
         : '$type?';
     final key = '$enumName.${helpers.enumMemberName(member)}';
@@ -895,10 +903,26 @@ class PatchEmitter {
   ) {
     if (field.isEnum) return false;
     if (type.contains('Function')) return false;
-    if (genericTypeNames.contains(type)) return false;
-    if (genericTypeNames.any((g) => type.contains(g))) return false;
+    if (_isGenericType(type, genericTypeNames)) return false;
     if (type.startsWith(r'$')) return true;
     return knownClasses.contains(type);
+  }
+
+  /// Whether [type] IS a generic parameter — exactly (`T`), nullable (`T?`), or
+  /// as a whole type argument (`List<T>`, `Map<String, T>`, `Foo<T>`).
+  ///
+  /// The test is per IDENTIFIER, not per substring: `Token` contains `T` as a
+  /// substring but is not `T`, so a generic entity's concrete `Token` field
+  /// must keep its `withTokenPatch` / `withTokenPatchFunc` builders (review of
+  /// #203). Splitting a type into identifiers also reaches a parameter nested
+  /// in a collection argument, which the legacy helper's `<…>` probe only
+  /// approximated.
+  static bool _isGenericType(String type, List<String> genericTypeNames) {
+    if (genericTypeNames.isEmpty) return false;
+    final identifiers = RegExp(
+      r'[A-Za-z_$][A-Za-z0-9_$]*',
+    ).allMatches(type).map((m) => m.group(0));
+    return identifiers.any(genericTypeNames.contains);
   }
 
   /// The patch shape a field carries, per ISSUE-008.

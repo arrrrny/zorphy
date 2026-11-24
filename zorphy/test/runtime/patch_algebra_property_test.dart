@@ -152,6 +152,40 @@ void main() {
       }
     });
 
+    test('diff: every field changed at once, id and name included', () {
+      // The randomized loop above keeps `id` fixed and only changes `name`
+      // when the coin lands, so `diff` is barely exercised for either (review
+      // of #203). This case is deterministic: EVERY field moves.
+      const previous = Account(
+        id: 'id-before',
+        name: 'ada',
+        score: 1,
+        note: 'draft',
+        tier: AccountTier.free,
+      );
+      const next = Account(
+        id: 'id-after',
+        name: 'grace',
+        score: 2,
+        note: 'shipped',
+        tier: AccountTier.enterprise,
+      );
+
+      final patch = AccountPatch.diff(previous, next);
+
+      expect(patch.apply(previous), next, reason: 'every field is carried');
+      expect(
+        patch.toWire().keys,
+        unorderedEquals(['id', 'name', 'score', 'note', 'tier']),
+        reason: 'no field escapes the diff',
+      );
+      expect(
+        patch.invert(previous).apply(next),
+        previous,
+        reason: 'the inverse restores id and name too',
+      );
+    });
+
     test(
       'composition order: (a.compose(b)).apply(x) == b.apply(a.apply(x))',
       () {
