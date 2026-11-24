@@ -264,6 +264,11 @@ void main() {
       // The seeding sites must never treat scores as a String-keyed map; the
       // WireFixtures half (ISSUE-016) legitimately names the field as a map
       // key in corruptMaps, so scope the guard to the MockData class body.
+      expect(
+        emitted,
+        contains('class CfgWireFixtures'),
+        reason: 'the WireFixtures class must be emitted before it is scoped',
+      );
       final mockDataOnly = emitted.substring(
         0,
         emitted.indexOf('class CfgWireFixtures'),

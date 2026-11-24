@@ -831,29 +831,47 @@ final class MockFixtureEmitter {
       );
     }
 
-    final targetNode = isDispatch && leaves.isNotEmpty ? leaves.first : node;
-    final payload = payloadFields(targetNode);
-    for (final field in payload) {
-      if (!field.isNullable) {
-        statements.add(
-          Code(
-            "maps.add(Map<String, Object?>.of(base)..remove('${field.name}'));",
-          ),
-        );
+    // Every emittable leaf is a rotation arm of `single(seed:)`, so a base
+    // per leaf index covers EVERY concrete payload in the hierarchy from the
+    // root fixtures class — not just `leaves.first`. A consumer driving a
+    // boundary gate from the root class alone then gets one corrupted payload
+    // per required field across all leaves.
+    final targets = isDispatch ? leaves : <ZorphyNodeIr>[node];
+    for (var targetIndex = 0; targetIndex < targets.length; targetIndex++) {
+      final baseName = targetIndex == 0 ? 'base' : 'base$targetIndex';
+      if (targetIndex > 0) {
+        statements.add(Code('final $baseName = validMap(seed: $targetIndex);'));
       }
-      final corruptVal = _corruptValueForType(field.type);
-      statements.add(
-        Code(
-          "maps.add(Map<String, Object?>.of(base)..[ '${field.name}' ] = $corruptVal);",
-        ),
-      );
+      for (final field in payloadFields(targets[targetIndex])) {
+        if (!field.isNullable) {
+          statements.add(
+            Code(
+              "maps.add(Map<String, Object?>.of($baseName)..remove('${field.name}'));",
+            ),
+          );
+        }
+        final corruptVal = _corruptValueForType(field.type);
+        // An unrecognized type cannot be corrupted honestly: the codec
+        // classifies `Object`/`dynamic` as scalar and would accept a numeric
+        // literal. Skipping the wrong-type map keeps the "100% BoundaryErr"
+        // gate true; the missing-key map still covers required fields.
+        if (corruptVal != null) {
+          statements.add(
+            Code(
+              "maps.add(Map<String, Object?>.of($baseName)..[ '${field.name}' ] = $corruptVal);",
+            ),
+          );
+        }
+      }
     }
 
     statements.add(const Code('return maps;'));
     return Block.of(statements);
   }
 
-  static String _corruptValueForType(String declaredType) {
+  /// A wrong-typed literal for [declaredType], or `null` when no honest
+  /// corruption is possible (e.g. `Object` / `dynamic` / unknown types).
+  static String? _corruptValueForType(String declaredType) {
     final type = declaredType.replaceAll('?', '').trim();
     if (type == 'String') {
       return '12345';
@@ -870,7 +888,10 @@ final class MockFixtureEmitter {
     } else if (type.startsWith('Map')) {
       return "'not-a-map'";
     } else {
-      return '12345';
+      // `Object` / `dynamic` (and any type this emitter cannot classify) is
+      // decoded by `_boundaryAs<Object>`, where `12345 is Object` passes — a
+      // fabricated numeric "corruption" would decode to BoundaryOk.
+      return null;
     }
   }
 
