@@ -379,12 +379,18 @@ patch.name.fold(
 `PatchNested<Sub, SubPatch extends ZorphyPatch<Sub>>` wraps a nested patch so a
 parent field can declare a precise nested patch type while still behaving like
 a plain `ZorphyPatch<Sub>`: every member delegates, and `compose` unwraps a
-matching `PatchNested` before delegating, so a delegate narrowing `compose` to
-its own type never receives the wrapper.
+`PatchNested` of the same `Sub` before delegating (the check is on `Sub`, not
+on `SubPatch`), so a delegate narrowing `compose` to its own type never receives
+the wrapper — for that `SubPatch`. A wrapper around a different patch type of
+the same `Sub` is unwrapped too, and the delegate's narrowed parameter is what
+rejects it.
 
 `ListPatchOp<E>` / `MapPatchOp<K, V>` are sealed per-field edit operations —
-switch over them exhaustively. Every variant returns a FRESH collection and
-never mutates the input.
+switch over them exhaustively. `apply` always returns a FRESH collection and
+never mutates its target. One caveat: `replaceAll` stores the collection you
+hand it BY REFERENCE (a `const` op cannot copy it), so mutating that collection
+afterwards changes what the op applies — pass a snapshot if you keep a handle
+on the original.
 
 ```dart
 const ListPatchOp<int> a = ListPatchOp.replaceAll([1, 2, 3]);
