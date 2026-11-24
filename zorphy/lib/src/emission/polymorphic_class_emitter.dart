@@ -90,12 +90,25 @@ final class PolymorphicClassEmitter {
   /// the principal-key type.
   static const String entityBase = 'ZorphyEntityBase';
 
-  /// The marker interface for every non-entity archetype family.
+  /// The marker interface for `@ZorphyState` hierarchies.
+  static const String stateBase = 'ZorphyStateBase';
+
+  /// The marker interface for `@ZorphyIntent` hierarchies.
+  static const String intentBase = 'ZorphyIntentBase';
+
+  /// The marker interface for `@ZorphyValue` (and `@ZorphyUnion`) hierarchies.
   static const String valueBase = 'ZorphyValueBase';
 
   /// The `copyWith` sentinel: an object no caller can pass, so `null` means
   /// "clear the field".
   static const String sentinel = '_sentinel';
+
+  /// The distinct private type the sentinel is an instance of. A plain
+  /// `const Object()` sentinel is canonical-identical to any `const Object()`
+  /// a caller passes, so `copyWith(field: const Object())` would be read as
+  /// "keep" instead of "set"; a private class no caller can construct makes
+  /// the `identical(...)` test reliable.
+  static const String sentinelType = '_ZorphyCopyWithSentinel';
 
   /// The shared emission pipeline (`code_builder` -> `dart_style`).
   ///
@@ -134,7 +147,7 @@ final class PolymorphicClassEmitter {
     }
 
     walk(root, const []);
-    return _emitter.emitSpecs([_sentinelDeclaration(), ...specs]);
+    return _emitter.emitSpecs([..._sentinelDeclarations(), ...specs]);
   }
 
   /// Emits a single node, without its subtree or its ancestors.
@@ -143,11 +156,19 @@ final class PolymorphicClassEmitter {
   /// class element at a time) and for a test that pins one class's shape.
   /// Because no ancestors are supplied, the emitted class has no `extends`
   /// and no inherited fields: use [emit] whenever the hierarchy matters.
+  ///
+  /// The returned source is self-contained: it declares the [_sentinel]
+  /// constant and its [_sentinelType] class so a node with a nullable field
+  /// compiles on its own. Both are library-private, so a caller that combines
+  /// SEVERAL [emitNode] fragments into ONE library must emit those two
+  /// declarations once, not once per fragment — emit them from a single node
+  /// (or call [emit]) and concatenate only the class specs of the rest.
   String emitNode({
     required ZorphyNodeIr node,
     required List<PolymorphicField> fields,
   }) {
     return _emitter.emitSpecs([
+      ..._sentinelDeclarations(),
       _classSpec(node, {node.className: fields}, const []),
     ]);
   }
@@ -181,7 +202,7 @@ final class PolymorphicClassEmitter {
         // entity hierarchy, `ZorphyValueBase` for a value one. It is what a
         // consumer bounds a type parameter by; the `$Name` interfaces the v2
         // generator emitted are gone in v3.
-        c.implements.add(_archetypeBase(node, isEntity, fields));
+        c.implements.add(_archetypeBase(node, fields));
       } else {
         // Roots and intermediates are `sealed`: Dart 3 forbids a subtype
         // outside the library, which is exactly the closed hierarchy the
@@ -194,7 +215,7 @@ final class PolymorphicClassEmitter {
         if (ancestors.isNotEmpty) {
           c.extend = referType(ancestors.first.cleanName);
         }
-        c.implements.add(_archetypeBase(node, isEntity, fields));
+        c.implements.add(_archetypeBase(node, fields));
       }
 
       if (node.isConcreteLeaf) {
@@ -249,25 +270,29 @@ final class PolymorphicClassEmitter {
             }),
           );
         }
-        // The principal key is DEFINED on the root and inherited by every
-        // subtype, so the getter is emitted once, where the identifier is
-        // declared.
-        final principalKey = node.principalKey;
-        if (isEntity && node.isSealedRoot && principalKey != null) {
-          c.methods.add(
-            Method((m) {
-              m.type = MethodType.getter;
-              m.name = 'principalKey';
-              m.returns = referType(_principalKeyType(node, fields));
-              // NOT `@override`: `ZorphyEntityBase<Id>` is a pure marker that
-              // declares no members, so there is nothing to override. The
-              // getter is the archetype's documented contract, not an
-              // inherited member.
-              m.lambda = true;
-              m.body = Code(principalKey);
-            }),
-          );
-        }
+      }
+
+      // The principal key is DEFINED on the root and inherited by every
+      // subtype, so the getter is emitted once, where the identifier is
+      // declared. It runs for EVERY sealed entity root — including a
+      // standalone root that is also a concrete leaf (which takes the leaf
+      // branch above) — and the `isSealedRoot` guard keeps descendant leaves
+      // from redeclaring it.
+      final principalKey = node.principalKey;
+      if (isEntity && node.isSealedRoot && principalKey != null) {
+        c.methods.add(
+          Method((m) {
+            m.type = MethodType.getter;
+            m.name = 'principalKey';
+            m.returns = referType(_principalKeyType(node, fields));
+            // NOT `@override`: `ZorphyEntityBase<Id>` is a pure marker that
+            // declares no members, so there is nothing to override. The
+            // getter is the archetype's documented contract, not an
+            // inherited member.
+            m.lambda = true;
+            m.body = Code(principalKey);
+          }),
+        );
       }
     });
   }
@@ -295,17 +320,32 @@ final class PolymorphicClassEmitter {
 
   /// The marker interface every class of the hierarchy implements.
   ///
+  /// The marker is chosen by the node's ARCHETYPE, not a binary entity/value
+  /// test: the annotation surface has five families (`@ZorphyEntity`,
+  /// `@ZorphyState`, `@ZorphyIntent`, `@ZorphyValue` and `@ZorphyUnion`, the
+  /// last lowering to [ArchetypeKind.value]) and each declares its own base
+  /// (`ZorphyEntityBase`, `ZorphyStateBase`, `ZorphyIntentBase`,
+  /// `ZorphyValueBase`). A `@ZorphyState` hierarchy must implement
+  /// `ZorphyStateBase`, or a consumer bounding `T extends ZorphyStateBase`
+  /// would reject the very hierarchy it was written for — the same reason the
+  /// entity base is parameterized.
+  ///
   /// An entity base is parameterized with the INHERITED principal key's type,
   /// read from the field list — the same source the root's getter uses, so the
-  /// two can never disagree. A value hierarchy has no identity, so its base
-  /// takes no type argument.
+  /// two can never disagree. The non-entity hierarchies have no identity, so
+  /// their bases take no type argument.
   Reference _archetypeBase(
     ZorphyNodeIr node,
-    bool isEntity,
     Map<String, List<PolymorphicField>> fields,
   ) {
-    if (!isEntity) return referType(valueBase);
-    return referType('$entityBase<${_principalKeyType(node, fields)}>');
+    return switch (node.archetype) {
+      ArchetypeKind.entity => referType(
+        '$entityBase<${_principalKeyType(node, fields)}>',
+      ),
+      ArchetypeKind.state => referType(stateBase),
+      ArchetypeKind.intent => referType(intentBase),
+      ArchetypeKind.value => referType(valueBase),
+    };
   }
 
   /// The declared type of the principal-key field, defaulting to `String`.
@@ -322,9 +362,16 @@ final class PolymorphicClassEmitter {
       if (field.name == key) return _lowerType(field.type);
     }
     // The key is declared on the ROOT, so a subtype resolves it from there.
-    final root = node.root ?? node;
-    for (final field in fields[root.className] ?? const <PolymorphicField>[]) {
-      if (field.name == key) return _lowerType(field.type);
+    // `node.root` is only the IMMEDIATE parent (the resolver stamps each child
+    // with its parent), so a leaf two levels down would never reach the root's
+    // declaration and would fall through to the `String` default — emit an
+    // intermediate's key type where the root declared another. Search the full
+    // transitive chain nearest-first instead.
+    for (final ancestor in node.superTypes) {
+      for (final field
+          in fields[ancestor.className] ?? const <PolymorphicField>[]) {
+        if (field.name == key) return _lowerType(field.type);
+      }
     }
     return 'String';
   }
@@ -421,7 +468,7 @@ final class PolymorphicClassEmitter {
         for (final field in fields)
           if (field.isNullable)
             '${field.name}: identical(${field.name}, $sentinel) '
-                '? this.${field.name} : ${field.name} as ${field.emittedType}'
+                '? this.${field.name} : ${field.name} as ${_lowerType(field.emittedType)}'
           else
             '${field.name}: ${field.name} ?? this.${field.name}',
       ];
@@ -445,7 +492,10 @@ final class PolymorphicClassEmitter {
         }),
       );
       final checks = [
-        for (final field in fields) '${field.name} == other.${field.name}',
+        // The left reference is qualified with `this.`: a field literally named
+        // `other` would otherwise resolve to the equality PARAMETER, making
+        // `other == other.other` compare the parameter to itself.
+        for (final field in fields) 'this.${field.name} == other.${field.name}',
       ];
       // `operator ==` is the method NAME (the repo's own convention in
       // `equals_tostring_generator.dart`); a bare `==` name emits
@@ -470,9 +520,12 @@ final class PolymorphicClassEmitter {
       m.annotations.add(refer('override'));
       m.lambda = true;
       m.body = Code(
+        // `Object.hash` requires 2..20 positional arguments: a one-field leaf
+        // (`Object.hash(x)`) and a >20-field leaf both fail to compile.
+        // `Object.hashAll` accepts any nonempty iterable, covering both ends.
         fields.isEmpty
             ? 'runtimeType.hashCode'
-            : 'Object.hash(${[for (final f in fields) f.name].join(', ')})',
+            : 'Object.hashAll([${[for (final f in fields) f.name].join(', ')}])',
       );
     });
   }
@@ -497,17 +550,37 @@ final class PolymorphicClassEmitter {
   static String _lowerType(String type) => type.replaceAll(r'$', '');
 
   /// The library-level `_sentinel` the emitted `copyWith` parameters default
-  /// to.
+  /// to, as the specs that declare it: a distinct private [sentinelType] class
+  /// plus its canonical const [sentinel] instance.
   ///
-  /// It must be a DECLARATION, not a bare identifier: `Object note =
+  /// The sentinel must be a DECLARATION, not a bare identifier: `Object note =
   /// _sentinel` does not compile unless `_sentinel` exists, and a per-class
-  /// private constant would be invisible to the leaf that needs it.
-  Field _sentinelDeclaration() {
-    return Field((f) {
-      f.name = sentinel;
-      f.modifier = FieldModifier.constant;
-      f.type = referType('Object');
-      f.assignment = Code('Object()');
-    });
+  /// private constant would be invisible to the leaf that needs it. And it must
+  /// be an instance of a DEDICATED type, not a plain `Object()`: Dart
+  /// canonicalizes const objects, so a `const Object()` a caller passes would be
+  /// `identical` to the sentinel and the method would read an explicit value as
+  /// omission. A private class no caller can construct keeps `identical(...)`
+  /// meaning exactly "the argument was omitted".
+  ///
+  /// ONE declaration per library: a caller combining several [emitNode]
+  /// fragments into one library emits these specs once, not per fragment.
+  List<Spec> _sentinelDeclarations() {
+    return [
+      Class((c) {
+        c.name = sentinelType;
+        c.modifier = ClassModifier.final$;
+        c.constructors.add(
+          Constructor((ctor) {
+            ctor.constant = true;
+          }),
+        );
+      }),
+      Field((f) {
+        f.name = sentinel;
+        f.modifier = FieldModifier.constant;
+        f.type = referType('Object');
+        f.assignment = Code('$sentinelType()');
+      }),
+    ];
   }
 }

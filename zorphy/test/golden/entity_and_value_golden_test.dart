@@ -65,6 +65,57 @@ ZorphyNodeIr _node({
 PolymorphicField _field(String name, String type, {bool nullable = false}) =>
     PolymorphicField(name: name, type: type, isNullable: nullable);
 
+/// Writes [emitted] into a throwaway package that depends on the real
+/// `zorphy_annotation`, then runs `dart analyze` on it.
+///
+/// A `contains(...)` assertion cannot prove the output BUILDS — the emitter's
+/// real defects (an undefined `_sentinel`, a one-argument `Object.hash`) were
+/// all invisible to text checks. This is the probe that catches them.
+({int exitCode, String output}) _analyzeEmitted(String emitted) {
+  final annotationRoot = Directory.current.parent.uri
+      .resolve('zorphy_annotation/')
+      .toFilePath();
+  final probeParent = Directory('test/.golden_compile_$pid')
+    ..createSync(recursive: true);
+  final probe = probeParent.createTempSync('issue_178_');
+  addTearDown(() => probe.deleteSync(recursive: true));
+
+  File('${probe.path}/pubspec.yaml').writeAsStringSync(
+    'name: golden_probe\n'
+    'environment:\n'
+    '  sdk: ">=3.11.0 <4.0.0"\n'
+    'dependencies:\n'
+    '  zorphy_annotation:\n'
+    '    path: $annotationRoot\n',
+  );
+  Directory('${probe.path}/lib').createSync();
+  File('${probe.path}/lib/emitted.dart').writeAsStringSync(
+    "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n"
+    '$emitted',
+  );
+
+  final pubGet = Process.runSync('dart', [
+    'pub',
+    'get',
+  ], workingDirectory: probe.path);
+  if (pubGet.exitCode != 0) {
+    return (
+      exitCode: pubGet.exitCode,
+      output: 'dart pub get failed:\n${pubGet.stdout}\n${pubGet.stderr}',
+    );
+  }
+
+  final analyze = Process.runSync('dart', [
+    'analyze',
+    '--no-fatal-warnings',
+    'lib/emitted.dart',
+  ], workingDirectory: probe.path);
+  return (
+    exitCode: analyze.exitCode,
+    output: '${analyze.stdout}\n${analyze.stderr}',
+  );
+}
+
 /// The single-level `@ZorphyEntity` fixture from the issue's own example.
 ({ZorphyNodeIr root, Map<String, List<PolymorphicField>> fields})
 _notification() {
@@ -344,9 +395,9 @@ void main() {
     test('the emitted hierarchy is valid Dart against zorphy_annotation', () {
       // A text assertion cannot prove the output BUILDS — this check did not
       // exist at first, and the source it now guards had 17 analyzer issues
-      // that every `contains(...)` above happily passed. The emitted library
-      // is written into a throwaway package that depends on the real
-      // `zorphy_annotation`, then analyzed.
+      // that every `contains(...)` above happily passed. `_analyzeEmitted`
+      // writes the library into a throwaway package that depends on the real
+      // `zorphy_annotation`, then analyzes it.
       final leaf = _node(
         className: r'$OrderNotification',
         archetype: ArchetypeKind.entity,
@@ -376,49 +427,11 @@ void main() {
         },
       );
 
-      final annotationRoot = Directory.current.parent.uri
-          .resolve('zorphy_annotation/')
-          .toFilePath();
-      final probeParent = Directory('test/.golden_compile_$pid')
-        ..createSync(recursive: true);
-      final probe = probeParent.createTempSync('issue_178_');
-      addTearDown(() => probe.deleteSync(recursive: true));
-
-      File('${probe.path}/pubspec.yaml').writeAsStringSync(
-        'name: golden_probe\n'
-        'environment:\n'
-        '  sdk: ">=3.11.0 <4.0.0"\n'
-        'dependencies:\n'
-        '  zorphy_annotation:\n'
-        '    path: $annotationRoot\n',
-      );
-      Directory('${probe.path}/lib').createSync();
-      File('${probe.path}/lib/emitted.dart').writeAsStringSync(
-        "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n"
-        '$emitted',
-      );
-
-      final pubGet = Process.runSync('dart', [
-        'pub',
-        'get',
-      ], workingDirectory: probe.path);
+      final result = _analyzeEmitted(emitted);
       expect(
-        pubGet.exitCode,
+        result.exitCode,
         0,
-        reason: 'dart pub get failed:\n${pubGet.stdout}\n${pubGet.stderr}',
-      );
-
-      final analyze = Process.runSync('dart', [
-        'analyze',
-        '--no-fatal-warnings',
-        'lib/emitted.dart',
-      ], workingDirectory: probe.path);
-      expect(
-        analyze.exitCode,
-        0,
-        reason:
-            'emitted source does not analyze:\n'
-            '${analyze.stdout}\n${analyze.stderr}',
+        reason: 'emitted source does not analyze:\n${result.output}',
       );
     });
   });
@@ -452,6 +465,217 @@ void main() {
       expect(source, isNot(contains('.toList()')));
       expect(source, isNot(contains('List.unmodifiable')));
       expect(source, isNot(contains('List<String>.from')));
+    });
+  });
+
+  group('@ZorphyEntity — standalone root (sealed + concrete leaf)', () {
+    test('a root that is also a concrete leaf still emits the principalKey '
+        'getter', () {
+      // A hierarchy with a single, instantiable root: the node is BOTH the
+      // sealed root and a concrete leaf, so it takes the leaf branch. The
+      // principalKey getter must still be emitted for every sealed entity
+      // root, not only the non-leaf branch.
+      final root = _node(
+        className: r'$Counter',
+        archetype: ArchetypeKind.entity,
+        isSealedRoot: true,
+        principalKey: 'id',
+      );
+
+      final source = const PolymorphicClassEmitter().emit(
+        root: root,
+        fields: {
+          r'$Counter': [_field('id', 'int'), _field('value', 'int')],
+        },
+      );
+
+      expect(source, contains('int get principalKey => id;'));
+      expect('principalKey'.allMatches(source), hasLength(1));
+    });
+  });
+
+  group('non-entity archetypes implement their own base', () {
+    test('@ZorphyState implements ZorphyStateBase, not ZorphyValueBase', () {
+      final leaf = _node(className: r'$Idle', archetype: ArchetypeKind.state);
+      final root = _node(
+        className: r'$UiState',
+        archetype: ArchetypeKind.state,
+        isSealedRoot: true,
+        children: [leaf],
+      );
+
+      final source = const PolymorphicClassEmitter().emit(
+        root: root,
+        fields: {
+          r'$UiState': [_field('status', 'String')],
+          r'$Idle': [_field('status', 'String')],
+        },
+      );
+
+      expect(
+        source,
+        contains('sealed class UiState implements ZorphyStateBase'),
+      );
+      expect(source, contains('implements ZorphyStateBase'));
+      expect(source, isNot(contains('ZorphyValueBase')));
+    });
+
+    test('@ZorphyIntent implements ZorphyIntentBase', () {
+      final leaf = _node(className: r'$Save', archetype: ArchetypeKind.intent);
+      final root = _node(
+        className: r'$Command',
+        archetype: ArchetypeKind.intent,
+        isSealedRoot: true,
+        children: [leaf],
+      );
+
+      final source = const PolymorphicClassEmitter().emit(
+        root: root,
+        fields: {
+          r'$Command': [_field('at', 'DateTime')],
+          r'$Save': [_field('at', 'DateTime')],
+        },
+      );
+
+      expect(source, contains('ZorphyIntentBase'));
+      expect(source, isNot(contains('ZorphyValueBase')));
+    });
+  });
+
+  group('principal key type through the full ancestor chain', () {
+    test('a leaf two levels down inherits the ROOT key type, not String', () {
+      // Root declares `id: int`; the intermediate and leaf declare OTHER
+      // fields and no `id` of their own. The resolver stamps each node's
+      // `root` with its IMMEDIATE parent, so the leaf must resolve `int`
+      // through `superTypes` — a `node.root`-only lookup reaches the
+      // intermediate (no `id`) and falls back to String.
+      final leaf = _node(
+        className: r'$Order',
+        archetype: ArchetypeKind.entity,
+        principalKey: 'id',
+      );
+      final middle = _node(
+        className: r'$Base',
+        archetype: ArchetypeKind.entity,
+        principalKey: 'id',
+        children: [leaf],
+      );
+      final root = _node(
+        className: r'$Record',
+        archetype: ArchetypeKind.entity,
+        isSealedRoot: true,
+        principalKey: 'id',
+        children: [middle],
+      );
+
+      final irLeaf = leaf.copyWith(superTypes: [middle, root], root: middle);
+      final irMiddle = middle.copyWith(superTypes: [root], root: root);
+      final tree = root.copyWith(
+        directSubTypes: [
+          irMiddle.copyWith(directSubTypes: [irLeaf]),
+        ],
+      );
+
+      final source = const PolymorphicClassEmitter().emit(
+        root: tree,
+        fields: {
+          r'$Record': [_field('id', 'int')],
+          r'$Base': [_field('to', 'String')],
+          r'$Order': [_field('subject', 'String')],
+        },
+      );
+
+      expect(source, isNot(contains('ZorphyEntityBase<String>')));
+      expect('ZorphyEntityBase<int>'.allMatches(source), hasLength(3));
+    });
+  });
+
+  group('field-count-independent hashing', () {
+    test(
+      'a single-field leaf uses Object.hashAll, not the two-arg Object.hash',
+      () {
+        final leaf = _node(className: r'$Dot', archetype: ArchetypeKind.value);
+        final root = _node(
+          className: r'$Shape',
+          archetype: ArchetypeKind.value,
+          isSealedRoot: true,
+          children: [leaf],
+        );
+
+        final source = const PolymorphicClassEmitter().emit(
+          root: root,
+          fields: {
+            // The root is a marker (no fields), so the leaf's payload is the
+            // single field `radius` — the shape that broke `Object.hash`.
+            r'$Shape': <PolymorphicField>[],
+            r'$Dot': [_field('radius', 'double')],
+          },
+        );
+
+        expect(source, contains('Object.hashAll([radius])'));
+        expect(source, isNot(contains('Object.hash(')));
+      },
+    );
+  });
+
+  group('emitNode is self-contained', () {
+    test('its output declares the sentinel and compiles on its own', () {
+      // `emitNode` advertises itself for a caller that owns the traversal, so
+      // its output must compile in isolation — a nullable field references
+      // `_sentinel`, which the fragment now declares alongside its private
+      // type.
+      final node = _node(
+        className: r'$Profile',
+        archetype: ArchetypeKind.value,
+      );
+      final source = const PolymorphicClassEmitter().emitNode(
+        node: node,
+        fields: [_field('nickname', 'String', nullable: true)],
+      );
+
+      expect(source, contains('_ZorphyCopyWithSentinel'));
+      expect(source, contains('identical(nickname, _sentinel)'));
+
+      final result = _analyzeEmitted(source);
+      expect(
+        result.exitCode,
+        0,
+        reason: 'emitNode output does not analyze:\n${result.output}',
+      );
+    });
+  });
+
+  group('copyWith — nullable cast lowering', () {
+    test(r'a nullable $-prefixed field casts to the lowered type', () {
+      // The field is declared `$Address?` but the generated constructor
+      // parameter and field are `Address?`; the copyWith replacement cast must
+      // be lowered too, or the emitted method does not compile.
+      final leaf = _node(
+        className: r'$Order',
+        archetype: ArchetypeKind.entity,
+        principalKey: 'id',
+      );
+      final root = _node(
+        className: r'$Receipt',
+        archetype: ArchetypeKind.entity,
+        isSealedRoot: true,
+        principalKey: 'id',
+        children: [leaf],
+      );
+
+      final source = const PolymorphicClassEmitter().emit(
+        root: root,
+        fields: {
+          r'$Receipt': [_field('id', 'String')],
+          r'$Order': [
+            _field('id', 'String'),
+            _field('address', r'$Address', nullable: true),
+          ],
+        },
+      );
+
+      expect(source, contains('address as Address?'));
+      expect(source, isNot(contains(r'as $Address')));
     });
   });
 }
