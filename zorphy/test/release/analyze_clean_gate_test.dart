@@ -89,6 +89,22 @@ abstract class \$Task {
   List<TaskStatus>? get history;
 }
 ''',
+  // arrrrny/zorphy#209: a nullable composite list field (`List<Map<K,V>>?`)
+  // must not emit a null-aware chain in the false branch of the `is …?`
+  // fast path — that branch is only reached when the value is NOT null, so
+  // `?.` there is `invalid_null_aware_operator`. Both emitted members
+  // (`copyWithField`'s arm and the `patchWith` merge arm) are exercised.
+  'nullable_composite_list': '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'nullable_composite_list.zorphy.dart';
+
+@Zorphy()
+abstract class \$TaggedResult {
+  List<Map<String, String>> get tags;
+  List<Map<String, String>>? get maybeTags;
+}
+''',
   // arrrrny/zorphy#159: a sealed base with `explicitSubTypes` whose subtypes
   // do not generate JSON must not emit the changeTo extension — its body
   // round-trips through toJson/fromJson the subtypes do not have. With the fix

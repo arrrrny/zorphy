@@ -79,18 +79,26 @@ void main() {
       expect(compact, isNot(contains('=>easMap<String,dynamic>')));
     });
 
-    test('nullable list field keeps null-aware semantics', () {
-      expect(
-        compact,
-        contains(
-          'returncopyWith(payloads:'
-          '(valueisList<Map<String,dynamic>>??value:'
-          '(valueasList<dynamic>?)?'
-          '.map((e)=>eisMap<String,dynamic>'
-          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),)?.toList()),);',
-        ),
-      );
-    });
+    test(
+      'nullable list field keeps nullable typing without a null-aware chain',
+      () {
+        // arrrrny/zorphy#209: the `is …?` fast path already admits null, so
+        // the conversion branch must cast to the NON-nullable `List<dynamic>`
+        // and use plain `.` chains — a `?.` there is
+        // `invalid_null_aware_operator`.
+        expect(
+          compact,
+          contains(
+            'returncopyWith(payloads:'
+            '(valueisList<Map<String,dynamic>>??value:'
+            '(valueasList<dynamic>)'
+            '.map((e)=>eisMap<String,dynamic>'
+            '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList()),);',
+          ),
+        );
+        expect(compact, isNot(contains('asList<dynamic>?)')));
+      },
+    );
 
     test('primitive fields keep the plain hard cast', () {
       // The fix is scoped to composite list fields; bool/String arms
@@ -123,17 +131,22 @@ void main() {
       expect(compact, isNot(contains('=>easMap<String,dynamic>')));
     });
 
-    test('nullable patch arm keeps null-aware semantics', () {
-      expect(
-        compact,
-        contains(
-          'asList<dynamic>?)?'
-          '.map((e)=>eisMap<String,dynamic>'
-          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),)?.toList())'
-          ':this.payloads,',
-        ),
-      );
-    });
+    test(
+      'nullable patch arm keeps nullable typing without a null-aware chain',
+      () {
+        // arrrrny/zorphy#209: same rule as the copyWithField arm above.
+        expect(
+          compact,
+          contains(
+            'asList<dynamic>)'
+            '.map((e)=>eisMap<String,dynamic>'
+            '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList())'
+            ':this.payloads,',
+          ),
+        );
+        expect(compact, isNot(contains('asList<dynamic>?)?')));
+      },
+    );
   });
 
   group('golden: typed map values (CodeRabbit finding on PR #149)', () {
@@ -158,9 +171,9 @@ void main() {
         contains(
           'returncopyWith(maybeTags:'
           '(valueisList<Map<String,String>>??value:'
-          '(valueasList<dynamic>?)?'
+          '(valueasList<dynamic>)'
           '.map((e)=>eisMap<String,String>'
-          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),)?.toList()),);',
+          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),).toList()),);',
         ),
       );
       expect(

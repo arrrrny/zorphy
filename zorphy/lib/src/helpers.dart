@@ -150,15 +150,20 @@ ListMapFieldType? parseListMapFieldType(String type) {
 ///   pass through untouched; non-convertible entries still fail with
 ///   the same TypeError class as the old cast.
 ///
-/// Nullability is preserved: a nullable field yields
-/// `(v as List<dynamic>?)?.map(...)?.toList()`, passing null through
-/// (the `is` fast path accepts null via the nullable type test). Any
-/// other type keeps the plain hard cast.
+/// Nullability is preserved: a nullable field still yields a
+/// `List<Map<...>>?`-typed expression, but the false branch casts to the
+/// NON-nullable `List<dynamic>` and uses plain `.` chains — the `is …?`
+/// fast path already accepts null, so that branch is only reached when the
+/// value is not null, and a `?.` there is `invalid_null_aware_operator`
+/// (issue #209). Any other type keeps the plain hard cast.
 String fieldCastExpression(String expr, String fieldType) {
   final listMap = parseListMapFieldType(fieldType);
   if (listMap == null) return '$expr as $fieldType';
-  final outer = listMap.isNullable ? 'List<dynamic>?' : 'List<dynamic>';
-  final chain = listMap.isNullable ? '?.' : '.';
+  // The `is …?` fast path returns null for a null value on BOTH spellings,
+  // so the conversion branch below is only ever reached with a non-null
+  // receiver and must not carry a null-aware chain (issue #209).
+  const outer = 'List<dynamic>';
+  const chain = '.';
   final element = listMap.elementType;
   final elemExpr =
       'e is $element ? e : $element.from(e as Map<dynamic, dynamic>)';
