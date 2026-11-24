@@ -45,6 +45,27 @@ import '../emission/emitter.dart';
 ///   loud failure a bulk update needs, since a silently skipped element in a
 ///   mixed collection is data loss nobody sees.
 ///
+/// ## The `copyWith` contract a patch relies on
+///
+/// Every emitted `apply` rebuilds its target through the entity's own
+/// `copyWith`, passing `field.isUnchanged ? target.field : field.valueOrNull`.
+/// That is the correct call for a patch — `valueOrNull` is `null` only for a
+/// deliberate [PatchValue.set(null)] — but the guarantee "a nullable field can
+/// be cleared" holds only when that `copyWith` can tell an explicit `null`
+/// apart from an omitted argument. A `copyWith` written as
+/// `readAt: readAt ?? this.readAt` cannot: it treats a deliberate clear as
+/// "keep the current value" and the update is silently dropped.
+///
+/// The entity-side contract is therefore:
+///
+/// * an **omitted** argument keeps the current value, and
+/// * an argument passed as `null` **clears** the field.
+///
+/// A `copyWith` that satisfies it uses a sentinel default for its nullable
+/// parameters (`Object? readAt = _unset`) instead of `T? readAt` with `??`.
+/// See the runtime fixture `test/runtime/fixtures/notification.dart` for the
+/// shape, and `polymorphic_patch_test.dart` for the clearing cases.
+///
 /// Everything is assembled as [Spec] objects and formatted by [ZorphyEmitter]:
 /// no source text is concatenated here, matching `PatchEmitter`.
 class PolymorphicPatchEmitter {
@@ -223,7 +244,7 @@ class PolymorphicPatchEmitter {
       c.methods.add(_isNotEmptyGetter());
       c.methods.add(_sharedApplyMethod(root, fields, subtypeNames));
       c.methods.add(
-        _concreteComposeMethod(root, fields, sharedName, guardKind: false),
+        _concreteComposeMethod(root, fields, sharedName),
       );
       c.methods.add(
         _concreteInvertMethod(
@@ -279,7 +300,7 @@ class PolymorphicPatchEmitter {
       c.methods.add(_isNotEmptyGetter());
       c.methods.add(_subtypeApplyMethod(subtype, fields));
       c.methods.add(
-        _concreteComposeMethod(root, fields, patchName, guardKind: true),
+        _concreteComposeMethod(root, fields, patchName),
       );
       c.methods.add(
         _concreteInvertMethod(
@@ -477,14 +498,14 @@ class PolymorphicPatchEmitter {
   });
 
   /// `compose` for a concrete patch: `next`'s set fields win, this one's fill
-  /// the rest. Kinds must match — merging a sibling subtype's patch would
-  /// silently drop its subtype-only fields.
+  /// the rest. Kinds must match — merging a sibling subtype's patch, or a
+  /// subtype patch into a shared one, would silently drop the other side's
+  /// subtype-only fields.
   Method _concreteComposeMethod(
     String root,
     List<NameTypeClassComment> fields,
-    String selfName, {
-    required bool guardKind,
-  }) => Method((m) {
+    String selfName,
+  ) => Method((m) {
     m
       ..name = 'compose'
       ..returns = referType('${root}Patch')
@@ -499,22 +520,21 @@ class PolymorphicPatchEmitter {
     m.annotations.add(refer('override'));
 
     // `next` is statically the ROOT patch. The type guard is what promotes it
-    // for the fields below, and it is also the loud failure a subtype patch
-    // needs: composing a SIBLING's patch would silently drop that sibling's
-    // fields. The shared patch sets only root fields and is final, so for it
-    // the guard can never fire — [guardKind] turns it off there.
+    // for the fields below, and it is also the loud failure every concrete
+    // patch needs: composing a SIBLING's patch would silently drop that
+    // sibling's fields, and a shared patch composed with a SUBTYPE patch would
+    // drop the subtype's own fields the same way. The guard fires for both
+    // directions, so neither is a silent data loss.
     final lines = <String>[
       'if (next.isEmpty) return this;',
       'if (isEmpty) return next;',
     ];
-    if (guardKind) {
-      lines.addAll([
-        'if (next is! $selfName) {',
-        '  throw ArgumentError.value(next, \'next\', '
-            '\'$selfName cannot compose \${next.runtimeType}\');',
-        '}',
-      ]);
-    }
+    lines.addAll([
+      'if (next is! $selfName) {',
+      '  throw ArgumentError.value(next, \'next\', '
+          '\'$selfName cannot compose \${next.runtimeType}\');',
+      '}',
+    ]);
     if (fields.isEmpty) {
       lines.add('return this;');
     } else {

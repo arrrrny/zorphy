@@ -9,6 +9,11 @@
 
 import 'package:zorphy_annotation/zorphy.dart';
 
+/// Sentinel for `copyWith`'s nullable parameters, matching the contract
+/// `PolymorphicPatchEmitter` documents: an OMITTED argument keeps the current
+/// value, an argument passed as `null` CLEARS the field.
+const Object _unset = Object();
+
 abstract class Notification {
   const Notification({required this.id, this.readAt});
 
@@ -27,10 +32,10 @@ class OrderNotification extends Notification {
 
   final int itemCount;
 
-  OrderNotification copyWith({String? id, DateTime? readAt, int? itemCount}) =>
+  OrderNotification copyWith({String? id, Object? readAt = _unset, int? itemCount}) =>
       OrderNotification(
         id: id ?? this.id,
-        readAt: readAt ?? this.readAt,
+        readAt: identical(readAt, _unset) ? this.readAt : readAt as DateTime?,
         itemCount: itemCount ?? this.itemCount,
       );
 }
@@ -46,11 +51,11 @@ class PriceDropNotification extends Notification {
 
   PriceDropNotification copyWith({
     String? id,
-    DateTime? readAt,
+    Object? readAt = _unset,
     double? newPrice,
   }) => PriceDropNotification(
     id: id ?? this.id,
-    readAt: readAt ?? this.readAt,
+    readAt: identical(readAt, _unset) ? this.readAt : readAt as DateTime?,
     newPrice: newPrice ?? this.newPrice,
   );
 }
@@ -137,6 +142,13 @@ final class NotificationSharedPatch extends NotificationPatch {
   NotificationPatch compose(covariant NotificationPatch next) {
     if (next.isEmpty) return this;
     if (isEmpty) return next;
+    if (next is! NotificationSharedPatch) {
+      throw ArgumentError.value(
+        next,
+        'next',
+        'NotificationSharedPatch cannot compose ${next.runtimeType}',
+      );
+    }
     return NotificationSharedPatch(
       id: next.id.isUnchanged ? id : next.id,
       readAt: next.readAt.isUnchanged ? readAt : next.readAt,
@@ -163,7 +175,6 @@ final class NotificationSharedPatch extends NotificationPatch {
     return wire;
   }
 }
-
 // GOLDEN-POLY-ROOT-END
 
 // GOLDEN-POLY-ORDER-START
@@ -255,7 +266,6 @@ final class OrderNotificationPatch extends NotificationPatch {
     return wire;
   }
 }
-
 // GOLDEN-POLY-ORDER-END
 
 // GOLDEN-POLY-PRICE-START
@@ -345,5 +355,4 @@ final class PriceDropNotificationPatch extends NotificationPatch {
     return wire;
   }
 }
-
 // GOLDEN-POLY-PRICE-END

@@ -226,6 +226,22 @@ class PatchClassGenerator extends ConcreteClassGenerator {
     // `<Root>Patch` plus the `<Root>SharedPatch` its `.shared(...)` factory
     // builds, dispatching shared-field updates across every concrete subtype.
     if (metadata.isSealed) {
+      // A generic sealed root would emit `PatchValue<T>` members whose `T` no
+      // emitted class declares: the root and shared patches carry no type
+      // parameters, so the generated library does not compile. Refuse it by
+      // name instead of emitting broken code; non-generic roots are unaffected.
+      if (metadata.generics.isNotEmpty) {
+        final genericNames = metadata.generics.map((g) => g.name).join(', ');
+        throw ArgumentError.value(
+          metadata.cleanName,
+          'rootName',
+          'a generic sealed root cannot get a polymorphic patch: '
+              '${metadata.cleanName}<$genericNames> would emit PatchValue '
+              'members referencing undeclared type parameters. Use a '
+              'non-generic sealed root, or a nonSealed base for a generic '
+              'hierarchy',
+        );
+      }
       final subtypeNames = {
         for (final subtype in metadata.explicitSubtypes)
           subtype.interfaceName.replaceAll(r'$', ''),
