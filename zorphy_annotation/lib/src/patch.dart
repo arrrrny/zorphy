@@ -161,7 +161,10 @@ final class PatchSet<V> extends PatchValue<V> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is PatchSet<V> && other.value == value;
+      identical(this, other) ||
+      other is PatchSet<V> &&
+          runtimeType == other.runtimeType &&
+          other.value == value;
 
   @override
   int get hashCode => value.hashCode;
@@ -204,8 +207,14 @@ final class PatchNested<Sub, SubPatch extends ZorphyPatch<Sub>>
   @override
   Sub applyTo(Sub entity) => apply(entity);
 
+  /// Composes exactly like the wrapped patch: a [next] that is itself a
+  /// [PatchNested] of the same [Sub] is unwrapped first, so a delegate
+  /// narrowing [compose]'s parameter to its own patch type still receives a
+  /// patch of that type instead of the wrapper.
   @override
-  ZorphyPatch<Sub> compose(ZorphyPatch<Sub> next) => patch.compose(next);
+  ZorphyPatch<Sub> compose(ZorphyPatch<Sub> next) => patch.compose(
+    next is PatchNested<Sub, ZorphyPatch<Sub>> ? next.patch : next,
+  );
 
   @override
   ZorphyPatch<Sub> invert(Sub before) => patch.invert(before);
@@ -227,7 +236,9 @@ final class PatchNested<Sub, SubPatch extends ZorphyPatch<Sub>>
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PatchNested<Sub, SubPatch> && other.patch == patch;
+      other is PatchNested<Sub, SubPatch> &&
+          runtimeType == other.runtimeType &&
+          other.patch == patch;
 
   @override
   int get hashCode => patch.hashCode;
@@ -255,7 +266,7 @@ sealed class ListPatchOp<E> {
   /// Removes the item at [index], as a [RangeError] when it is out of range.
   const factory ListPatchOp.removeAt(int index) = ListRemoveAt<E>;
 
-  /// Replaces the item at [index] with [item].
+  /// Replaces the item at [index], as a [RangeError] when it is out of range.
   const factory ListPatchOp.updateAt(int index, E item) = ListUpdateAt<E>;
 
   /// Applies this operation to [target] and returns the resulting list.
@@ -278,7 +289,9 @@ final class ListReplaceAll<E> extends ListPatchOp<E> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ListReplaceAll<E> && _listEquality.equals(other.items, items);
+      other is ListReplaceAll<E> &&
+          runtimeType == other.runtimeType &&
+          _listEquality.equals(other.items, items);
 
   @override
   int get hashCode => Object.hashAll(items);
@@ -298,7 +311,10 @@ final class ListAppend<E> extends ListPatchOp<E> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is ListAppend<E> && other.item == item;
+      identical(this, other) ||
+      other is ListAppend<E> &&
+          runtimeType == other.runtimeType &&
+          other.item == item;
 
   @override
   int get hashCode => item.hashCode;
@@ -319,7 +335,9 @@ final class ListRemoveAt<E> extends ListPatchOp<E> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ListRemoveAt<E> && other.index == index;
+      other is ListRemoveAt<E> &&
+          runtimeType == other.runtimeType &&
+          other.index == index;
 
   @override
   int get hashCode => index.hashCode;
@@ -341,7 +359,10 @@ final class ListUpdateAt<E> extends ListPatchOp<E> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ListUpdateAt<E> && other.index == index && other.item == item;
+      other is ListUpdateAt<E> &&
+          runtimeType == other.runtimeType &&
+          other.index == index &&
+          other.item == item;
 
   @override
   int get hashCode => Object.hash(index, item);
@@ -395,11 +416,11 @@ final class MapReplaceAll<K, V> extends MapPatchOp<K, V> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is MapReplaceAll<K, V> &&
+          runtimeType == other.runtimeType &&
           _mapEquality.equals(other.entries, entries);
 
   @override
-  int get hashCode =>
-      Object.hashAll(entries.entries.map((e) => Object.hash(e.key, e.value)));
+  int get hashCode => _mapEquality.hash(entries);
 
   @override
   String toString() => 'MapPatchOp<$K, $V>.replaceAll($entries)';
@@ -418,7 +439,10 @@ final class MapPut<K, V> extends MapPatchOp<K, V> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is MapPut<K, V> && other.key == key && other.value == value;
+      other is MapPut<K, V> &&
+          runtimeType == other.runtimeType &&
+          other.key == key &&
+          other.value == value;
 
   @override
   int get hashCode => Object.hash(key, value);
@@ -438,7 +462,10 @@ final class MapRemove<K, V> extends MapPatchOp<K, V> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is MapRemove<K, V> && other.key == key;
+      identical(this, other) ||
+      other is MapRemove<K, V> &&
+          runtimeType == other.runtimeType &&
+          other.key == key;
 
   @override
   int get hashCode => key.hashCode;
@@ -446,7 +473,6 @@ final class MapRemove<K, V> extends MapPatchOp<K, V> {
   @override
   String toString() => 'MapPatchOp<$K, $V>.remove($key)';
 }
-
 /// An ordered sequence of [ListPatchOp] steps — the collection-delta half of
 /// the patch algebra (ISSUE-008).
 ///

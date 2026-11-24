@@ -57,6 +57,61 @@ final class _Empty implements ZorphyPatch<String> {
   Map<String, Object?> toWire() => const <String, Object?>{};
 }
 
+/// A reference patch that narrows [compose] to its own type, the way a
+/// generated `<Name>Patch` does. Its parameter check is enforced at runtime,
+/// so handing it a wrapper instead of a [_Narrow] is what finding #199's
+/// `PatchNested.compose` had to stop doing.
+final class _Narrow implements ZorphyPatch<String> {
+  const _Narrow(this.value);
+
+  final String value;
+
+  @override
+  bool get isEmpty => false;
+
+  @override
+  bool get isNotEmpty => true;
+
+  @override
+  String apply(String _) => value;
+
+  @override
+  ZorphyPatch<String> compose(covariant _Narrow next) => next;
+
+  @override
+  ZorphyPatch<String> invert(String before) => _Narrow(before);
+
+  @override
+  Map<String, Object?> toWire() => <String, Object?>{'narrow': value};
+}
+
+/// A [ZorphyPatch] over [Object], used to compare a [PatchNested] against a
+/// wrapper of a different generic instantiation.
+final class _ObjectPatch implements ZorphyPatch<Object> {
+  const _ObjectPatch(this.value);
+
+  final String value;
+
+  @override
+  bool get isEmpty => false;
+
+  @override
+  bool get isNotEmpty => true;
+
+  @override
+  Object apply(Object _) => value;
+
+  @override
+  ZorphyPatch<Object> compose(ZorphyPatch<Object> next) =>
+      next.isEmpty ? this : next;
+
+  @override
+  ZorphyPatch<Object> invert(Object _) => const _ObjectPatch('');
+
+  @override
+  Map<String, Object?> toWire() => <String, Object?>{'object': value};
+}
+
 void main() {
   group('PatchValue', () {
     test('unchanged carries no value and reports isUnchanged', () {
@@ -94,6 +149,15 @@ void main() {
         isNot(const PatchValue<int>.set(0)),
       );
     });
+
+    test('set equality is symmetric across generic instantiations', () {
+      final narrower = const PatchSet<int>(1);
+      final wider = const PatchSet<num>(1);
+      expect(narrower == wider, isFalse);
+      expect(wider == narrower, isFalse);
+      expect(narrower, const PatchSet<int>(1));
+      expect(narrower.hashCode, const PatchSet<int>(1).hashCode);
+    });
   });
 
   group('ListPatchOp', () {
@@ -119,6 +183,11 @@ void main() {
 
     test('removeAt out of range is a RangeError', () {
       const op = ListPatchOp<int>.removeAt(2);
+      expect(() => op.apply(<int>[1]), throwsRangeError);
+    });
+
+    test('updateAt out of range is a RangeError', () {
+      const op = ListPatchOp<int>.updateAt(2, 9);
       expect(() => op.apply(<int>[1]), throwsRangeError);
     });
 
@@ -205,6 +274,27 @@ void main() {
         isNot(const MapPatchOp<String, int>.put('a', 0)),
       );
     });
+
+    test('replaceAll hash is order-independent like its equality', () {
+      const a = MapPatchOp<String, int>.replaceAll(<String, int>{
+        'a': 1,
+        'b': 2,
+      });
+      const b = MapPatchOp<String, int>.replaceAll(<String, int>{
+        'b': 2,
+        'a': 1,
+      });
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
+      expect(<Object>{a}, contains(b));
+    });
+
+    test('replaceAll equality is symmetric across generic instantiations', () {
+      final narrower = const MapReplaceAll<String, int>(<String, int>{'a': 1});
+      final wider = const MapReplaceAll<String, num>(<String, num>{'a': 1});
+      expect(narrower == wider, isFalse);
+      expect(wider == narrower, isFalse);
+    });
   });
 
   group('PatchNested', () {
@@ -223,6 +313,23 @@ void main() {
       expect(nested.isEmpty, isTrue);
       expect(nested.apply('same'), 'same');
       expect(nested.toWire(), isEmpty);
+    });
+
+    test('compose unwraps a compatible wrapper for a narrowed delegate', () {
+      const nested = PatchNested<String, _Narrow>(_Narrow('wrapper'));
+      const other = PatchNested<String, _Narrow>(_Narrow('next'));
+      final composed = nested.compose(other);
+      expect(composed.apply('seed'), 'next');
+      expect(nested.compose(const _Narrow('plain')).apply('seed'), 'plain');
+    });
+
+    test('equality is symmetric across generic instantiations', () {
+      final narrower = const PatchNested<String, _Narrow>(_Narrow('a'));
+      final wider = const PatchNested<Object, ZorphyPatch<Object>>(
+        _ObjectPatch('a'),
+      );
+      expect(narrower == wider, isFalse);
+      expect(wider == narrower, isFalse);
     });
   });
 
