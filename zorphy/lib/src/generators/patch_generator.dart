@@ -181,13 +181,22 @@ class PatchGenerator extends ConcreteClassGenerator {
   /// fields (List<Map<...>>, issue #148) — a hard list-level cast
   /// throws a TypeError on raw JSON payloads (List<dynamic> with Map
   /// elements).
-  String _patchFieldCastExpr(
-    dynamic f,
-    String patchKey,
-  ) => helpers.fieldCastExpression(
-    '( ($patchKey is Function) ? $patchKey(this.${f.name}) : ($patchKey is Patch) ? $patchKey.applyTo(this.${f.name}) : $patchKey )',
-    f.type!.replaceAll(r'$', ''),
-  );
+  ///
+  /// A Function-valued patch entry is a callback. Emitting the resolution
+  /// expression straight into `fieldCastExpression` would duplicate it three
+  /// times (type test, fast-path branch, conversion branch), invoking the
+  /// callback three times. A non-deterministic callback could then pass the
+  /// type test on one value while the cast runs on another — for a nullable
+  /// composite list that turns `(null as List<dynamic>)` into a throw where
+  /// the old nullable cast passed null through (issue #209 follow-up,
+  /// CodeRabbit finding on #211). Resolve once into a local so every branch
+  /// sees the same value.
+  String _patchFieldCastExpr(dynamic f, String patchKey) {
+    const value = '_patchValue';
+    final resolved =
+        '( ($patchKey is Function) ? $patchKey(this.${f.name}) : ($patchKey is Patch) ? $patchKey.applyTo(this.${f.name}) : $patchKey )';
+    return '(() { final $value = $resolved; return ${helpers.fieldCastExpression(value, f.type!.replaceAll(r'$', ''))}; })()';
+  }
 }
 
 /// Generates the Patch class for a class.

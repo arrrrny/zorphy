@@ -32,6 +32,9 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
+int _occurrences(String haystack, String needle) =>
+    haystack.split(needle).length - 1;
+
 void main() {
   final fixture = File(
     'example/lib/_br_/various/issue_148_list_map_cast_example.part.dart',
@@ -114,7 +117,7 @@ void main() {
         contains(
           'asList<dynamic>)'
           '.map((e)=>eisMap<String,dynamic>'
-          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList())'
+          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList());})()'
           ':this.marketplaces,',
         ),
       );
@@ -123,7 +126,7 @@ void main() {
         contains(
           'asList<dynamic>)'
           '.map((e)=>eisMap<String,dynamic>'
-          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList())'
+          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList());})()'
           ':this.errors,',
         ),
       );
@@ -140,13 +143,44 @@ void main() {
           contains(
             'asList<dynamic>)'
             '.map((e)=>eisMap<String,dynamic>'
-            '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList())'
+            '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList());})()'
             ':this.payloads,',
           ),
         );
         expect(compact, isNot(contains('asList<dynamic>?)?')));
       },
     );
+
+    test('a Function patch entry is evaluated once, not per branch', () {
+      // CodeRabbit finding on #211: the patch-value resolution expression
+      // used to be emitted three times (type test, fast-path branch and
+      // conversion branch). A non-deterministic callback could then pass
+      // the type test on one value while the cast ran on another — for a
+      // nullable composite list that turned `(null as List<dynamic>)` into
+      // a throw where the old nullable cast passed null through. The arm
+      // now resolves once into a local and every branch reads that value.
+      expect(
+        _occurrences(
+          compact,
+          '_patchMap[MarketplaceResult\$.marketplaces](this.marketplaces',
+        ),
+        1,
+      );
+      expect(
+        _occurrences(
+          compact,
+          '_patchMap[NullablePayloads\$.payloads](this.payloads',
+        ),
+        1,
+      );
+      expect(
+        _occurrences(
+          compact,
+          '_patchMap[TaggedResult\$.maybeTags](this.maybeTags',
+        ),
+        1,
+      );
+    });
   });
 
   group('golden: typed map values (CodeRabbit finding on PR #149)', () {
@@ -181,7 +215,7 @@ void main() {
         contains(
           'asList<dynamic>)'
           '.map((e)=>eisMap<String,String>'
-          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),).toList())'
+          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),).toList());})()'
           ':this.tags,',
         ),
       );

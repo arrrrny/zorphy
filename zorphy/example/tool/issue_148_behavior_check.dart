@@ -97,6 +97,39 @@ void main() {
     kept.payloads!.length == 1,
   );
 
+  // ── Function-valued patch entry on a nullable composite list ────
+  // CodeRabbit finding on #211: the patch resolution expression used to be
+  // emitted three times, invoking a Function patch entry repeatedly. A
+  // callback returning a raw list on the first call and null on the next
+  // passed the type test on one value but cast another — the non-nullable
+  // `(null as List<dynamic>)` then threw where the old nullable cast
+  // passed null through. It must be invoked exactly once and converted.
+  var patchCalls = 0;
+  final statefulPatch = NullablePayloadsPatch()
+    ..patchMap[NullablePayloads$.payloads] = (dynamic current) {
+      patchCalls++;
+      // Raw JSON-decoded list on the (single) invocation: the typed `is`
+      // fast path rejects it, so the conversion branch must run on this
+      // very same value.
+      return patchCalls == 1 ? jsonDecode('[{"id": 1}]') : null;
+    };
+  try {
+    final stateful = nullable.patchWithNullablePayloads(statefulPatch);
+    check(
+      'Function patch entry is evaluated once for a nullable composite list',
+      patchCalls == 1 &&
+          stateful.payloads!.length == 1 &&
+          stateful.payloads!.first['id'] == 1,
+    );
+  } catch (e) {
+    print(
+      'FAIL: Function patch entry evaluated once for a nullable composite list — threw $e',
+    );
+    failures.add(
+      'Function patch entry evaluated once for a nullable composite list',
+    );
+  }
+
   // ── typed map values (CodeRabbit finding on PR #149) ────────────
   // A field declared List<Map<String, String>> receives decoded
   // Map<String, dynamic> entries at the cast sites; the element cast
