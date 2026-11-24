@@ -321,6 +321,16 @@ final class HierarchyResolver {
   static List<ZorphyFieldIr> _declaredFields(ClassElement element) {
     final fields = <ZorphyFieldIr>[];
     final seen = <String>{};
+    // `element.getters` yields a REAL field's implicit getter too, and that
+    // implicit getter carries none of the field's annotations. Build the
+    // name→field lookup ONCE here instead of rescanning every field for every
+    // getter: O(fields + getters) rather than O(fields × getters). The getter
+    // loop claims the name first, so this is the only chance to honour a
+    // field-form `@ZorphyDomainBool()` hatch.
+    final declaredByName = <String, FieldElement>{
+      for (final field in element.fields)
+        if (!field.isStatic && field.name != null) field.name!: field,
+    };
     for (final getter in element.getters) {
       if (getter.isStatic) continue;
       final name = getter.name ?? '';
@@ -333,7 +343,7 @@ final class HierarchyResolver {
           isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
           isDomainBool:
               _isDomainBool(getter) ||
-              _isDomainBool(_declaringField(element, name)),
+              _isDomainBool(_declaringField(declaredByName, name)),
         ),
       );
     }
@@ -354,20 +364,18 @@ final class HierarchyResolver {
     return List.unmodifiable(fields);
   }
 
-  /// The statically declared field called [name] on [element], or `null`.
+  /// The statically declared field called [name] in [declaredByName], or `null`.
   ///
   /// `element.getters` yields a REAL field's implicit getter too, and that
   /// implicit getter carries none of the field's annotations. Without this
   /// lookup the getter loop claims the name first and the annotation on the
   /// field is never read — the escape hatch documented for fields silently
-  /// did nothing (finding on PR #216).
-  static FieldElement? _declaringField(ClassElement element, String name) {
-    for (final field in element.fields) {
-      if (field.isStatic) continue;
-      if (field.name == name) return field;
-    }
-    return null;
-  }
+  /// did nothing (finding on PR #216). The map is built once per class in
+  /// `_declaredFields`, so the lookup is O(1) per getter.
+  static FieldElement? _declaringField(
+    Map<String, FieldElement> declaredByName,
+    String name,
+  ) => declaredByName[name];
 
   /// Whether [element] carries `@ZorphyDomainBool()`.
   ///
