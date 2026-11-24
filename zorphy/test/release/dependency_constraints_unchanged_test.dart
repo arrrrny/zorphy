@@ -61,6 +61,9 @@ void main() {
 
         final expectedAnnotationDeps = <String, String>{
           'collection': '^1.19.1',
+          // issue #189 added `crypto`: `ZorphyIntentDigest` needs SHA-256 over
+          // the canonical intent payload, and stdlib has no digest.
+          'crypto': '^3.0.7',
           'json_annotation': '^4.12.0',
           'meta': '^1.17.0',
           'quiver': '^3.2.2',
