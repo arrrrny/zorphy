@@ -35,6 +35,7 @@ export 'zorphy.dart';
 export 'src/annotations.dart';
 export 'src/archetype_bases.dart';
 export 'src/archetypes.dart';
+export 'src/intent.dart';
 export 'src/merge_mode.dart';
 export 'src/patch_base.dart';
 export 'src/agent_annotations.dart';

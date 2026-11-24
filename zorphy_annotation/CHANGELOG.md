@@ -2,6 +2,30 @@
 
 ### Added
 
+- Collection delta patches (#183): `ListPatchDelta<E>` and
+  `MapPatchDelta<K, V>` carry an ordered sequence of `ListPatchOp` /
+  `MapPatchOp` steps and implement the full v3 algebra — minimal `diff`
+  (no op for an unchanged collection, one op per appended/removed/edited
+  element or put/removed key), fold-ordered `apply` that never mutates,
+  concatenating `compose`, round-tripping `invert`, and `toWire` rendering
+  each step as a descriptor. Both also implement the legacy `Patch<T>` arm,
+  which is how a generated `patchWith` applies them.
+- `PatchNested` implements `Patch<Sub>` as well as `ZorphyPatch<Sub>`, so a
+  parent patch's carried nested patch resolves through the same legacy arm,
+  and gained `invertNested(before)` for inverting a carried sub-patch (#183).
+
+- `PatchBase` is const-constructible through `PatchBase.empty()`, which backs
+  the generated `<Name>Patch.empty()` constructor: the empty patch is the
+  allocation-free neutral element of `compose` and `apply` returns its target
+  unchanged (#182).
+
+- The v3 patch algebra: `ZorphyPatch<T>` (`isEmpty` / `isNotEmpty`, `apply`,
+  `compose`, `invert`, `toWire`) with its laws documented on the interface,
+  plus the field-level shapes it composes with — `PatchValue<V>`
+  (`unchanged` / `set`), `PatchNested<Sub, SubPatch>`, `ListPatchOp<E>`
+  (`replaceAll` / `append` / `removeAt` / `updateAt`) and
+  `MapPatchOp<K, V>` (`replaceAll` / `put` / `remove`) (#181). Every op
+  returns a fresh collection and never mutates its input.
 - The five v3 archetypes, all zero-toggle: `ZorphyEntity` (`principalKey`),
   `ZorphyState`, `ZorphyUnion`, `ZorphyIntent` (`replaySafe`, required) and
   `ZorphyValue`, plus the marker interfaces `ZorphyEntityBase<Id>`,

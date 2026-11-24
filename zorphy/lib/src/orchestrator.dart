@@ -4,6 +4,7 @@ import 'package:source_gen/source_gen.dart';
 import 'package:zorphy/src/analysis/analysis.dart';
 import 'package:zorphy/src/ast/ast.dart';
 import 'package:zorphy/src/emission/emitter.dart';
+import 'package:zorphy/src/emitters/emitters.dart';
 import 'package:zorphy/src/generators/generators.dart';
 import 'package:zorphy/src/models/models.dart';
 import 'package:zorphy/src/plugins/plugin_context.dart';
@@ -78,6 +79,20 @@ class Orchestrator {
     LensGenerator(),
   ];
 
+  /// Hierarchy-wide emitters (ISSUE-004, #179).
+  ///
+  /// Kept apart from [_generators] because their contract is
+  /// `ClassMetadata` + `config` straight off the hierarchy, not the per-class
+  /// `GenerationContext`. Each one is gated by an existing feature flag, so
+  /// this list adds no annotation surface.
+  static final List<HierarchyEmitter> _hierarchyEmitters = [
+    // Sibling morphing: changeTo<Sibling>() on every subtype (generateChangeTo)
+    const MorphingEmitter(),
+
+    // when / maybeWhen matchers on a sealed root (generatePropertyHelpers)
+    const PolymorphicClassEmitter(),
+  ];
+
   /// Shared emitter instance (page width 80 — Dart style guide default).
   static final ZorphyEmitter _emitter = ZorphyEmitter();
 
@@ -111,6 +126,16 @@ class Orchestrator {
     for (final generator in _generators) {
       if (generator.shouldGenerate(context)) {
         allSpecs.addAll(generator.generateSpec(context));
+      }
+    }
+
+    // Phase 3b: Hierarchy-wide members. These belong to a whole polymorphic
+    // hierarchy rather than to one class, so they read `metadata` directly
+    // instead of the per-class generator contract, and they are gated by the
+    // feature family that owns them — never by a new toggle (ISSUE-001).
+    for (final emitter in _hierarchyEmitters) {
+      if (emitter.shouldEmit(metadata, config)) {
+        allSpecs.addAll(emitter.emit(metadata));
       }
     }
 

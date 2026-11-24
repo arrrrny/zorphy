@@ -1,0 +1,104 @@
+class ProgressBoxPatch<T> extends PatchBase<ProgressBox<T>, ProgressBox$> {
+  const ProgressBoxPatch.empty() : super.empty();
+
+  ProgressBoxPatch() : super();
+
+  bool get isEmpty {
+    return patchMap.isEmpty;
+  }
+
+  ProgressBox<T> apply(ProgressBox<T> target) {
+    if (isEmpty) return target;
+    return target.patchWithProgressBox(this) as ProgressBox<T>;
+  }
+
+  ProgressBox<T> applyTo(ProgressBox<T> entity) {
+    return apply(entity);
+  }
+
+  ProgressBoxPatch<T> compose(covariant ProgressBoxPatch<T> next) {
+    if (next.isEmpty) return this;
+    if (isEmpty) return next;
+    return ProgressBoxPatch<T>()
+      ..patchMap.addAll(patchMap)
+      ..patchMap.addAll(next.patchMap);
+  }
+
+  ProgressBoxPatch<T> invert(ProgressBox<T> before) {
+    final undo = ProgressBoxPatch<T>();
+    if (patchMap.containsKey(ProgressBox$.value))
+      undo.patchMap[ProgressBox$.value] = before.value;
+    if (patchMap.containsKey(ProgressBox$.label))
+      undo.patchMap[ProgressBox$.label] = before.label;
+    final tokenCarried = patchMap[ProgressBox$.token];
+    if (patchMap.containsKey(ProgressBox$.token) &&
+        tokenCarried is PatchNested) {
+      undo.patchMap[ProgressBox$.token] =
+          (tokenCarried as PatchNested<Token, TokenPatch>).invertNested(
+            before.token,
+          );
+    }
+    if (patchMap.containsKey(ProgressBox$.token) &&
+        tokenCarried is! PatchNested)
+      undo.patchMap[ProgressBox$.token] = before.token;
+    return undo;
+  }
+
+  static ProgressBoxPatch<T> diff<T>(
+    ProgressBox<T> previous,
+    ProgressBox<T> next,
+  ) {
+    if (identical(previous, next)) return ProgressBoxPatch<T>.empty();
+    final changes = ProgressBoxPatch<T>();
+    if (previous.value != next.value)
+      changes.patchMap[ProgressBox$.value] = next.value;
+    if (previous.label != next.label)
+      changes.patchMap[ProgressBox$.label] = next.label;
+    final tokenDelta = TokenPatch.diff(previous.token, next.token);
+    if (tokenDelta.isNotEmpty)
+      changes.patchMap[ProgressBox$.token] = PatchNested<Token, TokenPatch>(
+        tokenDelta,
+      );
+    return changes;
+  }
+
+  Map<String, Object?> toWire() {
+    final wire = <String, Object?>{};
+    if (patchMap.containsKey(ProgressBox$.value))
+      wire['value'] = patchMap[ProgressBox$.value];
+    if (patchMap.containsKey(ProgressBox$.label))
+      wire['label'] = patchMap[ProgressBox$.label];
+    if (patchMap.containsKey(ProgressBox$.token))
+      wire['token'] = patchMap[ProgressBox$.token] is PatchNested
+          ? (patchMap[ProgressBox$.token] as PatchNested).toWire()
+          : patchMap[ProgressBox$.token];
+    return wire;
+  }
+
+  ProgressBoxPatch withValue(dynamic value) {
+    patchMap[ProgressBox$.value] = value;
+    return this;
+  }
+
+  ProgressBoxPatch withLabel(String? value) {
+    patchMap[ProgressBox$.label] = value;
+    return this;
+  }
+
+  ProgressBoxPatch withToken(Token? value) {
+    patchMap[ProgressBox$.token] = value;
+    return this;
+  }
+
+  ProgressBoxPatch withTokenPatch(TokenPatch patch) {
+    patchMap[ProgressBox$.token] = patch;
+    return this;
+  }
+
+  ProgressBoxPatch withTokenPatchFunc(TokenPatch Function(TokenPatch) patch) {
+    patchMap[ProgressBox$.token] = (dynamic current) {
+      return patch(TokenPatch()).applyTo(current as Token);
+    };
+    return this;
+  }
+}

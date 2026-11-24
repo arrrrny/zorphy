@@ -1,6 +1,8 @@
 import 'package:code_builder/code_builder.dart';
 
 import '../ast/ast.dart';
+import '../emission/patch_emitter.dart';
+import '../emission/polymorphic_patch_emitter.dart';
 import '../helpers.dart' as helpers;
 import 'base_generator.dart';
 
@@ -199,6 +201,19 @@ class PatchClassGenerator extends ConcreteClassGenerator {
   @override
   bool shouldGenerate(GenerationContext context) {
     if (!context.config.generatePatch) return false;
+    // A sealed root DOES get a patch — the polymorphic one (ISSUE-009), which
+    // is what lets a heterogeneous collection be updated without downcasting.
+    if (context.metadata.isSealed) {
+      // A GENERIC sealed root is withheld, the same fail-closed posture
+      // `PolymorphicClassEmitter.shouldEmit` takes for the `when`/`maybeWhen`
+      // matcher: the root and shared patches carry no type parameters, so
+      // `PatchValue<T>` members would reference a `T` no emitted class
+      // declares and the generated library would not compile. A generic
+      // hierarchy keeps its per-subtype patches; throwing here instead would
+      // abort generation for every other class in the same run.
+      if (context.metadata.generics.isNotEmpty) return false;
+      return context.metadata.explicitSubtypes.isNotEmpty;
+    }
     // NonSealed abstract bases need Patch because parent entities
     // reference them in their own Patch generation (withXxxPatch methods).
     if (context.metadata.isAbstract && !context.metadata.nonSealed)
@@ -214,6 +229,34 @@ class PatchClassGenerator extends ConcreteClassGenerator {
         .map((k) => k.replaceAll(r'$', ''))
         .toList();
     final genericTypeNames = metadata.generics.map((g) => g.name).toList();
+
+    // Sealed roots: the polymorphic patch surface (ISSUE-009) — a sealed
+    // `<Root>Patch` plus the `<Root>SharedPatch` its `.shared(...)` factory
+    // builds, dispatching shared-field updates across every concrete subtype.
+    if (metadata.isSealed) {
+      // A generic sealed root never reaches this branch — `shouldGenerate`
+      // withholds it (see there), so generation cannot emit `PatchValue<T>`
+      // members whose `T` no emitted class declares.
+      assert(
+        metadata.generics.isEmpty,
+        'generic sealed root must be gated in '
+        'shouldGenerate',
+      );
+      final subtypeNames = {
+        for (final subtype in metadata.explicitSubtypes)
+          subtype.interfaceName.replaceAll(r'$', ''),
+        for (final subtype in metadata.polymorphicSubtypes)
+          subtype.interfaceName.replaceAll(r'$', ''),
+      }.toList();
+      if (subtypeNames.isEmpty) return [];
+      final emitted = PolymorphicPatchEmitter().emitRoot(
+        rootName: metadata.cleanName,
+        fields: metadata.allFields,
+        subtypeNames: subtypeNames,
+      );
+      if (emitted.trim().isEmpty) return [];
+      return [Code(emitted)];
+    }
 
     // Abstract nonSealed bases: emit minimal abstract Patch stub (data holder
     // only, no applyTo). The full Patch with applyTo is for concrete classes.
@@ -250,11 +293,15 @@ class PatchClassGenerator extends ConcreteClassGenerator {
       return [stub];
     }
 
-    final code = helpers.getPatchClass(
-      metadata.allFields,
-      metadata.cleanName,
-      knownClasses,
-      genericTypeNames,
+    final code = PatchEmitter().emit(
+      className: metadata.cleanName,
+      fields: metadata.allFields,
+      knownClasses: knownClasses,
+      genericTypeNames: genericTypeNames,
+      // Declaration sites (the class and `diff`) must carry the bounds:
+      // `toString()` renders `T extends num`, while `genericTypeNames` above
+      // stays bare for type-ARGUMENT sites (`PatchBase<Box<T>, Box$>`).
+      genericDeclarations: metadata.generics.map((g) => g.toString()).toList(),
     );
     if (code.trim().isEmpty) return [];
     return [Code(code)];
@@ -269,12 +316,21 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    return context.config.generatePatch &&
-        (context.metadata.isAbstract && context.metadata.nonSealed
-            ? context.metadata.allFields.isNotEmpty ||
-                  context.metadata.isInParentExplicitSubtypes
-            : !context.metadata.isAbstract &&
-                  context.metadata.allFields.isNotEmpty);
+    if (!context.config.generatePatch) return false;
+    final metadata = context.metadata;
+    // Abstract nonSealed bases emit their field enum alongside the abstract
+    // Patch stub in PatchClassGenerator (the fieldless placeholder included),
+    // so this generator handles only their fielded case — emitting here too
+    // would duplicate the enum.
+    if (metadata.isAbstract && metadata.nonSealed) {
+      return metadata.allFields.isNotEmpty;
+    }
+    // Sealed abstract bases get no Patch at all, so they get no field enum.
+    if (metadata.isAbstract) return false;
+    // A concrete class gets a field enum for exactly the set PatchClassGenerator
+    // emits a Patch for: a fieldless explicit subtype still references
+    // `${name}$` in its PatchBase, so it needs the placeholder enum.
+    return metadata.allFields.isNotEmpty || metadata.isInParentExplicitSubtypes;
   }
 
   @override
@@ -284,7 +340,21 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
       metadata.allFields,
       metadata.cleanName,
     );
-    if (code.trim().isEmpty) return [];
-    return [Code(code)];
+    if (code.trim().isNotEmpty) return [Code(code)];
+    // Fieldless concrete explicit subtype: its Patch (emitted by PatchEmitter)
+    // references `${name}$` in `PatchBase<Name, Name$>`, but
+    // getEnumPropertyList returns '' for empty fields. Emit the same
+    // placeholder enum the abstract stub path uses, named to match the
+    // PatchEmitter's `_clean(className)` + '$', so the generated Dart compiles.
+    if (!metadata.isAbstract && metadata.isInParentExplicitSubtypes) {
+      final cleanName = metadata.cleanName.replaceAll(r'$', '');
+      return [
+        Code(
+          '/// Placeholder field enum for fieldless [$cleanName].\n'
+          'enum $cleanName\$ { none }',
+        ),
+      ];
+    }
+    return [];
   }
 }

@@ -53,6 +53,16 @@ enum ZorphyDiagnosticCode {
 
   /// `ZORPHY_E003` — two nodes in one hierarchy share a `discriminatorValue`.
   e003DuplicateDiscriminator,
+
+  /// `ZORPHY_E004` — an `@ZorphyIntent` field's type has no canonical JSON
+  /// form, so a generated `toWire`/`intentDigest` could only throw at call
+  /// time. Reported at generation instead.
+  e004FieldNotEncodable,
+
+  /// `ZORPHY_E005` — an `@ZorphyIntent` payload field is named after the
+  /// hierarchy's `discriminatorKey`, so the wire tag and the field would
+  /// collide and the intent name would be lost from `toWire()`.
+  e005DiscriminatorCollision,
 }
 
 /// One diagnostic raised while resolving a hierarchy.
@@ -77,12 +87,14 @@ final class ZorphyDiagnostic {
     ZorphyDiagnosticCode.e001MissingPrincipalKey => 'ZORPHY_E001',
     ZorphyDiagnosticCode.e002MixedArchetypes => 'ZORPHY_E002',
     ZorphyDiagnosticCode.e003DuplicateDiscriminator => 'ZORPHY_E003',
+    ZorphyDiagnosticCode.e004FieldNotEncodable => 'ZORPHY_E004',
+    ZorphyDiagnosticCode.e005DiscriminatorCollision => 'ZORPHY_E005',
   };
 
   /// Whether this diagnostic blocks generation.
   ///
-  /// All three codes do today; the getter exists so a future advisory code
-  /// does not have to change every caller.
+  /// All codes do today; the getter exists so a future advisory code does not
+  /// have to change every caller.
   bool get isError => true;
 
   /// `ZORPHY_E001: $Product — message`
@@ -90,6 +102,31 @@ final class ZorphyDiagnostic {
 
   @override
   String toString() => render();
+}
+
+/// One field a node declares (`String get productId;`).
+///
+/// [type] is the field's type as written, so the emitter can declare the
+/// generated property and its constructor parameter with the same text a
+/// consumer already writes in the abstract declaration.
+final class ZorphyFieldIr {
+  /// The field name, without any `get`/`set` keyword.
+  final String name;
+
+  /// The declared type, as source text (`String`, `List<int>`, ...).
+  final String type;
+
+  /// Whether the declared type is nullable (`String?`).
+  final bool isNullable;
+
+  const ZorphyFieldIr({
+    required this.name,
+    required this.type,
+    this.isNullable = false,
+  });
+
+  @override
+  String toString() => '$type${isNullable ? '?' : ''} $name';
 }
 
 /// One node of a polymorphic hierarchy.
@@ -149,6 +186,18 @@ final class ZorphyNodeIr {
   /// The root of this node's hierarchy; unset on the root itself.
   final ZorphyNodeIr? root;
 
+  /// The fields this node DECLARES itself (`String get productId;`), in
+  /// declaration order.
+  ///
+  /// Inherited fields are NOT copied down. A consumer assembling a leaf's
+  /// whole payload walks the node itself first and then its `superTypes`
+  /// NEAREST-first, so the leaf's own declaration wins when a name is
+  /// redeclared further up the chain (the emitter's `_payloadFields` keeps
+  /// the first declaration of a name and drops the rest). Nearest-first is the
+  /// intended precedence — do not "fix" an emitter that lets the leaf win to
+  /// match a root-first reading of this comment.
+  final List<ZorphyFieldIr> fields;
+
   const ZorphyNodeIr({
     required this.className,
     required this.cleanName,
@@ -165,6 +214,7 @@ final class ZorphyNodeIr {
     this.replaySafe,
     this.isSyntheticLeaf = false,
     this.root,
+    this.fields = const [],
   });
 
   /// A copy with the named fields replaced, used by the resolver while it
@@ -187,6 +237,7 @@ final class ZorphyNodeIr {
     bool? isAbstractIntermediate,
     bool? isConcreteLeaf,
     bool? isSyntheticLeaf,
+    List<ZorphyFieldIr>? fields,
   }) {
     return ZorphyNodeIr(
       className: className,
@@ -209,6 +260,7 @@ final class ZorphyNodeIr {
           : replaySafe as bool?,
       isSyntheticLeaf: isSyntheticLeaf ?? this.isSyntheticLeaf,
       root: root ?? this.root,
+      fields: fields ?? this.fields,
     );
   }
 

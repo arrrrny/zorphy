@@ -441,3 +441,95 @@ lib/src/domain/entities/
     ├── index.dart
     └── user_status.dart
 ```
+
+## v3 polymorphic archetypes (3.0.0+)
+
+The `@Zorphy(...)` surface above is the v2 API. v3 replaces every preset and
+every `generate*` toggle with five zero-toggle archetypes: `@ZorphyEntity`,
+`@ZorphyState`, `@ZorphyUnion`, `@ZorphyIntent` and `@ZorphyValue`. A class
+carries exactly one, and polymorphism is declared by `implements $Parent`
+rather than by `explicitSubTypes`.
+
+```dart
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+@ZorphyEntity(principalKey: #id)
+abstract class $Notification {
+  String get id;
+  DateTime get createdAt;
+}
+
+@ZorphyEntity()
+class $OrderNotification implements $Notification {
+  String get orderId;
+}
+```
+
+`PolymorphicClassEmitter` (ISSUE-003, #178) emits the class shape of one such
+hierarchy from the resolved `PolymorphicIr`:
+
+- a `sealed class` root and every `sealed class` intermediate, implementing the
+  archetype marker base — `ZorphyEntityBase<Id>` (with `Id` taken from the
+  principal-key field's real type) or `ZorphyValueBase`;
+- a `final class` leaf that `extends` its NEAREST sealed ancestor, so it is a
+  subtype of every level above it;
+- the inherited `principalKey` getter, emitted ONCE on the root; subtypes reach
+  it through `extends`, so do not redeclare it;
+- `const <Leaf>.fromTrusted({required this.id, ...})`, assigning collection
+  references directly — no `toList()`, no `List.unmodifiable` — so a caller
+  that already owns a list pays no copy;
+- `copyWith`, where an omitted argument keeps the current value and an explicit
+  `null` CLEARS a nullable field (through a library-level `_sentinel`).
+
+Field data is passed alongside the IR (`Map<String, List<PolymorphicField>>`
+keyed by the node's `$`-prefixed class name), because the IR itself carries
+names, hierarchy links and the principal key but no fields.
+
+`ZorphyEntityBase<Id>` and its siblings are MARKERS: they declare no members.
+A generated `principalKey` getter is therefore the archetype's documented
+contract, not an `@override`.
+
+## v3 trust-boundary wire codecs (3.0.0+)
+
+A v3 hierarchy has exactly ONE wire entry point per direction — `fromWire` to
+decode untrusted data, `toWire` to encode it. There is no `fromJson`/`toJson`
+on the archetype surface, and no toggle to turn one on.
+
+```dart
+final result = Notification.fromWire(jsonDecode(body) as Map<String, Object?>);
+switch (result) {
+  case BoundaryOk(:final value):
+    handle(value);                     // OrderNotification or PriceDropNotification
+  case BoundaryErr(:final violations):
+    log(violations.map((v) => '${v.path}: expected ${v.expected}, got ${v.actual}'));
+}
+```
+
+`BoundaryCodecEmitter` (ISSUE-013, #188) emits those members from the resolved
+`PolymorphicIr`:
+
+- a **dispatch node** (the sealed root, or an abstract intermediate) resolves
+  `raw[discriminatorKey]` — `kind` by default — against the tags of the
+  concrete leaves BELOW it, and delegates to the matching leaf's `fromWire`.
+  A missing or unknown tag is a `BoundaryErr` carrying one `FieldViolation` at
+  `/<discriminatorKey>` whose `expected` names the tags that would have been
+  accepted; it never throws.
+- a **leaf** decodes each field through a total `is` test, collecting EVERY
+  failure into one `BoundaryErr` before it returns, and passes the decoded
+  values to `fromTrusted`. Its `toWire` re-injects the discriminator, so a
+  round-trip dispatches back to the same leaf.
+- **nested values** recurse: a `List<Contract>` or `Map<String, Contract>`
+  field calls the element's own `fromWire` and re-paths its violations under
+  the parent pointer, so a bad field inside the second element reports
+  `/children[1]/contractId`.
+
+A `DateTime` is an ISO-8601 string on the wire, `double` accepts an `int`
+(a JSON `1` is a legal `1.0`), and an absent nullable field is a null value,
+not a violation. Nothing is an `as`-cast, so arbitrary corrupt maps cannot
+raise `TypeError` or `CastError` — the whole point of the boundary.
+
+The emitted library must import
+`package:zorphy_annotation/zorphy_annotation.dart` (where
+`ZorphyBoundaryResult`/`BoundaryOk`/`BoundaryErr`/`FieldViolation` live), and
+`BoundaryCodecEmitter.helperSpecs()` must be emitted ONCE per library — a
+second copy is a duplicate-definition error.
