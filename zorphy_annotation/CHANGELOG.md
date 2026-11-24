@@ -2,6 +2,13 @@
 
 ### Added
 
+- The v3 patch algebra: `ZorphyPatch<T>` (`isEmpty` / `isNotEmpty`, `apply`,
+  `compose`, `invert`, `toWire`) with its laws documented on the interface,
+  plus the field-level shapes it composes with — `PatchValue<V>`
+  (`unchanged` / `set`), `PatchNested<Sub, SubPatch>`, `ListPatchOp<E>`
+  (`replaceAll` / `append` / `removeAt` / `updateAt`) and
+  `MapPatchOp<K, V>` (`replaceAll` / `put` / `remove`) (#181). Every op
+  returns a fresh collection and never mutates its input.
 - The five v3 archetypes, all zero-toggle: `ZorphyEntity` (`principalKey`),
   `ZorphyState`, `ZorphyUnion`, `ZorphyIntent` (`replaySafe`, required) and
   `ZorphyValue`, plus the marker interfaces `ZorphyEntityBase<Id>`,
