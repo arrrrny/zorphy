@@ -286,6 +286,7 @@ final class HierarchyResolver {
     return ZorphyNodeIr(
       className: className,
       cleanName: cleanName,
+      qualifiedName: _qualifiedName(element),
       archetype: declaration.kind,
       isSealedRoot: false,
       isAbstractIntermediate: false,
@@ -330,7 +331,9 @@ final class HierarchyResolver {
           name: name,
           type: _typeText(type),
           isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
-          isDomainBool: _isDomainBool(getter),
+          isDomainBool:
+              _isDomainBool(getter) ||
+              _isDomainBool(_declaringField(element, name)),
         ),
       );
     }
@@ -351,13 +354,31 @@ final class HierarchyResolver {
     return List.unmodifiable(fields);
   }
 
+  /// The statically declared field called [name] on [element], or `null`.
+  ///
+  /// `element.getters` yields a REAL field's implicit getter too, and that
+  /// implicit getter carries none of the field's annotations. Without this
+  /// lookup the getter loop claims the name first and the annotation on the
+  /// field is never read — the escape hatch documented for fields silently
+  /// did nothing (finding on PR #216).
+  static FieldElement? _declaringField(ClassElement element, String name) {
+    for (final field in element.fields) {
+      if (field.isStatic) continue;
+      if (field.name == name) return field;
+    }
+    return null;
+  }
+
   /// Whether [element] carries `@ZorphyDomainBool()`.
   ///
   /// An abstract getter's annotation sits on the getter element; on a real
   /// field it sits on the field. Both are checked because a fixture may
-  /// declare either shape.
-  static bool _isDomainBool(Element element) =>
-      zorphyDomainBoolChecker.hasAnnotationOf(element);
+  /// declare either shape — the getter loop asks this of the getter and of
+  /// the field behind it ([_declaringField]).
+  static bool _isDomainBool(Element? element) {
+    if (element == null) return false;
+    return zorphyDomainBoolChecker.hasAnnotationOf(element);
+  }
 
   /// A field type as source text, WITHOUT a trailing `?`.
   ///
