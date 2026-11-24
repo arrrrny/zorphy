@@ -5,7 +5,8 @@
 // `isLoading`/`hasError` has silently re-introduced the null-flag matrix that
 // `AsyncSlice<T>` removes, and an intent that carries `forceRefresh`/`silent`
 // makes two distinct commands indistinguishable on the wire. Both must be
-// rejected at generation time, with a message that names the replacement.
+// reported (and rejectable via `NoBoolFlagsLint.enforce`), with a message that
+// names the replacement.
 //
 // Coverage:
 //   - the lifecycle set on `@ZorphyState` and on `@ZorphyUnion` variants;
@@ -162,6 +163,47 @@ class \$Ready {
       expect(hits.single.nodeName, r'$Loading');
       expect(hits.single.message, contains('hasError'));
     });
+
+    test(
+      'a union member that only `implements` the root is still in scope',
+      () async {
+        // `$FailedImpl` reaches the union through `implements $AsyncStatus`,
+        // not a factory redirect, so it is not stamped `isUnion` itself. It is
+        // a real child of the union and must be checked all the same.
+        final ir = await _resolve(
+          _fixture('''
+@ZorphyUnion()
+abstract class \$AsyncStatus {
+  factory \$AsyncStatus.loading() = \$Loading;
+  factory \$AsyncStatus.ready() = \$Ready;
+}
+
+@ZorphyValue()
+class \$Loading {
+  String get value;
+}
+
+@ZorphyValue()
+class \$Ready {
+  String get value;
+}
+
+@ZorphyValue()
+class \$FailedImpl implements \$AsyncStatus {
+  bool get hasError;
+}
+'''),
+        );
+
+        final hits = _lintHits(ir);
+        expect(
+          hits.map((d) => d.nodeName),
+          contains(r'$FailedImpl'),
+          reason: 'an implements-only union member is in scope',
+        );
+        expect(hits.single.message, contains('hasError'));
+      },
+    );
   });
 
   group('ZORPHY_LINT_NO_BOOL_FLAGS — behavioral mode switches', () {
@@ -293,6 +335,50 @@ abstract class \$RefreshProducts {
     );
 
     test(
+      '`@ZorphyDomainBool()` on a REAL field (not a getter) is honoured',
+      () async {
+        // A real field surfaces as its own implicit getter, so the getter loop
+        // claims the name first; the hatch annotation lives on the FIELD. The
+        // resolver must read it there too, or an author who annotates a real
+        // field is told to annotate the thing they already annotated.
+        final ir = await _resolve(
+          _fixture('''
+@ZorphyState()
+abstract class \$UiState {
+  @ZorphyDomainBool()
+  bool hasError;
+}
+'''),
+        );
+
+        expect(
+          _lintHits(ir),
+          isEmpty,
+          reason: 'the field-form annotation is the author\'s domain claim',
+        );
+        expect(ir.hasErrors, isFalse);
+      },
+    );
+
+    test(
+      'a real lifecycle field WITHOUT the hatch is still rejected',
+      () async {
+        final ir = await _resolve(
+          _fixture('''
+@ZorphyState()
+abstract class \$UiState {
+  bool hasError;
+}
+'''),
+        );
+
+        final hits = _lintHits(ir);
+        expect(hits, hasLength(1));
+        expect(hits.single.message, contains('hasError'));
+      },
+    );
+
+    test(
       'genuine domain booleans on entities and values are not flags',
       () async {
         final ir = await _resolve(
@@ -318,6 +404,55 @@ abstract class \$UiNode {
         expect(ir.hasErrors, isFalse);
       },
     );
+  });
+
+  group('ZORPHY_LINT_NO_BOOL_FLAGS — cross-library dedupe', () {
+    test(r'two libraries each declaring `$UiState` are BOTH checked', () async {
+      // `PolymorphicIr.nodes` keys by `libraryUri#ClassName` precisely so two
+      // libraries may declare same-named classes. The walk's `visited` set must
+      // key the same way — keyed by bare `className` the first `$UiState`
+      // marks the name seen and the second library's node is dropped unexamined.
+      ZorphyNodeIr stateNode(String uri, String flagged) => ZorphyNodeIr(
+        className: r'$UiState',
+        qualifiedName: '$uri#\$UiState',
+        cleanName: 'UiState',
+        archetype: ArchetypeKind.state,
+        isSealedRoot: true,
+        isAbstractIntermediate: false,
+        isConcreteLeaf: false,
+        superTypes: const [],
+        directSubTypes: const [],
+        allConcreteLeaves: const [],
+        discriminatorKey: 'kind',
+        discriminatorValue: 'ui_state',
+        fields: [ZorphyFieldIr(name: flagged, type: 'bool')],
+      );
+
+      final ir = PolymorphicIr(
+        nodes: {
+          'a.dart#\$UiState': stateNode('a.dart', 'isLoading'),
+          'b.dart#\$UiState': stateNode('b.dart', 'hasError'),
+        },
+        roots: [
+          stateNode('a.dart', 'isLoading'),
+          stateNode('b.dart', 'hasError'),
+        ],
+        diagnostics: const [],
+      );
+
+      final messages = NoBoolFlagsLint.check(ir).map((d) => d.message).toList();
+      expect(
+        messages.join('\n'),
+        contains('isLoading'),
+        reason: 'a.dart\'s flag is reported',
+      );
+      expect(
+        messages.join('\n'),
+        contains('hasError'),
+        reason: 'b.dart\'s same-named node is NOT dropped',
+      );
+      expect(messages, hasLength(2));
+    });
   });
 
   group('NoBoolFlagsLint.enforce', () {
@@ -353,7 +488,8 @@ abstract class \$UiState {
 @ZorphyState()
 abstract class \$UiState {
   List<String> get items;
-  bool get isRefreshing;
+  @ZorphyDomainBool()
+  bool get isPinned;
 }
 '''),
       );

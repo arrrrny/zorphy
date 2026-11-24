@@ -565,7 +565,7 @@ contract, not an `@override`.
 
 The Chord no-boolean-flags rule rejects behavioral mode switches and lifecycle
 flags modelled as booleans on `@ZorphyState`, `@ZorphyIntent`, and polymorphic
-subtypes at compile time:
+subtypes:
 
 - **Lifecycle flags** on `@ZorphyState` / `@ZorphyUnion` (`isLoading`, `isFetching`,
   `isCreating`, `isUpdating`, `isDeleting`, `hasError`, `isError`) must be modelled
@@ -574,8 +574,18 @@ subtypes at compile time:
   `silent`, `noCache`, `force*`, `skip*`, `bypass*`) must be distinct polymorphic
   subtypes.
 - **Escape hatch:** `@ZorphyDomainBool()` exempts genuine domain booleans
-  (e.g., `@ZorphyDomainBool() bool get inStock;`). Genuine domain booleans on
+  (e.g., `@ZorphyDomainBool() bool get inStock;`). It is read on BOTH declaration
+  forms — an abstract getter (`bool get inStock;`) and a real field
+  (`bool inStock;`) — so annotating either shape works. Genuine domain booleans on
   `@ZorphyEntity` / `@ZorphyValue` (like `inStock`, `enabled`) are permitted by default.
+
+**Enforcement status:** the rule runs during v3 hierarchy resolution and reports
+through `PolymorphicIr.diagnostics` (so `PolymorphicIr.hasErrors` is `true` on a
+hit); `NoBoolFlagsLint.enforce(ir)` raises `InvalidGenerationSourceError` for a
+hard stop. The v3 resolver/emitter pipeline is not yet wired into the
+`build_runner` builder (which still drives the legacy `ZorphyGenerator`), so the
+rule does not yet fail a real `build_runner` run — that lands with the v3 builder
+cutover, which will call `enforce` before emitting.
 
 ## v3 trust-boundary wire codecs (3.0.0+)
 

@@ -159,6 +159,16 @@ final class ZorphyNodeIr {
   /// The declared class name, `$`/`$$` prefixes included.
   final String className;
 
+  /// The fully-qualified name (`libraryUri#ClassName`) that uniquely identifies
+  /// this node across libraries.
+  ///
+  /// [className] is only unique within one library; two libraries may each
+  /// declare `$UiState`. A walk that dedupes visited nodes MUST key on this,
+  /// not [className], or the second library's same-named node is dropped
+  /// unexamined (the collapse `PolymorphicIr.nodes` keys by qualified name to
+  /// avoid). Empty only on hand-built test nodes that never set it.
+  final String qualifiedName;
+
   /// The generated class name, prefixes stripped.
   final String cleanName;
 
@@ -239,6 +249,7 @@ final class ZorphyNodeIr {
 
   const ZorphyNodeIr({
     required this.className,
+    this.qualifiedName = '',
     required this.cleanName,
     required this.archetype,
     required this.isSealedRoot,
@@ -284,6 +295,7 @@ final class ZorphyNodeIr {
   }) {
     return ZorphyNodeIr(
       className: className,
+      qualifiedName: qualifiedName,
       cleanName: cleanName,
       archetype: archetype,
       isSealedRoot: isSealedRoot ?? this.isSealedRoot,

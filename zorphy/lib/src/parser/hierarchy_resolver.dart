@@ -285,6 +285,7 @@ final class HierarchyResolver {
     final cleanName = className.replaceAll(r'$', '');
     return ZorphyNodeIr(
       className: className,
+      qualifiedName: _qualifiedName(element),
       cleanName: cleanName,
       archetype: declaration.kind,
       isSealedRoot: false,
@@ -325,12 +326,28 @@ final class HierarchyResolver {
       final name = getter.name ?? '';
       if (name.isEmpty || !seen.add(name)) continue;
       final type = getter.returnType;
+      // A real field ALSO surfaces here as its implicit getter, so this loop
+      // claims the name first and the `element.fields` loop below — the only
+      // branch that reads the field's own annotation — would be skipped. The
+      // `@ZorphyDomainBool()` escape hatch sits on the FIELD for a real field,
+      // so resolve the declaring field and read its annotation too; otherwise
+      // an author who annotates a real field gets a generation error telling
+      // them to annotate the thing they already annotated.
+      FieldElement? declaringField;
+      for (final f in element.fields) {
+        if (!f.isStatic && f.name == name) {
+          declaringField = f;
+          break;
+        }
+      }
       fields.add(
         ZorphyFieldIr(
           name: name,
           type: _typeText(type),
           isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
-          isDomainBool: _isDomainBool(getter),
+          isDomainBool:
+              _isDomainBool(getter) ||
+              (declaringField != null && _isDomainBool(declaringField)),
         ),
       );
     }

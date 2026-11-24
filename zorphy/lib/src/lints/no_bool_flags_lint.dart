@@ -11,9 +11,20 @@
 ///   collapses two distinct commands into one node whose meaning depends on
 ///   its own payload, so a replay cannot be read off the type.
 ///
-/// Both are rejected at GENERATION time with a message naming the field and
-/// the replacement, because the alternative — emit, ship, and discover the
-/// ambiguity at runtime — is exactly the failure the rule exists to prevent.
+/// Both are reported with a message naming the field and the replacement,
+/// because the alternative — emit, ship, and discover the ambiguity at
+/// runtime — is exactly the failure the rule exists to prevent.
+///
+/// **Enforcement status (v3.0.0):** the rule runs as part of hierarchy
+/// resolution — `HierarchyResolver` appends every hit to
+/// [PolymorphicIr.diagnostics] (phase 4c) — and [enforce] raises an
+/// [InvalidGenerationSourceError] for a caller that wants a hard stop. The v3
+/// resolver/emitter pipeline is not yet wired into the `build_runner` builder
+/// (which still drives the legacy `ZorphyGenerator`), so today the rule
+/// REPORTS through `diagnostics`; it does not yet fail a real `build_runner`
+/// run. The "rejected at generation time" promise lands with the v3 builder
+/// cutover; until then a consumer reads `PolymorphicIr.hasErrors` /
+/// `diagnostics` (or calls [enforce]) to act on a hit.
 ///
 /// The escape hatch is `@ZorphyDomainBool()`: a genuine domain boolean
 /// (`Product.inStock`, `InteractiveUiNode.enabled`) is not a flag, and its
@@ -91,8 +102,16 @@ final class NoBoolFlagsLint {
     final visited = <String>{};
 
     void walk(ZorphyNodeIr node) {
-      // A node is reachable twice in a multi-root graph; report it once.
-      if (!visited.add(node.className)) return;
+      // A node is reachable twice in a multi-root graph; report it once. Key
+      // by the QUALIFIED name, not `className`: two libraries may each declare
+      // `$UiState`, and keying by the bare name drops the second library's
+      // node unexamined (the same collapse `PolymorphicIr.nodes` avoids by
+      // keying on `libraryUri#ClassName`). Fall back to `className` only for
+      // hand-built nodes that never set a qualified name.
+      final key = node.qualifiedName.isNotEmpty
+          ? node.qualifiedName
+          : node.className;
+      if (!visited.add(key)) return;
       if (_isChecked(node)) {
         for (final field in node.fields) {
           if (!field.isBool || field.isDomainBool) continue;
@@ -129,8 +148,11 @@ final class NoBoolFlagsLint {
   /// Throws an actionable [InvalidGenerationSourceError] when [ir] violates
   /// the rule, and returns normally otherwise.
   ///
-  /// The generator calls this before emitting, so a flagged hierarchy fails
-  /// generation instead of producing a node whose booleans are meaningless.
+  /// This is the hard-stop entry point for a caller that wants a flagged
+  /// hierarchy to fail generation. The v3 `build_runner` builder is not yet
+  /// wired to the resolver pipeline (see the library doc), so the production
+  /// path reports through [PolymorphicIr.diagnostics] today; [enforce] is what
+  /// the v3 builder cutover will call before emitting.
   static void enforce(PolymorphicIr ir) {
     final hits = check(ir);
     if (hits.isEmpty) return;
@@ -150,11 +172,24 @@ final class NoBoolFlagsLint {
   /// escape hatch the rule. A union hierarchy IS in scope even though
   /// `@ZorphyUnion` lowers to [ArchetypeKind.value] — the union is the
   /// replacement the rule points authors at, so its members must be clean.
-  static bool _isChecked(ZorphyNodeIr node) => switch (node.archetype) {
-    ArchetypeKind.state || ArchetypeKind.intent => true,
-    ArchetypeKind.value => node.isUnion,
-    ArchetypeKind.entity => false,
-  };
+  ///
+  /// A member that reaches the union through `implements $Root` (rather than
+  /// being a factory-redirect target) is a real child of the union but is not
+  /// itself stamped [ZorphyNodeIr.isUnion], so the ancestor chain is walked
+  /// too: a node whose `superTypes` reach a union root is in scope.
+  static bool _isChecked(ZorphyNodeIr node) {
+    if (switch (node.archetype) {
+      ArchetypeKind.state || ArchetypeKind.intent => true,
+      ArchetypeKind.value => node.isUnion,
+      ArchetypeKind.entity => false,
+    }) {
+      return true;
+    }
+    for (final superType in node.superTypes) {
+      if (superType.isUnion) return true;
+    }
+    return false;
+  }
 
   static bool _isBehavioralFlag(String name) =>
       behavioralFlags.contains(name) || behavioralPrefixes.any(name.startsWith);
