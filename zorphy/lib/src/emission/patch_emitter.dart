@@ -784,9 +784,13 @@ class PatchEmitter {
       b.statements.add(
         const Code('final ops = ZorphyPatchWire.opsOf(raw, \'\', violations);'),
       );
-      b.statements.add(
-        const Code('final prefix = ZorphyPatchWire.opsPathOf(raw);'),
-      );
+      // `prefix` only feeds the per-field read paths below; a field-less
+      // patch would carry it unused (an `unused_local_variable` warning).
+      if (fields.isNotEmpty) {
+        b.statements.add(
+          const Code('final prefix = ZorphyPatchWire.opsPathOf(raw);'),
+        );
+      }
       b.statements.add(const Code('if (ops != null) {'));
       b.statements.add(Code('  final patch = $patchCtor;'));
       for (final field in fields) {
@@ -1413,9 +1417,9 @@ class PatchEmitter {
   /// approximated.
   static bool _isGenericType(String type, List<String> genericTypeNames) {
     if (genericTypeNames.isEmpty) return false;
-    final identifiers = RegExp(
-      r'[A-Za-z_$][A-Za-z0-9_$]*',
-    ).allMatches(type).map((m) => m.group(0));
+    final identifiers = RegExp(r'[A-Za-z_$][A-Za-z0-9_$]*')
+        .allMatches(type)
+        .map((m) => m.group(0));
     return identifiers.any(genericTypeNames.contains);
   }
 

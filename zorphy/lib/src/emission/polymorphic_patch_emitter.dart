@@ -871,10 +871,12 @@ class PolymorphicPatchEmitter {
         }),
       );
 
-    final lines = <String>[
-      'final violations = <FieldViolation>[];',
-      "final ops = ZorphyPatchWire.opsOf(raw, '', violations);",
-    ];
+    final lines = <String>['final violations = <FieldViolation>[];'];
+    // `ops` is only read inside the per-field loop below; a field-less patch
+    // would carry it unused (an `unused_local_variable` analyze warning).
+    if (fields.isNotEmpty) {
+      lines.add("final ops = ZorphyPatchWire.opsOf(raw, '', violations);");
+    }
     for (final field in fields) {
       final name = _memberName(field.name);
       final declaredType = _concreteType(field.type);
