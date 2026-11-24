@@ -1,13 +1,8 @@
 dependency_overrides:
   zorphy_annotation:
     path: ../zorphy_annotation
-  # built_value 8.13.0 still pins built_collection ^5.0.0, which is the sole
-  # blocker for 6.0.0 (google/built_value.dart#1405). The widening is in
-  # google/built_value.dart#1406; until a release carries it, resolve against
-  # that branch so CI exercises the 6.0.0 graph. Development-only: pub ignores
-  # this file, so consumers still resolve whatever built_value allows.
-  built_value:
+  analyzer: ^14.0.0
+  json_serializable:
     git:
-      url: https://github.com/arrrrny/built_value.dart
-      ref: widen-built-collection-1405
-      path: built_value
+      url: https://github.com/google/json_serializable.dart
+      path: json_serializable

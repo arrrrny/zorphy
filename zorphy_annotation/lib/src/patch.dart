@@ -182,8 +182,13 @@ final class PatchSet<V> extends PatchValue<V> {
 /// ordinary [ZorphyPatch] of the nested value. Every member delegates to
 /// [patch], so a nested patch composes, inverts and renders exactly like the
 /// patch it wraps.
+///
+/// It also implements the legacy [Patch] surface, because that is the arm a
+/// generated `patchWith` resolves a carried field through: the parent patch
+/// puts one of these in its field map and the entity applies it to its own
+/// sub-value (ISSUE-008).
 final class PatchNested<Sub, SubPatch extends ZorphyPatch<Sub>>
-    implements ZorphyPatch<Sub> {
+    implements ZorphyPatch<Sub>, Patch<Sub> {
   const PatchNested(this.patch);
 
   /// The patch applied to the nested value.
@@ -198,6 +203,10 @@ final class PatchNested<Sub, SubPatch extends ZorphyPatch<Sub>>
   @override
   Sub apply(Sub target) => patch.apply(target);
 
+  /// The legacy [Patch] entry point: same behaviour as [apply].
+  @override
+  Sub applyTo(Sub entity) => apply(entity);
+
   /// Composes exactly like the wrapped patch: a [next] that is itself a
   /// [PatchNested] of the same [Sub] is unwrapped first, so a delegate
   /// narrowing [compose]'s parameter to its own patch type still receives a
@@ -209,6 +218,17 @@ final class PatchNested<Sub, SubPatch extends ZorphyPatch<Sub>>
 
   @override
   ZorphyPatch<Sub> invert(Sub before) => patch.invert(before);
+
+  /// The inverse as a nested patch of the same shape.
+  ///
+  /// The inner patch narrows its own `invert` covariantly (a generated
+  /// `<Sub>Patch` returns a `<Sub>Patch`), but [PatchNested] cannot require
+  /// that of an arbitrary [SubPatch], so the inverse is carried as a
+  /// [ZorphyPatch] of [Sub]. It stays a [PatchNested] — and therefore still
+  /// resolves through the legacy [Patch] arm — whatever the inner patch
+  /// returns.
+  PatchNested<Sub, ZorphyPatch<Sub>> invertNested(Sub before) =>
+      PatchNested<Sub, ZorphyPatch<Sub>>(patch.invert(before));
 
   @override
   Map<String, Object?> toWire() => patch.toWire();
@@ -452,4 +472,286 @@ final class MapRemove<K, V> extends MapPatchOp<K, V> {
 
   @override
   String toString() => 'MapPatchOp<$K, $V>.remove($key)';
+}
+/// An ordered sequence of [ListPatchOp] steps — the collection-delta half of
+/// the patch algebra (ISSUE-008).
+///
+/// A list field is patched operationally rather than by whole-value
+/// assignment, so a burst of small edits stays cheap and readable on the wire.
+/// The delta implements the same algebra the generated `<Name>Patch` classes
+/// do, which makes it composable with them and — through the legacy [Patch]
+/// surface — applicable by a generated `patchWith` exactly like a patch.
+///
+/// ## Laws
+///
+/// - **Minimal diff.** [diff] carries no op for two content-equal lists, and an
+///   append tail, a removal tail and an in-place edit each become the single
+///   [ListPatchOp] that expresses them.
+/// - **No mutation.** [apply] folds the ops in order and returns a fresh list.
+/// - **Composition.** [compose] concatenates, so
+///   `(a.compose(b)).apply(x) == b.apply(a.apply(x))`.
+/// - **Invert round-trip.** `d.invert(x).apply(d.apply(x)) == x`.
+final class ListPatchDelta<E> implements ZorphyPatch<List<E>>, Patch<List<E>> {
+  /// Creates a delta over [ops], applied in order.
+  const ListPatchDelta(this.ops);
+
+  /// The empty delta: no operation, no change.
+  ///
+  /// Not `const`: a type variable may not appear in a const expression, and
+  /// the canonical empty ops list is what makes this allocation-free anyway.
+  ListPatchDelta.empty() : ops = const <ListPatchOp<Never>>[];
+
+  /// The steps this delta applies, in order.
+  final List<ListPatchOp<E>> ops;
+
+  /// The smallest delta that turns [previous] into [next].
+  ///
+  /// Identical and content-equal lists carry no op. A changed tail is an
+  /// append (per added item) or a removal (per removed item, from the end);
+  /// a same-length list with changed positions is one updateAt per position.
+  /// A structural change between unchanged neighbours falls back to a single
+  /// replaceAll — the op vocabulary has no insertion, so nothing finer is
+  /// expressible.
+  ///
+  /// A static member cannot see the class's type variables, so `diff` declares
+  /// its own — the caller supplies them from the two lists it passes in. This
+  /// matches the generic `<Name>Patch.diff` shape (ISSUE-007).
+  static ListPatchDelta<E> diff<E>(List<E> previous, List<E> next) {
+    // Type variables are never const-eligible, so the empty delta is built
+    // rather than `const`; its `ops` list is the canonical const one.
+    final empty = ListPatchDelta<E>.empty();
+    if (identical(previous, next)) return empty;
+    if (previous.length == next.length &&
+        _listEquality.equals(previous, next)) {
+      return empty;
+    }
+
+    final shortest = previous.length < next.length
+        ? previous.length
+        : next.length;
+    var prefix = 0;
+    while (prefix < shortest && previous[prefix] == next[prefix]) {
+      prefix++;
+    }
+
+    // Pure append: every previous item survives at the same position.
+    if (prefix == previous.length && next.length > previous.length) {
+      return ListPatchDelta<E>(<ListPatchOp<E>>[
+        for (var i = prefix; i < next.length; i++)
+          ListPatchOp<E>.append(next[i]),
+      ]);
+    }
+
+    // Pure removal of the tail: drop from the end so every index stays valid.
+    if (prefix == next.length && previous.length > next.length) {
+      return ListPatchDelta<E>(<ListPatchOp<E>>[
+        for (var i = previous.length - 1; i >= next.length; i--)
+          ListPatchOp<E>.removeAt(i),
+      ]);
+    }
+
+    // Same shape: a positional edit per changed position.
+    if (previous.length == next.length) {
+      final ops = <ListPatchOp<E>>[];
+      for (var i = 0; i < next.length; i++) {
+        if (previous[i] != next[i])
+          ops.add(ListPatchOp<E>.updateAt(i, next[i]));
+      }
+      return ops.isEmpty ? empty : ListPatchDelta<E>(ops);
+    }
+
+    return ListPatchDelta<E>(<ListPatchOp<E>>[
+      ListPatchOp<E>.replaceAll(List<E>.of(next)),
+    ]);
+  }
+
+  @override
+  bool get isEmpty => ops.isEmpty;
+
+  @override
+  bool get isNotEmpty => ops.isNotEmpty;
+
+  @override
+  List<E> apply(List<E> target) {
+    if (isEmpty) return target;
+    var result = target;
+    for (final op in ops) {
+      result = op.apply(result);
+    }
+    return result;
+  }
+
+  /// The legacy [Patch] entry point: same behaviour as [apply].
+  @override
+  List<E> applyTo(List<E> entity) => apply(entity);
+
+  @override
+  ListPatchDelta<E> compose(covariant ListPatchDelta<E> next) {
+    if (next.isEmpty) return this;
+    if (isEmpty) return next;
+    return ListPatchDelta<E>(<ListPatchOp<E>>[...ops, ...next.ops]);
+  }
+
+  /// The delta that restores [before].
+  ///
+  /// The ops are positional, so a positional inverse would have to replay
+  /// intermediate list states this delta does not carry. Restoring the prior
+  /// list wholesale is the one shape that is correct for every composition,
+  /// which is why the inverse is a single replaceAll rather than the mirror of
+  /// each step.
+  @override
+  ListPatchDelta<E> invert(List<E> before) {
+    if (isEmpty) return ListPatchDelta<E>.empty();
+    return ListPatchDelta<E>(<ListPatchOp<E>>[
+      ListPatchOp<E>.replaceAll(List<E>.of(before)),
+    ]);
+  }
+
+  @override
+  Map<String, Object?> toWire() => <String, Object?>{
+    'ops': <Object?>[
+      for (final op in ops)
+        switch (op) {
+          ListReplaceAll<E>(:final items) => <String, Object?>{
+            'op': 'replaceAll',
+            'items': items,
+          },
+          ListAppend<E>(:final item) => <String, Object?>{
+            'op': 'append',
+            'item': item,
+          },
+          ListRemoveAt<E>(:final index) => <String, Object?>{
+            'op': 'removeAt',
+            'index': index,
+          },
+          ListUpdateAt<E>(:final index, :final item) => <String, Object?>{
+            'op': 'updateAt',
+            'index': index,
+            'item': item,
+          },
+        },
+    ],
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ListPatchDelta<E> && _listEquality.equals(other.ops, ops);
+
+  @override
+  int get hashCode => Object.hashAll(ops);
+
+  @override
+  String toString() => 'ListPatchDelta<$E>($ops)';
+}
+
+/// An ordered sequence of [MapPatchOp] steps — the key-keyed counterpart of
+/// [ListPatchDelta].
+///
+/// Same algebra and the same laws: [diff] is minimal (one put per added or
+/// changed key, one remove per dropped key, none for an unchanged map),
+/// [apply] never mutates, [compose] concatenates and [invert] round-trips.
+final class MapPatchDelta<K, V>
+    implements ZorphyPatch<Map<K, V>>, Patch<Map<K, V>> {
+  /// Creates a delta over [ops], applied in order.
+  const MapPatchDelta(this.ops);
+
+  /// The empty delta: no operation, no change.
+  ///
+  /// Not `const`, for the same reason as [ListPatchDelta.empty].
+  MapPatchDelta.empty() : ops = const <MapPatchOp<Never, Never>>[];
+
+  /// The steps this delta applies, in order.
+  final List<MapPatchOp<K, V>> ops;
+
+  /// The smallest delta that turns [previous] into [next].
+  ///
+  /// Puts are emitted in [next]'s key order and removals in [previous]'s, so
+  /// the same pair always yields the same delta.
+  /// As in [ListPatchDelta.diff], the static declares its own type parameters.
+  static MapPatchDelta<K, V> diff<K, V>(Map<K, V> previous, Map<K, V> next) {
+    final empty = MapPatchDelta<K, V>.empty();
+    if (identical(previous, next)) return empty;
+    final ops = <MapPatchOp<K, V>>[];
+    for (final entry in next.entries) {
+      if (!previous.containsKey(entry.key) ||
+          previous[entry.key] != entry.value) {
+        ops.add(MapPatchOp<K, V>.put(entry.key, entry.value));
+      }
+    }
+    for (final key in previous.keys) {
+      if (!next.containsKey(key)) ops.add(MapPatchOp<K, V>.remove(key));
+    }
+    return ops.isEmpty ? empty : MapPatchDelta<K, V>(ops);
+  }
+
+  @override
+  bool get isEmpty => ops.isEmpty;
+
+  @override
+  bool get isNotEmpty => ops.isNotEmpty;
+
+  @override
+  Map<K, V> apply(Map<K, V> target) {
+    if (isEmpty) return target;
+    var result = target;
+    for (final op in ops) {
+      result = op.apply(result);
+    }
+    return result;
+  }
+
+  /// The legacy [Patch] entry point: same behaviour as [apply].
+  @override
+  Map<K, V> applyTo(Map<K, V> entity) => apply(entity);
+
+  @override
+  MapPatchDelta<K, V> compose(covariant MapPatchDelta<K, V> next) {
+    if (next.isEmpty) return this;
+    if (isEmpty) return next;
+    return MapPatchDelta<K, V>(<MapPatchOp<K, V>>[...ops, ...next.ops]);
+  }
+
+  /// The delta that restores [before] — a single replaceAll, for the same
+  /// reason [ListPatchDelta.invert] is: positional history is not carried.
+  @override
+  MapPatchDelta<K, V> invert(Map<K, V> before) {
+    if (isEmpty) return MapPatchDelta<K, V>.empty();
+    return MapPatchDelta<K, V>(<MapPatchOp<K, V>>[
+      MapPatchOp<K, V>.replaceAll(Map<K, V>.of(before)),
+    ]);
+  }
+
+  @override
+  Map<String, Object?> toWire() => <String, Object?>{
+    'ops': <Object?>[
+      for (final op in ops)
+        switch (op) {
+          MapReplaceAll<K, V>(:final entries) => <String, Object?>{
+            'op': 'replaceAll',
+            'entries': entries,
+          },
+          MapPut<K, V>(:final key, :final value) => <String, Object?>{
+            'op': 'put',
+            'key': key,
+            'value': value,
+          },
+          MapRemove<K, V>(:final key) => <String, Object?>{
+            'op': 'remove',
+            'key': key,
+          },
+        },
+    ],
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MapPatchDelta<K, V> && _listEquality.equals(other.ops, ops);
+
+  @override
+  int get hashCode => Object.hashAll(ops);
+
+  @override
+  String toString() => 'MapPatchDelta<$K, $V>($ops)';
 }
