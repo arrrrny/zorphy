@@ -504,9 +504,7 @@ class PatchEmitter {
             );
           case _FieldShapeKind.list when shape.isNullable:
             b.statements.add(
-              Code(
-                'if (previous.$member != null && next.$member != null) {',
-              ),
+              Code('if (previous.$member != null && next.$member != null) {'),
             );
             b.statements.add(
               Code(
@@ -523,9 +521,7 @@ class PatchEmitter {
             );
             b.statements.add(const Code('}'));
             b.statements.add(
-              Code(
-                'if (previous.$member == null || next.$member == null) {',
-              ),
+              Code('if (previous.$member == null || next.$member == null) {'),
             );
             b.statements.add(
               Code(
@@ -550,9 +546,7 @@ class PatchEmitter {
             );
           case _FieldShapeKind.map when shape.isNullable:
             b.statements.add(
-              Code(
-                'if (previous.$member != null && next.$member != null) {',
-              ),
+              Code('if (previous.$member != null && next.$member != null) {'),
             );
             b.statements.add(
               Code(
@@ -568,9 +562,7 @@ class PatchEmitter {
             );
             b.statements.add(const Code('}'));
             b.statements.add(
-              Code(
-                'if (previous.$member == null || next.$member == null) {',
-              ),
+              Code('if (previous.$member == null || next.$member == null) {'),
             );
             b.statements.add(
               Code(

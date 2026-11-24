@@ -151,10 +151,7 @@ void main() {
         const Address(street: 'Elm', city: 'Ogdenville'),
       );
       final patched = patch.apply(before);
-      expect(
-        patched.address,
-        const Address(street: 'Elm', city: 'Ogdenville'),
-      );
+      expect(patched.address, const Address(street: 'Elm', city: 'Ogdenville'));
       expect(
         patch.invert(before).apply(patched).address,
         originalAddress,
@@ -267,25 +264,28 @@ void main() {
       });
     });
 
-    test('a nested change renders the sub-patch on the wire, not an object', () {
-      final previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: const Address(street: 'Main', city: 'Springfield'),
-        tags: const [],
-        scores: const {},
-      );
-      final wire = ProfilePatch.diff(
-        previous,
-        previous.copyWith(
-          address: const Address(street: 'Elm', city: 'Springfield'),
-        ),
-      ).toWire();
+    test(
+      'a nested change renders the sub-patch on the wire, not an object',
+      () {
+        final previous = Profile(
+          id: 'p1',
+          displayName: 'ada',
+          address: const Address(street: 'Main', city: 'Springfield'),
+          tags: const [],
+          scores: const {},
+        );
+        final wire = ProfilePatch.diff(
+          previous,
+          previous.copyWith(
+            address: const Address(street: 'Elm', city: 'Springfield'),
+          ),
+        ).toWire();
 
-      // A nested field unwraps to its inner toWire map — plain JSON, never a
-      // live PatchNested object.
-      expect(wire['address'], <String, Object?>{'street': 'Elm'});
-    });
+        // A nested field unwraps to its inner toWire map — plain JSON, never a
+        // live PatchNested object.
+        expect(wire['address'], <String, Object?>{'street': 'Elm'});
+      },
+    );
   });
 
   group('round-trip and composition', () {
