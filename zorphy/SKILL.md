@@ -336,6 +336,72 @@ final patch = UserPatch.create()
 final patched = user.patchWithUser(patchInput: patch);
 ```
 
+### Patch Algebra (v3 primitives)
+
+`package:zorphy_annotation/zorphy_annotation.dart` also exports the v3 patch
+algebra these generated patches will be rebuilt on. It is purely additive — the
+`UserPatch.create()` surface above is untouched and is still what the generator
+emits today.
+
+`ZorphyPatch<T>` is the contract every patch implements: `isEmpty` /
+`isNotEmpty`, `apply`, `compose`, `invert`, `toWire`. An EMPTY patch must be a
+zero-copy no-op — `apply` returns the target itself, not a copy.
+
+```dart
+abstract interface class ZorphyPatch<T> {
+  bool get isEmpty;
+  bool get isNotEmpty;
+  T apply(T target);                      // never mutates target
+  ZorphyPatch<T> compose(covariant ZorphyPatch<T> next);
+  ZorphyPatch<T> invert(T before);        // undo THIS patch, knowing the prior value
+  Map<String, Object?> toWire();
+}
+```
+
+Laws the interface promises, and what to test against:
+
+- empty-patch identity — `empty.apply(x)` is `identical` to `x`;
+- composition order — `compose(next).apply(x) == next.apply(apply(x))`;
+- `compose` is associative;
+- `invert` round-trip — `p.invert(x).apply(p.apply(x)) == x`.
+
+`PatchValue<V>` is one field's contribution: `PatchUnchanged` (leave the field
+alone) or `PatchSet` (set it — `null` is a legal value, so `isSet` is what
+distinguishes it from unchanged, not `valueOrNull == null`).
+
+```dart
+patch.name.fold(
+  () => print('name untouched'),
+  (value) => print('name set to $value'),
+);
+```
+
+`PatchNested<Sub, SubPatch extends ZorphyPatch<Sub>>` wraps a nested patch so a
+parent field can declare a precise nested patch type while still behaving like
+a plain `ZorphyPatch<Sub>`: every member delegates, and `compose` unwraps a
+matching `PatchNested` before delegating, so a delegate narrowing `compose` to
+its own type never receives the wrapper.
+
+`ListPatchOp<E>` / `MapPatchOp<K, V>` are sealed per-field edit operations —
+switch over them exhaustively. Every variant returns a FRESH collection and
+never mutates the input.
+
+```dart
+const ListPatchOp<int> a = ListPatchOp.replaceAll([1, 2, 3]);
+const ListPatchOp<int> b = ListPatchOp.append(4);
+const ListPatchOp<int> c = ListPatchOp.removeAt(0);   // RangeError when out of range
+const ListPatchOp<int> d = ListPatchOp.updateAt(0, 9); // RangeError when out of range
+
+const MapPatchOp<String, int> m = MapPatchOp.replaceAll({'a': 1});
+const MapPatchOp<String, int> p = MapPatchOp.put('a', 2);  // put IS the update
+const MapPatchOp<String, int> r = MapPatchOp.remove('a');  // no-op when absent
+```
+
+Equality is exact-type across all of these: `PatchSet<int>(1)` and
+`PatchSet<num>(1)` are never equal in either direction, and `MapReplaceAll`
+hashes order-independently so it stays consistent with its order-independent
+`==`.
+
 ### Multiple Inheritance
 
 ```dart
