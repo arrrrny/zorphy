@@ -35,7 +35,11 @@ library;
 
 import 'package:code_builder/code_builder.dart';
 
+import '../ast/spec_mapper.dart';
 import '../ast/type_ref.dart';
+import '../analysis/class_analyzer.dart';
+import '../common/NameType.dart';
+import '../common/classes.dart';
 import '../helpers.dart' as helpers;
 import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
@@ -53,7 +57,42 @@ final class MorphingEmitter implements HierarchyEmitter {
     // The base declares the closed set; a subtype inherits it. Morphing is
     // emitted on the SUBTYPE side only — the base has no sibling to become.
     if (metadata.explicitSubtypes.isNotEmpty) return false;
-    return metadata.polymorphicSubtypes.isNotEmpty;
+    if (metadata.polymorphicSubtypes.isEmpty) return false;
+    // Name-collision gate: `ChangeToExtensionGenerator` emits the SAME
+    // `changeTo<Target>` method names (as a JSON round-trip) on the base
+    // whenever the whole hierarchy has a JSON surface. Two `changeTo<Target>`
+    // extensions on the same source class make the call ambiguous
+    // (`ambiguous_extension_member_access`) — so when the JSON generator already
+    // covers this hierarchy, sibling morphing stands down (review finding on
+    // morphing_emitter.dart:170).
+    if (_jsonChangeToCovers(metadata, config)) return false;
+    return true;
+  }
+
+  /// Whether `ChangeToExtensionGenerator` already emits a `changeTo<Target>`
+  /// extension for [metadata]'s hierarchy — i.e. the JSON round-trip surface
+  /// exists, so the direct-construction morphing below would collide by name.
+  ///
+  /// The JSON generator runs on the BASE (a class that declares subtypes) and
+  /// covers it exactly when `generateJson` is on and every declared subtype
+  /// generates JSON (`ChangeToExtensionGenerator._jsonSurfaceExists`); a `sealed`
+  /// base needs no extra base case. This subtype stands down when its hierarchy's
+  /// base would emit that extension, which is the same predicate evaluated from
+  /// the subtype's inherited view.
+  bool _jsonChangeToCovers(ClassMetadata metadata, GenerationConfig config) {
+    if (!config.generateJson) return false;
+    // The source must itself be a JSON subtype of the base — the base's
+    // `changeTo<Target>` is emitted on the base and inherited by every subtype,
+    // so a source that does not generate JSON is not covered by it.
+    if (!metadata.isInParentExplicitSubtypes) return false;
+    // Every sibling the base's switch dispatches to must generate JSON too, or
+    // the base's `_jsonSurfaceExists` fails and no JSON `changeTo` is emitted.
+    for (final sibling in metadata.polymorphicSubtypes) {
+      final element = metadata.allAnnotatedClasses[sibling.interfaceName];
+      if (element == null) return false;
+      if (!ClassAnalyzer.generatesJson(element)) return false;
+    }
+    return true;
   }
 
   @override
@@ -74,9 +113,11 @@ final class MorphingEmitter implements HierarchyEmitter {
         // A generic hierarchy must carry its type parameters onto the
         // extension: without them `SliceData<T>` collapses to `SliceData` and
         // the body's `T` is undefined (finding: `changeToSliceData({required
-        // T value})` in a non-generic extension).
+        // T value})` in a non-generic extension). The bound rides along too —
+        // `mapGenericParameter` keeps `<T extends Comparable<T>>` well-bounded,
+        // the same mapping `ClassDeclarationGenerator` uses.
         for (final generic in metadata.generics) {
-          e.types.add(refer(generic.name));
+          e.types.add(mapGenericParameter(generic));
         }
         e.on = referType('${metadata.cleanName}${genericArgs(metadata)}');
         e.methods.addAll(methods);
@@ -91,7 +132,7 @@ final class MorphingEmitter implements HierarchyEmitter {
   /// inherited closed set on every subtype ([ClassAnalyzer] resolves it), so
   /// both halves of a hierarchy read the same sibling list without the
   /// emitter walking supertypes again.
-  List<dynamic> _siblings(ClassMetadata metadata) {
+  List<Interface> _siblings(ClassMetadata metadata) {
     final ownName = metadata.cleanName;
     return [
       for (final subtype in metadata.polymorphicSubtypes)
@@ -108,7 +149,7 @@ final class MorphingEmitter implements HierarchyEmitter {
   /// surface (#159).
   Method? _morphingMethod({
     required ClassMetadata metadata,
-    required dynamic target,
+    required Interface target,
   }) {
     final targetClassName = target.interfaceName.replaceAll(r'$', '');
     final targetTypeName = '$targetClassName${genericArgs(metadata)}';
@@ -119,9 +160,12 @@ final class MorphingEmitter implements HierarchyEmitter {
     final arguments = <String, Expression>{};
 
     for (final field in targetFields) {
-      final name = field.name as String;
-      final type = helpers.replaceDollarTypesWithConcrete(field.type as String);
-      final isNullable = _isNullable(type);
+      final name = field.name;
+      final type = helpers.replaceDollarTypesWithConcrete(field.type ?? '');
+      // A `T?` field is nullable; `dynamic` is NOT — it is required unless the
+      // source supplies it (review finding on morphing_emitter.dart:167). The
+      // `?? this.x` fallback below is value-level and only fires for a `T?`.
+      final isOptional = _isNullable(type);
       final sourceType = sourceFieldsByName[name]?.type;
 
       if (sourceType != null) {
@@ -137,11 +181,11 @@ final class MorphingEmitter implements HierarchyEmitter {
         final sourceIsNullable = _isNullable(
           helpers.replaceDollarTypesWithConcrete(sourceType),
         );
-        if (!isNullable && sourceIsNullable) {
+        if (!isOptional && sourceIsNullable) {
           // The target demands a value the receiver may not have.
           parameters.add(_parameter(name, type, required: true));
           arguments[name] = refer(name);
-        } else if (isNullable) {
+        } else if (isOptional) {
           parameters.add(_parameter(name, type));
           arguments[name] = refer(
             name,
@@ -152,16 +196,21 @@ final class MorphingEmitter implements HierarchyEmitter {
         continue;
       }
 
-      // The target's own field: the caller supplies it.
-      parameters.add(_parameter(name, type, required: !isNullable));
+      // The target's own field: the caller supplies it. `dynamic` is required
+      // (no `?`), so `required: !isOptional` asks the caller for it.
+      parameters.add(_parameter(name, type, required: !isOptional));
       arguments[name] = refer(name);
     }
 
     // Last word: every non-nullable target field must have an argument,
-    // otherwise the emitted constructor call cannot compile.
+    // otherwise the emitted constructor call cannot compile. Only a `T?` field
+    // is nullable — `dynamic` is required (review finding on
+    // morphing_emitter.dart:167), so a `dynamic` target field the source does
+    // not supply withholds the method rather than emitting a call that omits a
+    // required argument.
     for (final field in targetFields) {
       if (arguments.containsKey(field.name)) continue;
-      final type = helpers.replaceDollarTypesWithConcrete(field.type as String);
+      final type = helpers.replaceDollarTypesWithConcrete(field.type ?? '');
       if (_isNullable(type)) continue;
       return null;
     }
@@ -178,12 +227,12 @@ final class MorphingEmitter implements HierarchyEmitter {
 
   /// [target]'s fields that carry a usable type, first occurrence winning so
   /// a field repeated by the interface list is not emitted twice.
-  List<dynamic> _distinctTypedFields(dynamic target) {
+  List<NameType> _distinctTypedFields(Interface target) {
     final seen = <String>{};
     return [
       for (final field in target.fields)
-        if (field.type != null && (field.type as String).isNotEmpty)
-          if (seen.add(field.name as String)) field,
+        if (field.type != null && field.type!.isNotEmpty)
+          if (seen.add(field.name)) field,
     ];
   }
 
@@ -192,11 +241,15 @@ final class MorphingEmitter implements HierarchyEmitter {
       ? ''
       : '<${metadata.generics.map((g) => g.name).join(', ')}>';
 
-  static bool _isNullable(String type) =>
-      type.endsWith('?') ||
-      type == 'dynamic' ||
-      type.startsWith('dynamic<') ||
-      type.startsWith('dynamic ');
+  /// Whether [type] is a `T?` nullable — the "the caller MAY omit it" test.
+  ///
+  /// `dynamic` is deliberately NOT nullable here: it accepts `null` as a value
+  /// but is not a `T?` optional, so a `dynamic` target field is required unless
+  /// the source supplies it (review finding on morphing_emitter.dart:167). The
+  /// fail-closed guard below keys requiredness off this same test, so a `dynamic`
+  /// target field the source does not supply withholds the method rather than
+  /// emitting a constructor call that omits a required argument.
+  static bool _isNullable(String type) => type.endsWith('?');
 
   static Parameter _parameter(
     String name,

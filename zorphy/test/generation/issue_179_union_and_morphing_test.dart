@@ -136,6 +136,97 @@ abstract class \$SliceData<T> implements \$\$AsyncSlice<T> {
 abstract class \$SliceLoading<T> implements \$\$AsyncSlice<T> {}
 ''';
 
+/// A bounded generic hierarchy: `T extends num`.
+///
+/// The extension's type parameter must carry the bound, or the emitted
+/// `on Box<T>` is not well-bounded and fails `dart analyze` with
+/// `type_argument_not_matching_bounds` (review finding on
+/// morphing_emitter.dart:81 and polymorphic_class_emitter.dart:73). The matcher
+/// is withheld on a generic root, so the bound is exercised through the morphing
+/// extension, whose `T` is the type parameter under test. A non-self-referential
+/// bound (`num`, not `Comparable<T>`) is used so this isolates the extension
+/// bound: a self-referential bound trips a separate, pre-existing
+/// class-declaration defect that is out of scope here.
+const _boundedGenericSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'bounded.zorphy.dart';
+
+@Zorphy(explicitSubTypes: [\$Box, \$Crate])
+abstract class \$\$Container<T extends num> {
+  String get id;
+}
+
+@Zorphy()
+abstract class \$Box<T extends num> implements \$\$Container<T> {
+  T get value;
+}
+
+@Zorphy()
+abstract class \$Crate<T extends num> implements \$\$Container<T> {
+  T get payload;
+}
+''';
+
+/// A sibling whose target has a `dynamic` field the source cannot supply.
+///
+/// The `dynamic` field is required (no `?`), so the morphing method must ask
+/// for it — it must not be silently dropped as if it were `T?` (review finding
+/// on morphing_emitter.dart:167). The method is emitted with a `required`
+/// `dynamic` parameter rather than withheld.
+const _dynamicFieldSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'dynamic_field.zorphy.dart';
+
+@Zorphy(explicitSubTypes: [\$Source, \$Target])
+abstract class \$Base {
+  String get id;
+}
+
+@Zorphy()
+abstract class \$Source implements \$Base {
+  String get own;
+}
+
+@Zorphy()
+abstract class \$Target implements \$Base {
+  dynamic get payload;
+}
+''';
+
+/// A sibling hierarchy where every class turns JSON on.
+///
+/// With JSON on, `ChangeToExtensionGenerator` already emits `changeTo<Target>`
+/// (the JSON round-trip) on the base, so the direct-construction morphing of
+/// `MorphingEmitter` would declare a second `changeTo<Target>` on the same
+/// source class — an `ambiguous_extension_member_access` at the call site
+/// (review finding on morphing_emitter.dart:170). The morphing emitter must
+/// stand down when the JSON generator covers the hierarchy.
+const _jsonCollisionSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'json_collision.zorphy.dart';
+
+@Zorphy(
+  explicitSubTypes: [\$JsonOrder, \$JsonDrop],
+  generateJson: true,
+)
+abstract class \$JsonNotification {
+  String get id;
+}
+
+@Zorphy(generateJson: true)
+abstract class \$JsonOrder implements \$JsonNotification {
+  String get orderId;
+}
+
+@Zorphy(generateJson: true)
+abstract class \$JsonDrop implements \$JsonNotification {
+  String get productId;
+}
+''';
+
 /// Resolves every `@Zorphy` class in [libraryPath] and returns the generated
 /// part bodies keyed by class name.
 Future<Map<String, String>> _generateLibrary(String libraryPath) async {
@@ -448,32 +539,196 @@ void main() {
       if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
     });
 
-    // The emitter's own contract on a generic hierarchy. Whether the emitted
-    // subclass declarations make the ROOT's switch exhaustive is a separate,
-    // pre-existing defect: `ClassDeclarationGenerator` drops the type
-    // arguments on `implements` (`class SliceData<T> implements AsyncSlice`),
-    // so a generic subtype implements `AsyncSlice<dynamic>` and no matcher
-    // over `AsyncSlice<T>` can be exhaustive. Reported on the PR, not fixed
-    // here — the issue's literal ask is the non-generic §2 shape.
-    test('the matcher does not shadow the class type parameter', () {
-      // `when<T>` inside `on AsyncSlice<T>` would rebind every `T` in the
-      // extension and break the arms; the return type parameter must differ.
-      expect(root, contains('when<TResult>('));
-      expect(root, contains('maybeWhen<TResult>('));
-      expect(root, isNot(contains('when<T>(')));
+    // A generic sealed root now WITHHOLDS `when`/`maybeWhen` (review finding on
+    // polymorphic_class_emitter.dart:184): `ClassDeclarationGenerator` emits
+    // `implements` without type arguments, so a generic subtype implements
+    // `AsyncSlice<dynamic>` and no matcher over `AsyncSlice<T>` can be
+    // exhaustive. The emitter fails closed and keeps only the `isX`/`asX`
+    // helpers for a generic hierarchy.
+    test('a generic sealed root withholds the when/maybeWhen matcher', () {
+      expect(
+        root,
+        isNot(contains('when<')),
+        reason:
+            'a generic root cannot host an exhaustive switch; the matcher is '
+            'withheld rather than emitted non-exhaustively',
+      );
+      expect(root, isNot(contains('maybeWhen')));
     });
 
-    test('the extension and every arm keep the class type arguments', () {
-      expect(root, contains('on AsyncSlice<T>'));
-      expect(root, contains('required TResult Function(SliceData<T>)'));
-      expect(root, contains('SliceLoading<T> value =>'));
-    });
-
-    test('morphing on a generic sibling is generic too', () {
+    test('morphing on a generic sibling keeps the class type arguments', () {
       expect(loading, contains('extension SliceLoadingMorphing<T>'));
       expect(loading, contains('on SliceLoading<T>'));
       expect(loading, contains('SliceData<T> changeToSliceData('));
       expect(loading, contains('SliceData<T>('));
+    });
+  });
+
+  group('issue #179 — generic bound is preserved on the extension', () {
+    late Directory fixtureDir;
+    late String libraryPath;
+    late Map<String, String> outputs;
+    late List<String> diagnostics;
+    late String box;
+
+    setUpAll(() async {
+      final rootDir = Directory('test/.issue_179_bounded_tmp').absolute.path;
+      fixtureDir = Directory(rootDir)..createSync(recursive: true);
+      fixtureDir = fixtureDir.createTempSync('fixture_');
+
+      libraryPath = '${fixtureDir.path}/bounded.dart';
+      File(libraryPath).writeAsStringSync(_boundedGenericSource);
+
+      outputs = await _generateLibrary(libraryPath);
+      _writePart(
+        fixtureDir,
+        'bounded.dart',
+        'bounded.zorphy.dart',
+        outputs.values.join('\n\n'),
+      );
+
+      diagnostics = await _diagnostics(fixtureDir, libraryPath);
+      box = outputs.entries.firstWhere((e) => e.key == r'$Box').value;
+    });
+
+    tearDownAll(() {
+      if (fixtureDir.existsSync()) fixtureDir.deleteSync(recursive: true);
+      final tmp = Directory('test/.issue_179_bounded_tmp');
+      if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
+    });
+
+    test('the morphing extension carries the bound', () {
+      expect(
+        box,
+        contains('extension BoxMorphing<T extends num>'),
+        reason: 'a bounded class generic must keep its bound on the extension',
+      );
+      expect(box, contains('on Box<T>'));
+    });
+
+    test('bounded hierarchy analyzes with no bound diagnostics', () {
+      expect(
+        diagnostics.where(
+          (d) =>
+              d.contains('type_argument_not_matching_bounds') ||
+              d.contains('non_exhaustive_switch_expression'),
+        ),
+        isEmpty,
+        reason:
+            'the emitted part must be well-bounded. diagnostics:\n'
+            '${diagnostics.join('\n')}',
+      );
+    });
+  });
+
+  group('issue #179 — dynamic target field stays required', () {
+    late Directory fixtureDir;
+    late String libraryPath;
+    late Map<String, String> outputs;
+    late List<String> diagnostics;
+    late String source;
+
+    setUpAll(() async {
+      final rootDir = Directory('test/.issue_179_dynamic_tmp').absolute.path;
+      fixtureDir = Directory(rootDir)..createSync(recursive: true);
+      fixtureDir = fixtureDir.createTempSync('fixture_');
+
+      libraryPath = '${fixtureDir.path}/dynamic_field.dart';
+      File(libraryPath).writeAsStringSync(_dynamicFieldSource);
+
+      outputs = await _generateLibrary(libraryPath);
+      _writePart(
+        fixtureDir,
+        'dynamic_field.dart',
+        'dynamic_field.zorphy.dart',
+        outputs.values.join('\n\n'),
+      );
+
+      diagnostics = await _diagnostics(fixtureDir, libraryPath);
+      source = outputs.entries.firstWhere((e) => e.key == r'$Source').value;
+    });
+
+    tearDownAll(() {
+      if (fixtureDir.existsSync()) fixtureDir.deleteSync(recursive: true);
+      final tmp = Directory('test/.issue_179_dynamic_tmp');
+      if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
+    });
+
+    test('a dynamic target field the source cannot supply is required', () {
+      expect(
+        source,
+        contains('required dynamic payload'),
+        reason:
+            'a dynamic target field is not a T? optional — it must be asked '
+            'for, not silently dropped',
+      );
+      expect(source, contains('changeToTarget('));
+    });
+
+    test('dynamic-field hierarchy analyzes cleanly', () {
+      expect(
+        diagnostics.where(_isMissingMember),
+        isEmpty,
+        reason:
+            'the morphing body must compile. diagnostics:\n'
+            '${diagnostics.join('\n')}',
+      );
+    });
+  });
+
+  group('issue #179 — morphing stands down when JSON changeTo covers it', () {
+    late Directory fixtureDir;
+    late String libraryPath;
+    late Map<String, String> outputs;
+    late List<String> diagnostics;
+    late String order;
+
+    setUpAll(() async {
+      final rootDir = Directory('test/.issue_179_collision_tmp').absolute.path;
+      fixtureDir = Directory(rootDir)..createSync(recursive: true);
+      fixtureDir = fixtureDir.createTempSync('fixture_');
+
+      libraryPath = '${fixtureDir.path}/json_collision.dart';
+      File(libraryPath).writeAsStringSync(_jsonCollisionSource);
+
+      outputs = await _generateLibrary(libraryPath);
+      _writePart(
+        fixtureDir,
+        'json_collision.dart',
+        'json_collision.zorphy.dart',
+        outputs.values.join('\n\n'),
+      );
+
+      diagnostics = await _diagnostics(fixtureDir, libraryPath);
+      order = outputs.entries
+          .firstWhere((e) => e.key == r'$JsonOrder')
+          .value;
+    });
+
+    tearDownAll(() {
+      if (fixtureDir.existsSync()) fixtureDir.deleteSync(recursive: true);
+      final tmp = Directory('test/.issue_179_collision_tmp');
+      if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
+    });
+
+    test('the direct-construction morphing extension is not emitted', () {
+      expect(
+        order,
+        isNot(contains('JsonOrderMorphing')),
+        reason:
+            'when the JSON changeTo covers the hierarchy, the morphing '
+            'extension would collide by name and must stand down',
+      );
+    });
+
+    test('no ambiguous_extension_member_access is produced', () {
+      expect(
+        diagnostics.where((d) => d.contains('ambiguous_extension_member_access')),
+        isEmpty,
+        reason:
+            'two changeTo<Target> extensions on one source class are '
+            'ambiguous. diagnostics:\n${diagnostics.join('\n')}',
+      );
     });
   });
 

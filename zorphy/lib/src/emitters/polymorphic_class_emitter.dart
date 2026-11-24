@@ -36,6 +36,7 @@ library;
 
 import 'package:code_builder/code_builder.dart';
 
+import '../ast/spec_mapper.dart';
 import '../ast/type_ref.dart';
 import '../models/class_metadata.dart';
 import '../models/generation_config.dart';
@@ -51,7 +52,19 @@ final class PolymorphicClassEmitter implements HierarchyEmitter {
     // Rides the existing property-helper family; no new toggle (#179 §5).
     if (!config.generatePropertyHelpers) return false;
     if (metadata.explicitSubtypes.isEmpty) return false;
-    return metadata.isSealed;
+    if (!metadata.isSealed) return false;
+    // A GENERIC sealed root is withheld. `ClassDeclarationGenerator` emits
+    // `implements` without type arguments (`class SliceData<T> implements
+    // AsyncSlice`), so a generic subtype implements `AsyncSlice<dynamic>` and
+    // no matcher over `AsyncSlice<T>` can be exhaustive — the emitted
+    // `switch (this)` fails `dart analyze` with
+    // `non_exhaustive_switch_expression` (review finding on
+    // polymorphic_class_emitter.dart:184). Withholding `when`/`maybeWhen` is the
+    // fail-closed posture this file already takes; a generic hierarchy keeps its
+    // `isX`/`asX` helpers. The root cause is the `implements`-drops-type-args
+    // defect in `ClassDeclarationGenerator`, which is a separate change.
+    if (metadata.generics.isNotEmpty) return false;
+    return true;
   }
 
   @override
@@ -67,8 +80,12 @@ final class PolymorphicClassEmitter implements HierarchyEmitter {
     return [
       Extension((e) {
         e.name = whenExtensionName(metadata.cleanName);
+        // The bound rides along too — `mapGenericParameter` keeps
+        // `<T extends Comparable<T>>` well-bounded, the same mapping
+        // `ClassDeclarationGenerator` uses (review finding on
+        // polymorphic_class_emitter.dart:73).
         for (final generic in metadata.generics) {
-          e.types.add(_typeParameter(generic.name));
+          e.types.add(mapGenericParameter(generic));
         }
         e.on = referType('${metadata.cleanName}${_genericArgs(metadata)}');
         e.methods.add(_when(leaves, resultType));
