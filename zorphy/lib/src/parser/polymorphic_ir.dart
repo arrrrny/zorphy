@@ -159,6 +159,14 @@ final class ZorphyNodeIr {
   /// The declared class name, `$`/`$$` prefixes included.
   final String className;
 
+  /// The node's identity across libraries: `libraryUri#ClassName`.
+  ///
+  /// [className] alone is NOT unique — two libraries may declare the same
+  /// `$UiState`, which is exactly why [PolymorphicIr.nodes] is keyed this
+  /// way. A rule that dedupes a graph walk must dedupe on this, or the first
+  /// same-named node silently hides every other one.
+  final String qualifiedName;
+
   /// The generated class name, prefixes stripped.
   final String cleanName;
 
@@ -249,6 +257,7 @@ final class ZorphyNodeIr {
     required this.allConcreteLeaves,
     required this.discriminatorKey,
     required this.discriminatorValue,
+    this.qualifiedName = '',
     this.principalKey,
     this.replaySafe,
     this.isSyntheticLeaf = false,
@@ -286,6 +295,7 @@ final class ZorphyNodeIr {
       className: className,
       cleanName: cleanName,
       archetype: archetype,
+      qualifiedName: qualifiedName,
       isSealedRoot: isSealedRoot ?? this.isSealedRoot,
       isAbstractIntermediate:
           isAbstractIntermediate ?? this.isAbstractIntermediate,

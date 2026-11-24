@@ -563,9 +563,9 @@ contract, not an `@override`.
 
 ### `ZORPHY_LINT_NO_BOOL_FLAGS` and `@ZorphyDomainBool()` (3.0.0+)
 
-The Chord no-boolean-flags rule rejects behavioral mode switches and lifecycle
+The Chord no-boolean-flags rule flags behavioral mode switches and lifecycle
 flags modelled as booleans on `@ZorphyState`, `@ZorphyIntent`, and polymorphic
-subtypes at compile time:
+subtypes:
 
 - **Lifecycle flags** on `@ZorphyState` / `@ZorphyUnion` (`isLoading`, `isFetching`,
   `isCreating`, `isUpdating`, `isDeleting`, `hasError`, `isError`) must be modelled
@@ -573,9 +573,23 @@ subtypes at compile time:
 - **Behavioral switches** on `@ZorphyIntent` or polymorphic variants (`isRetry`,
   `silent`, `noCache`, `force*`, `skip*`, `bypass*`) must be distinct polymorphic
   subtypes.
-- **Escape hatch:** `@ZorphyDomainBool()` exempts genuine domain booleans
-  (e.g., `@ZorphyDomainBool() bool get inStock;`). Genuine domain booleans on
-  `@ZorphyEntity` / `@ZorphyValue` (like `inStock`, `enabled`) are permitted by default.
+- **Escape hatch:** `@ZorphyDomainBool()` exempts genuine domain booleans, on
+  either declaration form — an abstract getter (`@ZorphyDomainBool() bool get
+  inStock;`) or a real field (`@ZorphyDomainBool() final bool inStock;`).
+  Genuine domain booleans on `@ZorphyEntity` / `@ZorphyValue` (like `inStock`,
+  `enabled`) are permitted by default.
+
+**Where the rule reports.** `HierarchyResolver` runs the rule on the resolved
+`PolymorphicIr` and appends each hit to `PolymorphicIr.diagnostics` (code
+`ZORPHY_LINT_NO_BOOL_FLAGS`), and `NoBoolFlagsLint.enforce(ir)` is the
+fail-the-build entry point a v3 caller invokes itself. The v3 IR pipeline is
+not yet the path `build_runner` drives — `ZorphyGenerator` still runs the v2
+`Orchestrator` pipeline — so a flagged hierarchy does not fail a real
+`build_runner` run today. Do not document or assume otherwise until
+`enforce` is called from the generator.
+
+Union membership for the rule's scope includes a member that only
+`implements` the union root, not just the factory variants.
 
 ## v3 trust-boundary wire codecs (3.0.0+)
 

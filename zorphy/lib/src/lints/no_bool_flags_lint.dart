@@ -15,9 +15,21 @@
 /// the replacement, because the alternative — emit, ship, and discover the
 /// ambiguity at runtime — is exactly the failure the rule exists to prevent.
 ///
+/// **Where the rejection actually happens.** `HierarchyResolver` runs the rule
+/// and appends its hits to [PolymorphicIr.diagnostics] (phase 4c), and every
+/// diagnostic there is an error ([ZorphyDiagnostic.isError]). The v3 IR
+/// pipeline is not yet the path `build_runner` calls — `ZorphyGenerator`, the
+/// builder's entrypoint, drives `Orchestrator`'s v2 pipeline and never resolves
+/// a [PolymorphicIr] — so today the rule reports through `diagnostics` (and
+/// [NoBoolFlagsLint.enforce], which a v3 caller must call itself) rather than
+/// failing a real `build_runner` run. Wiring `enforce` into the generator is
+/// the remaining half of #180; until then the wording here and in `SKILL.md`
+/// says "reports", not "blocks the build".
+///
 /// The escape hatch is `@ZorphyDomainBool()`: a genuine domain boolean
 /// (`Product.inStock`, `InteractiveUiNode.enabled`) is not a flag, and its
-/// author says so once, at the declaration.
+/// author says so once, at the declaration — on either declaration form, an
+/// abstract getter or a real field.
 ///
 /// The rule is deliberately name-based and archetype-scoped:
 ///
@@ -92,7 +104,12 @@ final class NoBoolFlagsLint {
 
     void walk(ZorphyNodeIr node) {
       // A node is reachable twice in a multi-root graph; report it once.
-      if (!visited.add(node.className)) return;
+      // Keyed by QUALIFIED name: `PolymorphicIr.nodes` is keyed that way
+      // precisely so two libraries may declare same-named classes, and a set
+      // keyed by the bare class name collapses them again — the first
+      // `$UiState` marks the name visited and every other library's node is
+      // dropped unexamined (finding on PR #216).
+      if (!visited.add(_identityOf(node))) return;
       if (_isChecked(node)) {
         for (final field in node.fields) {
           if (!field.isBool || field.isDomainBool) continue;
@@ -129,8 +146,13 @@ final class NoBoolFlagsLint {
   /// Throws an actionable [InvalidGenerationSourceError] when [ir] violates
   /// the rule, and returns normally otherwise.
   ///
-  /// The generator calls this before emitting, so a flagged hierarchy fails
+  /// This is the FAIL-the-build entry point: a v3 caller that owns a
+  /// [PolymorphicIr] calls it before emitting, so a flagged hierarchy stops
   /// generation instead of producing a node whose booleans are meaningless.
+  /// It has no production caller in this package today — the v3 IR pipeline
+  /// is not the path `build_runner` drives (see the library doc) — so the
+  /// `build_runner` path reports nothing yet rather than failing. Call it from
+  /// any new v3 entrypoint; do not describe it as already wired.
   static void enforce(PolymorphicIr ir) {
     final hits = check(ir);
     if (hits.isEmpty) return;
@@ -150,11 +172,36 @@ final class NoBoolFlagsLint {
   /// escape hatch the rule. A union hierarchy IS in scope even though
   /// `@ZorphyUnion` lowers to [ArchetypeKind.value] — the union is the
   /// replacement the rule points authors at, so its members must be clean.
+  ///
+  /// A variant reaches the union two ways, and both count: a factory target
+  /// carries the stamp itself, while a class that only `implements` the union
+  /// root keeps `isUnion = false` and instead carries the root in
+  /// [ZorphyNodeIr.superTypes]. Reading the flag alone left that member
+  /// unchecked (finding on PR #216), which is exactly the hole the rule
+  /// exists to close.
   static bool _isChecked(ZorphyNodeIr node) => switch (node.archetype) {
     ArchetypeKind.state || ArchetypeKind.intent => true,
-    ArchetypeKind.value => node.isUnion,
+    ArchetypeKind.value => _belongsToUnion(node),
     ArchetypeKind.entity => false,
   };
+
+  /// Whether [node] is a union root, a stamped variant, or a member that
+  /// reaches a union root through its `superTypes` chain.
+  static bool _belongsToUnion(ZorphyNodeIr node) {
+    if (node.isUnion) return true;
+    for (final superType in node.superTypes) {
+      if (superType.isUnion) return true;
+    }
+    return false;
+  }
+
+  /// The dedupe key for a graph walk.
+  ///
+  /// [ZorphyNodeIr.qualifiedName] is the node's identity across libraries;
+  /// it is empty only on a HAND-BUILT node (a test fixture, or an IR a caller
+  /// assembled), where the class name is the best identity available.
+  static String _identityOf(ZorphyNodeIr node) =>
+      node.qualifiedName.isEmpty ? node.className : node.qualifiedName;
 
   static bool _isBehavioralFlag(String name) =>
       behavioralFlags.contains(name) || behavioralPrefixes.any(name.startsWith);

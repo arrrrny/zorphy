@@ -4,8 +4,10 @@
 // being modelled as booleans on a polymorphic node: a state that carries
 // `isLoading`/`hasError` has silently re-introduced the null-flag matrix that
 // `AsyncSlice<T>` removes, and an intent that carries `forceRefresh`/`silent`
-// makes two distinct commands indistinguishable on the wire. Both must be
-// rejected at generation time, with a message that names the replacement.
+// makes two distinct commands indistinguishable on the wire. Both are reported
+// as `ZORPHY_LINT_NO_BOOL_FLAGS` diagnostics on the resolved IR, with a message
+// that names the replacement; `enforce` is the fail-the-build entry point a v3
+// caller invokes (the v3 pipeline is not yet the `build_runner` path).
 //
 // Coverage:
 //   - the lifecycle set on `@ZorphyState` and on `@ZorphyUnion` variants;
@@ -53,6 +55,31 @@ Future<PolymorphicIr> _resolve(
               .getResolvedLibrary(libraryPath)
           as ResolvedLibraryResult;
   final ir = HierarchyResolver.resolveLibrary(resolved.element);
+  await collection.dispose();
+  return ir;
+}
+
+/// Resolves EVERY source in [sources] as one graph, the way a multi-library
+/// consumer does — the shape two same-named classes live in.
+Future<PolymorphicIr> _resolveLibraries(Map<String, String> sources) async {
+  final root = Directory('test/.no_bool_flags_tmp').absolute.path;
+  Directory(root).createSync(recursive: true);
+  final fixture = Directory(root).createTempSync('fixture_');
+  for (final entry in sources.entries) {
+    File('${fixture.path}/${entry.key}').writeAsStringSync(entry.value);
+  }
+  final collection = AnalysisContextCollection(includedPaths: [fixture.path]);
+  final libraries = <ResolvedLibraryResult>[];
+  for (final name in sources.keys) {
+    final path = '${fixture.path}/$name';
+    libraries.add(
+      await collection.contextFor(path).currentSession.getResolvedLibrary(path)
+          as ResolvedLibraryResult,
+    );
+  }
+  final ir = HierarchyResolver.resolveLibraries([
+    for (final library in libraries) library.element,
+  ]);
   await collection.dispose();
   return ir;
 }
@@ -162,6 +189,49 @@ class \$Ready {
       expect(hits.single.nodeName, r'$Loading');
       expect(hits.single.message, contains('hasError'));
     });
+
+    test(
+      'a member that only `implements` a union root is still checked',
+      () async {
+        // `isUnion` is stamped for factory variants and for the root itself.
+        // A class that reaches the union through `implements $AsyncStatus`
+        // is a real child of the root but carries none of those stamps, so
+        // reading the flag alone left its flags unreported.
+        final ir = await _resolve(
+          _fixture('''
+@ZorphyUnion()
+abstract class \$AsyncStatus {
+  factory \$AsyncStatus.loading() = \$Loading;
+  factory \$AsyncStatus.ready() = \$Ready;
+}
+
+@ZorphyValue()
+class \$Loading {
+  String get value;
+}
+
+@ZorphyValue()
+class \$Ready {
+  String get value;
+}
+
+@ZorphyValue()
+class \$FailedImpl implements \$AsyncStatus {
+  bool get hasError;
+}
+'''),
+        );
+
+        final hits = _lintHits(ir);
+        expect(
+          hits,
+          hasLength(1),
+          reason: 'the implements-only union member is in scope',
+        );
+        expect(hits.single.nodeName, r'$FailedImpl');
+        expect(hits.single.message, contains('hasError'));
+      },
+    );
   });
 
   group('ZORPHY_LINT_NO_BOOL_FLAGS — behavioral mode switches', () {
@@ -250,6 +320,43 @@ abstract class \$RefreshProducts {
         reason: '`reinforced` does not start with `force`',
       );
     });
+
+    test(
+      'two libraries declaring a same-named class are both checked',
+      () async {
+        // The graph is keyed by qualified name precisely so two libraries may
+        // declare same-named classes. A `visited` set keyed by the bare class
+        // name reintroduced that collapse: the first `$UiState` marked the
+        // name visited and every other library's was dropped unexamined.
+        final ir = await _resolveLibraries({
+          'a.dart':
+              '$_annotationImport'
+              '''
+part 'a.zorphy.dart';
+
+@ZorphyState()
+abstract class \$UiState {
+  bool get isLoading;
+}
+''',
+          'b.dart':
+              '$_annotationImport'
+              '''
+part 'b.zorphy.dart';
+
+@ZorphyState()
+abstract class \$UiState {
+  bool get hasError;
+}
+''',
+        });
+
+        final messages = _lintHits(ir).map((d) => d.message).toList();
+        expect(messages, hasLength(2), reason: 'both libraries are in scope');
+        expect(messages.join('\n'), contains('isLoading'));
+        expect(messages.join('\n'), contains('hasError'));
+      },
+    );
   });
 
   group('ZORPHY_LINT_NO_BOOL_FLAGS — the escape hatch', () {
@@ -274,6 +381,48 @@ abstract class \$UiState {
         expect(ir.hasErrors, isFalse);
       },
     );
+
+    test('`@ZorphyDomainBool()` on a real FIELD exempts it too', () async {
+      // A real field surfaces in `element.getters` as an implicit getter,
+      // and the annotation lives on the FIELD. Reading only the getter let
+      // the getter loop claim the name first, so the documented hatch never
+      // fired for the declaration form the docs show for fields.
+      final ir = await _resolve(
+        _fixture('''
+@ZorphyState()
+abstract class \$UiState {
+  List<String> get items;
+  @ZorphyDomainBool()
+  final bool hasError;
+  \$UiState(this.hasError);
+}
+'''),
+      );
+
+      expect(
+        _lintHits(ir),
+        isEmpty,
+        reason: 'the annotation on the field is the same domain claim',
+      );
+      expect(ir.hasErrors, isFalse);
+    });
+
+    test('an unannotated real field is still rejected', () async {
+      final ir = await _resolve(
+        _fixture('''
+@ZorphyState()
+abstract class \$UiState {
+  List<String> get items;
+  final bool hasError;
+  \$UiState(this.hasError);
+}
+'''),
+      );
+
+      final hits = _lintHits(ir);
+      expect(hits, hasLength(1), reason: 'the hatch is opt-in per field');
+      expect(hits.single.message, contains('hasError'));
+    });
 
     test(
       '`@ZorphyDomainBool()` allows a behavioral-named intent field',
@@ -353,7 +502,8 @@ abstract class \$UiState {
 @ZorphyState()
 abstract class \$UiState {
   List<String> get items;
-  bool get isRefreshing;
+  @ZorphyDomainBool()
+  bool get isPinned;
 }
 '''),
       );
