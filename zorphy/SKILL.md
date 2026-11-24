@@ -27,7 +27,7 @@ author: zorphy
 
 ## Quick Start
 
-CLI (from a project that depends on `zorphy_annotation` — `dart run zorphy`
+CLI (from a project that depends on `zorphy_annotation` and lists `zorphy` under `dev_dependencies` — `dart run zorphy`
 alone only resolves inside the `zorphy` package itself):
 
 ```bash

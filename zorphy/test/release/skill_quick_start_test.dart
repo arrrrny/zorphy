@@ -62,6 +62,16 @@ void main() {
         isTrue,
         reason: 'Quick Start must reference a registered MCP tool',
       );
+      expect(
+        section,
+        isNot(contains('generate_json')),
+        reason: 'arg is `generateJson` (zorphy) / `json` (zuraffa)',
+      );
+      expect(
+        section,
+        contains('generateJson'),
+        reason: 'zorphy `create_entity` takes a `generateJson` argument',
+      );
     });
   });
 }
