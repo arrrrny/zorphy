@@ -2,6 +2,20 @@
 
 ### Added
 
+- Generated `<Name>Patch` classes now patch nested and collection fields
+  deeply instead of overwriting them (#183). `diff` carries a
+  `PatchNested<Sub, SubPatch>` built from `SubPatch.diff(previous.x, next.x)`
+  for a nested `@ZorphyEntity` / `@ZorphyState` field, and a
+  `ListPatchDelta<E>` / `MapPatchDelta<K, V>` for a `List<E>` / `Map<K, V>`
+  field — granular `ListPatchOp` / `MapPatchOp` steps rather than a
+  whole-collection replace. `invert` inverts the value the patch actually
+  carried, and `toWire` renders a delta as its `ops` list. A nullable nested
+  field treats a null on either side as a whole-value transition, since there
+  is no sub-patch to apply. Scalar fields are unchanged.
+- `PatchBase` implements `ZorphyPatch<TEntity>`, so a generated
+  `<Name>Patch` satisfies the bound a `PatchNested<Sub, SubPatch>` declares
+  and supplies `isNotEmpty` as the negation of `isEmpty` (#183).
+
 - Generated `<Name>Patch` classes now carry the v3 patch algebra (#182):
   `static diff(previous, next)` (O(1) and allocation-free when the two are
   `identical`), `apply(target)` (returns `target` itself when the patch is

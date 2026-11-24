@@ -137,7 +137,16 @@ class PatchEmitter {
       c.methods.add(_applyMethod(entityRef, patchRef));
       c.methods.add(_applyToMethod(entityRef, patchRef));
       c.methods.add(_composeMethod(patchRef));
-      c.methods.add(_invertMethod(patchRef, entityRef, fields, enumName));
+      c.methods.add(
+        _invertMethod(
+          patchRef,
+          entityRef,
+          fields,
+          enumName,
+          knownClasses: knownClasses,
+          genericTypeNames: genericTypeNames,
+        ),
+      );
       c.methods.add(
         _diffMethod(
           patchRef,
@@ -145,9 +154,17 @@ class PatchEmitter {
           fields,
           enumName,
           genericTypeNames: genericTypeNames,
+          knownClasses: knownClasses,
         ),
       );
-      c.methods.add(_toWireMethod(enumName, fields));
+      c.methods.add(
+        _toWireMethod(
+          enumName,
+          fields,
+          knownClasses: knownClasses,
+          genericTypeNames: genericTypeNames,
+        ),
+      );
       for (final field in fields) {
         c.methods.addAll(
           _fluentBuilders(
@@ -242,12 +259,20 @@ class PatchEmitter {
   });
 
   /// `invert(before)` — the patch that undoes this one for [before].
+  ///
+  /// The inverse is built from the value this patch ACTUALLY carried, not from
+  /// a fresh empty patch: a nested field carries a `PatchNested`, and a
+  /// collection field carries a delta, so each is inverted through its own
+  /// carried instance. A scalar carries the value itself, so its inverse is
+  /// simply the prior value.
   Method _invertMethod(
     String patchRef,
     String entityRef,
     List<NameTypeClassComment> fields,
-    String enumName,
-  ) => Method((m) {
+    String enumName, {
+    List<String> knownClasses = const [],
+    List<String> genericTypeNames = const [],
+  }) => Method((m) {
     m
       ..name = 'invert'
       ..returns = referType(patchRef)
@@ -263,24 +288,128 @@ class PatchEmitter {
       for (final field in fields) {
         final member = _memberName(field.name);
         final key = '$enumName.${helpers.enumMemberName(member)}';
-        b.statements.add(
-          Code(
-            'if ($patchMapName.containsKey($key)) '
-            'undo.$patchMapName[$key] = before.$member;',
-          ),
+        final shape = _fieldShape(
+          field,
+          knownClasses: knownClasses,
+          genericTypeNames: genericTypeNames,
         );
+        switch (shape.kind) {
+          case _FieldShapeKind.nested:
+            // Only a carried PatchNested can be inverted; a nullable field
+            // that transitioned to or from null carried the raw value, and
+            // that is restored wholesale. The carried value is bound to a
+            // LOCAL: Dart does not promote a public FIELD through an `is`
+            // test, so testing `before.$member` directly cannot narrow it.
+            b.statements.add(
+              Code('final ${member}Carried = $patchMapName[$key];'),
+            );
+            if (shape.isNullable) {
+              // A public FIELD is never promoted through a null test, so the
+              // prior value is bound to a local as well.
+              b.statements.add(Code('final ${member}Before = before.$member;'));
+            }
+            final priorRef = shape.isNullable
+                ? '${member}Before'
+                : 'before.$member';
+            final carriedGuard = shape.isNullable
+                ? '${member}Carried is PatchNested && $priorRef != null'
+                : '${member}Carried is PatchNested';
+            b.statements.add(
+              Code('if ($patchMapName.containsKey($key) && $carriedGuard) {'),
+            );
+            b.statements.add(
+              Code(
+                '  undo.$patchMapName[$key] = '
+                '(${member}Carried as PatchNested<'
+                '${shape.valueType}, ${shape.patchType}>)'
+                '.invertNested($priorRef);',
+              ),
+            );
+            b.statements.add(const Code('}'));
+            // A fluent `with*` builder writes a raw value, a sub-patch or a
+            // function into the map — none of which is a `PatchNested` — so
+            // the inverse restores the prior value wholesale, exactly as the
+            // list / map arms below do. Without this fallback a patch built
+            // from the public `withX`/`withXPatch`/`withXPatchFunc` builders
+            // and then inverted silently drops the field (issue #207 review).
+            b.statements.add(
+              Code(
+                'if ($patchMapName.containsKey($key) && '
+                '${member}Carried is! PatchNested) '
+                'undo.$patchMapName[$key] = before.$member;',
+              ),
+            );
+          case _FieldShapeKind.list:
+            // A nullable field's prior value may be null, and `invert` takes
+            // the non-nullable collection; the else arm below restores the
+            // raw prior value (including null) wholesale.
+            b.statements.add(
+              Code(
+                'if ($patchMapName[$key] is ListPatchDelta<${shape.valueType}>'
+                '${shape.isNullable ? ' && before.$member != null' : ''}) '
+                'undo.$patchMapName[$key] = '
+                '($patchMapName[$key] as ListPatchDelta<${shape.valueType}>)'
+                '.invert(before.$member${shape.isNullable ? '!' : ''});',
+              ),
+            );
+            b.statements.add(
+              Code(
+                'if ($patchMapName.containsKey($key) && '
+                '$patchMapName[$key] is! ListPatchDelta<${shape.valueType}>) '
+                'undo.$patchMapName[$key] = before.$member;',
+              ),
+            );
+          case _FieldShapeKind.map:
+            b.statements.add(
+              Code(
+                'if ($patchMapName[$key] '
+                'is MapPatchDelta<${shape.valueType}>'
+                '${shape.isNullable ? ' && before.$member != null' : ''}) '
+                'undo.$patchMapName[$key] = '
+                '($patchMapName[$key] as MapPatchDelta<${shape.valueType}>)'
+                '.invert(before.$member${shape.isNullable ? '!' : ''});',
+              ),
+            );
+            b.statements.add(
+              Code(
+                'if ($patchMapName.containsKey($key) && '
+                '$patchMapName[$key] is! MapPatchDelta<${shape.valueType}>) '
+                'undo.$patchMapName[$key] = before.$member;',
+              ),
+            );
+          case _FieldShapeKind.scalar:
+            b.statements.add(
+              Code(
+                'if ($patchMapName.containsKey($key)) '
+                'undo.$patchMapName[$key] = before.$member;',
+              ),
+            );
+        }
       }
       b.statements.add(const Code('return undo;'));
     });
   });
 
   /// `static diff(previous, next)` — O(1) when the two are identical.
+  ///
+  /// Per field shape (ISSUE-008):
+  /// - a nested Zorphy field carries a `PatchNested<Sub, SubPatch>` built from
+  ///   `SubPatch.diff(previous.x, next.x)`, so the parent patch delegates to
+  ///   the sub-entity's own patch instead of copying it wholesale;
+  /// - a `List<E>` field carries a `ListPatchDelta<E>` — granular ops, never a
+  ///   whole-list overwrite;
+  /// - a `Map<K, V>` field carries a `MapPatchDelta<K, V>`;
+  /// - anything else carries the value itself.
+  ///
+  /// A guarded shape (nested nullable, collection) only records a change when
+  /// its delta is non-empty, so a patch never carries a no-op step.
   Method _diffMethod(
     String patchRef,
     String entityRef,
     List<NameTypeClassComment> fields,
     String enumName, {
     List<String> genericTypeNames = const [],
+    List<String> knownClasses = const [],
   }) => Method((m) {
     final patchName = _baseName(patchRef);
     m
@@ -322,12 +451,148 @@ class PatchEmitter {
       for (final field in fields) {
         final member = _memberName(field.name);
         final key = '$enumName.${helpers.enumMemberName(member)}';
-        b.statements.add(
-          Code(
-            'if (previous.$member != next.$member) '
-            'changes.$patchMapName[$key] = next.$member;',
-          ),
+        final shape = _fieldShape(
+          field,
+          knownClasses: knownClasses,
+          genericTypeNames: genericTypeNames,
         );
+        switch (shape.kind) {
+          case _FieldShapeKind.nested when shape.isNullable:
+            // Both sides must carry a sub-entity to diff one against the
+            // other; a null on either side is a whole-value transition.
+            b.statements.add(
+              Code('if (previous.$member != null && next.$member != null) {'),
+            );
+            b.statements.add(
+              Code(
+                '  final nested = ${shape.patchType}.diff('
+                'previous.$member!, next.$member!);',
+              ),
+            );
+            b.statements.add(
+              Code(
+                '  if (nested.isNotEmpty) '
+                'changes.$patchMapName[$key] = '
+                'PatchNested<${shape.valueType}, ${shape.patchType}>(nested);',
+              ),
+            );
+            b.statements.add(const Code('}'));
+            b.statements.add(
+              Code('if (previous.$member == null || next.$member == null) {'),
+            );
+            b.statements.add(
+              Code(
+                '  if (previous.$member != next.$member) '
+                'changes.$patchMapName[$key] = next.$member;',
+              ),
+            );
+            b.statements.add(const Code('}'));
+          case _FieldShapeKind.nested:
+            b.statements.add(
+              Code(
+                'final ${member}Delta = ${shape.patchType}.diff('
+                'previous.$member, next.$member);',
+              ),
+            );
+            b.statements.add(
+              Code(
+                'if (${member}Delta.isNotEmpty) '
+                'changes.$patchMapName[$key] = '
+                'PatchNested<${shape.valueType}, ${shape.patchType}>'
+                '(${member}Delta);',
+              ),
+            );
+          case _FieldShapeKind.list when shape.isNullable:
+            b.statements.add(
+              Code('if (previous.$member != null && next.$member != null) {'),
+            );
+            b.statements.add(
+              Code(
+                '  final ${member}Delta = '
+                'ListPatchDelta.diff<${shape.valueType}>('
+                'previous.$member!, next.$member!);',
+              ),
+            );
+            b.statements.add(
+              Code(
+                '  if (${member}Delta.isNotEmpty) '
+                'changes.$patchMapName[$key] = ${member}Delta;',
+              ),
+            );
+            b.statements.add(const Code('}'));
+            b.statements.add(
+              Code('if (previous.$member == null || next.$member == null) {'),
+            );
+            b.statements.add(
+              Code(
+                '  if (previous.$member != next.$member) '
+                'changes.$patchMapName[$key] = next.$member;',
+              ),
+            );
+            b.statements.add(const Code('}'));
+          case _FieldShapeKind.list:
+            b.statements.add(
+              Code(
+                'final ${member}Delta = '
+                'ListPatchDelta.diff<${shape.valueType}>(previous.$member, '
+                'next.$member);',
+              ),
+            );
+            b.statements.add(
+              Code(
+                'if (${member}Delta.isNotEmpty) '
+                'changes.$patchMapName[$key] = ${member}Delta;',
+              ),
+            );
+          case _FieldShapeKind.map when shape.isNullable:
+            b.statements.add(
+              Code('if (previous.$member != null && next.$member != null) {'),
+            );
+            b.statements.add(
+              Code(
+                '  final ${member}Delta = MapPatchDelta.diff<${shape.valueType}>('
+                'previous.$member!, next.$member!);',
+              ),
+            );
+            b.statements.add(
+              Code(
+                '  if (${member}Delta.isNotEmpty) '
+                'changes.$patchMapName[$key] = ${member}Delta;',
+              ),
+            );
+            b.statements.add(const Code('}'));
+            b.statements.add(
+              Code('if (previous.$member == null || next.$member == null) {'),
+            );
+            b.statements.add(
+              Code(
+                '  if (previous.$member != next.$member) '
+                'changes.$patchMapName[$key] = next.$member;',
+              ),
+            );
+            b.statements.add(const Code('}'));
+          case _FieldShapeKind.map:
+            final args = shape.valueType;
+            b.statements.add(
+              Code(
+                'final ${member}Delta = MapPatchDelta.diff<$args>('
+                'previous.$member, next.$member);',
+              ),
+            );
+            b.statements.add(
+              Code(
+                'if (${member}Delta.isNotEmpty) '
+                'changes.$patchMapName[$key] = ${member}Delta;',
+              ),
+            );
+          case _FieldShapeKind.scalar:
+            b.statements.add(
+              Code(
+                'if (previous.$member != next.$member) '
+                'changes.$patchMapName[$key] = next.$member;',
+              ),
+            );
+        }
       }
       b.statements.add(const Code('return changes;'));
     });
@@ -338,26 +603,60 @@ class PatchEmitter {
   /// The wire key is the entity's field name, not the enum member: reserved
   /// members are escaped in the enum (`name` becomes `name_`), and a wire map
   /// that leaked that escape would name a field the entity does not have.
-  Method _toWireMethod(String enumName, List<NameTypeClassComment> fields) =>
-      Method((m) {
-        m
-          ..name = 'toWire'
-          ..returns = referType('Map<String, Object?>');
-        m.body = Block((b) {
-          b.statements.add(const Code('final wire = <String, Object?>{};'));
-          for (final field in fields) {
-            final member = _memberName(field.name);
-            final key = '$enumName.${helpers.enumMemberName(member)}';
-            b.statements.add(
-              Code(
-                'if ($patchMapName.containsKey($key)) '
-                'wire[${_stringLiteral(member)}] = $patchMapName[$key];',
-              ),
-            );
-          }
-          b.statements.add(const Code('return wire;'));
-        });
-      });
+  ///
+  /// A carried delta renders as its own `toWire` step list (ISSUE-008), so a
+  /// collection change reaches the wire as `{'ops': [...]}` rather than as an
+  /// opaque delta object; every other shape renders verbatim.
+  Method _toWireMethod(
+    String enumName,
+    List<NameTypeClassComment> fields, {
+    List<String> knownClasses = const [],
+    List<String> genericTypeNames = const [],
+  }) => Method((m) {
+    m
+      ..name = 'toWire'
+      ..returns = referType('Map<String, Object?>');
+    m.body = Block((b) {
+      b.statements.add(const Code('final wire = <String, Object?>{};'));
+      for (final field in fields) {
+        final member = _memberName(field.name);
+        final key = '$enumName.${helpers.enumMemberName(member)}';
+        final shape = _fieldShape(
+          field,
+          knownClasses: knownClasses,
+          genericTypeNames: genericTypeNames,
+        );
+        // A collection field carries either a delta (from `diff`) or a raw
+        // collection (from the fluent `with*` builder), and a nested field
+        // carries either a `PatchNested` (from `diff`) or a raw sub-value (from
+        // the fluent builder), so each arm is narrowed rather than blind-cast.
+        // Both unwrap to plain JSON so a wire map never carries an opaque patch
+        // object.
+        final wireValue = switch (shape.kind) {
+          _FieldShapeKind.list =>
+            '$patchMapName[$key] is ListPatchDelta<${shape.valueType}>'
+                ' ? ($patchMapName[$key] as ListPatchDelta<${shape.valueType}>)'
+                '.toWire() : $patchMapName[$key]',
+          _FieldShapeKind.map =>
+            '$patchMapName[$key] is MapPatchDelta<${shape.valueType}>'
+                ' ? ($patchMapName[$key] as MapPatchDelta<${shape.valueType}>)'
+                '.toWire() : $patchMapName[$key]',
+          _FieldShapeKind.nested =>
+            '$patchMapName[$key] is PatchNested'
+                ' ? ($patchMapName[$key] as PatchNested).toWire()'
+                ' : $patchMapName[$key]',
+          _ => '$patchMapName[$key]',
+        };
+        b.statements.add(
+          Code(
+            'if ($patchMapName.containsKey($key)) '
+            'wire[${_stringLiteral(member)}] = $wireValue;',
+          ),
+        );
+      }
+      b.statements.add(const Code('return wire;'));
+    });
+  });
 
   static String _stringLiteral(String value) =>
       "'${value.replaceAll(r'\', r'\\').replaceAll("'", r"\'")}'";
@@ -602,6 +901,65 @@ class PatchEmitter {
     return knownClasses.contains(type);
   }
 
+  /// The patch shape a field carries, per ISSUE-008.
+  ///
+  /// The shapes are mutually exclusive and derived from the declared type
+  /// alone, so a field is classified the same way for `diff` and `toWire`.
+  _FieldShape _fieldShape(
+    NameTypeClassComment field, {
+    required List<String> knownClasses,
+    required List<String> genericTypeNames,
+  }) {
+    final declared = (field.type ?? 'dynamic').replaceAll(r'$', '');
+    final isNullable = declared.endsWith('?');
+    final type = isNullable
+        ? declared.substring(0, declared.length - 1)
+        : declared;
+
+    final list = RegExp(r'^List<(.+)>$').firstMatch(type);
+    if (list != null) {
+      return _FieldShape(
+        kind: _FieldShapeKind.list,
+        valueType: list.group(1)!.trim(),
+        patchType: '',
+        isNullable: isNullable,
+      );
+    }
+
+    final map = RegExp(r'^Map<(.+)>$').firstMatch(type);
+    if (map != null) {
+      return _FieldShape(
+        kind: _FieldShapeKind.map,
+        // `Map<K, V>` keeps both arguments: the delta is parameterized on the
+        // pair, and dropping K would not name the field's declared type.
+        valueType: map.group(1)!.trim(),
+        patchType: '',
+        isNullable: isNullable,
+      );
+    }
+
+    // A nested Zorphy field: route the test through the single `_isZorphyType`
+    // helper the fluent-builder emission already uses, so the two call sites
+    // cannot drift. `type` is `$`-stripped above (as the helper's other callers
+    // pass it), so a concrete class the caller knows is what matches here.
+    if (_isZorphyType(type, field, knownClasses, genericTypeNames)) {
+      final bare = _baseName(type);
+      return _FieldShape(
+        kind: _FieldShapeKind.nested,
+        valueType: bare,
+        patchType: '${bare}Patch',
+        isNullable: isNullable,
+      );
+    }
+
+    return _FieldShape(
+      kind: _FieldShapeKind.scalar,
+      valueType: type,
+      patchType: '',
+      isNullable: isNullable,
+    );
+  }
+
   static String _clean(String name) => name.replaceAll(r'$', '');
 
   /// The bare class name of a possibly-parameterized type reference.
@@ -612,4 +970,42 @@ class PatchEmitter {
 
   static String _memberName(String name) =>
       name.startsWith('_') ? name.substring(1) : name;
+}
+
+/// What a patch carries for one field (ISSUE-008).
+enum _FieldShapeKind {
+  /// A nested Zorphy entity: carried as a `PatchNested`.
+  nested,
+
+  /// A `List<E>`: carried as a `ListPatchDelta<E>`.
+  list,
+
+  /// A `Map<K, V>`: carried as a `MapPatchDelta<K, V>`.
+  map,
+
+  /// Anything else: carried as the value itself.
+  scalar,
+}
+
+/// The classification of one field's declared type.
+class _FieldShape {
+  const _FieldShape({
+    required this.kind,
+    required this.valueType,
+    required this.patchType,
+    required this.isNullable,
+  });
+
+  /// Which patch shape the field carries.
+  final _FieldShapeKind kind;
+
+  /// The type arguments the carried patch is parameterized on: the nullable
+  /// marker stripped, and for a map both key and value (`String, int`).
+  final String valueType;
+
+  /// The nested patch type for [_FieldShapeKind.nested]; empty otherwise.
+  final String patchType;
+
+  /// Whether the declared type carries a `?`.
+  final bool isNullable;
 }

@@ -2,6 +2,18 @@
 
 ### Added
 
+- Collection delta patches (#183): `ListPatchDelta<E>` and
+  `MapPatchDelta<K, V>` carry an ordered sequence of `ListPatchOp` /
+  `MapPatchOp` steps and implement the full v3 algebra — minimal `diff`
+  (no op for an unchanged collection, one op per appended/removed/edited
+  element or put/removed key), fold-ordered `apply` that never mutates,
+  concatenating `compose`, round-tripping `invert`, and `toWire` rendering
+  each step as a descriptor. Both also implement the legacy `Patch<T>` arm,
+  which is how a generated `patchWith` applies them.
+- `PatchNested` implements `Patch<Sub>` as well as `ZorphyPatch<Sub>`, so a
+  parent patch's carried nested patch resolves through the same legacy arm,
+  and gained `invertNested(before)` for inverting a carried sub-patch (#183).
+
 - `PatchBase` is const-constructible through `PatchBase.empty()`, which backs
   the generated `<Name>Patch.empty()` constructor: the empty patch is the
   allocation-free neutral element of `compose` and `apply` returns its target
