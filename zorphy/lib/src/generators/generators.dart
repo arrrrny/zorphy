@@ -11,3 +11,5 @@ export 'patch_generator.dart';
 export 'property_helper_generator.dart';
 export 'agent_directive_generator.dart';
 export 'value_equality_generator.dart';
+export 'json_pointer_generator.dart';
+export 'lens_generator.dart';

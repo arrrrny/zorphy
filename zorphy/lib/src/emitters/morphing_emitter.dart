@@ -166,9 +166,19 @@ final class MorphingEmitter implements HierarchyEmitter {
       // source supplies it (review finding on morphing_emitter.dart:167). The
       // `?? this.x` fallback below is value-level and only fires for a `T?`.
       final isOptional = _isNullable(type);
-      final sourceType = sourceFieldsByName[name]?.type;
+      final rawSourceType = sourceFieldsByName[name]?.type;
+      final sourceType = rawSourceType == null
+          ? null
+          : helpers.replaceDollarTypesWithConcrete(rawSourceType);
 
-      if (sourceType != null) {
+      // A field shared with the target only flows across when its TYPE agrees.
+      // Two siblings under one root may type the same segment differently
+      // (`String payload` vs `$Draft payload`), and copying by NAME alone
+      // emitted `DraftNode(payload: payload)` — a `String` handed to a `Draft`
+      // parameter (`argument_type_not_assignable`, seen on the sibling_nested
+      // fixture once MorphingEmitter met a covariant sibling pair). Such a
+      // field is not shared: it is asked for as the target's own field.
+      if (sourceType != null && _typesAgree(sourceType, type)) {
         // A shared `$Parent` field: copy it across, never asked for twice.
         //
         //  - target NON-nullable, source nullable: the receiver may have no
@@ -178,9 +188,7 @@ final class MorphingEmitter implements HierarchyEmitter {
         //    `createdAt ?? this.createdAt` shape §2 documents.
         //  - both non-nullable: copy verbatim, no parameter at all; the
         //    receiver already holds a value the target accepts.
-        final sourceIsNullable = _isNullable(
-          helpers.replaceDollarTypesWithConcrete(sourceType),
-        );
+        final sourceIsNullable = _isNullable(sourceType);
         if (!isOptional && sourceIsNullable) {
           // The target demands a value the receiver may not have.
           parameters.add(_parameter(name, type, required: true));
@@ -222,6 +230,20 @@ final class MorphingEmitter implements HierarchyEmitter {
         referType(targetTypeName).newInstance([], arguments).returned.statement,
       ]);
     });
+  }
+
+  /// Whether a source field's type can be handed to the target's parameter.
+  ///
+  /// `$`-stripping already happened on both sides, so this compares the
+  /// emitted spellings. A trailing `?` is ignored: a nullable source is
+  /// already handled by the required-parameter branch above, and
+  /// `createdAt ?? this.createdAt` passes a non-null value on the optional
+  /// path — so `T?` and `T` agree, while `String` and `Draft` never do.
+  static bool _typesAgree(String sourceType, String targetType) {
+    String bare(String type) => type.trim().endsWith('?')
+        ? type.trim().substring(0, type.trim().length - 1).trim()
+        : type.trim();
+    return bare(sourceType) == bare(targetType);
   }
 
   /// [target]'s fields that carry a usable type, first occurrence winning so

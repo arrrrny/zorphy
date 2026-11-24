@@ -3,10 +3,13 @@ import 'package:code_builder/code_builder.dart';
 /// A [Spec] marker that signals the orchestrator to inject
 /// code into the primary class body rather than at the library level.
 ///
-/// Two modes:
+/// Three modes:
 /// - If [constructor] is non-null, it is added to the class's
 ///   constructors list (for factory constructors like fromJson).
 /// - If [method] is non-null, it is added to the class's methods.
+/// - If [field] is non-null, it is added to the class's fields — the only way
+///   to emit a `static const` registry, since code_builder's [MethodModifier]
+///   has no `const` member while [FieldModifier] does.
 class ClassMemberCode implements Spec {
   /// A constructor to inject into the class.
   final Constructor? constructor;
@@ -14,11 +17,19 @@ class ClassMemberCode implements Spec {
   /// A method to inject into the class.
   final Method? method;
 
+  /// A field to inject into the class.
+  final Field? field;
+
   /// Creates a [ClassMemberCode] wrapping a [Constructor].
-  const ClassMemberCode.constructor(this.constructor) : method = null;
+  const ClassMemberCode.constructor(this.constructor)
+    : method = null,
+      field = null;
 
   /// Creates a [ClassMemberCode] wrapping a [Method].
-  const ClassMemberCode.method(this.method) : constructor = null;
+  const ClassMemberCode.method(this.method) : constructor = null, field = null;
+
+  /// Creates a [ClassMemberCode] wrapping a [Field].
+  const ClassMemberCode.field(this.field) : constructor = null, method = null;
 
   @override
   R accept<R>(covariant SpecVisitor<R> visitor, [R? context]) {

@@ -249,10 +249,49 @@ class PatchClassGenerator extends ConcreteClassGenerator {
           subtype.interfaceName.replaceAll(r'$', ''),
       }.toList();
       if (subtypeNames.isEmpty) return [];
+      // A covariant redeclaration (`$$Node.payload: $DraftA`,
+      // `$Child.payload: $DraftB`) means the shared patch's root-typed value
+      // cannot be handed straight to the subtype's narrowed `copyWith`. The
+      // subtype's own declared type per field is what the dispatch arm casts
+      // to, so it is read here rather than guessed in the emitter.
+      final subtypeFieldTypes = <String, Map<String, String>>{};
+      for (final subtype in [
+        ...metadata.explicitSubtypes,
+        ...metadata.polymorphicSubtypes,
+      ]) {
+        final cleanSubtype = subtype.interfaceName.replaceAll(r'$', '');
+        if (cleanSubtype.isEmpty) continue;
+        // `Interface.fields` reports the INHERITED declaration (a covariant
+        // narrowing on the subtype is not reflected there), so the subtype's
+        // own field type is read off its ClassElement when it resolves.
+        final element =
+            metadata.allAnnotatedClasses[subtype.interfaceName] ??
+            metadata.allAnnotatedClasses['\$$cleanSubtype'];
+        final declared = <String, String>{};
+        if (element != null) {
+          for (final field in element.fields) {
+            final name = field.name;
+            if (name == null || name.isEmpty) continue;
+            final type = helpers.replaceDollarTypesWithConcrete(
+              field.type.getDisplayString(),
+            );
+            if (type.isNotEmpty) declared[name] = type;
+          }
+        }
+        for (final field in subtype.fields) {
+          if (field.name.isEmpty) continue;
+          final own = declared[field.name];
+          declared[field.name] = own != null && own.isNotEmpty
+              ? own
+              : helpers.replaceDollarTypesWithConcrete(field.type ?? '');
+        }
+        subtypeFieldTypes[cleanSubtype] = declared;
+      }
       final emitted = PolymorphicPatchEmitter().emitRoot(
         rootName: metadata.cleanName,
         fields: metadata.allFields,
         subtypeNames: subtypeNames,
+        subtypeFieldTypes: subtypeFieldTypes,
       );
       if (emitted.trim().isEmpty) return [];
       return [Code(emitted)];

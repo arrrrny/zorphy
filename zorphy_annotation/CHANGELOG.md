@@ -36,6 +36,9 @@
 - `ZorphyMock` — a field-level seed hint, not a toggle — and
   `ZorphyMockPresets`, the reserved `preset` names (`email`, `uuid`, `price`,
   `url`) as constants so a consumer and the generator share one closed set.
+- `ZorphyLens<S, V>` — a typed, JSON-Pointer-addressed lens (`path`, `get`,
+  `set`) with `then` composition, so a consumer can subscribe to or update one
+  nested field with full static type safety (#185).
 
 ### Changed
 
