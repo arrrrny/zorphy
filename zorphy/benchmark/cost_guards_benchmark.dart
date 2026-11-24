@@ -8,6 +8,8 @@
 //
 // Run: `dart run benchmark/cost_guards_benchmark.dart`
 
+import 'dart:io';
+
 import 'cost_guards.dart';
 
 void main() {
@@ -28,6 +30,9 @@ void main() {
     return;
   }
   print('$failures COST GUARD(S) FAILED');
-  // Non-zero exit fails the CI step that runs this benchmark.
-  throw StateError('$failures cost guard(s) exceeded budget');
+  // Non-zero exit fails the CI step that runs this benchmark. `exitCode`
+  // (rather than a `throw`, which exits 255 with a stack trace) reads as a
+  // deliberate CI-gate failure.
+  exitCode = 1;
+  return;
 }
