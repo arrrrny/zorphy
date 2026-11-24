@@ -217,6 +217,15 @@ final class HierarchyResolver {
       _checkDuplicateDiscriminators(root, diagnostics);
     }
 
+    // Phase 4b — intent payload checks. An intent's payload is replayed across
+    // a trust boundary, so a field that cannot be canonicalized, or one whose
+    // name collides with the wire discriminator, must fail GENERATION rather
+    // than emit a method that compiles and then throws (or silently loses the
+    // wire tag) at call time.
+    for (final root in resolvedRoots) {
+      _checkIntentPayload(root, diagnostics);
+    }
+
     // A union variant that also declares its own `implements` parent was
     // refused its union edge in Phase 1 — report it rather than letting the
     // union silently lose a declared variant.
@@ -632,8 +641,87 @@ final class HierarchyResolver {
     walk(root);
   }
 
-  /// A stable key for [element] that survives two libraries declaring the
-  /// same class name: `libraryUri#ClassName`.
+  /// ZORPHY_E004/E005 — every `@ZorphyIntent` node's assembled payload must be
+  /// safely replayable: every field type must have a canonical JSON form, and
+  /// no field may be named after the hierarchy's `discriminatorKey` (it would
+  /// collide with the wire tag in `toWire()`).
+  ///
+  /// The payload is the nearest-first walk `IntentEmitter` performs (the node's
+  /// own fields, then each ancestor's), so the check sees exactly the fields the
+  /// emitted `toWire`/`intentDigest` will reference.
+  static void _checkIntentPayload(
+    ZorphyNodeIr root,
+    List<ZorphyDiagnostic> diagnostics,
+  ) {
+    void walk(ZorphyNodeIr node) {
+      if (node.archetype == ArchetypeKind.intent) {
+        final seen = <String>{};
+        final payload = <ZorphyFieldIr>[
+          for (final owner in <ZorphyNodeIr>[node, ...node.superTypes])
+            for (final field in owner.fields)
+              if (seen.add(field.name)) field,
+        ];
+        for (final field in payload) {
+          if (field.name == node.discriminatorKey) {
+            diagnostics.add(
+              ZorphyDiagnostic(
+                code: ZorphyDiagnosticCode.e005DiscriminatorCollision,
+                nodeName: node.className,
+                message:
+                    'intent field "${field.name}" collides with the '
+                    'discriminator key "${node.discriminatorKey}"; the wire '
+                    'tag would be lost — rename the field or set a different '
+                    'discriminator on @ZorphyIntent',
+              ),
+            );
+          }
+          if (!_hasCanonicalJsonForm(field.type)) {
+            diagnostics.add(
+              ZorphyDiagnostic(
+                code: ZorphyDiagnosticCode.e004FieldNotEncodable,
+                nodeName: node.className,
+                message:
+                    'intent field "${field.name}" has type "${field.type}" '
+                    'with no canonical JSON form; an intent field must be '
+                    'null, bool, num, String, Map<String, Object?> or a List '
+                    'of those (DateTime and custom classes are not)',
+              ),
+            );
+          }
+        }
+      }
+      for (final child in node.directSubTypes) {
+        walk(child);
+      }
+    }
+
+    walk(root);
+  }
+
+  /// Whether [type] (source text, no trailing `?`) names one of the canonical
+  /// JSON forms `ZorphyIntentDigest` can hash: a core scalar, `Object`/
+  /// `dynamic`, or a `Map`/`List`/`Iterable` (whose *contents* are checked
+  /// recursively at runtime). A deliberately conservative allowlist: anything
+  /// not provably canonical is rejected at generation rather than trusted.
+  static bool _hasCanonicalJsonForm(String type) {
+    final base = type.split('<').first.trim();
+    const canonical = <String>{
+      'bool',
+      'int',
+      'double',
+      'num',
+      'String',
+      'Object',
+      'Object?',
+      'dynamic',
+      'Map',
+      'Map<String, Object?>',
+      'List',
+      'Iterable',
+    };
+    return canonical.contains(base) || canonical.contains(type);
+  }
+
   static String _qualifiedName(ClassElement element) {
     final name = element.name ?? '';
     final uri = element.library.uri.toString();

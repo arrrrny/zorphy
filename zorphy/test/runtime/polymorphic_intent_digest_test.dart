@@ -31,10 +31,15 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 const _annotationImport =
     "import 'package:zorphy_annotation/zorphy_annotation.dart';\n";
 
+/// Every test fixture and emitted program is written under here; a single
+/// `tearDownAll` removes it so repeated runs do not accumulate
+/// `fixture_*`/`run_*` directories on disk or in CI.
+final _tmpRoot = Directory('test/.intent_emitter_tmp');
+
 /// Resolves [sources] into a [PolymorphicIr], exactly the way the generator
 /// sees a library — resolved analyzer elements, no string scanning.
 Future<PolymorphicIr> _resolve(Map<String, String> sources) async {
-  final root = Directory('test/.intent_emitter_tmp').absolute;
+  final root = _tmpRoot.absolute;
   root.createSync(recursive: true);
   final fixture = root.createTempSync('fixture_');
   for (final entry in sources.entries) {
@@ -87,6 +92,46 @@ abstract class \$PingIntent {
 }
 ''';
 
+/// An intent with a nullable field, to prove a nullable field stays optional in
+/// the generated constructor (finding: every field was `required`).
+const _nullable =
+    '''
+$_annotationImport
+part 'intents.zorphy.dart';
+
+@ZorphyIntent(replaySafe: true)
+abstract class \$NoteIntent {
+  String get id;
+  String? get note;
+}
+''';
+
+/// An intent with a field type that has no canonical JSON form (`DateTime`) —
+/// the resolver must reject it at generation (ZORPHY_E004).
+const _unencodable =
+    '''
+$_annotationImport
+part 'intents.zorphy.dart';
+
+@ZorphyIntent(replaySafe: true)
+abstract class \$StampIntent {
+  DateTime get at;
+}
+''';
+
+/// An intent with a field named after the default discriminator (`kind`) — the
+/// resolver must reject it at generation (ZORPHY_E005).
+const _collision =
+    '''
+$_annotationImport
+part 'intents.zorphy.dart';
+
+@ZorphyIntent(replaySafe: true)
+abstract class \$ClashIntent {
+  String get kind;
+}
+''';
+
 /// Emits [ir]'s intent surface, writes it next to [sources] and runs [body]
 /// as a test program, returning the program's stdout.
 ///
@@ -101,7 +146,7 @@ Future<String> _runEmitted(
 ) async {
   final emitted = IntentEmitter().emitIntents(ir);
 
-  final root = Directory('test/.intent_emitter_tmp').absolute;
+  final root = _tmpRoot.absolute;
   root.createSync(recursive: true);
   final fixture = root.createTempSync('run_');
   for (final entry in sources.entries) {
@@ -146,6 +191,11 @@ $body
 }
 
 void main() {
+  tearDownAll(() {
+    final root = _tmpRoot.absolute;
+    if (root.existsSync()) root.deleteSync(recursive: true);
+  });
+
   group('#189 — polymorphic intent hierarchy', () {
     late PolymorphicIr ir;
 
@@ -343,6 +393,72 @@ void main() {
     );
   });
 
+  group('#189 — nullable payload field stays optional', () {
+    test('a nullable field is not `required` in the constructor', () async {
+      final ir = await _resolve({'intents.dart': _nullable});
+
+      // Constructing without the nullable field must COMPILE and run: the
+      // emitted constructor leaves `note` optional (finding: every field was
+      // `required`, forcing `note: null` at every call site).
+      final out = await _runEmitted(
+        ir,
+        {'intents.dart': _nullable},
+        '''
+  final withNote = NoteIntent(id: 'n-1', note: 'hi');
+  final withoutNote = NoteIntent(id: 'n-2');
+  stdout.writeln('a=' + withNote.toWire().toString());
+  stdout.writeln('b=' + withoutNote.toWire().toString());
+  stdout.writeln(
+      'distinct=' + (withNote.intentDigest() != withoutNote.intentDigest()).toString());
+''',
+      );
+
+      expect(out, contains('note: hi'));
+      expect(out, contains('note: null'));
+      expect(out, contains('distinct=true'));
+    });
+  });
+
+  group('#189 — generation-time intent payload diagnostics', () {
+    test(
+      'a field with no canonical JSON form is rejected (ZORPHY_E004)',
+      () async {
+        final ir = await _resolve({'intents.dart': _unencodable});
+        expect(ir.hasErrors, isTrue);
+        expect(
+          ir.diagnostics.map((d) => d.codeName),
+          contains('ZORPHY_E004'),
+          reason: 'a DateTime intent field must fail generation, not replay',
+        );
+      },
+    );
+
+    test(
+      'a field named after the discriminator is rejected (ZORPHY_E005)',
+      () async {
+        final ir = await _resolve({'intents.dart': _collision});
+        expect(ir.hasErrors, isTrue);
+        expect(
+          ir.diagnostics.map((d) => d.codeName),
+          contains('ZORPHY_E005'),
+          reason: 'a `kind` field must not silently drop the wire tag',
+        );
+      },
+    );
+
+    test('the canonical fixture raises neither diagnostic', () async {
+      final ir = await _resolve({'intents.dart': _polymorphic});
+      expect(
+        ir.diagnostics.map((d) => d.codeName),
+        isNot(contains('ZORPHY_E004')),
+      );
+      expect(
+        ir.diagnostics.map((d) => d.codeName),
+        isNot(contains('ZORPHY_E005')),
+      );
+    });
+  });
+
   group('#189 — ZorphyIntentDigest canonical form', () {
     test('is a 64-char lowercase SHA-256 hex string', () {
       final digest = ZorphyIntentDigest.compute('inspect_product', {
@@ -393,6 +509,29 @@ void main() {
     test('rejects a non-finite number instead of hashing a JSON null', () {
       expect(
         () => ZorphyIntentDigest.compute('x', {'n': double.nan}),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a Set so iteration order cannot leak into the digest', () {
+      // A `Set`'s order is not stable across hosts/runs, so accepting one as a
+      // canonical List would make the same intent digest differently.
+      expect(
+        () => ZorphyIntentDigest.compute('x', {
+          'tags': {1, 2, 3},
+        }),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a non-String map key with an ArgumentError', () {
+      // A bare `_TypeError` would escape the file's documented contract that a
+      // non-encodable value throws `ArgumentError`. The non-String key lives in
+      // a nested map, since the top-level fields map is typed `Map<String, ?>`.
+      expect(
+        () => ZorphyIntentDigest.compute('x', {
+          'payload': <Object, Object?>{1: 'a'},
+        }),
         throwsArgumentError,
       );
     });

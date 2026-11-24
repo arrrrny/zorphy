@@ -6,72 +6,83 @@
 /// (`intentName`), and a canonical `intentDigest()` that a receiver can verify
 /// a replay against. This emitter produces all of it — for a standalone intent
 /// and for a sealed root with abstract intermediate leaves — through
-/// `package:code_builder` only: every declaration is a [Spec], and the one
-/// non-spec construct (a `throw` inside `fromWire`) is a [CodeExpression]
-/// wrapping a [Code], which is the same seam `ClassDeclarationGenerator`
-/// already uses for source-level annotations.
+/// `package:code_builder` only: every declaration is a [Spec].
+///
+/// The output is a PART-FILE BODY: a sequence of class declarations with no
+/// `import`/`part` directives of its own. zorphy 3.0.0's output model is shared
+/// parts (`shared_part_builder.dart`, `adds_to_library: true`), and a Dart part
+/// may carry no directive other than `part of`. The Owning library is therefore
+/// responsible for importing the symbols the fragment names — at minimum
+/// [annotationImportUrl] — exactly the way `orchestrator.dart` folds
+/// `pluginImports` into the library it generates. Because the fragment is
+/// directive-free it composes into that library (and its `part` wrapper) as-is.
+///
+/// Field types are emitted verbatim from the IR (`ZorphyFieldIr.type`), so a
+/// non-`dart:core` field type resolves against the Owning library's existing
+/// imports — the same imports that resolve the type in the hand-written
+/// `$`-prefixed declaration this class was generated from. A field type with no
+/// canonical JSON form, or one named after the discriminator, is rejected at
+/// GENERATION by the resolver (ZORPHY_E004/E005) rather than emitting a method
+/// that compiles and then throws at replay time.
 ///
 /// Nothing here reads or writes a `.zorphy.dart` file: the emitter is a pure
 /// `PolymorphicIr -> String` function the generator composes into a part file.
 library;
 
-import 'package:code_builder/code_builder.dart';
-import 'package:dart_style/dart_style.dart';
+import 'dart:collection';
 
+import 'package:code_builder/code_builder.dart';
+
+import '../emission/emitter.dart';
 import '../parser/polymorphic_ir.dart';
 
-/// The intent annotation's package, for the `replaySafe` base marker and the
-/// digest helper the generated code calls.
-const String _annotationUrl =
+/// The annotation package's import URI.
+///
+/// The emitted fragment carries no directives (it is a part-file body), so the
+/// Owning library must import this for the symbols the fragment names —
+/// `ZorphyIntentBase`, `ZorphyIntentDigest` — to resolve.
+const String annotationImportUrl =
     'package:zorphy_annotation/zorphy_annotation.dart';
 
 /// Emits the intent surface of one resolved hierarchy.
 final class IntentEmitter {
-  /// Creates a stateless emitter.
-  const IntentEmitter();
+  /// The shared spec-emission pipeline, so page width and the formatter are
+  /// owned in ONE place (`ZorphyEmitter`) rather than re-created per call.
+  final ZorphyEmitter _emitter;
+
+  /// Creates an emitter that formats through [ZorphyEmitter] at [pageWidth]
+  /// (the shared `defaultPageWidth` by default).
+  IntentEmitter({int pageWidth = ZorphyEmitter.defaultPageWidth})
+    : _emitter = ZorphyEmitter.withPageWidth(pageWidth);
 
   /// Emits every `@ZorphyIntent` node in [ir] as one formatted source block.
   ///
   /// Returns an empty string when [ir] carries no intent hierarchy, so a
-  /// caller can compose this unconditionally into a part file.
-  String emitIntents(PolymorphicIr ir, {int pageWidth = 80}) {
-    final intentRoots = [
-      for (final root in ir.roots)
-        if (root.archetype == ArchetypeKind.intent) root,
-    ];
-    if (intentRoots.isEmpty) return '';
-
+  /// caller can compose this unconditionally into a part file. The result has
+  /// no directives: the Owning library supplies [annotationImportUrl] and the
+  /// `part of` wrapper.
+  String emitIntents(PolymorphicIr ir) {
     final specs = <Spec>[
-      for (final root in intentRoots) ..._hierarchySpecs(root),
+      for (final root in ir.roots)
+        if (root.archetype == ArchetypeKind.intent) ..._hierarchySpecs(root),
     ];
-    final library = Library((b) {
-      b
-        ..directives.add(Directive.import(_annotationUrl))
-        ..body.addAll(specs);
-    });
+    if (specs.isEmpty) return '';
 
-    final raw = library.accept(DartEmitter()).toString();
-    try {
-      return DartFormatter(
-        languageVersion: DartFormatter.latestLanguageVersion,
-        pageWidth: pageWidth,
-      ).format(raw);
-    } on FormatterException {
-      // A spec this emitter builds is complete Dart by construction, so a
-      // format failure means the generated fragment is a partial program a
-      // caller is composing further (`part of` context). Returning the raw
-      // form keeps that composition working, exactly like `ZorphyEmitter`.
-      return raw;
-    }
+    final library = Library((b) => b.body.addAll(specs));
+    return _emitter.emit(library);
   }
 
   /// One root and its whole subtree, roots first so a leaf's `implements`
   /// clause names an already-emitted type.
+  ///
+  /// A [ListQueue] with a `seen` set drains in O(n) and emits each node once,
+  /// so a node reachable from two roots is declared once (not twice).
   Iterable<Spec> _hierarchySpecs(ZorphyNodeIr root) sync* {
-    yield _classSpec(root);
-    final queue = <ZorphyNodeIr>[...root.directSubTypes];
+    final seen = <String>{};
+    final queue = ListQueue<ZorphyNodeIr>.from([root]);
     while (queue.isNotEmpty) {
-      final node = queue.removeAt(0);
+      final node = queue.removeFirst();
+      if (!seen.add(node.cleanName)) continue;
       yield _classSpec(node);
       queue.addAll(node.directSubTypes);
     }
@@ -89,7 +100,7 @@ final class IntentEmitter {
     final payload = _payloadFields(node);
     final hasSubtypes = node.directSubTypes.isNotEmpty;
     final parents = <Reference>[
-      refer('ZorphyIntentBase', _annotationUrl),
+      refer('ZorphyIntentBase'),
       for (final superType in node.superTypes) refer(superType.cleanName),
     ];
 
@@ -124,11 +135,13 @@ final class IntentEmitter {
     });
   }
 
-  /// `InspectProductIntent({required this.productId});`
+  /// `InspectProductIntent({required this.productId, this.note});`
   ///
-  /// Every payload field is required: an intent with a missing field has no
-  /// canonical form, so the compiler refuses it rather than the digest
-  /// silently hashing a `null` into a valid-looking hash.
+  /// A non-nullable field is `required`: an intent missing a non-null field
+  /// would hash a fabricated `null` into a valid-looking digest. A NULLABLE
+  /// field stays optional — `null` is itself a canonical form that
+  /// `ZorphyIntentDigest` hashes as `"note":null`, so forcing `note: null` at
+  /// every call site would only be noise.
   Constructor _constructor(List<ZorphyFieldIr> payload) {
     return Constructor((k) {
       for (final field in payload) {
@@ -140,7 +153,7 @@ final class IntentEmitter {
             p
               ..name = field.name
               ..named = true
-              ..required = true
+              ..required = !field.isNullable
               ..toThis = true;
           }),
         );
@@ -175,7 +188,9 @@ final class IntentEmitter {
   ///
   /// The leaf's whole payload plus the wire name, because a receiver that only
   /// got the fields could not tell an `inspect_product` from a
-  /// `delete_product` carrying the same `productId`.
+  /// `delete_product` carrying the same `productId`. The discriminator is
+  /// guaranteed not to collide with a payload field name by the resolver
+  /// (ZORPHY_E005).
   Method _toWireMethod(ZorphyNodeIr node, List<ZorphyFieldIr> payload) {
     return Method((m) {
       m
@@ -200,16 +215,13 @@ final class IntentEmitter {
       m
         ..name = 'intentDigest'
         ..returns = refer('String')
-        ..body = refer('ZorphyIntentDigest', _annotationUrl)
-            .property('compute')
-            .call([
-              refer('intentName'),
-              literalMap({
-                for (final field in payload)
-                  field.name: refer('this').property(field.name),
-              }),
-            ])
-            .code;
+        ..body = refer('ZorphyIntentDigest').property('compute').call([
+          refer('intentName'),
+          literalMap({
+            for (final field in payload)
+              field.name: refer('this').property(field.name),
+          }),
+        ]).code;
     });
   }
 

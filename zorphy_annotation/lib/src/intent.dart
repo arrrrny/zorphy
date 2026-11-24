@@ -60,10 +60,21 @@ abstract final class ZorphyIntentDigest {
           : _canonicalDouble(value as double);
     }
     if (value is Map) {
-      final keys = value.keys.map((k) => k as String).toList()..sort();
+      final keys = <String>[];
+      for (final key in value.keys) {
+        if (key is! String) {
+          throw ArgumentError.value(
+            key,
+            'value',
+            'an intent field map key must be a String, got ${key.runtimeType}',
+          );
+        }
+        keys.add(key);
+      }
+      keys.sort();
       return '{${keys.map((k) => '${jsonEncode(k)}:${_canonicalJson(value[k])}').join(',')}}';
     }
-    if (value is Iterable) {
+    if (value is List) {
       return '[${value.map(_canonicalJson).join(',')}]';
     }
     throw ArgumentError.value(
@@ -74,12 +85,16 @@ abstract final class ZorphyIntentDigest {
     );
   }
 
-  /// Shortest round-trip form of a finite double, with `1.0` kept as `1.0`.
+  /// Shortest round-trip form of a finite double, with the `.0` of a
+  /// whole-number double kept.
   ///
-  /// `double.toString()` already yields the shortest representation that
-  /// round-trips, and unlike `jsonEncode` it never emits exponent notation for
-  /// an integral value — so `2.0` stays `2.0` and cannot canonicalize to the
-  /// same bytes as the int `2`.
+  /// `double.toString()` is the shortest string that round-trips to the same
+  /// double, and it keeps `2.0` as `2.0` — which is what stops the int `2`
+  /// and the double `2.0` from canonicalizing to the same bytes (the test
+  /// `an int and a double never canonicalize to the same bytes` is the guard).
+  /// It is NOT true that `toString()` never uses exponent notation
+  /// (`1e21.toString()` is `1e+21`); that does not break the contract, because
+  /// the representation is deterministic across hosts, processes and runs.
   static String _canonicalDouble(double value) {
     final text = value.toString();
     return text;
