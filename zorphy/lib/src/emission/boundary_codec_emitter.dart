@@ -293,9 +293,7 @@ class BoundaryCodecEmitter {
     // most informative map a codec can produce for a value it cannot dispatch,
     // and `_boundaryDescribe`-style diagnostics stay on the decode side.
     body.add(
-      Code(
-        "return <String, Object?>{${_literal(key)}: '\$runtimeType'};",
-      ),
+      Code("return <String, Object?>{${_literal(key)}: '\$runtimeType'};"),
     );
     return body;
   }

@@ -121,10 +121,11 @@ String _compact(String source) => source.replaceAll(RegExp(r'\s+'), '');
 
 /// The emitter's source with comment lines removed, so the acceptance gate
 /// reads CODE and not the prose that names the forbidden construct.
-String _emitterCode() => File('lib/src/emission/boundary_codec_emitter.dart')
-    .readAsLinesSync()
-    .where((line) => !line.trimLeft().startsWith('//'))
-    .join('\n');
+String _emitterCode() =>
+    File('lib/src/emission/boundary_codec_emitter.dart')
+        .readAsLinesSync()
+        .where((line) => !line.trimLeft().startsWith('//'))
+        .join('\n');
 
 void main() {
   group('golden: dispatch node', () {
@@ -196,29 +197,35 @@ void main() {
       // The dispatch's fallback is a returned map keyed by the discriminator,
       // never a `throw` — the boundary promise is symmetric with fromWire.
       expect(compact, isNot(contains('throw')));
-      expect(compact, contains("return<String,Object?>{'kind':'\$runtimeType'};"));
+      expect(
+        compact,
+        contains("return<String,Object?>{'kind':'\$runtimeType'};"),
+      );
     });
   });
 
   group('golden: num field encode', () {
-    test('a num field round-trips through toDouble, a double stays identity', () {
-      const numFields = <String, List<BoundaryField>>{
-        r'$OrderNotification': [
-          BoundaryField(name: 'ratio', type: 'num'),
-          BoundaryField(name: 'price', type: 'double'),
-        ],
-      };
-      final fixture = _notification();
-      final toWire = _compact(
-        _emit([
-          const BoundaryCodecEmitter().toWire(fixture.order, numFields),
-        ]),
-      );
-      // A `num` may carry an int the decode side widens to double, so encode
-      // widens too; a `double` is already a double and is emitted as-is.
-      expect(toWire, contains("map['ratio']=ratio.toDouble();"));
-      expect(toWire, contains("map['price']=price;"));
-    });
+    test(
+      'a num field round-trips through toDouble, a double stays identity',
+      () {
+        const numFields = <String, List<BoundaryField>>{
+          r'$OrderNotification': [
+            BoundaryField(name: 'ratio', type: 'num'),
+            BoundaryField(name: 'price', type: 'double'),
+          ],
+        };
+        final fixture = _notification();
+        final toWire = _compact(
+          _emit([
+            const BoundaryCodecEmitter().toWire(fixture.order, numFields),
+          ]),
+        );
+        // A `num` may carry an int the decode side widens to double, so encode
+        // widens too; a `double` is already a double and is emitted as-is.
+        expect(toWire, contains("map['ratio']=ratio.toDouble();"));
+        expect(toWire, contains("map['price']=price;"));
+      },
+    );
   });
 
   group('golden: leaf node', () {
