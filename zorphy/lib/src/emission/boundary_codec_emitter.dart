@@ -220,6 +220,14 @@ class BoundaryCodecEmitter {
   // ── Dispatch nodes ────────────────────────────────────────────────
 
   List<Code> _dispatchFromWireBody(ZorphyNodeIr node) {
+    // ASSUMPTION (explicit, by design): the dispatch switches over
+    // `leavesOf(node)` — the CONCRETE leaves only. An abstract intermediate
+    // node between [node] and a leaf carries no discriminator of its own in
+    // the current IR, so it is never a `case`; a wire tag that would match an
+    // intermediate's value falls through to the `BoundaryErr` below. This is
+    // correct for the v3 IR shape (only leaves are tagged). If a future IR
+    // gives intermediates their own tags, this dispatch must recurse into the
+    // intermediate's own dispatch rather than enumerating only leaves.
     final key = node.discriminatorKey;
     final leaves = leavesOf(node);
     final tags = leaves.map((leaf) => leaf.discriminatorValue).join(', ');
@@ -271,16 +279,22 @@ class BoundaryCodecEmitter {
 
   List<Code> _dispatchToWireBody(ZorphyNodeIr node) {
     final leaves = leavesOf(node);
+    final key = node.discriminatorKey;
     final body = <Code>[const Code('final value = this;')];
     // `is` promotion, not an `as` cast: the dispatch is total and the
     // promotion is what hands the leaf's own `toWire` the call.
     for (final leaf in leaves) {
       body.add(Code('if (value is ${leaf.cleanName}) return value.toWire();'));
     }
+    // The boundary is symmetric with `fromWire`: an unknown subtype (e.g. a
+    // plugin extending a sealed hierarchy at runtime) is ENCODED, never thrown
+    // — `toWire` keeps the same "never a thrown UnsupportedError" promise
+    // `fromWire` makes. The runtime type under the discriminator key is the
+    // most informative map a codec can produce for a value it cannot dispatch,
+    // and `_boundaryDescribe`-style diagnostics stay on the decode side.
     body.add(
       Code(
-        'throw UnsupportedError('
-        "'Unknown ${node.cleanName} subtype: \$runtimeType');",
+        "return <String, Object?>{${_literal(key)}: '\$runtimeType'};",
       ),
     );
     return body;
@@ -587,6 +601,11 @@ class BoundaryCodecEmitter {
       case _Shape.dateTime:
         return '$name.toIso8601String()';
       case _Shape.number:
+        // A `double` field already carries a double, so identity is correct.
+        // A `num` field may hold an `int` that the decode side ALWAYS widens to
+        // a `double` (`_boundaryDouble`); emitting it raw would silently
+        // truncate on the round-trip, so encode it symmetrically with `.toDouble()`.
+        return _strip(type.inner) == 'num' ? '$name.toDouble()' : name;
       case _Shape.scalar:
         return name;
     }
@@ -605,8 +624,12 @@ class BoundaryCodecEmitter {
     }
 
     // A leaf cannot see its siblings through `directSubTypes`; walking from
-    // the hierarchy root is what makes a `List<Sibling>` field resolve.
-    walk(node.root ?? node);
+    // the hierarchy root is what makes a `List<Sibling>` field resolve. When
+    // [node] IS the root (`node.root == null`, or a self-referential root),
+    // the two walks would traverse the same subtree and double every name in
+    // the set, so the second walk is guarded away.
+    final root = node.root;
+    if (root != null && root != node) walk(root);
     walk(node);
     return names;
   }
@@ -731,11 +754,12 @@ return null;''');
       ..requiredParameters.add(_param('value', 'Object?'))
       ..requiredParameters.add(_param('path', 'String'))
       ..requiredParameters.add(_param('violations', 'List<FieldViolation>'))
+      // Only a genuine `Map<String, Object?>` is accepted. A map with non-String
+      // keys (`{1: 'a'}`) is NOT coerced via `'$key'` — that silently invents
+      // string keys and hides corruption — it becomes a `FieldViolation`, the
+      // same way `_boundaryAs` reports a scalar type mismatch.
       ..body = Code('''
 if (value is Map<String, Object?>) return value;
-if (value is Map) {
-  return value.map((key, entry) => MapEntry('\$key', entry));
-}
 violations.add(
   FieldViolation(
     path: path,

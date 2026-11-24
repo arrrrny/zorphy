@@ -162,9 +162,12 @@ void main() {
       expect(compact, contains("FieldViolation(path:'/kind',"));
       expect(compact, contains('BoundaryErr<Notification>'));
       expect(compact, contains('_boundaryDescribe(tag)'));
-      // The decode path never throws: the only UnsupportedError in the
-      // emitted source is `toWire`'s unreachable fallback.
+      // Neither direction throws: `fromWire` answers a `BoundaryErr` for a bad
+      // tag, and `toWire` ENCODES an unhandled subtype (it no longer throws an
+      // `UnsupportedError`), so the "never a thrown UnsupportedError" promise
+      // holds for the whole codec, not just the decode side.
       expect(compact, contains('targetType:'));
+      expect(source, isNot(contains('UnsupportedError')));
       expect(
         _compact(
           _emit([
@@ -187,6 +190,34 @@ void main() {
       expect(compact, contains('if(valueisOrderNotification)'));
       expect(compact, contains('returnvalue.toWire();'));
       expect(source, isNot(contains(' as OrderNotification')));
+    });
+
+    test('toWire encodes an unhandled subtype instead of throwing', () {
+      // The dispatch's fallback is a returned map keyed by the discriminator,
+      // never a `throw` — the boundary promise is symmetric with fromWire.
+      expect(compact, isNot(contains('throw')));
+      expect(compact, contains("return<String,Object?>{'kind':'\$runtimeType'};"));
+    });
+  });
+
+  group('golden: num field encode', () {
+    test('a num field round-trips through toDouble, a double stays identity', () {
+      const numFields = <String, List<BoundaryField>>{
+        r'$OrderNotification': [
+          BoundaryField(name: 'ratio', type: 'num'),
+          BoundaryField(name: 'price', type: 'double'),
+        ],
+      };
+      final fixture = _notification();
+      final toWire = _compact(
+        _emit([
+          const BoundaryCodecEmitter().toWire(fixture.order, numFields),
+        ]),
+      );
+      // A `num` may carry an int the decode side widens to double, so encode
+      // widens too; a `double` is already a double and is emitted as-is.
+      expect(toWire, contains("map['ratio']=ratio.toDouble();"));
+      expect(toWire, contains("map['price']=price;"));
     });
   });
 
