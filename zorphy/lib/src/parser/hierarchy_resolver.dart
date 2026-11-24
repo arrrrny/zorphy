@@ -20,6 +20,7 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 
 import '../cli/utils/naming_utils.dart';
+import '../lints/no_bool_flags_lint.dart';
 import 'archetype_parser.dart';
 import 'polymorphic_ir.dart';
 
@@ -226,6 +227,22 @@ final class HierarchyResolver {
       _checkIntentPayload(root, diagnostics);
     }
 
+    // Phase 4c — `ZORPHY_LINT_NO_BOOL_FLAGS` (ISSUE-005, #180). A behavioral
+    // or lifecycle `bool` on a state/intent/union node flattens a polymorphic
+    // variant back into a flag, so it is reported here alongside the other
+    // generation-blocking diagnostics instead of being emitted and discovered
+    // at runtime. The rule itself lives in `lints/no_bool_flags_lint.dart` so
+    // it can be unit-tested without a build step.
+    diagnostics.addAll(
+      NoBoolFlagsLint.check(
+        PolymorphicIr(
+          nodes: const {},
+          roots: List.unmodifiable(resolvedRoots),
+          diagnostics: const [],
+        ),
+      ),
+    );
+
     // A union variant that also declares its own `implements` parent was
     // refused its union edge in Phase 1 — report it rather than letting the
     // union silently lose a declared variant.
@@ -262,6 +279,7 @@ final class HierarchyResolver {
     ClassElement element,
     ArchetypeDeclaration declaration, {
     required bool isSyntheticLeaf,
+    bool isUnion = false,
   }) {
     final className = element.name ?? '';
     final cleanName = className.replaceAll(r'$', '');
@@ -280,6 +298,7 @@ final class HierarchyResolver {
       principalKey: declaration.principalKey,
       replaySafe: declaration.replaySafe,
       isSyntheticLeaf: isSyntheticLeaf,
+      isUnion: isUnion || declaration.isUnion,
       fields: _declaredFields(element),
       typeParameters: List.unmodifiable(
         element.typeParameters.map((parameter) => parameter.toString()),
@@ -294,6 +313,10 @@ final class HierarchyResolver {
   /// still round-trips. A declaration that inherits its payload from a
   /// supertype declares nothing here, and the leaf walk asks the ancestors —
   /// which is why this list is the node's OWN fields only.
+  ///
+  /// `@ZorphyDomainBool()` is read here (getter annotation, then any
+  /// annotation on the same source field) so the lint downstream never has to
+  /// touch an element.
   static List<ZorphyFieldIr> _declaredFields(ClassElement element) {
     final fields = <ZorphyFieldIr>[];
     final seen = <String>{};
@@ -307,6 +330,7 @@ final class HierarchyResolver {
           name: name,
           type: _typeText(type),
           isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+          isDomainBool: _isDomainBool(getter),
         ),
       );
     }
@@ -320,11 +344,20 @@ final class HierarchyResolver {
           name: name,
           type: _typeText(type),
           isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+          isDomainBool: _isDomainBool(field),
         ),
       );
     }
     return List.unmodifiable(fields);
   }
+
+  /// Whether [element] carries `@ZorphyDomainBool()`.
+  ///
+  /// An abstract getter's annotation sits on the getter element; on a real
+  /// field it sits on the field. Both are checked because a fixture may
+  /// declare either shape.
+  static bool _isDomainBool(Element element) =>
+      zorphyDomainBoolChecker.hasAnnotationOf(element);
 
   /// A field type as source text, WITHOUT a trailing `?`.
   ///
@@ -523,6 +556,10 @@ final class HierarchyResolver {
         // `isSyntheticLeaf` is decided by membership in the union variant set,
         // so declaration order cannot flip it (finding: order-dependent flag).
         isSyntheticLeaf: unionVariants.containsKey(declaration.element),
+        // A union VARIANT belongs to the union hierarchy even when it carries
+        // no `@ZorphyUnion` of its own, so the lint can treat every member of
+        // the hierarchy as in scope.
+        isUnion: node.isUnion || unionVariants.containsKey(declaration.element),
       ),
     );
   }

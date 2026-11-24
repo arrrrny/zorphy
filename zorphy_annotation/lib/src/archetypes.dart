@@ -99,6 +99,30 @@ final class ZorphyValue {
   });
 }
 
+/// Field-level escape hatch from `ZORPHY_LINT_NO_BOOL_FLAGS` (ISSUE-005, #180).
+///
+/// A `bool` on a `@ZorphyState` / `@ZorphyIntent` / polymorphic variant is
+/// rejected by the generator when its NAME is a behavioral or lifecycle flag
+/// (`isLoading`, `hasError`, `force*`, `skip*`, `silent`, ...): those exist to
+/// model two commands or two states as one node, which is what polymorphic
+/// subtypes and `AsyncSlice<T>` exist to replace.
+///
+/// A boolean that is genuinely part of the domain — `Product.inStock`,
+/// `InteractiveUiNode.enabled` — is not a flag and must be able to say so:
+///
+/// ```dart
+/// @ZorphyState()
+/// abstract class $UiNode {
+///   @ZorphyDomainBool()
+///   bool get isLoading; // a domain fact of THIS node, not a mode switch
+/// }
+/// ```
+final class ZorphyDomainBool {
+  /// Marks the annotated field/getter as a genuine domain boolean, exempting
+  /// it from `ZORPHY_LINT_NO_BOOL_FLAGS`.
+  const ZorphyDomainBool();
+}
+
 /// Field-level mock-data seed hint for mock-first generation.
 ///
 /// Unlike the five archetypes, [ZorphyMock] annotates a FIELD, not a class: it

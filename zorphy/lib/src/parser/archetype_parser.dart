@@ -76,6 +76,16 @@ final class ZorphyArchetype {
   static const all = <ZorphyArchetype>[entity, state, intent, value, union];
 }
 
+/// `@ZorphyDomainBool()` — the field-level escape hatch from
+/// `ZORPHY_LINT_NO_BOOL_FLAGS` (ISSUE-005, #180).
+///
+/// Read here rather than in the lint because this file is the ONE place the
+/// parser touches annotation objects; the lint consumes the lowered
+/// [ZorphyFieldIr.isDomainBool] flag and never sees an element.
+const TypeChecker zorphyDomainBoolChecker = TypeChecker.fromUrl(
+  'package:zorphy_annotation/src/archetypes.dart#ZorphyDomainBool',
+);
+
 /// The parsed annotation values of one archetype-annotated class.
 final class ArchetypeDeclaration {
   /// The archetype annotation found on the class.

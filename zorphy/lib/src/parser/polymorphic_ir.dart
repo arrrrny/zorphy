@@ -63,6 +63,13 @@ enum ZorphyDiagnosticCode {
   /// hierarchy's `discriminatorKey`, so the wire tag and the field would
   /// collide and the intent name would be lost from `toWire()`.
   e005DiscriminatorCollision,
+
+  /// `ZORPHY_LINT_NO_BOOL_FLAGS` — a behavioral or lifecycle `bool` on a
+  /// `@ZorphyState` / `@ZorphyIntent` / polymorphic variant (ISSUE-005, #180).
+  ///
+  /// A LINT code rather than an `E00N`: the namespace is the rule's, so a
+  /// consumer matching on it is not tied to this generator's numbering.
+  lintNoBoolFlags,
 }
 
 /// One diagnostic raised while resolving a hierarchy.
@@ -89,6 +96,7 @@ final class ZorphyDiagnostic {
     ZorphyDiagnosticCode.e003DuplicateDiscriminator => 'ZORPHY_E003',
     ZorphyDiagnosticCode.e004FieldNotEncodable => 'ZORPHY_E004',
     ZorphyDiagnosticCode.e005DiscriminatorCollision => 'ZORPHY_E005',
+    ZorphyDiagnosticCode.lintNoBoolFlags => 'ZORPHY_LINT_NO_BOOL_FLAGS',
   };
 
   /// Whether this diagnostic blocks generation.
@@ -119,11 +127,23 @@ final class ZorphyFieldIr {
   /// Whether the declared type is nullable (`String?`).
   final bool isNullable;
 
+  /// Whether the declaration carries `@ZorphyDomainBool()` — the author's
+  /// explicit claim that this boolean is part of the domain rather than a
+  /// behavioral mode switch (ISSUE-005, #180).
+  ///
+  /// `ZORPHY_LINT_NO_BOOL_FLAGS` skips an exempted field; nothing else reads
+  /// the flag, so the escape hatch changes no emitted code.
+  final bool isDomainBool;
+
   const ZorphyFieldIr({
     required this.name,
     required this.type,
     this.isNullable = false,
+    this.isDomainBool = false,
   });
+
+  /// Whether this field is a `bool` (and therefore a candidate flag).
+  bool get isBool => type == 'bool';
 
   @override
   String toString() => '$type${isNullable ? '?' : ''} $name';
@@ -183,6 +203,14 @@ final class ZorphyNodeIr {
   /// Whether this node was lowered from a `@ZorphyUnion` factory variant.
   final bool isSyntheticLeaf;
 
+  /// Whether this node belongs to a `@ZorphyUnion` hierarchy — the union root
+  /// itself, or any of its variants (ISSUE-005, #180).
+  ///
+  /// `@ZorphyUnion` lowers to [ArchetypeKind.value], so without this flag the
+  /// two value shapes are indistinguishable to a rule that must treat a union
+  /// as the replacement for the flags its variants may not carry.
+  final bool isUnion;
+
   /// The root of this node's hierarchy; unset on the root itself.
   final ZorphyNodeIr? root;
 
@@ -224,6 +252,7 @@ final class ZorphyNodeIr {
     this.principalKey,
     this.replaySafe,
     this.isSyntheticLeaf = false,
+    this.isUnion = false,
     this.root,
     this.fields = const [],
     this.typeParameters = const [],
@@ -249,6 +278,7 @@ final class ZorphyNodeIr {
     bool? isAbstractIntermediate,
     bool? isConcreteLeaf,
     bool? isSyntheticLeaf,
+    bool? isUnion,
     List<ZorphyFieldIr>? fields,
     List<String>? typeParameters,
   }) {
@@ -272,6 +302,7 @@ final class ZorphyNodeIr {
           ? this.replaySafe
           : replaySafe as bool?,
       isSyntheticLeaf: isSyntheticLeaf ?? this.isSyntheticLeaf,
+      isUnion: isUnion ?? this.isUnion,
       root: root ?? this.root,
       fields: fields ?? this.fields,
       typeParameters: typeParameters ?? this.typeParameters,
