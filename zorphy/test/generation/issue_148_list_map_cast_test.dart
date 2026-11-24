@@ -32,6 +32,9 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
+int _occurrences(String haystack, String needle) =>
+    haystack.split(needle).length - 1;
+
 void main() {
   final fixture = File(
     'example/lib/_br_/various/issue_148_list_map_cast_example.part.dart',
@@ -79,18 +82,26 @@ void main() {
       expect(compact, isNot(contains('=>easMap<String,dynamic>')));
     });
 
-    test('nullable list field keeps null-aware semantics', () {
-      expect(
-        compact,
-        contains(
-          'returncopyWith(payloads:'
-          '(valueisList<Map<String,dynamic>>??value:'
-          '(valueasList<dynamic>?)?'
-          '.map((e)=>eisMap<String,dynamic>'
-          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),)?.toList()),);',
-        ),
-      );
-    });
+    test(
+      'nullable list field keeps nullable typing without a null-aware chain',
+      () {
+        // arrrrny/zorphy#209: the `is …?` fast path already admits null, so
+        // the conversion branch must cast to the NON-nullable `List<dynamic>`
+        // and use plain `.` chains — a `?.` there is
+        // `invalid_null_aware_operator`.
+        expect(
+          compact,
+          contains(
+            'returncopyWith(payloads:'
+            '(valueisList<Map<String,dynamic>>??value:'
+            '(valueasList<dynamic>)'
+            '.map((e)=>eisMap<String,dynamic>'
+            '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList()),);',
+          ),
+        );
+        expect(compact, isNot(contains('asList<dynamic>?)')));
+      },
+    );
 
     test('primitive fields keep the plain hard cast', () {
       // The fix is scoped to composite list fields; bool/String arms
@@ -106,7 +117,7 @@ void main() {
         contains(
           'asList<dynamic>)'
           '.map((e)=>eisMap<String,dynamic>'
-          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList())'
+          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList());})()'
           ':this.marketplaces,',
         ),
       );
@@ -115,7 +126,7 @@ void main() {
         contains(
           'asList<dynamic>)'
           '.map((e)=>eisMap<String,dynamic>'
-          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList())'
+          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList());})()'
           ':this.errors,',
         ),
       );
@@ -123,15 +134,51 @@ void main() {
       expect(compact, isNot(contains('=>easMap<String,dynamic>')));
     });
 
-    test('nullable patch arm keeps null-aware semantics', () {
+    test(
+      'nullable patch arm keeps nullable typing without a null-aware chain',
+      () {
+        // arrrrny/zorphy#209: same rule as the copyWithField arm above.
+        expect(
+          compact,
+          contains(
+            'asList<dynamic>)'
+            '.map((e)=>eisMap<String,dynamic>'
+            '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),).toList());})()'
+            ':this.payloads,',
+          ),
+        );
+        expect(compact, isNot(contains('asList<dynamic>?)?')));
+      },
+    );
+
+    test('a Function patch entry is evaluated once, not per branch', () {
+      // CodeRabbit finding on #211: the patch-value resolution expression
+      // used to be emitted three times (type test, fast-path branch and
+      // conversion branch). A non-deterministic callback could then pass
+      // the type test on one value while the cast ran on another — for a
+      // nullable composite list that turned `(null as List<dynamic>)` into
+      // a throw where the old nullable cast passed null through. The arm
+      // now resolves once into a local and every branch reads that value.
       expect(
-        compact,
-        contains(
-          'asList<dynamic>?)?'
-          '.map((e)=>eisMap<String,dynamic>'
-          '?e:Map<String,dynamic>.from(easMap<dynamic,dynamic>,),)?.toList())'
-          ':this.payloads,',
+        _occurrences(
+          compact,
+          '_patchMap[MarketplaceResult\$.marketplaces](this.marketplaces',
         ),
+        1,
+      );
+      expect(
+        _occurrences(
+          compact,
+          '_patchMap[NullablePayloads\$.payloads](this.payloads',
+        ),
+        1,
+      );
+      expect(
+        _occurrences(
+          compact,
+          '_patchMap[TaggedResult\$.maybeTags](this.maybeTags',
+        ),
+        1,
       );
     });
   });
@@ -158,9 +205,9 @@ void main() {
         contains(
           'returncopyWith(maybeTags:'
           '(valueisList<Map<String,String>>??value:'
-          '(valueasList<dynamic>?)?'
+          '(valueasList<dynamic>)'
           '.map((e)=>eisMap<String,String>'
-          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),)?.toList()),);',
+          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),).toList()),);',
         ),
       );
       expect(
@@ -168,7 +215,7 @@ void main() {
         contains(
           'asList<dynamic>)'
           '.map((e)=>eisMap<String,String>'
-          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),).toList())'
+          '?e:Map<String,String>.from(easMap<dynamic,dynamic>,),).toList());})()'
           ':this.tags,',
         ),
       );

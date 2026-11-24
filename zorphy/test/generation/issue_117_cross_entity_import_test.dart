@@ -61,15 +61,18 @@ void main() {
     test('patchWith cast target is the concrete entity type, not \$Type', () {
       // The cast MUST be `as Issue117Ref` (concrete form) — the previous
       // `as $Issue117Ref` (abstract form) caused argument_type_not_assignable.
-      // The dart formatter places `as Issue117Ref` on its own line, so we use
-      // a regex that matches across newlines.
+      // Match the cast target itself rather than the token before `as`: the
+      // patch arm resolves the value into a local first (CodeRabbit finding
+      // on #211), so the cast reads `return _patchValue as Issue117Ref` and
+      // no longer has a `)` immediately before `as`. The assertion is about
+      // the concrete vs abstract cast TARGET, not the expression shape.
       expect(
-        RegExp(r'\)\s*as\s+Issue117Ref\b').hasMatch(output),
+        RegExp(r'\bas\s+Issue117Ref\b').hasMatch(output),
         isTrue,
         reason: 'patchWith cast must target the concrete Issue117Ref form',
       );
       expect(
-        RegExp(r'\)\s*as\s+\$Issue117Ref\b').hasMatch(output),
+        RegExp(r'\bas\s+\$Issue117Ref\b').hasMatch(output),
         isFalse,
         reason:
             'patchWith cast must NOT target the abstract \$Issue117Ref form',
