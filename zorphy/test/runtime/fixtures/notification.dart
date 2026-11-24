@@ -32,12 +32,15 @@ class OrderNotification extends Notification {
 
   final int itemCount;
 
-  OrderNotification copyWith({String? id, Object? readAt = _unset, int? itemCount}) =>
-      OrderNotification(
-        id: id ?? this.id,
-        readAt: identical(readAt, _unset) ? this.readAt : readAt as DateTime?,
-        itemCount: itemCount ?? this.itemCount,
-      );
+  OrderNotification copyWith({
+    String? id,
+    Object? readAt = _unset,
+    int? itemCount,
+  }) => OrderNotification(
+    id: id ?? this.id,
+    readAt: identical(readAt, _unset) ? this.readAt : readAt as DateTime?,
+    itemCount: itemCount ?? this.itemCount,
+  );
 }
 
 class PriceDropNotification extends Notification {

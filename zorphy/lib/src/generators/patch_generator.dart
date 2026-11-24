@@ -204,6 +204,14 @@ class PatchClassGenerator extends ConcreteClassGenerator {
     // A sealed root DOES get a patch — the polymorphic one (ISSUE-009), which
     // is what lets a heterogeneous collection be updated without downcasting.
     if (context.metadata.isSealed) {
+      // A GENERIC sealed root is withheld, the same fail-closed posture
+      // `PolymorphicClassEmitter.shouldEmit` takes for the `when`/`maybeWhen`
+      // matcher: the root and shared patches carry no type parameters, so
+      // `PatchValue<T>` members would reference a `T` no emitted class
+      // declares and the generated library would not compile. A generic
+      // hierarchy keeps its per-subtype patches; throwing here instead would
+      // abort generation for every other class in the same run.
+      if (context.metadata.generics.isNotEmpty) return false;
       return context.metadata.explicitSubtypes.isNotEmpty;
     }
     // NonSealed abstract bases need Patch because parent entities
@@ -226,22 +234,14 @@ class PatchClassGenerator extends ConcreteClassGenerator {
     // `<Root>Patch` plus the `<Root>SharedPatch` its `.shared(...)` factory
     // builds, dispatching shared-field updates across every concrete subtype.
     if (metadata.isSealed) {
-      // A generic sealed root would emit `PatchValue<T>` members whose `T` no
-      // emitted class declares: the root and shared patches carry no type
-      // parameters, so the generated library does not compile. Refuse it by
-      // name instead of emitting broken code; non-generic roots are unaffected.
-      if (metadata.generics.isNotEmpty) {
-        final genericNames = metadata.generics.map((g) => g.name).join(', ');
-        throw ArgumentError.value(
-          metadata.cleanName,
-          'rootName',
-          'a generic sealed root cannot get a polymorphic patch: '
-              '${metadata.cleanName}<$genericNames> would emit PatchValue '
-              'members referencing undeclared type parameters. Use a '
-              'non-generic sealed root, or a nonSealed base for a generic '
-              'hierarchy',
-        );
-      }
+      // A generic sealed root never reaches this branch — `shouldGenerate`
+      // withholds it (see there), so generation cannot emit `PatchValue<T>`
+      // members whose `T` no emitted class declares.
+      assert(
+        metadata.generics.isEmpty,
+        'generic sealed root must be gated in '
+        'shouldGenerate',
+      );
       final subtypeNames = {
         for (final subtype in metadata.explicitSubtypes)
           subtype.interfaceName.replaceAll(r'$', ''),
@@ -298,6 +298,10 @@ class PatchClassGenerator extends ConcreteClassGenerator {
       fields: metadata.allFields,
       knownClasses: knownClasses,
       genericTypeNames: genericTypeNames,
+      // Declaration sites (the class and `diff`) must carry the bounds:
+      // `toString()` renders `T extends num`, while `genericTypeNames` above
+      // stays bare for type-ARGUMENT sites (`PatchBase<Box<T>, Box$>`).
+      genericDeclarations: metadata.generics.map((g) => g.toString()).toList(),
     );
     if (code.trim().isEmpty) return [];
     return [Code(code)];

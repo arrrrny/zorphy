@@ -54,12 +54,14 @@ class PatchEmitter {
     required List<NameTypeClassComment> fields,
     List<String> knownClasses = const [],
     List<String> genericTypeNames = const [],
+    List<String> genericDeclarations = const [],
   }) {
     final classSpec = buildClass(
       className: className,
       fields: fields,
       knownClasses: knownClasses,
       genericTypeNames: genericTypeNames,
+      genericDeclarations: genericDeclarations,
     );
     return ZorphyEmitter().emitSpecs([classSpec]).trim();
   }
@@ -73,6 +75,7 @@ class PatchEmitter {
     required List<NameTypeClassComment> fields,
     List<String> knownClasses = const [],
     List<String> genericTypeNames = const [],
+    List<String> genericDeclarations = const [],
   }) {
     final name = _clean(className);
     final enumName = '${name}\$';
@@ -84,7 +87,15 @@ class PatchEmitter {
     return Class((c) {
       c.name = patchName;
       c.extend = referType('PatchBase<$name$typeArgs, $enumName>');
-      c.types.addAll(genericTypeNames.map(referType));
+      // A DECLARATION site: the type parameters must carry their bounds, or
+      // every use of `T` inside the class violates `<T extends num>`
+      // (`type_argument_not_matching_bounds`). Falls back to the bare names
+      // when no declaration list was supplied, which is the unbounded case
+      // the emitters take by default.
+      c.types.addAll(
+        (genericDeclarations.isEmpty ? genericTypeNames : genericDeclarations)
+            .map(referType),
+      );
 
       // The canonical empty patch: const, so diff()'s identical() fast path
       // allocates nothing and compose() has a real neutral element. It is a
@@ -154,6 +165,7 @@ class PatchEmitter {
           fields,
           enumName,
           genericTypeNames: genericTypeNames,
+          genericDeclarations: genericDeclarations,
           knownClasses: knownClasses,
         ),
       );
@@ -409,6 +421,7 @@ class PatchEmitter {
     List<NameTypeClassComment> fields,
     String enumName, {
     List<String> genericTypeNames = const [],
+    List<String> genericDeclarations = const [],
     List<String> knownClasses = const [],
   }) => Method((m) {
     final patchName = _baseName(patchRef);
@@ -418,8 +431,13 @@ class PatchEmitter {
       ..returns = referType(patchRef);
     // A static member cannot see the class's type variables, so a generic
     // patch declares them on `diff` itself — the caller supplies them from
-    // the two entities it passes in.
-    for (final generic in genericTypeNames) {
+    // the two entities it passes in. A DECLARATION site, so the bounds ride
+    // along: a bare `<T>` here is not well-bounded against `Box<T extends
+    // num>` (type_argument_not_matching_bounds).
+    for (final generic
+        in genericDeclarations.isEmpty
+            ? genericTypeNames
+            : genericDeclarations) {
       m.types.add(referType(generic));
     }
     m.requiredParameters.addAll([

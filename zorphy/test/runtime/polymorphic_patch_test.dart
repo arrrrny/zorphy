@@ -86,9 +86,9 @@ void main() {
         readAt: PatchValue.set(DateTime.utc(2026, 11, 23)),
       );
 
-      final applied = first.compose(second).apply(
-        OrderNotification(id: 'o1', itemCount: 5),
-      );
+      final applied = first
+          .compose(second)
+          .apply(OrderNotification(id: 'o1', itemCount: 5));
 
       expect(applied.id, 'renamed');
       expect(applied.readAt, DateTime.utc(2026, 11, 23));
@@ -140,9 +140,11 @@ void main() {
         readAt: readAt,
       );
 
-      final applied = NotificationPatch.shared(
-        id: const PatchValue.set('o2'),
-      ).apply(original) as OrderNotification;
+      final applied =
+          NotificationPatch.shared(
+                id: const PatchValue.set('o2'),
+              ).apply(original)
+              as OrderNotification;
 
       expect(applied.id, 'o2');
       expect(

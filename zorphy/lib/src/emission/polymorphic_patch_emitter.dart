@@ -243,9 +243,7 @@ class PolymorphicPatchEmitter {
       c.methods.add(_isEmptyGetter(fields));
       c.methods.add(_isNotEmptyGetter());
       c.methods.add(_sharedApplyMethod(root, fields, subtypeNames));
-      c.methods.add(
-        _concreteComposeMethod(root, fields, sharedName),
-      );
+      c.methods.add(_concreteComposeMethod(root, fields, sharedName));
       c.methods.add(
         _concreteInvertMethod(
           root,
@@ -299,9 +297,7 @@ class PolymorphicPatchEmitter {
       c.methods.add(_isEmptyGetter(fields));
       c.methods.add(_isNotEmptyGetter());
       c.methods.add(_subtypeApplyMethod(subtype, fields));
-      c.methods.add(
-        _concreteComposeMethod(root, fields, patchName),
-      );
+      c.methods.add(_concreteComposeMethod(root, fields, patchName));
       c.methods.add(
         _concreteInvertMethod(
           root,

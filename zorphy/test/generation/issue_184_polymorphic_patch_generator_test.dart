@@ -120,7 +120,7 @@ void main() {
       );
     });
 
-    test('a generic sealed root is refused by name, not emitted broken', () {
+    test('a generic sealed root is withheld, not emitted broken', () {
       final meta = _sealedRootMeta(
         cleanName: 'Result',
         generics: [const GenericParameterMetadata(name: 'T')],
@@ -131,17 +131,16 @@ void main() {
       );
       final context = GenerationContext(metadata: meta, config: _config());
 
-      // Without this gate the emitter writes `PatchValue<T> get value` into a
-      // class that declares no `T`, and the generated library does not compile.
+      // Emitting it would write `PatchValue<T> get value` into a class that
+      // declares no `T`, and the generated library would not compile. The
+      // gate is `shouldGenerate`, so the generator declines rather than
+      // throwing: a throw here aborts generation for every other class in the
+      // same run, which is the fail-closed posture this repo takes for a
+      // generic sealed root (see `PolymorphicClassEmitter.shouldEmit`).
       expect(
-        () => PatchClassGenerator().generateSpec(context),
-        throwsA(
-          isA<ArgumentError>().having(
-            (e) => e.toString(),
-            'message',
-            contains('generic sealed root'),
-          ),
-        ),
+        PatchClassGenerator().shouldGenerate(context),
+        isFalse,
+        reason: 'a generic sealed root is withheld, so nothing is emitted',
       );
     });
 
@@ -167,7 +166,9 @@ void main() {
       final meta = _sealedRootMeta(
         fields: [NameTypeClassComment('id', 'String', '')],
         explicitSubtypes: [
-          _subtypeInterface('OrderNotification', [NameType('itemCount', 'int')]),
+          _subtypeInterface('OrderNotification', [
+            NameType('itemCount', 'int'),
+          ]),
           _subtypeInterface('PriceDropNotification', [
             NameType('newPrice', 'double'),
           ]),
