@@ -561,6 +561,22 @@ names, hierarchy links and the principal key but no fields.
 A generated `principalKey` getter is therefore the archetype's documented
 contract, not an `@override`.
 
+### `ZORPHY_LINT_NO_BOOL_FLAGS` and `@ZorphyDomainBool()` (3.0.0+)
+
+The Chord no-boolean-flags rule rejects behavioral mode switches and lifecycle
+flags modelled as booleans on `@ZorphyState`, `@ZorphyIntent`, and polymorphic
+subtypes at compile time:
+
+- **Lifecycle flags** on `@ZorphyState` / `@ZorphyUnion` (`isLoading`, `isFetching`,
+  `isCreating`, `isUpdating`, `isDeleting`, `hasError`, `isError`) must be modelled
+  as `AsyncSlice<T>` variants or polymorphic subtypes.
+- **Behavioral switches** on `@ZorphyIntent` or polymorphic variants (`isRetry`,
+  `silent`, `noCache`, `force*`, `skip*`, `bypass*`) must be distinct polymorphic
+  subtypes.
+- **Escape hatch:** `@ZorphyDomainBool()` exempts genuine domain booleans
+  (e.g., `@ZorphyDomainBool() bool get inStock;`). Genuine domain booleans on
+  `@ZorphyEntity` / `@ZorphyValue` (like `inStock`, `enabled`) are permitted by default.
+
 ## v3 trust-boundary wire codecs (3.0.0+)
 
 A v3 hierarchy has exactly ONE wire entry point per direction — `fromWire` to
