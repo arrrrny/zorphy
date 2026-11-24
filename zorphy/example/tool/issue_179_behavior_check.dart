@@ -42,7 +42,9 @@ void main() {
   check('morph preserves readAt', drop.readAt == read);
   check(
     'morph takes the target-only fields',
-    drop.productId == 'sku-42' && drop.oldPrice == 19.99 && drop.newPrice == 9.99,
+    drop.productId == 'sku-42' &&
+        drop.oldPrice == 19.99 &&
+        drop.newPrice == 9.99,
   );
 
   // ── A shared-field override still wins over the receiver value ───
@@ -93,7 +95,10 @@ void main() {
     priceDropNotification179S: (value) => 'drop ${value.productId}',
     orElse: () => 'other',
   );
-  check('maybeWhen matches when a callback is supplied', matched == 'drop sku-7');
+  check(
+    'maybeWhen matches when a callback is supplied',
+    matched == 'drop sku-7',
+  );
 
   if (failures.isEmpty) {
     print('ALL CHECKS PASSED');

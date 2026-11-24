@@ -187,9 +187,8 @@ final class MorphingEmitter implements HierarchyEmitter {
           arguments[name] = refer(name);
         } else if (isOptional) {
           parameters.add(_parameter(name, type));
-          arguments[name] = refer(
-            name,
-          ).ifNullThen(refer('this').property(name));
+          arguments[name] = refer(name)
+              .ifNullThen(refer('this').property(name));
         } else {
           arguments[name] = refer(name);
         }

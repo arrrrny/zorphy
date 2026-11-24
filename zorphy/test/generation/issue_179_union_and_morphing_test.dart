@@ -291,9 +291,8 @@ void _writePart(
   String partName,
   String generated,
 ) {
-  File(
-    '${fixtureDir.path}/$partName',
-  ).writeAsStringSync("part of '$libraryName';\n\n$generated");
+  File('${fixtureDir.path}/$partName')
+      .writeAsStringSync("part of '$libraryName';\n\n$generated");
 }
 
 /// Every diagnostic the analyzer reports for the library at [libraryPath]
@@ -700,9 +699,7 @@ void main() {
       );
 
       diagnostics = await _diagnostics(fixtureDir, libraryPath);
-      order = outputs.entries
-          .firstWhere((e) => e.key == r'$JsonOrder')
-          .value;
+      order = outputs.entries.firstWhere((e) => e.key == r'$JsonOrder').value;
     });
 
     tearDownAll(() {
@@ -723,7 +720,9 @@ void main() {
 
     test('no ambiguous_extension_member_access is produced', () {
       expect(
-        diagnostics.where((d) => d.contains('ambiguous_extension_member_access')),
+        diagnostics.where(
+          (d) => d.contains('ambiguous_extension_member_access'),
+        ),
         isEmpty,
         reason:
             'two changeTo<Target> extensions on one source class are '
