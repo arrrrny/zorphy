@@ -480,9 +480,7 @@ class PolymorphicPatchEmitter {
         final written = narrowed == null
             ? value
             : '$value as ${_concreteType(narrowed)}';
-        lines.add(
-          '  $name: $name.isUnchanged ? target.$name : $written,',
-        );
+        lines.add('  $name: $name.isUnchanged ? target.$name : $written,');
       }
       lines.add(');');
       lines.add('}');

@@ -240,8 +240,7 @@ final class MorphingEmitter implements HierarchyEmitter {
   /// `createdAt ?? this.createdAt` passes a non-null value on the optional
   /// path — so `T?` and `T` agree, while `String` and `Draft` never do.
   static bool _typesAgree(String sourceType, String targetType) {
-    String bare(String type) =>
-        type.trim().endsWith('?')
+    String bare(String type) => type.trim().endsWith('?')
         ? type.trim().substring(0, type.trim().length - 1).trim()
         : type.trim();
     return bare(sourceType) == bare(targetType);
