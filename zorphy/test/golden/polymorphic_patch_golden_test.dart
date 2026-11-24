@@ -337,6 +337,25 @@ void main() {
       final result = _analyzeEmitted(emitted, _standaloneFixture);
       expect(result.exitCode, 0, reason: result.output);
     });
+
+    test('a field named value does not shadow the carried field', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Box',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('value', 'String', ''),
+        ],
+      );
+
+      // `withId(String value)` must carry `value: this.value` — an
+      // unqualified `value: value` picks up the builder's parameter instead
+      // of the existing patch field and fails to compile.
+      expect(emitted, contains('value: this.value'));
+      expect(emitted, contains('id: this.id'));
+
+      final result = _analyzeEmitted(emitted, _standaloneValueFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
   });
 }
 
@@ -350,6 +369,21 @@ final class Product {
 
   Product copyWith({String? id, String? name}) {
     return Product(id: id ?? this.id, name: name ?? this.name);
+  }
+}
+''';
+
+/// Standalone entity carrying a field literally named `value` — the name
+/// collides with the `with*` builders' own parameter.
+const _standaloneValueFixture = r'''
+final class Box {
+  const Box({required this.id, required this.value});
+
+  final String id;
+  final String value;
+
+  Box copyWith({String? id, String? value}) {
+    return Box(id: id ?? this.id, value: value ?? this.value);
   }
 }
 ''';

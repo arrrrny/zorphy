@@ -413,7 +413,7 @@ class PolymorphicPatchEmitter {
       for (final f in fields)
         f.name == field.name
             ? '${_memberName(f.name)}: PatchValue.set(value)'
-            : '${_memberName(f.name)}: ${_memberName(f.name)}',
+            : '${_memberName(f.name)}: this.${_memberName(f.name)}',
     ];
     return Method((m) {
       m

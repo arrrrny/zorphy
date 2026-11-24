@@ -271,7 +271,11 @@ void main() {
       expect(toWire, contains("<String,Object?>{'kind':'order'}"));
       expect(toWire, contains("map['orderId']=orderId;"));
       expect(toWire, contains("map['createdAt']=createdAt.toIso8601String();"));
-      expect(toWire, contains('if(note!=null)'));
+      // A nullable field is read into a local before the null guard: Dart
+      // does not promote a public field, so checking the field directly and
+      // then calling a member on it stays a call on the nullable type.
+      expect(toWire, contains('final_note=note;if(_note!=null)'));
+      expect(toWire, contains("map['note']=_note;"));
     });
   });
 
@@ -360,6 +364,63 @@ void main() {
       expect(compact, contains("path_lines='/lines'+'[\$i]'"));
       expect(compact, contains('decoded_lines=<OrderLine>[]'));
       expect(compact, isNot(contains('asList<OrderLine>')));
+    });
+
+    test('a List<Node> field encodes its elements through toWire', () {
+      const fields = <String, List<BoundaryField>>{
+        r'$OrderNotification': [
+          BoundaryField(name: 'lines', type: 'List<OrderLine>'),
+        ],
+      };
+      final compact = _compact(
+        _emit([
+          emitter.toWire(
+            fixture.order,
+            fields,
+            additionalNodes: const {'OrderLine'},
+          ),
+        ]),
+      );
+      // Re-classifying the inner type without the hierarchy's known nodes
+      // would make this a scalar list and leave the objects unencoded.
+      expect(compact, contains('lines.map((e)=>e.toWire()).toList()'));
+    });
+
+    test('a Map<String, Node> field encodes its values through toWire', () {
+      const fields = <String, List<BoundaryField>>{
+        r'$OrderNotification': [
+          BoundaryField(name: 'byId', type: 'Map<String, OrderLine>'),
+        ],
+      };
+      final compact = _compact(
+        _emit([
+          emitter.toWire(
+            fixture.order,
+            fields,
+            additionalNodes: const {'OrderLine'},
+          ),
+        ]),
+      );
+      expect(
+        compact,
+        contains('byId.map((key,e)=>MapEntry(key,e.toWire()))'),
+      );
+    });
+
+    test('a nullable member-call field is promoted into a local toWire', () {
+      const fields = <String, List<BoundaryField>>{
+        r'$OrderNotification': [
+          BoundaryField(name: 'lastSeenAt', type: 'DateTime?'),
+        ],
+      };
+      final compact = _compact(_emit([emitter.toWire(fixture.order, fields)]));
+      // Dart does not promote a public field after a null check, so
+      // `lastSeenAt.toIso8601String()` on the guarded field would not compile.
+      expect(compact, contains('final_lastSeenAt=lastSeenAt;'));
+      expect(
+        compact,
+        contains("if(_lastSeenAt!=null){map['lastSeenAt']=_lastSeenAt.toIso8601String();}"),
+      );
     });
 
     test('a List<double> decodes element-wise, never a hard list cast', () {

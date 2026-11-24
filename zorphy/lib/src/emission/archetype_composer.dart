@@ -70,8 +70,15 @@ final class ArchetypeComposer {
     if (codecRoots.isNotEmpty) {
       final ownFields = _ownFields(ir);
       final payloads = _payloads(ir);
+      // Intent names are deliberately NOT known nodes for the codec: intents
+      // are emitted by [IntentEmitter], which provides `toWire`/`intentDigest`
+      // but no `fromWire`. Classifying an intent-typed field as a nested node
+      // would make the codec emit `<Intent>.fromWire(...)`, which does not
+      // exist in the generated library. An intent value therefore travels as
+      // a plain field on the wire, as it does in `IntentEmitter.toWire`.
       final knownNodes = <String>{
-        for (final node in ir.nodes.values) node.cleanName,
+        for (final node in ir.nodes.values)
+          if (node.archetype != ArchetypeKind.intent) node.cleanName,
       };
       const codec = BoundaryCodecEmitter();
       var firstRoot = true;
@@ -140,6 +147,12 @@ final class ArchetypeComposer {
   ///   fields patchable through it) is follow-up work.
   String _emitEntityPatches(ZorphyNodeIr root) {
     const emitter = PolymorphicPatchEmitter();
+    // A generic entity has no compilable patch surface: `T` would be an
+    // unbound type parameter in `BoxPatch` and in `ZorphyPatch<Box>`. Fail
+    // closed the same way `MockFixtureEmitter` does for generic nodes — that
+    // emitter skips the node entirely, so no `samplePatch()` will reference a
+    // patch we did not emit.
+    if (root.typeParameters.isNotEmpty) return '';
     // A childless root is its own concrete leaf (the resolver's rule), so
     // "standalone" is read off the ROOT, not off a leaf walk — a walk would
     // answer `[root]` and emit a hierarchy whose one subtype patch extends
@@ -151,6 +164,7 @@ final class ArchetypeComposer {
       );
     }
     final leaves = _concreteLeaves(root);
+    if (leaves.isEmpty) return '';
 
     final fragments = <String>[
       emitter.emitRoot(
@@ -160,7 +174,13 @@ final class ArchetypeComposer {
         subtypeFieldTypes: {
           for (final leaf in leaves)
             leaf.cleanName: {
-              for (final field in leaf.fields)
+              // The full inherited payload, not just the leaf's own fields:
+              // the shared `apply` arm writes every field it maps, including
+              // ones a leaf inherits without redeclaring. `_payloadFields`
+              // keeps the nearest declaration of a name, so a narrowed
+              // inherited type wins and `apply` type-checks against the
+              // leaf's `copyWith`.
+              for (final field in _payloadFields(leaf))
                 field.name: field.isNullable ? '${field.type}?' : field.type,
             },
         },
@@ -170,6 +190,10 @@ final class ArchetypeComposer {
     final rootFieldNames = [for (final field in root.fields) field.name];
     void walk(ZorphyNodeIr node) {
       for (final child in node.directSubTypes) {
+        // A generic subtree is pruned from the patch surface for the same
+        // reason the root is: no patch can name its type parameter, and
+        // `MockFixtureEmitter` skips it too.
+        if (child.typeParameters.isNotEmpty) continue;
         if (child.isConcreteLeaf) {
           fragments.add(
             emitter.emitSubtypePatch(
@@ -199,6 +223,10 @@ final class ArchetypeComposer {
   List<ZorphyNodeIr> _concreteLeaves(ZorphyNodeIr node) {
     final out = <ZorphyNodeIr>[];
     void walk(ZorphyNodeIr current) {
+      // Generic nodes (and everything below them) are not emittable: a
+      // patch cannot declare their type parameter, and the mock emitter
+      // skips the same subtree.
+      if (current.typeParameters.isNotEmpty) return;
       if (current.isConcreteLeaf) {
         out.add(current);
         return;

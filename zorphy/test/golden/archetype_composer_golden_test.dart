@@ -1,0 +1,146 @@
+// Regression tests for the review findings on arrrrny/zorphy#226 that live in
+// `ArchetypeComposer` — the production wiring that composes the v3 emitters.
+//
+// The IR is built directly (the emitters' own golden tests do the same): the
+// findings are about how the composer CLASSIFIES and FILTERS nodes before it
+// hands them to an emitter, not about analyzer resolution.
+
+import 'package:test/test.dart';
+import 'package:zorphy/src/emission/archetype_composer.dart';
+import 'package:zorphy/src/parser/polymorphic_ir.dart';
+
+ZorphyNodeIr _node({
+  required String name,
+  ArchetypeKind archetype = ArchetypeKind.entity,
+  bool isRoot = false,
+  List<ZorphyFieldIr> fields = const [],
+  List<ZorphyNodeIr> superTypes = const [],
+  List<ZorphyNodeIr> directSubTypes = const [],
+  List<String> typeParameters = const [],
+}) {
+  return ZorphyNodeIr(
+    className: '\$$name',
+    cleanName: name,
+    archetype: archetype,
+    isSealedRoot: isRoot,
+    isAbstractIntermediate: superTypes.isNotEmpty && directSubTypes.isNotEmpty,
+    isConcreteLeaf: directSubTypes.isEmpty,
+    superTypes: superTypes,
+    directSubTypes: directSubTypes,
+    allConcreteLeaves: const [],
+    discriminatorKey: 'kind',
+    discriminatorValue: name.toLowerCase(),
+    fields: fields,
+    typeParameters: typeParameters,
+  );
+}
+
+void main() {
+  group('ArchetypeComposer — review findings on #226', () {
+    test('an intent-typed field is not classified as a codec node', () {
+      final intent = _node(
+        name: 'InspectIntent',
+        archetype: ArchetypeKind.intent,
+        isRoot: true,
+        fields: const [ZorphyFieldIr(name: 'target', type: 'String')],
+      );
+      final order = _node(
+        name: 'Order',
+        isRoot: true,
+        fields: const [
+          ZorphyFieldIr(name: 'id', type: 'String'),
+          ZorphyFieldIr(name: 'intent', type: 'InspectIntent'),
+        ],
+      );
+      final ir = PolymorphicIr(
+        nodes: {
+          '\$Order': order,
+          '\$InspectIntent': intent,
+        },
+        roots: [order, intent],
+        diagnostics: const [],
+      );
+
+      final emitted = const ArchetypeComposer().compose(ir);
+
+      // IntentEmitter emits toWire/intentDigest but NO fromWire, so treating
+      // an intent as a known node would make the codec call a decoder that
+      // does not exist in the generated library.
+      expect(
+        emitted,
+        isNot(contains('InspectIntent.fromWire(')),
+        reason: 'the codec must not call a decoder the intent does not emit',
+      );
+    });
+
+    test('a generic standalone entity emits no unbound patch', () {
+      final box = _node(
+        name: 'Box',
+        isRoot: true,
+        typeParameters: const ['T'],
+        fields: const [
+          ZorphyFieldIr(name: 'id', type: 'String'),
+          ZorphyFieldIr(name: 'value', type: 'T'),
+        ],
+      );
+      final ir = PolymorphicIr(
+        nodes: {'\$Box': box},
+        roots: [box],
+        diagnostics: const [],
+      );
+
+      final emitted = const ArchetypeComposer().compose(ir);
+
+      // MockFixtureEmitter fails closed on generic nodes (no samplePatch is
+      // emitted), so no patch may be emitted either — `BoxPatch` would name
+      // `T` and `ZorphyPatch<Box>` without a type argument.
+      expect(
+        emitted,
+        isNot(contains('BoxPatch')),
+        reason: 'a generic entity has no compilable patch surface',
+      );
+    });
+
+    test('the shared apply narrows an inherited field the leaf did not redeclare', () {
+      final root = _node(
+        name: 'Node',
+        isRoot: true,
+        fields: const [ZorphyFieldIr(name: 'payload', type: 'Object')],
+      );
+      final mid = _node(
+        name: 'Mid',
+        fields: const [ZorphyFieldIr(name: 'payload', type: 'String')],
+        superTypes: [root],
+      );
+      final leaf = _node(name: 'Leaf', superTypes: [mid]);
+      final wiredMid = mid.copyWith(
+        directSubTypes: [leaf],
+        isConcreteLeaf: false,
+      );
+      final wiredRoot = root.copyWith(
+        directSubTypes: [wiredMid],
+        isConcreteLeaf: false,
+      );
+      final ir = PolymorphicIr(
+        nodes: {
+          '\$Node': wiredRoot,
+          '\$Mid': wiredMid,
+          '\$Leaf': leaf,
+        },
+        roots: [wiredRoot],
+        diagnostics: const [],
+      );
+
+      final emitted = const ArchetypeComposer().compose(ir);
+
+      // `payload` is declared on the intermediate, not on the leaf. Building
+      // the subtype type map from `leaf.fields` alone drops it, and the
+      // shared apply writes an `Object?` into `copyWith(payload: String?)`.
+      expect(
+        emitted,
+        contains('payload.valueOrNull as String'),
+        reason: 'the nearest inherited declaration must win in the apply arm',
+      );
+    });
+  });
+}

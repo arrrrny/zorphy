@@ -359,23 +359,23 @@ final class OrderNotificationPatch extends NotificationPatch {
   OrderNotificationPatch withId(String value) {
     return OrderNotificationPatch(
       id: PatchValue.set(value),
-      readAt: readAt,
-      itemCount: itemCount,
+      readAt: this.readAt,
+      itemCount: this.itemCount,
     );
   }
 
   OrderNotificationPatch withReadAt(DateTime? value) {
     return OrderNotificationPatch(
-      id: id,
+      id: this.id,
       readAt: PatchValue.set(value),
-      itemCount: itemCount,
+      itemCount: this.itemCount,
     );
   }
 
   OrderNotificationPatch withItemCount(int value) {
     return OrderNotificationPatch(
-      id: id,
-      readAt: readAt,
+      id: this.id,
+      readAt: this.readAt,
       itemCount: PatchValue.set(value),
     );
   }
@@ -556,23 +556,23 @@ final class PriceDropNotificationPatch extends NotificationPatch {
   PriceDropNotificationPatch withId(String value) {
     return PriceDropNotificationPatch(
       id: PatchValue.set(value),
-      readAt: readAt,
-      newPrice: newPrice,
+      readAt: this.readAt,
+      newPrice: this.newPrice,
     );
   }
 
   PriceDropNotificationPatch withReadAt(DateTime? value) {
     return PriceDropNotificationPatch(
-      id: id,
+      id: this.id,
       readAt: PatchValue.set(value),
-      newPrice: newPrice,
+      newPrice: this.newPrice,
     );
   }
 
   PriceDropNotificationPatch withNewPrice(double value) {
     return PriceDropNotificationPatch(
-      id: id,
-      readAt: readAt,
+      id: this.id,
+      readAt: this.readAt,
       newPrice: PatchValue.set(value),
     );
   }

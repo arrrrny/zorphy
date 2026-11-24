@@ -616,12 +616,23 @@ class BoundaryCodecEmitter {
     }
 
     for (final field in own) {
-      final value = _wireExpression(field, _classify(field, known));
-      final assignment = 'map[${_literal(field.name)}] = $value;';
+      final type = _classify(field, known);
       if (field.isNullable) {
-        body.add(Code('if (${field.name} != null) { $assignment }'));
+        // Dart does not promote a public field after a null check, so an
+        // encoding that calls a member on it (`toWire`, `toIso8601String`,
+        // `toDouble`) would stay a call on the nullable type and fail to
+        // compile. Bind it to a local, guard the local, encode the local.
+        final local = _local(field);
+        final value = _wireExpression(field, type, source: local);
+        body
+          ..add(Code('final $local = ${field.name};'))
+          ..add(
+            Code('if ($local != null) { '
+                'map[${_literal(field.name)}] = $value; }'),
+          );
       } else {
-        body.add(Code(assignment));
+        final value = _wireExpression(field, type);
+        body.add(Code('map[${_literal(field.name)}] = $value;'));
       }
     }
 
@@ -629,19 +640,29 @@ class BoundaryCodecEmitter {
     return body;
   }
 
-  String _wireExpression(BoundaryField field, _FieldType type) {
-    final name = field.name;
+  /// [source] is the expression to encode — the field itself, or a local a
+  /// nullable field was promoted into by [_leafToWireBody].
+  String _wireExpression(
+    BoundaryField field,
+    _FieldType type, {
+    String? source,
+  }) {
+    final name = source ?? field.name;
     switch (type.shape) {
       case _Shape.node:
         return '$name.toWire()';
       case _Shape.list:
-        return switch (_shapeOfType(type.inner)) {
+        // `elementShape` is resolved by `_classify` with the hierarchy's
+        // known node names; re-classifying `type.inner` here would lose that
+        // context and turn a `List<Child>` into a scalar list whose elements
+        // are never converted through `toWire()`.
+        return switch (type.elementShape) {
           _Shape.node => '$name.map((e) => e.toWire()).toList()',
           _Shape.dateTime => '$name.map((e) => e.toIso8601String()).toList()',
           _ => name,
         };
       case _Shape.map:
-        return switch (_shapeOfType(type.inner)) {
+        return switch (type.elementShape) {
           _Shape.node => '$name.map((key, e) => MapEntry(key, e.toWire()))',
           _Shape.dateTime =>
             '$name.map((key, e) => MapEntry(key, e.toIso8601String()))',
