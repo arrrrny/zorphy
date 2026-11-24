@@ -270,12 +270,21 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
 
   @override
   bool shouldGenerate(GenerationContext context) {
-    return context.config.generatePatch &&
-        (context.metadata.isAbstract && context.metadata.nonSealed
-            ? context.metadata.allFields.isNotEmpty ||
-                  context.metadata.isInParentExplicitSubtypes
-            : !context.metadata.isAbstract &&
-                  context.metadata.allFields.isNotEmpty);
+    if (!context.config.generatePatch) return false;
+    final metadata = context.metadata;
+    // Abstract nonSealed bases emit their field enum alongside the abstract
+    // Patch stub in PatchClassGenerator (the fieldless placeholder included),
+    // so this generator handles only their fielded case — emitting here too
+    // would duplicate the enum.
+    if (metadata.isAbstract && metadata.nonSealed) {
+      return metadata.allFields.isNotEmpty;
+    }
+    // Sealed abstract bases get no Patch at all, so they get no field enum.
+    if (metadata.isAbstract) return false;
+    // A concrete class gets a field enum for exactly the set PatchClassGenerator
+    // emits a Patch for: a fieldless explicit subtype still references
+    // `${name}$` in its PatchBase, so it needs the placeholder enum.
+    return metadata.allFields.isNotEmpty || metadata.isInParentExplicitSubtypes;
   }
 
   @override
@@ -285,7 +294,21 @@ class FieldEnumGenerator extends ConcreteClassGenerator {
       metadata.allFields,
       metadata.cleanName,
     );
-    if (code.trim().isEmpty) return [];
-    return [Code(code)];
+    if (code.trim().isNotEmpty) return [Code(code)];
+    // Fieldless concrete explicit subtype: its Patch (emitted by PatchEmitter)
+    // references `${name}$` in `PatchBase<Name, Name$>`, but
+    // getEnumPropertyList returns '' for empty fields. Emit the same
+    // placeholder enum the abstract stub path uses, named to match the
+    // PatchEmitter's `_clean(className)` + '$', so the generated Dart compiles.
+    if (!metadata.isAbstract && metadata.isInParentExplicitSubtypes) {
+      final cleanName = metadata.cleanName.replaceAll(r'$', '');
+      return [
+        Code(
+          '/// Placeholder field enum for fieldless [$cleanName].\n'
+          'enum $cleanName\$ { none }',
+        ),
+      ];
+    }
+    return [];
   }
 }
