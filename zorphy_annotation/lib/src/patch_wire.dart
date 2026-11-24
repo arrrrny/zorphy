@@ -59,6 +59,19 @@ abstract final class ZorphyPatchWire {
   /// contributes to the decoded patch.
   static const String principalKeyKey = 'principalKey';
 
+  /// The names an envelope reserves: a generated patch field may not use one.
+  ///
+  /// A bare `toWire()` map keys each field by its own name, so a field called
+  /// `ops` or `patchKind` would be mistaken for envelope metadata by [opsOf]
+  /// and [opsPathOf] (#215). The emitters refuse such fields at generation
+  /// time rather than shipping a wire format with a silent ambiguity.
+  static const Set<String> reservedEnvelopeKeys = <String>{
+    entityTypeKey,
+    patchKindKey,
+    opsKey,
+    principalKeyKey,
+  };
+
   /// The `patchKind` a hierarchy's shared patch answers to.
   static const String sharedPatchKind = 'shared';
 
@@ -100,6 +113,23 @@ abstract final class ZorphyPatchWire {
     return null;
   }
 
+  /// [value] as a [num], preserving an integer rather than rounding it.
+  ///
+  /// A declared `num` field may carry a large `int` that a `double` cannot
+  /// represent exactly (`9007199254740993` on the VM). Only a field declared
+  /// `double` converts an integer with [asDouble].
+  static num? asNum(
+    Object? value,
+    String path,
+    List<FieldViolation> violations,
+  ) {
+    if (value is num) return value;
+    violations.add(
+      FieldViolation(path: path, expected: 'num', actual: describe(value)),
+    );
+    return null;
+  }
+
   /// [value] as a `double`, accepting a JSON integer (`1` is a legal `1.0`).
   static double? asDouble(
     Object? value,
@@ -126,7 +156,10 @@ abstract final class ZorphyPatchWire {
     if (value is DateTime) return value;
     if (value is String) {
       final parsed = DateTime.tryParse(value);
-      if (parsed != null) return parsed;
+      // DateTime.tryParse NORMALIZES out-of-range components: 2020-01-42
+      // becomes 2020-02-11, 25:00 becomes 01:00 the next day. A corrupt wire
+      // value must be a violation, never a silently different instant (#215).
+      if (parsed != null && _hasValidIsoCalendar(value)) return parsed;
     }
     violations.add(
       FieldViolation(
@@ -200,6 +233,36 @@ abstract final class ZorphyPatchWire {
       )
       .toList();
 
+  /// Escapes [key] as one RFC 6901 JSON Pointer token.
+  ///
+  /// Without this, a map key `a/b` appended to `/scores` reads as two segments
+  /// and a key `~1` collides with `a/b` (#215).
+  static String pointerToken(Object? key) =>
+      key.toString().replaceAll('~', '~0').replaceAll('/', '~1');
+
+  /// Declares that [key] must be present in [map], reporting a violation at
+  /// `<path>/<key>` when it is absent.
+  ///
+  /// A missing member and an explicit `null` are different things: a nullable
+  /// field's clear is `{'value': null}` and must decode, while `{'op': 'set'}`
+  /// with no `value` is a corrupt descriptor that must fail (#215).
+  static bool requireMember(
+    Map<String, Object?> map,
+    String key,
+    String path,
+    List<FieldViolation> violations,
+  ) {
+    if (map.containsKey(key)) return true;
+    violations.add(
+      FieldViolation(
+        path: '$path/$key',
+        expected: 'member $key',
+        actual: 'missing',
+      ),
+    );
+    return false;
+  }
+
   /// The `patchKind` [raw] carries, or `null` when it carries no envelope.
   static String? patchKindOf(Map<String, Object?> raw) {
     final kind = raw[patchKindKey];
@@ -255,29 +318,18 @@ abstract final class ZorphyPatchWire {
       ? '/$opsKey'
       : '';
 
-  /// One field's value, unwrapping the `{"op": "set", "value": …}` spelling a
-  /// peer may send in place of the bare value (`toWire()` writes the bare
-  /// value, so both are accepted).
+  /// One field's value, unwrapping the explicit-set spelling a peer may send
+  /// in place of the bare value (`toWire()` writes the bare value, so both are
+  /// accepted).
+  ///
+  /// The explicit set is a [PatchWireSet], never a map with an `op` key: a map
+  /// field is allowed to contain a literal `op` entry, and reading that as a
+  /// descriptor silently lost the field (#215).
   static Object? fieldValue(
     Object? value,
     String path,
     List<FieldViolation> violations,
-  ) {
-    if (value is Map<String, Object?> && value['op'] == 'set') {
-      return value['value'];
-    }
-    if (value is Map<String, Object?> && value.containsKey('op')) {
-      violations.add(
-        FieldViolation(
-          path: '$path/op',
-          expected: "'set'",
-          actual: describe(value['op']),
-        ),
-      );
-      return null;
-    }
-    return value;
-  }
+  ) => value is PatchWireSet ? value.value : value;
 
   /// The delta [raw] carries for a list field, or `null` when it could not be
   /// decoded in full.
@@ -298,8 +350,11 @@ abstract final class ZorphyPatchWire {
     if (raw is List) {
       final items = <E>[];
       for (var i = 0; i < raw.length; i++) {
-        final decoded = decodeElement(raw[i], '$path[$i]', violations);
-        if (decoded != null) items.add(decoded);
+        final elementBefore = violations.length;
+        final decoded = decodeElement(raw[i], '$path/$i', violations);
+        // A clean read of a nullable element answers null too. Track SUCCESS
+        // with the violation count, never the decoded value (#215).
+        if (violations.length == elementBefore) items.add(decoded as E);
       }
       if (violations.length != before) return null;
       return ListPatchDelta<E>(<ListPatchOp<E>>[
@@ -322,12 +377,17 @@ abstract final class ZorphyPatchWire {
     }
 
     final ops = <ListPatchOp<E>>[];
+    // replaceAll fixes the list length for every target; append/removeAt move
+    // it, updateAt leaves it. While the length is known, an index that cannot
+    // ever be valid is a decode violation — applying it would throw RangeError.
+    int? knownLength;
     for (var i = 0; i < opsRaw.length; i++) {
-      final opPath = '$path/$opsKey[$i]';
+      final opPath = '$path/$opsKey/$i';
       final op = asObject(opsRaw[i], opPath, violations);
       if (op == null) continue;
       switch (op['op']) {
         case 'replaceAll':
+          if (!requireMember(op, 'items', opPath, violations)) continue;
           final itemsRaw = op['items'];
           if (itemsRaw is! List) {
             violations.add(
@@ -341,26 +401,36 @@ abstract final class ZorphyPatchWire {
           }
           final items = <E>[];
           for (var j = 0; j < itemsRaw.length; j++) {
+            final elementBefore = violations.length;
             final decoded = decodeElement(
               itemsRaw[j],
-              '$opPath/items[$j]',
+              '$opPath/items/$j',
               violations,
             );
-            if (decoded != null) items.add(decoded);
+            if (violations.length == elementBefore) items.add(decoded as E);
           }
           ops.add(ListPatchOp<E>.replaceAll(items));
+          knownLength = items.length;
         case 'append':
+          if (!requireMember(op, 'item', opPath, violations)) continue;
+          final elementBefore = violations.length;
           final decoded = decodeElement(op['item'], '$opPath/item', violations);
-          if (decoded != null) ops.add(ListPatchOp<E>.append(decoded));
+          if (violations.length != elementBefore) continue;
+          ops.add(ListPatchOp<E>.append(decoded as E));
+          if (knownLength != null) knownLength = knownLength + 1;
         case 'removeAt':
-          final index = as<int>(op['index'], '$opPath/index', violations);
-          if (index != null) ops.add(ListPatchOp<E>.removeAt(index));
+          final index = _listIndex(op, opPath, knownLength, violations);
+          if (index == null) continue;
+          ops.add(ListPatchOp<E>.removeAt(index));
+          if (knownLength != null) knownLength = knownLength - 1;
         case 'updateAt':
-          final index = as<int>(op['index'], '$opPath/index', violations);
+          final index = _listIndex(op, opPath, knownLength, violations);
+          if (!requireMember(op, 'item', opPath, violations)) continue;
+          final elementBefore = violations.length;
           final decoded = decodeElement(op['item'], '$opPath/item', violations);
-          if (index != null && decoded != null) {
-            ops.add(ListPatchOp<E>.updateAt(index, decoded));
-          }
+          if (violations.length != elementBefore) continue;
+          if (index == null) continue;
+          ops.add(ListPatchOp<E>.updateAt(index, decoded as E));
         default:
           // The OP itself is the offending value, so the pointer the caller
           // must look at is the step, not a member inside it.
@@ -380,8 +450,38 @@ abstract final class ZorphyPatchWire {
     return ListPatchDelta<E>(ops);
   }
 
+  /// Reads an `index` member for a positional list step, refusing a negative
+  /// index and an index that the tracked length proves out of range (#215).
+  static int? _listIndex(
+    Map<String, Object?> op,
+    String opPath,
+    int? knownLength,
+    List<FieldViolation> violations,
+  ) {
+    if (!requireMember(op, 'index', opPath, violations)) return null;
+    final index = as<int>(op['index'], '$opPath/index', violations);
+    if (index == null) return null;
+    if (index < 0 || (knownLength != null && index >= knownLength)) {
+      violations.add(
+        FieldViolation(
+          path: '$opPath/index',
+          expected: knownLength == null
+              ? 'non-negative int'
+              : 'int in 0..${knownLength - 1}',
+          actual: describe(index),
+        ),
+      );
+      return null;
+    }
+    return index;
+  }
+
   /// The delta [raw] carries for a map field, or `null` when it could not be
   /// decoded in full.
+  ///
+  /// A MAP is a replacement (every field key is a literal key); a LIST is an
+  /// ordered step sequence — `MapPatchDelta.toWire()` emits that list, so a
+  /// literal map key named `ops` can no longer be mistaken for a delta (#215).
   ///
   /// [decodeKey] and [decodeValue] decode one `K` and one `V`; the emitted call
   /// site knows both types statically, so no reflection is needed here — a
@@ -407,13 +507,16 @@ abstract final class ZorphyPatchWire {
   }) {
     final before = violations.length;
 
-    if (raw is Map && !raw.containsKey(opsKey)) {
+    if (raw is Map) {
       final entries = <K, V>{};
       for (final entry in raw.entries) {
-        final entryPath = '$path/${entry.key}';
+        final entryPath = '$path/${pointerToken(entry.key)}';
+        final entryBefore = violations.length;
         final key = decodeKey(entry.key, entryPath, violations);
         final value = decodeValue(entry.value, entryPath, violations);
-        if (key != null && value != null) entries[key] = value;
+        if (violations.length == entryBefore) {
+          entries[key as K] = value as V;
+        }
       }
       if (violations.length != before) return null;
       return MapPatchDelta<K, V>(<MapPatchOp<K, V>>[
@@ -421,27 +524,20 @@ abstract final class ZorphyPatchWire {
       ]);
     }
 
-    final map = asObject(raw, path, violations);
-    if (map == null) return null;
-    final opsRaw = map[opsKey];
-    if (opsRaw is! List) {
-      violations.add(
-        FieldViolation(
-          path: '$path/$opsKey',
-          expected: 'List<Object?>',
-          actual: describe(opsRaw),
-        ),
-      );
+    if (raw is! List) {
+      asObject(raw, path, violations);
       return null;
     }
+    final opsRaw = raw;
 
     final ops = <MapPatchOp<K, V>>[];
     for (var i = 0; i < opsRaw.length; i++) {
-      final opPath = '$path/$opsKey[$i]';
+      final opPath = '$path/$i';
       final op = asObject(opsRaw[i], opPath, violations);
       if (op == null) continue;
       switch (op['op']) {
         case 'replaceAll':
+          if (!requireMember(op, 'entries', opPath, violations)) continue;
           final entriesRaw = op['entries'];
           if (entriesRaw is! Map) {
             violations.add(
@@ -455,21 +551,37 @@ abstract final class ZorphyPatchWire {
           }
           final entries = <K, V>{};
           for (final entry in entriesRaw.entries) {
-            final entryPath = '$opPath/entries/${entry.key}';
+            final entryPath = '$opPath/entries/${pointerToken(entry.key)}';
+            final entryBefore = violations.length;
             final key = decodeKey(entry.key, entryPath, violations);
             final value = decodeValue(entry.value, entryPath, violations);
-            if (key != null && value != null) entries[key] = value;
+            if (violations.length == entryBefore) {
+              entries[key as K] = value as V;
+            }
           }
           ops.add(MapPatchOp<K, V>.replaceAll(entries));
         case 'put':
+          if (!requireMember(op, 'key', opPath, violations) ||
+              !requireMember(op, 'value', opPath, violations)) {
+            continue;
+          }
+          final keyBefore = violations.length;
           final key = decodeKey(op['key'], '$opPath/key', violations);
+          final valueBefore = violations.length;
           final value = decodeValue(op['value'], '$opPath/value', violations);
-          if (key != null && value != null) {
-            ops.add(MapPatchOp<K, V>.put(key, value));
+          if (violations.length == keyBefore &&
+              violations.length == valueBefore) {
+            // A nullable V legitimately decodes to null; success is the
+            // violation count, not the value (#215).
+            ops.add(MapPatchOp<K, V>.put(key as K, value as V));
           }
         case 'remove':
+          if (!requireMember(op, 'key', opPath, violations)) continue;
+          final keyBefore = violations.length;
           final key = decodeKey(op['key'], '$opPath/key', violations);
-          if (key != null) ops.add(MapPatchOp<K, V>.remove(key));
+          if (violations.length == keyBefore && key != null) {
+            ops.add(MapPatchOp<K, V>.remove(key));
+          }
         default:
           violations.add(
             FieldViolation(
@@ -494,4 +606,54 @@ abstract final class ZorphyPatchWire {
     String path,
     List<FieldViolation> violations,
   ) => as<String>(value, path, violations);
+}
+
+/// The unambiguous spelling of an explicit field set on the wire.
+///
+/// A bare value (what `toWire()` emits) and a [PatchWireSet] both decode, but
+/// a literal `Map` that happens to contain an `op` key is ALWAYS a literal map
+/// — it can no longer be misread as an operation descriptor (#215).
+final class PatchWireSet {
+  const PatchWireSet(this.value);
+
+  /// The value to set — `null` is a valid clear for a nullable field.
+  final Object? value;
+}
+
+/// A whole-value replacement for a nested field, as opposed to a
+/// [PatchNested]-style edit of the existing value.
+///
+/// `diff()` writes the replacement sub-entity itself into the patch map, and
+/// the generated `toWire()` wraps it here so the decoder never mistakes it for
+/// a field-keyed nested patch map (#215).
+final class PatchWireReplacement {
+  const PatchWireReplacement(this.value);
+
+  /// The replacement sub-entity.
+  final Object? value;
+}
+
+/// Whether [value]'s ISO-8601 calendar components are in range.
+///
+/// `DateTime.tryParse` normalizes an out-of-range component instead of
+/// rejecting it, so a wire string must be checked before its parse is trusted
+/// (#215). A string whose format `tryParse` accepts but this matcher does not
+/// recognize is left to `tryParse`'s own validation.
+bool _hasValidIsoCalendar(String value) {
+  final match = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})'
+    r'(?:[T ](\d{2})(?::(\d{2})(?::(\d{2})(?:\.\d+)?)?)?)?',
+  ).firstMatch(value);
+  if (match == null) return true;
+  final year = int.parse(match.group(1)!);
+  final month = int.parse(match.group(2)!);
+  final day = int.parse(match.group(3)!);
+  if (month < 1 || month > 12) return false;
+  final daysInMonth = DateTime(year, month + 1, 0).day;
+  if (day < 1 || day > daysInMonth) return false;
+  final hour = match.group(4) == null ? 0 : int.parse(match.group(4)!);
+  final minute = match.group(5) == null ? 0 : int.parse(match.group(5)!);
+  final second = match.group(6) == null ? 0 : int.parse(match.group(6)!);
+  if (hour > 23 || minute > 59 || second > 59) return false;
+  return true;
 }

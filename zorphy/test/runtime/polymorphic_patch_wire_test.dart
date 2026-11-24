@@ -18,6 +18,8 @@
 // `fixtures/notification.dart`) carry the emitters' real output, so these
 // tests exercise emitted code rather than a hand-written lookalike.
 
+import 'dart:convert';
+
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
 
@@ -149,7 +151,7 @@ void main() {
 
       expect(result.isOk, isFalse);
       final error = result as BoundaryErr<ProfilePatch>;
-      expect(error.violations.map((v) => v.path), contains('/tags/ops[1]'));
+      expect(error.violations.map((v) => v.path), contains('/tags/ops/1'));
     });
 
     test('a non-map nested value is a violation', () {
@@ -314,6 +316,219 @@ void main() {
           (v) => v.path,
         ),
         contains('/ops/readAt'),
+      );
+    });
+  });
+
+  group('review findings #215', () {
+    test('an enum patch survives a JSON envelope hop with a principal key', () {
+      final envelope = (AccountPatch()..withTier(AccountTier.enterprise))
+          .toEnvelope(principalKey: 'a1');
+      final wire = jsonDecode(jsonEncode(envelope)) as Map<String, dynamic>;
+
+      expect(wire['principalKey'], 'a1');
+      expect((wire['ops'] as Map)['tier'], 'enterprise');
+
+      final decoded = AccountPatch.fromWire(Map<String, Object?>.from(wire));
+      expect(decoded.isOk, isTrue);
+      expect(
+        decoded
+            .getOrThrow()
+            .apply(const Account(id: 'a1', name: 'ada', score: 1))
+            .tier,
+        AccountTier.enterprise,
+      );
+    });
+
+    test('a corrupt calendar date is a violation, not a normalized date', () {
+      final result = NotificationPatch.fromWire(const {
+        'entityType': 'Notification',
+        'patchKind': 'shared',
+        'ops': {'readAt': '2020-01-42'},
+      });
+
+      expect(result.isOk, isFalse);
+      expect(
+        (result as BoundaryErr<NotificationPatch>).violations.map(
+          (v) => v.path,
+        ),
+        contains('/ops/readAt'),
+      );
+    });
+
+    test('a literal op key in a replacement map field round-trips', () {
+      final patch = ProfilePatch()..withScores(const {'op': 7});
+
+      final decoded = ProfilePatch.fromWire(patch.toWire()).getOrThrow();
+      const before = Profile(
+        id: 'p1',
+        displayName: 'ada',
+        address: Address(street: 'Main', city: 'Springfield'),
+        tags: [],
+        scores: {},
+      );
+      expect(decoded.apply(before).scores, {'op': 7});
+    });
+
+    test('a literal ops key in a replacement map field round-trips', () {
+      final patch = ProfilePatch()..withScores(const {'ops': 7});
+
+      final decoded = ProfilePatch.fromWire(patch.toWire()).getOrThrow();
+      const before = Profile(
+        id: 'p1',
+        displayName: 'ada',
+        address: Address(street: 'Main', city: 'Springfield'),
+        tags: [],
+        scores: {},
+      );
+      expect(decoded.apply(before).scores, {'ops': 7});
+    });
+
+    test('a map delta keeps its ordered steps on the wire', () {
+      const before = Profile(
+        id: 'p1',
+        displayName: 'ada',
+        address: Address(street: 'Main', city: 'Springfield'),
+        tags: [],
+        scores: {},
+      );
+      final patch = ProfilePatch.diff(
+        before,
+        before.copyWith(scores: const {'math': 9}),
+      );
+      final wire = patch.toWire();
+
+      expect(wire['scores'], isA<List<Object?>>());
+      expect(ProfilePatch.fromWire(wire).getOrThrow().apply(before).scores, {
+        'math': 9,
+      });
+    });
+
+    test('a nested replacement from null round-trips as a whole value', () {
+      const before = Profile(
+        id: 'p1',
+        displayName: 'ada',
+        address: Address(street: 'Main', city: 'Springfield'),
+        tags: [],
+        scores: {},
+      );
+      final next = before.copyWith(
+        previousAddress: const Address(street: 'Elm', city: 'Springfield'),
+      );
+      final patch = ProfilePatch.diff(before, next);
+
+      final decoded = ProfilePatch.fromWire(patch.toWire()).getOrThrow();
+      expect(decoded.apply(before).previousAddress, next.previousAddress);
+    });
+
+    test('a negative list index is a decode violation', () {
+      final result = ProfilePatch.fromWire(const {
+        'tags': {
+          'ops': [
+            {'op': 'removeAt', 'index': -1},
+          ],
+        },
+      });
+
+      expect(result.isOk, isFalse);
+      expect(
+        (result as BoundaryErr<ProfilePatch>).violations.map((v) => v.path),
+        contains('/tags/ops/0/index'),
+      );
+    });
+
+    test('an index that cannot be valid after replaceAll is rejected', () {
+      final result = ProfilePatch.fromWire(const {
+        'tags': {
+          'ops': [
+            {
+              'op': 'replaceAll',
+              'items': ['a'],
+            },
+            {'op': 'append', 'item': 'b'},
+            {'op': 'updateAt', 'index': 2, 'item': 'c'},
+          ],
+        },
+      });
+
+      expect(result.isOk, isFalse);
+      expect(
+        (result as BoundaryErr<ProfilePatch>).violations.map((v) => v.path),
+        contains('/tags/ops/2/index'),
+      );
+    });
+
+    test('the root entity name is not a valid patch kind', () {
+      final result = NotificationPatch.fromWire(const {
+        'entityType': 'Notification',
+        'patchKind': 'Notification',
+        'ops': <String, Object?>{},
+      });
+
+      expect(result.isOk, isFalse);
+      expect(
+        (result as BoundaryErr<NotificationPatch>).violations.map(
+          (v) => v.path,
+        ),
+        contains('/patchKind'),
+      );
+    });
+
+    test('a shared envelope rejects an op the shared patch cannot express', () {
+      final result = NotificationPatch.fromWire(const {
+        'entityType': 'Notification',
+        'patchKind': 'shared',
+        'ops': {'itemCount': 3},
+      });
+
+      expect(result.isOk, isFalse);
+      expect(
+        (result as BoundaryErr<NotificationPatch>).violations.map(
+          (v) => v.path,
+        ),
+        contains('/ops/itemCount'),
+      );
+    });
+
+    test('a subtype field violation is prefixed with /ops', () {
+      final result = NotificationPatch.fromWire(const {
+        'entityType': 'OrderNotification',
+        'patchKind': 'OrderNotification',
+        'ops': {'readAt': 42},
+      });
+
+      expect(result.isOk, isFalse);
+      expect(
+        (result as BoundaryErr<NotificationPatch>).violations.map(
+          (v) => v.path,
+        ),
+        contains('/ops/readAt'),
+      );
+    });
+
+    test('an explicit null clear through PatchWireSet wins over a shape', () {
+      final patch = AccountPatch.fromWire(const {
+        'note': PatchWireSet(null),
+        'tier': PatchWireSet(AccountTier.pro),
+      });
+
+      expect(patch.isOk, isTrue);
+      final applied = patch.getOrThrow().apply(
+        const Account(id: 'a1', name: 'ada', score: 1, note: 'old'),
+      );
+      expect(applied.note, isNull);
+      expect(applied.tier, AccountTier.pro);
+    });
+
+    test('a descriptor with no value cannot silently clear a scalar', () {
+      final result = AccountPatch.fromWire(const {
+        'note': {'op': 'set'},
+      });
+
+      expect(result.isOk, isFalse);
+      expect(
+        (result as BoundaryErr<AccountPatch>).violations.map((v) => v.path),
+        contains('/note'),
       );
     });
   });

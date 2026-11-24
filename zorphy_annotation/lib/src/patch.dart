@@ -473,6 +473,7 @@ final class MapRemove<K, V> extends MapPatchOp<K, V> {
   @override
   String toString() => 'MapPatchOp<$K, $V>.remove($key)';
 }
+
 /// An ordered sequence of [ListPatchOp] steps — the collection-delta half of
 /// the patch algebra (ISSUE-008).
 ///
@@ -743,6 +744,31 @@ final class MapPatchDelta<K, V>
         },
     ],
   };
+
+  /// The field-level wire form: a bare list of steps, not `{'ops': [...]}`.
+  ///
+  /// A replacement map may legitimately contain a literal `ops` key, so a
+  /// wrapper keyed `ops` would make the two shapes ambiguous (#215). A map
+  /// field therefore carries the bare list; `ZorphyPatchWire.mapDelta` reads a
+  /// list as steps and a map as a replacement.
+  List<Object?> toWireSteps() => <Object?>[
+    for (final op in ops)
+      switch (op) {
+        MapReplaceAll<K, V>(:final entries) => <String, Object?>{
+          'op': 'replaceAll',
+          'entries': entries,
+        },
+        MapPut<K, V>(:final key, :final value) => <String, Object?>{
+          'op': 'put',
+          'key': key,
+          'value': value,
+        },
+        MapRemove<K, V>(:final key) => <String, Object?>{
+          'op': 'remove',
+          'key': key,
+        },
+      },
+  ];
 
   @override
   bool operator ==(Object other) =>

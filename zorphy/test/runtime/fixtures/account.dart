@@ -157,8 +157,10 @@ class AccountPatch extends PatchBase<Account, Account$> {
       wire['score'] = patchMap[Account$.score];
     if (patchMap.containsKey(Account$.note))
       wire['note'] = patchMap[Account$.note];
-    if (patchMap.containsKey(Account$.tier))
-      wire['tier'] = patchMap[Account$.tier];
+    if (patchMap.containsKey(Account$.tier)) {
+      final value = patchMap[Account$.tier];
+      wire['tier'] = value is Enum ? value.name : value;
+    }
     return wire;
   }
 
@@ -174,14 +176,24 @@ class AccountPatch extends PatchBase<Account, Account$> {
           '$prefix/id',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.as<String>(
-          idRaw,
-          '$prefix/id',
-          violations,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Account$.id] = decoded;
+        if (idRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/id',
+              expected: 'String',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.as<String>(
+            idRaw,
+            '$prefix/id',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Account$.id] = decoded;
+          }
         }
       }
       if (ops.containsKey('name')) {
@@ -190,14 +202,24 @@ class AccountPatch extends PatchBase<Account, Account$> {
           '$prefix/name',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.as<String>(
-          nameRaw,
-          '$prefix/name',
-          violations,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Account$.name_] = decoded;
+        if (nameRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/name',
+              expected: 'String',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.as<String>(
+            nameRaw,
+            '$prefix/name',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Account$.name_] = decoded;
+          }
         }
       }
       if (ops.containsKey('score')) {
@@ -206,14 +228,24 @@ class AccountPatch extends PatchBase<Account, Account$> {
           '$prefix/score',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.as<int>(
-          scoreRaw,
-          '$prefix/score',
-          violations,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Account$.score] = decoded;
+        if (scoreRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/score',
+              expected: 'int',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.as<int>(
+            scoreRaw,
+            '$prefix/score',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Account$.score] = decoded;
+          }
         }
       }
       if (ops.containsKey('note')) {
@@ -222,15 +254,18 @@ class AccountPatch extends PatchBase<Account, Account$> {
           '$prefix/note',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.as<String>(
-          noteRaw,
-          '$prefix/note',
-          violations,
-          nullable: true,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Account$.note] = decoded;
+        if (noteRaw == null) {
+          patch.patchMap[Account$.note] = null;
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.as<String>(
+            noteRaw,
+            '$prefix/note',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Account$.note] = decoded;
+          }
         }
       }
       if (ops.containsKey('tier')) {
@@ -239,15 +274,25 @@ class AccountPatch extends PatchBase<Account, Account$> {
           '$prefix/tier',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.enumByName<AccountTier>(
-          AccountTier.values,
-          tierRaw,
-          '$prefix/tier',
-          violations,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Account$.tier] = decoded;
+        if (tierRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/tier',
+              expected: 'AccountTier',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.enumByName<AccountTier>(
+            AccountTier.values,
+            tierRaw,
+            '$prefix/tier',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Account$.tier] = decoded;
+          }
         }
       }
       if (violations.isEmpty) return BoundaryOk<AccountPatch>(patch);
@@ -258,12 +303,14 @@ class AccountPatch extends PatchBase<Account, Account$> {
     );
   }
 
-  Map<String, Object?> toEnvelope() {
-    return <String, Object?>{
+  Map<String, Object?> toEnvelope({Object? principalKey}) {
+    final envelope = <String, Object?>{
       'entityType': 'Account',
       'patchKind': 'Account',
+      'principalKey': principalKey,
       'ops': toWire(),
     };
+    return envelope;
   }
 
   AccountPatch withId(String? value) {

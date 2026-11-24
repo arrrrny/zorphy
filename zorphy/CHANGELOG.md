@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+### Changed
+
+- Patch wire codecs hardened from the #215 review: generated `toWire()` writes
+  enum NAMES (so `jsonEncode(toEnvelope())` survives a transport hop),
+  `toEnvelope({principalKey: ...})` carries caller-supplied row identity beside
+  `ops`, a nested whole-value replacement is wrapped so it is never decoded as
+  an edit of the old value, explicit nulls are handled before shape dispatch,
+  a `num` field keeps integers, and nested `List<List<T>>` / `Map<K, Map<...>>`
+  decoders keep their full type arguments. Generating a patch with a field
+  named after an envelope key (`ops`, `patchKind`, `entityType`,
+  `principalKey`) is now refused — the bare/envelope dual shape cannot tell
+  such a field apart from metadata. A nested class inside a collection that
+  arrives as a JSON map still needs the entity's own boundary codec; the
+  emitted decoder documents that limitation.
+
 ### Added
 
 - Generated patches now carry a trust-boundary codec (#192). Every concrete

@@ -1,4 +1,5 @@
 import 'package:code_builder/code_builder.dart';
+import 'package:zorphy_annotation/zorphy.dart' show ZorphyPatchWire;
 
 import '../ast/ast.dart';
 import '../common/NameType.dart';
@@ -100,6 +101,7 @@ class PolymorphicPatchEmitter {
     Map<String, Map<String, String>> subtypeFieldTypes = const {},
   }) {
     _requireSubtypes(subtypeNames);
+    _requireNoReservedFields(fields);
     return _emit([
       buildRootClass(
         rootName: rootName,
@@ -126,6 +128,7 @@ class PolymorphicPatchEmitter {
     required List<NameTypeClassComment> fields,
     required List<String> sharedFields,
   }) {
+    _requireNoReservedFields(fields);
     return _emit([
       buildSubtypeClass(
         subtypeName: subtypeName,
@@ -463,7 +466,15 @@ class PolymorphicPatchEmitter {
       Method((m) {
         m
           ..name = 'toEnvelope'
-          ..returns = referType('Map<String, Object?>');
+          ..returns = referType('Map<String, Object?>')
+          ..optionalParameters.add(
+            Parameter((p) {
+              p
+                ..name = 'principalKey'
+                ..named = true
+                ..type = referType('Object?');
+            }),
+          );
       });
 
   /// The shared patch's `apply`: dispatch each concrete subtype to its own
@@ -738,6 +749,10 @@ class PolymorphicPatchEmitter {
 
     final cleanSubtypes = subtypeNames.map(_clean).toList();
     final kinds = ['shared', ...cleanSubtypes].join(', ');
+    // Only an EMITTED subtype kind is valid: `hierarchy` also contains the root
+    // name, which no patch ever emits as a patchKind (#215).
+    final subtypeList =
+        'const <String>[${cleanSubtypes.map((sub) => "'$sub'").join(', ')}]';
     final hierarchy =
         "const <String>['$root'"
         '${cleanSubtypes.map((s) => ", '$s'").join()}]';
@@ -774,31 +789,26 @@ class PolymorphicPatchEmitter {
           "path: '/$_opsKey', expected: 'Map<String, Object?>', "
           "actual: ZorphyPatchWire.describe(raw['$_opsKey']))]);",
       '}',
-      'if (kind == \'shared\' || hierarchy.contains(kind)) {',
+      "if (kind == 'shared' || $subtypeList.contains(kind)) {",
       // Shared-surface decode: the shared patch IS a root patch, and it is the
       // one concrete root-typed patch a generated library always declares.
       '  final prefix = ZorphyPatchWire.opsPathOf(raw);',
       '  final decoded = $sharedName.fromWire(ops);',
-      '  if (kind == \'shared\') return decoded'
-          '.fold<ZorphyBoundaryResult<$patchName>>(',
-      '    (value) => BoundaryOk<$patchName>(value),',
-      '    (error) => BoundaryErr<$patchName>('
-          'targetType: error.targetType, '
-          'violations: ZorphyPatchWire.prefix(error.violations, prefix)),',
-      '  );',
-      // A subtype envelope carries that subtype's ops; the root patch can only
-      // express the shared fields, so anything else is a violation rather than
-      // a silently dropped change.
+      // Unknown-key validation applies to EVERY kind, including shared: the
+      // old early return let a shared envelope silently discard an op it
+      // could not express (#215).
       '  final sharedKeys = $sharedKeyList;',
       '  final unknown = <FieldViolation>[];',
       '  for (final key in ops.keys) {',
       '    if (!sharedKeys.contains(key)) {',
       '      unknown.add(FieldViolation('
-          "path: '/$_opsKey/\$key', "
+          "path: '\$prefix/\$key', "
           "expected: 'one of: \${sharedKeys.join(', ')}', "
           'actual: ZorphyPatchWire.describe(ops[key])));',
       '    }',
       '  }',
+      // Prefix decoded field violations on BOTH kinds: a subtype field error
+      // used to read `/readAt` beside `/ops/itemCount` (#215).
       '  return decoded.fold<ZorphyBoundaryResult<$patchName>>(',
       '    (value) => unknown.isEmpty',
       '        ? BoundaryOk<$patchName>(value)',
@@ -806,7 +816,8 @@ class PolymorphicPatchEmitter {
           "targetType: '$patchName', violations: unknown),",
       '    (error) => BoundaryErr<$patchName>('
           'targetType: error.targetType, '
-          'violations: <FieldViolation>[...error.violations, ...unknown]),',
+          'violations: <FieldViolation>[...ZorphyPatchWire.prefix('
+          'error.violations, prefix), ...unknown]),',
       '  );',
       '}',
       'return BoundaryErr<$patchName>('
@@ -918,15 +929,27 @@ class PolymorphicPatchEmitter {
           '$bare.values, $value, $path, violations)';
     } else if (bare == 'DateTime') {
       read = 'ZorphyPatchWire.asDateTime($value, $path, violations)';
-    } else if (bare == 'double' || bare == 'num') {
+    } else if (bare == 'double') {
       read = 'ZorphyPatchWire.asDouble($value, $path, violations)';
+    } else if (bare == 'num') {
+      // A declared `num` keeps an integer intact; only `double` converts.
+      read = 'ZorphyPatchWire.asNum($value, $path, violations)';
     } else {
       read = 'ZorphyPatchWire.as<$declared>($value, $path, violations)';
     }
     // A local is what promotes: `switch` over a nullable result does not
     // narrow the binder itself, and `PatchValue.set` needs the non-null value.
+    // A nullable declared type with an explicit null is a CLEAR, not a failed
+    // read: `nullable: true` alone cannot distinguish the two (#215).
     final local = '${nome}Decoded';
-    return '(() { final $local = $read; '
+    final nullable = declared.endsWith('?');
+    // Emit the branch ONLY for a nullable declaration: a constant-false
+    // `if` still type-checks its body and records dead code in analysis.
+    final nullBranch = nullable
+        ? 'if ($value == null) return PatchValue<$declared>.set(null); '
+        : '';
+    return '(() { $nullBranch'
+        'final $local = $read; '
         'return $local == null '
         '? null '
         ': PatchValue<$declared>.set($local); })()';
@@ -946,11 +969,23 @@ class PolymorphicPatchEmitter {
   }) => Method((m) {
     m
       ..name = 'toEnvelope'
-      ..returns = referType('Map<String, Object?>');
+      ..returns = referType('Map<String, Object?>')
+      ..optionalParameters.add(
+        Parameter((p) {
+          p
+            ..name = 'principalKey'
+            ..named = true
+            ..type = referType('Object?');
+        }),
+      );
+    // The principal key is caller-supplied transport metadata: a name-only
+    // patch cannot know which row it targets, and no ID edit is synthesized
+    // into ops (#215).
     m.body = Code(
       'return <String, Object?>{'
       "'$_entityTypeKey': '$entityType', "
       "'$_patchKindKey': '$patchKind', "
+      "'$_principalKeyKey': principalKey, "
       "'$_opsKey': toWire(),"
       '};',
     );
@@ -967,6 +1002,30 @@ class PolymorphicPatchEmitter {
 
   /// The envelope key carrying a patch's own `toWire()` map.
   static const String _opsKey = 'ops';
+
+  /// The envelope key carrying the principal key of the targeted row.
+  static const String _principalKeyKey = 'principalKey';
+
+  /// Rejects a field whose name is an envelope key: a bare `toWire()` map and
+  /// an envelope share one key namespace, so such a field would be misread as
+  /// metadata (#215). Refusing it at generation time keeps the wire contract
+  /// unambiguous instead of failing silently at decode time.
+  static void _requireNoReservedFields(List<NameTypeClassComment> fields) {
+    for (final field in fields) {
+      final member = field.name.startsWith('_')
+          ? field.name.substring(1)
+          : field.name;
+      if (ZorphyPatchWire.reservedEnvelopeKeys.contains(member)) {
+        throw ArgumentError.value(
+          member,
+          'fields',
+          'is a reserved patch envelope key '
+              '(${ZorphyPatchWire.reservedEnvelopeKeys.join(', ')}) '
+              'and cannot be a patch field',
+        );
+      }
+    }
+  }
 
   static void _requireSubtypes(List<String> subtypeNames) {
     if (subtypeNames.isEmpty) {

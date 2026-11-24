@@ -94,7 +94,7 @@ sealed class NotificationPatch implements ZorphyPatch<Notification> {
   NotificationPatch invert(Notification before);
   @override
   Map<String, Object?> toWire();
-  Map<String, Object?> toEnvelope();
+  Map<String, Object?> toEnvelope({Object? principalKey});
   static ZorphyBoundaryResult<NotificationPatch> fromWire(
     Map<String, Object?> raw,
   ) {
@@ -142,24 +142,20 @@ sealed class NotificationPatch implements ZorphyPatch<Notification> {
         ],
       );
     }
-    if (kind == 'shared' || hierarchy.contains(kind)) {
+    if (kind == 'shared' ||
+        const <String>[
+          'OrderNotification',
+          'PriceDropNotification',
+        ].contains(kind)) {
       final prefix = ZorphyPatchWire.opsPathOf(raw);
       final decoded = NotificationSharedPatch.fromWire(ops);
-      if (kind == 'shared')
-        return decoded.fold<ZorphyBoundaryResult<NotificationPatch>>(
-          (value) => BoundaryOk<NotificationPatch>(value),
-          (error) => BoundaryErr<NotificationPatch>(
-            targetType: error.targetType,
-            violations: ZorphyPatchWire.prefix(error.violations, prefix),
-          ),
-        );
       final sharedKeys = const <String>['id', 'readAt'];
       final unknown = <FieldViolation>[];
       for (final key in ops.keys) {
         if (!sharedKeys.contains(key)) {
           unknown.add(
             FieldViolation(
-              path: '/ops/$key',
+              path: '$prefix/$key',
               expected: 'one of: ${sharedKeys.join(', ')}',
               actual: ZorphyPatchWire.describe(ops[key]),
             ),
@@ -175,7 +171,10 @@ sealed class NotificationPatch implements ZorphyPatch<Notification> {
               ),
         (error) => BoundaryErr<NotificationPatch>(
           targetType: error.targetType,
-          violations: <FieldViolation>[...error.violations, ...unknown],
+          violations: <FieldViolation>[
+            ...ZorphyPatchWire.prefix(error.violations, prefix),
+            ...unknown,
+          ],
         ),
       );
     }
@@ -274,10 +273,11 @@ final class NotificationSharedPatch extends NotificationPatch {
     return wire;
   }
 
-  Map<String, Object?> toEnvelope() {
+  Map<String, Object?> toEnvelope({Object? principalKey}) {
     return <String, Object?>{
       'entityType': 'Notification',
       'patchKind': 'shared',
+      'principalKey': principalKey,
       'ops': toWire(),
     };
   }
@@ -311,6 +311,7 @@ final class NotificationSharedPatch extends NotificationPatch {
         violations,
       );
       readAtValue = (() {
+        if (rawValue == null) return PatchValue<DateTime?>.set(null);
         final readAtDecoded = ZorphyPatchWire.asDateTime(
           rawValue,
           '/readAt',
@@ -426,10 +427,11 @@ final class OrderNotificationPatch extends NotificationPatch {
     return wire;
   }
 
-  Map<String, Object?> toEnvelope() {
+  Map<String, Object?> toEnvelope({Object? principalKey}) {
     return <String, Object?>{
       'entityType': 'OrderNotification',
       'patchKind': 'OrderNotification',
+      'principalKey': principalKey,
       'ops': toWire(),
     };
   }
@@ -463,6 +465,7 @@ final class OrderNotificationPatch extends NotificationPatch {
         violations,
       );
       readAtValue = (() {
+        if (rawValue == null) return PatchValue<DateTime?>.set(null);
         final readAtDecoded = ZorphyPatchWire.asDateTime(
           rawValue,
           '/readAt',
@@ -595,10 +598,11 @@ final class PriceDropNotificationPatch extends NotificationPatch {
     return wire;
   }
 
-  Map<String, Object?> toEnvelope() {
+  Map<String, Object?> toEnvelope({Object? principalKey}) {
     return <String, Object?>{
       'entityType': 'PriceDropNotification',
       'patchKind': 'PriceDropNotification',
+      'principalKey': principalKey,
       'ops': toWire(),
     };
   }
@@ -632,6 +636,7 @@ final class PriceDropNotificationPatch extends NotificationPatch {
         violations,
       );
       readAtValue = (() {
+        if (rawValue == null) return PatchValue<DateTime?>.set(null);
         final readAtDecoded = ZorphyPatchWire.asDateTime(
           rawValue,
           '/readAt',

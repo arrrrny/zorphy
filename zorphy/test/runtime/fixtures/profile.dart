@@ -142,14 +142,24 @@ class AddressPatch extends PatchBase<Address, Address$> {
           '$prefix/street',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.as<String>(
-          streetRaw,
-          '$prefix/street',
-          violations,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Address$.street] = decoded;
+        if (streetRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/street',
+              expected: 'String',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.as<String>(
+            streetRaw,
+            '$prefix/street',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Address$.street] = decoded;
+          }
         }
       }
       if (ops.containsKey('city')) {
@@ -158,14 +168,24 @@ class AddressPatch extends PatchBase<Address, Address$> {
           '$prefix/city',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.as<String>(
-          cityRaw,
-          '$prefix/city',
-          violations,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Address$.city] = decoded;
+        if (cityRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/city',
+              expected: 'String',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.as<String>(
+            cityRaw,
+            '$prefix/city',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Address$.city] = decoded;
+          }
         }
       }
       if (ops.containsKey('postalCode')) {
@@ -174,15 +194,18 @@ class AddressPatch extends PatchBase<Address, Address$> {
           '$prefix/postalCode',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.as<String>(
-          postalCodeRaw,
-          '$prefix/postalCode',
-          violations,
-          nullable: true,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Address$.postalCode] = decoded;
+        if (postalCodeRaw == null) {
+          patch.patchMap[Address$.postalCode] = null;
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.as<String>(
+            postalCodeRaw,
+            '$prefix/postalCode',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Address$.postalCode] = decoded;
+          }
         }
       }
       if (violations.isEmpty) return BoundaryOk<AddressPatch>(patch);
@@ -193,12 +216,14 @@ class AddressPatch extends PatchBase<Address, Address$> {
     );
   }
 
-  Map<String, Object?> toEnvelope() {
-    return <String, Object?>{
+  Map<String, Object?> toEnvelope({Object? principalKey}) {
+    final envelope = <String, Object?>{
       'entityType': 'Address',
       'patchKind': 'Address',
+      'principalKey': principalKey,
       'ops': toWire(),
     };
+    return envelope;
   }
 
   AddressPatch withStreet(String? value) {
@@ -477,20 +502,21 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
     if (patchMap.containsKey(Profile$.address))
       wire['address'] = patchMap[Profile$.address] is PatchNested
           ? (patchMap[Profile$.address] as PatchNested).toWire()
-          : patchMap[Profile$.address];
+          : PatchWireReplacement(patchMap[Profile$.address]);
     if (patchMap.containsKey(Profile$.tags))
       wire['tags'] = patchMap[Profile$.tags] is ListPatchDelta<String>
           ? (patchMap[Profile$.tags] as ListPatchDelta<String>).toWire()
           : patchMap[Profile$.tags];
     if (patchMap.containsKey(Profile$.scores))
       wire['scores'] = patchMap[Profile$.scores] is MapPatchDelta<String, int>
-          ? (patchMap[Profile$.scores] as MapPatchDelta<String, int>).toWire()
+          ? (patchMap[Profile$.scores] as MapPatchDelta<String, int>)
+                .toWireSteps()
           : patchMap[Profile$.scores];
     if (patchMap.containsKey(Profile$.previousAddress))
       wire['previousAddress'] =
           patchMap[Profile$.previousAddress] is PatchNested
           ? (patchMap[Profile$.previousAddress] as PatchNested).toWire()
-          : patchMap[Profile$.previousAddress];
+          : PatchWireReplacement(patchMap[Profile$.previousAddress]);
     return wire;
   }
 
@@ -506,14 +532,24 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
           '$prefix/id',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.as<String>(
-          idRaw,
-          '$prefix/id',
-          violations,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Profile$.id] = decoded;
+        if (idRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/id',
+              expected: 'String',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.as<String>(
+            idRaw,
+            '$prefix/id',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Profile$.id] = decoded;
+          }
         }
       }
       if (ops.containsKey('displayName')) {
@@ -522,14 +558,24 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
           '$prefix/displayName',
           violations,
         );
-        final before = violations.length;
-        final decoded = ZorphyPatchWire.as<String>(
-          displayNameRaw,
-          '$prefix/displayName',
-          violations,
-        );
-        if (violations.length == before) {
-          patch.patchMap[Profile$.displayName] = decoded;
+        if (displayNameRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/displayName',
+              expected: 'String',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final before = violations.length;
+          final decoded = ZorphyPatchWire.as<String>(
+            displayNameRaw,
+            '$prefix/displayName',
+            violations,
+          );
+          if (violations.length == before) {
+            patch.patchMap[Profile$.displayName] = decoded;
+          }
         }
       }
       if (ops.containsKey('address')) {
@@ -538,19 +584,46 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
           '$prefix/address',
           violations,
         );
-        final nestedRaw = ZorphyPatchWire.asObject(
-          addressRaw,
-          '$prefix/address',
-          violations,
-        );
-        if (nestedRaw != null) {
-          AddressPatch.fromWire(nestedRaw).fold(
-            (value) => patch.patchMap[Profile$.address] =
-                PatchNested<Address, AddressPatch>(value),
-            (error) => violations.addAll(
-              ZorphyPatchWire.prefix(error.violations, '$prefix/address'),
+        if (addressRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/address',
+              expected: 'Address',
+              actual: ZorphyPatchWire.describe(null),
             ),
           );
+        } else {
+          if (addressRaw is PatchWireReplacement) {
+            final value = addressRaw.value;
+            if (value is Address) {
+              patch.patchMap[Profile$.address] = value;
+            } else {
+              violations.add(
+                FieldViolation(
+                  path: '$prefix/address',
+                  expected: 'Address',
+                  actual: ZorphyPatchWire.describe(value),
+                ),
+              );
+            }
+          } else if (addressRaw is Address) {
+            patch.patchMap[Profile$.address] = addressRaw;
+          } else {
+            final nestedRaw = ZorphyPatchWire.asObject(
+              addressRaw,
+              '$prefix/address',
+              violations,
+            );
+            if (nestedRaw != null) {
+              AddressPatch.fromWire(nestedRaw).fold(
+                (value) => patch.patchMap[Profile$.address] =
+                    PatchNested<Address, AddressPatch>(value),
+                (error) => violations.addAll(
+                  ZorphyPatchWire.prefix(error.violations, '$prefix/address'),
+                ),
+              );
+            }
+          }
         }
       }
       if (ops.containsKey('tags')) {
@@ -559,14 +632,24 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
           '$prefix/tags',
           violations,
         );
-        final decoded = ZorphyPatchWire.listDelta<String>(
-          tagsRaw,
-          '$prefix/tags',
-          violations,
-          (value, path, violations) =>
-              ZorphyPatchWire.as<String>(value, path, violations),
-        );
-        if (decoded != null) patch.patchMap[Profile$.tags] = decoded;
+        if (tagsRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/tags',
+              expected: 'String',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final decoded = ZorphyPatchWire.listDelta<String>(
+            tagsRaw,
+            '$prefix/tags',
+            violations,
+            (value, path, violations) =>
+                ZorphyPatchWire.as<String>(value, path, violations),
+          );
+          if (decoded != null) patch.patchMap[Profile$.tags] = decoded;
+        }
       }
       if (ops.containsKey('scores')) {
         final Object? scoresRaw = ZorphyPatchWire.fieldValue(
@@ -574,16 +657,26 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
           '$prefix/scores',
           violations,
         );
-        final decoded = ZorphyPatchWire.mapDelta<String, int>(
-          scoresRaw,
-          '$prefix/scores',
-          violations,
-          decodeKey: (value, path, violations) =>
-              ZorphyPatchWire.stringKey(value, path, violations),
-          decodeValue: (value, path, violations) =>
-              ZorphyPatchWire.as<int>(value, path, violations),
-        );
-        if (decoded != null) patch.patchMap[Profile$.scores] = decoded;
+        if (scoresRaw == null) {
+          violations.add(
+            FieldViolation(
+              path: '$prefix/scores',
+              expected: 'String, int',
+              actual: ZorphyPatchWire.describe(null),
+            ),
+          );
+        } else {
+          final decoded = ZorphyPatchWire.mapDelta<String, int>(
+            scoresRaw,
+            '$prefix/scores',
+            violations,
+            decodeKey: (value, path, violations) =>
+                ZorphyPatchWire.stringKey(value, path, violations),
+            decodeValue: (value, path, violations) =>
+                ZorphyPatchWire.as<int>(value, path, violations),
+          );
+          if (decoded != null) patch.patchMap[Profile$.scores] = decoded;
+        }
       }
       if (ops.containsKey('previousAddress')) {
         final Object? previousAddressRaw = ZorphyPatchWire.fieldValue(
@@ -591,22 +684,43 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
           '$prefix/previousAddress',
           violations,
         );
-        final nestedRaw = ZorphyPatchWire.asObject(
-          previousAddressRaw,
-          '$prefix/previousAddress',
-          violations,
-        );
-        if (nestedRaw != null) {
-          AddressPatch.fromWire(nestedRaw).fold(
-            (value) => patch.patchMap[Profile$.previousAddress] =
-                PatchNested<Address, AddressPatch>(value),
-            (error) => violations.addAll(
-              ZorphyPatchWire.prefix(
-                error.violations,
-                '$prefix/previousAddress',
-              ),
-            ),
-          );
+        if (previousAddressRaw == null) {
+          patch.patchMap[Profile$.previousAddress] = null;
+        } else {
+          if (previousAddressRaw is PatchWireReplacement) {
+            final value = previousAddressRaw.value;
+            if (value is Address) {
+              patch.patchMap[Profile$.previousAddress] = value;
+            } else {
+              violations.add(
+                FieldViolation(
+                  path: '$prefix/previousAddress',
+                  expected: 'Address',
+                  actual: ZorphyPatchWire.describe(value),
+                ),
+              );
+            }
+          } else if (previousAddressRaw is Address) {
+            patch.patchMap[Profile$.previousAddress] = previousAddressRaw;
+          } else {
+            final nestedRaw = ZorphyPatchWire.asObject(
+              previousAddressRaw,
+              '$prefix/previousAddress',
+              violations,
+            );
+            if (nestedRaw != null) {
+              AddressPatch.fromWire(nestedRaw).fold(
+                (value) => patch.patchMap[Profile$.previousAddress] =
+                    PatchNested<Address, AddressPatch>(value),
+                (error) => violations.addAll(
+                  ZorphyPatchWire.prefix(
+                    error.violations,
+                    '$prefix/previousAddress',
+                  ),
+                ),
+              );
+            }
+          }
         }
       }
       if (violations.isEmpty) return BoundaryOk<ProfilePatch>(patch);
@@ -617,12 +731,14 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
     );
   }
 
-  Map<String, Object?> toEnvelope() {
-    return <String, Object?>{
+  Map<String, Object?> toEnvelope({Object? principalKey}) {
+    final envelope = <String, Object?>{
       'entityType': 'Profile',
       'patchKind': 'Profile',
+      'principalKey': principalKey,
       'ops': toWire(),
     };
+    return envelope;
   }
 
   ProfilePatch withId(String? value) {

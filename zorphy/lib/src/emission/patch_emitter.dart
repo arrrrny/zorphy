@@ -1,4 +1,5 @@
 import 'package:code_builder/code_builder.dart';
+import 'package:zorphy_annotation/zorphy.dart' show ZorphyPatchWire;
 
 import '../ast/ast.dart';
 import '../common/NameType.dart';
@@ -77,6 +78,21 @@ class PatchEmitter {
     List<String> genericTypeNames = const [],
     List<String> genericDeclarations = const [],
   }) {
+    // Envelope keys and field names share one namespace in a bare `toWire()`
+    // map. Refuse the collision at GENERATION time rather than shipping a
+    // decoder that misreads a legitimate field as envelope metadata (#215).
+    for (final field in fields) {
+      final member = _memberName(field.name);
+      if (ZorphyPatchWire.reservedEnvelopeKeys.contains(member)) {
+        throw ArgumentError.value(
+          member,
+          'fields',
+          'is a reserved patch envelope key '
+              '(${ZorphyPatchWire.reservedEnvelopeKeys.join(', ')}) '
+              'and cannot be a patch field',
+        );
+      }
+    }
     final name = _clean(className);
     final enumName = '${name}\$';
     final patchName = '${name}Patch';
@@ -667,22 +683,43 @@ class PatchEmitter {
             '$patchMapName[$key] is ListPatchDelta<${shape.valueType}>'
                 ' ? ($patchMapName[$key] as ListPatchDelta<${shape.valueType}>)'
                 '.toWire() : $patchMapName[$key]',
+          // A map delta carries a BARE step list: a replacement map may hold a
+          // literal `ops` key, so a wrapper keyed `ops` would be ambiguous
+          // (#215). The field-level `toWireSteps()` keeps that distinction.
           _FieldShapeKind.map =>
             '$patchMapName[$key] is MapPatchDelta<${shape.valueType}>'
                 ' ? ($patchMapName[$key] as MapPatchDelta<${shape.valueType}>)'
-                '.toWire() : $patchMapName[$key]',
+                '.toWireSteps() : $patchMapName[$key]',
+          // A whole-value replacement is wrapped so its decoder never treats
+          // it as an edit of the old value; a PatchNested still renders as the
+          // field-keyed sub-patch map (#215).
           _FieldShapeKind.nested =>
             '$patchMapName[$key] is PatchNested'
                 ' ? ($patchMapName[$key] as PatchNested).toWire()'
-                ' : $patchMapName[$key]',
+                ' : PatchWireReplacement($patchMapName[$key])',
           _ => '$patchMapName[$key]',
         };
-        b.statements.add(
-          Code(
-            'if ($patchMapName.containsKey($key)) '
-            'wire[${_stringLiteral(member)}] = $wireValue;',
-          ),
-        );
+        // An enum instance is not JSON-encodable. Write its NAME on the wire
+        // so `jsonEncode(toEnvelope())` survives a transport hop and the
+        // existing name-based decoder reads it back (#215).
+        if (field.isEnum) {
+          b.statements.add(Code('if ($patchMapName.containsKey($key)) {'));
+          b.statements.add(Code('  final value = $patchMapName[$key];'));
+          b.statements.add(
+            Code(
+              '  wire[${_stringLiteral(member)}] = '
+              'value is Enum ? value.name : value;',
+            ),
+          );
+          b.statements.add(const Code('}'));
+        } else {
+          b.statements.add(
+            Code(
+              'if ($patchMapName.containsKey($key)) '
+              'wire[${_stringLiteral(member)}] = $wireValue;',
+            ),
+          );
+        }
       }
       b.statements.add(const Code('return wire;'));
     });
@@ -797,41 +834,48 @@ class PatchEmitter {
       genericTypeNames: genericTypeNames,
     );
     final local = '${member}Raw';
-
-    // An ABSENT key leaves the field unchanged: a patch carries changes, so
-    // "not mentioned" means "do not touch", and decoding it must not
-    // manufacture a set-to-null.
-    final out = <String>[
-      'if (ops.containsKey($keyLiteral)) {',
-      '  final Object? $local = '
-          'ZorphyPatchWire.fieldValue(ops[$keyLiteral], $path, violations);',
-    ];
+    final body = <String>[];
 
     switch (shape.kind) {
       case _FieldShapeKind.list:
-        out
+        body
           ..add(
-            '  final decoded = ZorphyPatchWire.listDelta<'
+            'final decoded = ZorphyPatchWire.listDelta<'
             '${shape.valueType}>($local, $path, violations, '
             '${_valueDecoder(shape.valueType)});',
           )
-          ..add('  if (decoded != null) patch.$patchMapName[$key] = decoded;');
+          ..add('if (decoded != null) patch.$patchMapName[$key] = decoded;');
       case _FieldShapeKind.map:
-        final args = shape.valueType.split(',').map((e) => e.trim()).toList();
+        final args = _splitTypeArguments(shape.valueType);
         final keyType = args.length == 2 ? args[0] : 'String';
         final valueType = args.length == 2 ? args[1] : 'Object?';
-        out
+        body
           ..add(
-            '  final decoded = ZorphyPatchWire.mapDelta<$keyType, '
+            'final decoded = ZorphyPatchWire.mapDelta<$keyType, '
             '$valueType>($local, $path, violations, '
             'decodeKey: ${_keyDecoder(keyType)}, '
             'decodeValue: ${_valueDecoder(valueType)});',
           )
-          ..add('  if (decoded != null) patch.$patchMapName[$key] = decoded;');
+          ..add('if (decoded != null) patch.$patchMapName[$key] = decoded;');
       case _FieldShapeKind.nested:
-        // A nested field decodes through the sub-entity's own patch, carried
-        // as a PatchNested so the parent applies it to its own sub-value.
-        out
+        // A whole-value replacement (diff from null to a sub-entity) carries
+        // the sub-entity itself, wrapped so it can never be read as an edit of
+        // the OLD value; a field-keyed map is still a PatchNested (#215).
+        body
+          ..add('if ($local is PatchWireReplacement) {')
+          ..add('  final value = $local.value;')
+          ..add('  if (value is ${shape.valueType}) {')
+          ..add('    patch.$patchMapName[$key] = value;')
+          ..add('  } else {')
+          ..add(
+            "    violations.add(FieldViolation(path: $path, "
+            "expected: '${shape.valueType}', "
+            'actual: ZorphyPatchWire.describe(value)));',
+          )
+          ..add('  }')
+          ..add('} else if ($local is ${shape.valueType}) {')
+          ..add('  patch.$patchMapName[$key] = $local;')
+          ..add('} else {')
           ..add(
             '  final nestedRaw = ZorphyPatchWire.asObject('
             '$local, $path, violations);',
@@ -847,10 +891,10 @@ class PatchEmitter {
             'ZorphyPatchWire.prefix(error.violations, $path)),',
           )
           ..add('    );')
-          ..add('  }');
+          ..add('  }')
+          ..add('}');
       case _FieldShapeKind.scalar:
         final baseType = shape.valueType;
-        final isNullable = shape.isNullable;
         final String decode;
         if (field.isEnum) {
           decode =
@@ -858,28 +902,44 @@ class PatchEmitter {
               '$baseType.values, $local, $path, violations)';
         } else if (baseType == 'DateTime') {
           decode = 'ZorphyPatchWire.asDateTime($local, $path, violations)';
-        } else if (baseType == 'double' || baseType == 'num') {
+        } else if (baseType == 'double') {
           decode = 'ZorphyPatchWire.asDouble($local, $path, violations)';
+        } else if (baseType == 'num') {
+          // A `num` field must not round a large int through a double (#215).
+          decode = 'ZorphyPatchWire.asNum($local, $path, violations)';
         } else {
-          decode =
-              'ZorphyPatchWire.as<$baseType>('
-              '$local, $path, violations'
-              '${isNullable ? ', nullable: true' : ''})';
+          decode = 'ZorphyPatchWire.as<$baseType>($local, $path, violations)';
         }
         // A nullable field's legitimate `null` and a failed read are both
-        // `null` in the value domain, so the guard is the VIOLATION COUNT: a
-        // clean read — including a deliberate clear — writes the field, and
-        // only a fresh violation leaves it untouched.
-        out
-          ..add('  final before = violations.length;')
-          ..add('  final decoded = $decode;')
-          ..add('  if (violations.length == before) {')
-          ..add('    patch.$patchMapName[$key] = decoded;')
-          ..add('  }');
+        // `null` in the value domain, so the guard is the VIOLATION COUNT.
+        body
+          ..add('final before = violations.length;')
+          ..add('final decoded = $decode;')
+          ..add('if (violations.length == before) {')
+          ..add('  patch.$patchMapName[$key] = decoded;')
+          ..add('}');
     }
 
-    out.add('}');
-    return out;
+    // An explicit null is a CLEAR before any shape-specific reader runs: the
+    // nested, list, map and enum readers all reject a null they were never
+    // meant to see (#215). Absent keys never reach here.
+    final nullBody = shape.isNullable
+        ? 'patch.$patchMapName[$key] = null;'
+        : "violations.add(FieldViolation(path: $path, "
+              "expected: '${shape.valueType}', "
+              'actual: ZorphyPatchWire.describe(null)));';
+
+    return <String>[
+      'if (ops.containsKey($keyLiteral)) {',
+      '  final Object? $local = '
+          'ZorphyPatchWire.fieldValue(ops[$keyLiteral], $path, violations);',
+      '  if ($local == null) {',
+      '    $nullBody',
+      '  } else {',
+      ...body.map((line) => '  $line'),
+      '  }',
+      '}',
+    ];
   }
 
   /// The element decoder an emitted `listDelta` / `mapDelta` call passes for
@@ -888,18 +948,64 @@ class PatchEmitter {
   /// A CLOSURE, never a generic tear-off: `ZorphyPatchWire.as<T>` takes an
   /// optional `nullable:` named parameter, so its function type is wider than
   /// the `T? Function(Object?, String, List<FieldViolation>)` a delta call
-  /// wants, and a tear-off does not assign to it.
+  /// wants, and a tear-off does not assign to it. The declared `?` is carried
+  /// into the call (`nullable: true`), so `List<String?>` keeps its nulls; the
+  /// delta decides success by the violation count (#215).
+  ///
+  /// LIMITATION (review of #215): a JSON-hopped `List<KnownClass>` element
+  /// arrives as a field-keyed Map, which `as<KnownClass>` rejects. Turning that
+  /// map back into a class instance needs the entity's OWN boundary codec
+  /// (`BoundaryCodecEmitter.fromWire`) and a trusted constructor, neither of
+  /// which a patch field can assume exists. In-process elements (the class
+  /// instance itself) round-trip; a nested-class collection across a JSON
+  /// boundary is not supported by this codec.
   String _elementDecoder(String type) {
-    final base = _baseName(type.trim()).replaceAll('?', '').trim();
+    final trimmed = type.trim();
+    final nullable = trimmed.endsWith('?');
+    final declared = nullable
+        ? trimmed.substring(0, trimmed.length - 1).trim()
+        : trimmed;
+    final base = _baseName(declared);
     const signature = '(value, path, violations)';
     if (base == 'DateTime') {
       return '$signature => ZorphyPatchWire.asDateTime(value, path, violations)';
     }
-    if (base == 'double' || base == 'num') {
+    if (base == 'double') {
       return '$signature => ZorphyPatchWire.asDouble(value, path, violations)';
     }
-    final target = (base == 'Object' || base == 'dynamic') ? 'Object?' : base;
-    return '$signature => ZorphyPatchWire.as<$target>(value, path, violations)';
+    if (base == 'num') {
+      return '$signature => ZorphyPatchWire.asNum(value, path, violations)';
+    }
+    if (base == 'List') {
+      // A nested collection element keeps its FULL type: `as<List>` would
+      // answer an untyped list where `listDelta<List<int>>` wants a callback
+      // returning `List<int>?` (#215).
+      final inner = _singleTypeArgument(declared);
+      if (inner != null) {
+        return '(value, path, violations) {'
+            ' if (value is! List) {'
+            '  violations.add(FieldViolation(path: path, '
+            "expected: 'List<$inner>', "
+            'actual: ZorphyPatchWire.describe(value)));'
+            '  return null;'
+            ' }'
+            ' final out = <$inner>[];'
+            ' for (var i = 0; i < value.length; i++) {'
+            "  final elementPath = '\$path/\$i';"
+            '  final before = violations.length;'
+            '  final decoded = (${_elementDecoder(inner)})('
+            'value[i], elementPath, violations);'
+            '  if (violations.length == before) out.add(decoded as $inner);'
+            ' }'
+            ' return out;'
+            ' }';
+      }
+    }
+    final target = (base == 'Object' || base == 'dynamic')
+        ? 'Object?'
+        : declared;
+    return '$signature => ZorphyPatchWire.as<$target>('
+        'value, path, violations${nullable ? ', nullable: true' : ''})';
   }
 
   /// The VALUE decoder a map field's `mapDelta` call passes for its `V`.
@@ -907,11 +1013,18 @@ class PatchEmitter {
   /// A map-valued entry (`Map<String, String>`) needs a keyed decode of its
   /// own: handing it the scalar `as<Map<...>>` would answer an untyped
   /// `Map<dynamic, dynamic>` no `Map<String, String>` function may return.
+  /// Type arguments are split at DEPTH ZERO, so `Map<String, Map<String, int>>`
+  /// keeps its full inner type (#215). Nullability is carried through the
+  /// recursive decoders as well.
   String _valueDecoder(String type) {
     final trimmed = type.trim();
-    final mapMatch = RegExp(r'^Map<(.+)>$').firstMatch(trimmed);
+    final nullable = trimmed.endsWith('?');
+    final declared = nullable
+        ? trimmed.substring(0, trimmed.length - 1).trim()
+        : trimmed;
+    final mapMatch = RegExp(r'^Map<(.+)>$').firstMatch(declared);
     if (mapMatch != null) {
-      final args = mapMatch.group(1)!.split(',').map((e) => e.trim()).toList();
+      final args = _splitTypeArguments(declared);
       final innerKey = args.length == 2 ? args[0] : 'String';
       final innerValue = args.length == 2 ? args[1] : 'Object?';
       return '(value, path, violations) {'
@@ -919,14 +1032,17 @@ class PatchEmitter {
           ' if (nested == null) return null;'
           ' final out = <$innerKey, $innerValue>{};'
           ' for (final entry in nested.entries) {'
-          "  final path2 = '\$path/\${entry.key}';"
-          // The decoder is a CLOSURE, so the invocation must be parenthesised:
-          // `fn (args)` would be read as part of the arrow body, not a call.
+          "  final path2 = '\$path/\${ZorphyPatchWire.pointerToken(entry.key)}';"
+          '  final kBefore = violations.length;'
           '  final k = (${_keyDecoder(innerKey)})'
           '(entry.key, path2, violations);'
+          '  final vBefore = violations.length;'
           '  final v = (${_elementDecoder(innerValue)})'
           '(entry.value, path2, violations);'
-          '  if (k != null && v != null) out[k] = v;'
+          '  if (violations.length == kBefore &&'
+          ' violations.length == vBefore) {'
+          '    out[k as $innerKey] = v as $innerValue;'
+          '  }'
           ' }'
           ' return out;'
           ' }';
@@ -956,6 +1072,36 @@ class PatchEmitter {
         'ZorphyPatchWire.as<$base>(value, path, violations)';
   }
 
+  /// The single type argument of a `List<T>` reference, or `null`.
+  static String? _singleTypeArgument(String type) {
+    final match = RegExp(r'^List<(.+)>$').firstMatch(type.trim());
+    return match?.group(1)?.trim();
+  }
+
+  /// Splits a `Map<K, V>` type argument list at top-level commas only.
+  ///
+  /// A naive `split(',')` breaks `Map<String, Map<String, int>>` into three
+  /// pieces and emits a `Map<String, Object?>` the field cannot assign (#215).
+  static List<String> _splitTypeArguments(String type) {
+    final inner =
+        RegExp(r'^Map<(.+)>$').firstMatch(type.trim())?.group(1) ?? type.trim();
+    final parts = <String>[];
+    var depth = 0;
+    var current = '';
+    for (final char in inner.split('')) {
+      if (char == '<' || char == '[') depth++;
+      if (char == '>' || char == ']') depth--;
+      if (char == ',' && depth == 0) {
+        parts.add(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    parts.add(current.trim());
+    return parts;
+  }
+
   /// The envelope key naming the entity the ops belong to.
   static const String _entityTypeKey = 'entityType';
 
@@ -964,6 +1110,9 @@ class PatchEmitter {
 
   /// The envelope key carrying a patch's own `toWire()` map.
   static const String _opsKey = 'ops';
+
+  /// The envelope key carrying the principal key of the targeted row.
+  static const String _principalKeyKey = 'principalKey';
 
   /// `toEnvelope()` — the polymorphic wire envelope this patch travels in.
   ///
@@ -981,14 +1130,29 @@ class PatchEmitter {
     final kind = isShared ? 'shared' : clean;
     m
       ..name = 'toEnvelope'
-      ..returns = referType('Map<String, Object?>');
-    m.body = Code(
-      'return <String, Object?>{'
-      "'$_entityTypeKey': '$clean', "
-      "'$_patchKindKey': '$kind', "
-      "'$_opsKey': toWire(),"
-      '};',
-    );
+      ..returns = referType('Map<String, Object?>')
+      ..optionalParameters.add(
+        Parameter((p) {
+          p
+            ..name = 'principalKey'
+            ..named = true
+            ..type = referType('Object?');
+        }),
+      );
+    // A name-only patch cannot know which row it targets. The principal key
+    // is TRANSPORT metadata supplied by the caller, beside ops, and never an
+    // edit inside ops (#215).
+    m.body = Block((b) {
+      b.statements.add(const Code('final envelope = <String, Object?>{'));
+      b.statements.add(Code("  '$_entityTypeKey': '$clean',"));
+      b.statements.add(Code("  '$_patchKindKey': '$kind',"));
+      if (!isShared) {
+        b.statements.add(Code("  '$_principalKeyKey': principalKey,"));
+      }
+      b.statements.add(Code("  '$_opsKey': toWire(),"));
+      b.statements.add(const Code('};'));
+      b.statements.add(const Code('return envelope;'));
+    });
   });
 
   /// The fluent builders for [field]: `with<Name>` always, plus the nested
