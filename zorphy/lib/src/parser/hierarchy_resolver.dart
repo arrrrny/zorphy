@@ -281,6 +281,9 @@ final class HierarchyResolver {
       replaySafe: declaration.replaySafe,
       isSyntheticLeaf: isSyntheticLeaf,
       fields: _declaredFields(element),
+      typeParameters: List.unmodifiable(
+        element.typeParameters.map((parameter) => parameter.toString()),
+      ),
     );
   }
 

@@ -30,6 +30,7 @@ ZorphyNodeIr _node({
   String? principalKey,
   String discriminatorValue = '',
   List<ZorphyFieldIr> fields = const [],
+  List<String> typeParameters = const [],
 }) => ZorphyNodeIr(
   className: className,
   cleanName: className.replaceAll(r'$', ''),
@@ -46,6 +47,7 @@ ZorphyNodeIr _node({
   replaySafe: archetype == ArchetypeKind.intent ? false : null,
   isSyntheticLeaf: false,
   fields: fields,
+  typeParameters: typeParameters,
 );
 
 /// `$Notification` -> `$OrderNotification` | `$PriceDropNotification`, the
@@ -242,6 +244,68 @@ void main() {
       final emitted = MockFixtureEmitter().emit(_notifications().root);
       expect(emitted, startsWith('class '));
     });
+
+    test('a generic node is skipped, and the rotation names only leaves that '
+        'were emitted', () {
+      // `class Box<T>MockData` and `Box<T>.fromTrusted(...)` are not legal
+      // Dart, and `T` is not a type this seeder can produce — so the node is
+      // withheld rather than approximated (the posture the generator takes for
+      // a generic hierarchy).
+      final generic = _node(
+        className: r'$Box',
+        isSealedRoot: true,
+        fields: const [ZorphyFieldIr(name: 'value', type: 'T')],
+        typeParameters: const ['T extends num'],
+      );
+      expect(MockFixtureEmitter().emitForNode(generic), isEmpty);
+
+      // A generic leaf inside a hierarchy is not an arm a root can name.
+      final okLeaf = _node(
+        className: r'$OkNode',
+        fields: const [ZorphyFieldIr(name: 'id', type: 'String')],
+      );
+      final genericLeaf = _node(
+        className: r'$BadNode',
+        superTypes: [okLeaf],
+        typeParameters: const ['T'],
+      );
+      final root = _node(
+        className: r'$Root',
+        isSealedRoot: true,
+        children: [okLeaf, genericLeaf],
+        fields: const [ZorphyFieldIr(name: 'id', type: 'String')],
+      );
+      final emitted = MockFixtureEmitter().emit(root);
+      expect(emitted, isNot(contains('BadNodeMockData')));
+      expect(emitted, contains('seed % 1'));
+    });
+
+    test(
+      'a required unseedable field refuses instead of fabricating a value',
+      () {
+        final node = _node(
+          className: r'$Order',
+          isSealedRoot: true,
+          fields: const [
+            ZorphyFieldIr(name: 'id', type: 'String'),
+            ZorphyFieldIr(name: 'status', type: 'OrderStatus'),
+          ],
+        );
+        final emitted = MockFixtureEmitter().emitForNode(node);
+        expect(
+          emitted,
+          contains('UnsupportedError'),
+          reason: 'a required enum field has no seed this emitter can supply',
+        );
+        expect(
+          emitted,
+          isNot(contains("'status-")),
+          reason: 'an enum must never be seeded as a String',
+        );
+        // The field it CAN seed still lands, so the rest of the class is usable.
+        expect(emitted, contains("patch = patch.withId('id-"));
+      },
+    );
   });
 
   group('ISSUE-015 MockFixtureEmitter — intents', () {

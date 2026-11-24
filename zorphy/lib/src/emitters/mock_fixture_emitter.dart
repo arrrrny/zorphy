@@ -70,7 +70,32 @@
 /// in through [emit]'s `mockSeeds`, because the IR deliberately carries no
 /// annotation data. A preset name outside the reserved set is a
 /// consumer-defined seed this emitter cannot know, so it falls through to the
-/// type default rather than emitting a literal it would have to invent.
+/// type default rather than emitting a literal it would have to invent. A
+/// KNOWN preset or example that does not fit the field's declared type falls
+/// through the same way: a `price` on an `int` field is not a licence to hand
+/// a `double` to an `int` parameter.
+///
+/// ## Seedability — a type this emitter cannot seed is never fabricated
+///
+/// `single()` constructs through the node's own `fromTrusted`, whose
+/// non-nullable parameters are `required`. So a field of a type outside the
+/// seeder's surface — a nested `$Entity` (bare or inside a `List`/`Set`/`Map`),
+/// an enum, `Uint8List`, `Uri`, a type variable — has no honest literal: the
+/// old catch-all handed every one of them a `String`, and the emitted source
+/// then did not compile. The rule now is that the per-field seeder answers
+/// `null` for such a type, and the callers decide:
+///
+/// - a NULLABLE field is simply omitted from the `fromTrusted` arguments (the
+///   parameter is optional, and the value stays `null`);
+/// - a non-nullable field makes the node's `single()` unseedable, so it throws
+///   a documented `UnsupportedError` instead of emitting a call that cannot
+///   compile;
+/// - `samplePatch()` skips the field either way, since its fluent builder
+///   carries something other than a raw seeded value.
+///
+/// A node whose class name carries type parameters (`Box<T>`) is not emitted at
+/// all, matching the generator's own posture for generic hierarchies
+/// (`PatchGenerator.shouldGenerate` withholds a generic sealed root).
 ///
 /// ## Output shape
 ///
@@ -103,6 +128,13 @@ final class MockFixtureEmitter {
   /// root and every concrete leaf below it, in depth-first pre-order — so a
   /// root's rotation arms resolve against classes emitted by the same call.
   ///
+  /// A node whose declaration carries type parameters is SKIPPED, along with
+  /// everything below it: `Box<T>MockData` and `Box<T>.fromTrusted(...)` are
+  /// not legal Dart, and `T` is not a type this seeder can produce a value for.
+  /// That is the same fail-closed posture the generator takes for a generic
+  /// hierarchy (`PatchGenerator.shouldGenerate`), and it is why a generator
+  /// calling this per node never sees a class it cannot compile.
+  ///
   /// [mockSeeds] maps a FIELD name to its `@ZorphyMock` hint; the hint applies
   /// wherever that name is seeded in this hierarchy.
   String emit(
@@ -111,6 +143,7 @@ final class MockFixtureEmitter {
   }) {
     final specs = <Spec>[];
     void walk(ZorphyNodeIr node) {
+      if (node.typeParameters.isNotEmpty) return;
       specs.add(_classSpec(node, mockSeeds));
       for (final child in node.directSubTypes) {
         walk(child);
@@ -126,14 +159,28 @@ final class MockFixtureEmitter {
   /// A node with subtypes emits the rotation across them, so the caller must
   /// also emit those leaves for the arms to resolve — use [emit] for a whole
   /// hierarchy, or compose the per-node results into one library.
+  ///
+  /// A GENERIC node emits nothing (an empty string, like
+  /// `PolymorphicPatchEmitter.emitRoot` for an unemittable root): there is no
+  /// legal declaration to produce, and silently approximating one would hand
+  /// the caller source that does not compile.
   String emitForNode(
     ZorphyNodeIr node, {
     Map<String, ZorphyMock> mockSeeds = const {},
-  }) => _emitter.emitSpecs([_classSpec(node, mockSeeds)]);
+  }) {
+    if (node.typeParameters.isNotEmpty) return '';
+    return _emitter.emitSpecs([_classSpec(node, mockSeeds)]);
+  }
 
   /// The `<Name>MockData` class of [node].
   Class _classSpec(ZorphyNodeIr node, Map<String, ZorphyMock> mockSeeds) {
-    final leaves = leavesOf(node);
+    // Only leaves this emitter actually emits can be rotation arms: a generic
+    // leaf is skipped, so naming its MockData would reference an undefined
+    // class.
+    final leaves = [
+      for (final leaf in leavesOf(node))
+        if (leaf.typeParameters.isEmpty) leaf,
+    ];
     final isDispatch = leaves.isNotEmpty && !node.isConcreteLeaf;
     final payload = payloadFields(node);
 
@@ -173,6 +220,13 @@ final class MockFixtureEmitter {
   ///
   /// A dispatch node rotates across its concrete leaves; anything else
   /// constructs itself through its own `fromTrusted`, seeded field by field.
+  ///
+  /// A field this emitter cannot seed is left out of the argument map when it
+  /// is NULLABLE (`fromTrusted`'s nullable parameters are optional, so the
+  /// value stays `null`), and makes the whole builder throw a documented
+  /// [UnsupportedError] when it is not — a required parameter has no value
+  /// this emitter could honestly supply, and a fabricated `String` would not
+  /// compile at the call site.
   Method _single({
     required ZorphyNodeIr node,
     required List<ZorphyFieldIr> payload,
@@ -199,20 +253,47 @@ final class MockFixtureEmitter {
         return;
       }
 
+      if (!node.isConcreteLeaf && leaves.isEmpty) {
+        // Every subtype below this node is one this emitter cannot emit, so
+        // there is no arm to rotate into and the node cannot construct itself.
+        m.body = _unsupported(
+          node,
+          'no concrete subtype is emittable (a generic subtype is skipped)',
+        );
+        return;
+      }
+
       if (payload.isEmpty) {
-        // A fieldless node's generated `const` constructor takes no arguments.
+        // A fieldless LEAF's generated `const` constructor takes no arguments.
         m.body = Code('return const ${node.cleanName}();');
         return;
       }
 
-      final arguments = <String, Expression>{
-        for (final field in payload)
-          field.name: _seedValue(
-            field: field,
-            seedExpression: refer('seed'),
-            hint: mockSeeds[field.name],
-          ),
-      };
+      final arguments = <String, Expression>{};
+      ZorphyFieldIr? blockedBy;
+      for (final field in payload) {
+        final value = _seedValue(
+          field: field,
+          seedExpression: refer('seed'),
+          hint: mockSeeds[field.name],
+        );
+        if (value != null) {
+          arguments[field.name] = value;
+          continue;
+        }
+        if (!field.isNullable) blockedBy ??= field;
+      }
+
+      final blocked = blockedBy;
+      if (blocked != null) {
+        m.body = _unsupported(
+          node,
+          '${blocked.name} is ${blocked.type}, '
+          'which this emitter cannot seed',
+        );
+        return;
+      }
+
       m.body = Block.of([
         referType(node.cleanName)
             .newInstanceNamed('fromTrusted', const [], arguments)
@@ -220,6 +301,18 @@ final class MockFixtureEmitter {
             .statement,
       ]);
     });
+  }
+
+  /// The body of a builder that refuses to emit a value: a documented
+  /// [UnsupportedError] naming the node and why.
+  ///
+  /// A throw beats a call that does not compile, and it keeps the emitted
+  /// class usable for its other members (`list()` and `samplePatch()` still
+  /// resolve, and a `samplePatch()` covers whatever it can seed).
+  static Code _unsupported(ZorphyNodeIr node, String reason) {
+    final message = '${mockDataName(node)} has no seedable value: $reason'
+        .replaceAll(r'$', r'\$');
+    return Code("throw UnsupportedError('$message');");
   }
 
   /// `static List<Foo> list({int count = 10}) => List<Foo>.generate(…)`
@@ -287,6 +380,9 @@ final class MockFixtureEmitter {
           seedExpression: literalNum(0),
           hint: mockSeeds[field.name],
         );
+        // A field whose type has no seed is skipped on the patch side too: its
+        // builder takes a value, and there is none to give it.
+        if (value == null) continue;
         statements.add(
           Code(
             'patch = patch.with${_capitalize(memberName(field.name))}'
@@ -299,39 +395,124 @@ final class MockFixtureEmitter {
     });
   }
 
-  /// The seed [Expression] for one field.
+  /// The seed [Expression] for one field, or `null` when the field's type is
+  /// outside the surface this emitter can seed.
   ///
   /// Precedence: a `@ZorphyMock(example: …)` literal, then a reserved
   /// `@ZorphyMock(preset: …)`, then the type-derived default. [seedExpression]
   /// is spliced into the default so the value varies with the caller's seed,
   /// while a hint stays constant — a preset names a SHAPE, not a sequence.
-  Expression _seedValue({
+  ///
+  /// A hint is only used when it fits the field's declared type
+  /// ([_presetFitsType] / [_exampleFitsType]): a `price` on an `int` field, an
+  /// `email` on a `bool`, or an example of the wrong shape falls through to the
+  /// type default rather than emitting a literal the parameter would reject.
+  Expression? _seedValue({
     required ZorphyFieldIr field,
     required Expression seedExpression,
     ZorphyMock? hint,
   }) {
+    final defaultSeed = _defaultSeedValue(field, seedExpression);
+    if (defaultSeed == null) return null;
+
     if (hint != null) {
       final example = hint.example;
-      if (example != null) return _exampleLiteral(example);
+      if (example != null && _exampleFitsType(example, field.type)) {
+        return _exampleLiteral(example);
+      }
       final preset = hint.preset;
-      if (preset != null && ZorphyMockPresets.all.contains(preset)) {
+      if (preset != null &&
+          ZorphyMockPresets.all.contains(preset) &&
+          _presetFitsType(preset, field.type)) {
         return _presetLiteral(preset, field);
       }
-      // An unrecognized preset is a consumer-defined seed: fall through.
+      // An unrecognized preset is a consumer-defined seed, and a recognized
+      // one that does not fit the field is unusable: both fall through.
     }
-    return _defaultSeedValue(field, seedExpression);
+    return defaultSeed;
   }
+
+  /// Whether the reserved [preset] can seed a field declared as [type].
+  ///
+  /// The presets name a SHAPE with a fixed literal kind — an address, an id, a
+  /// URL and a monetary amount are all text except the price — so a preset on
+  /// a field of another kind would emit a literal the constructor rejects.
+  /// `url` is `String`-only: a `Uri` field would need a `Uri.parse(...)`
+  /// expression this emitter does not build, so the type default (which is
+  /// `null` for `Uri`, i.e. skipped) is the honest answer.
+  static bool _presetFitsType(String preset, String type) {
+    final bare = _bareType(type);
+    return switch (preset) {
+      ZorphyMockPresets.email ||
+      ZorphyMockPresets.uuid ||
+      ZorphyMockPresets.url => bare == 'String',
+      ZorphyMockPresets.price => bare == 'num' || bare == 'double',
+      _ => false,
+    };
+  }
+
+  /// Whether a `@ZorphyMock(example: …)` literal can seed a field declared as
+  /// [type].
+  ///
+  /// The check is on the literal's runtime KIND against the declared type, and
+  /// it recurses one level for a collection so a `List<String>` example is not
+  /// emitted into a `Set<int>` field.
+  static bool _exampleFitsType(Object? example, String type) {
+    final bare = _bareType(type);
+    if (example == null) return true;
+    if (bare.startsWith('List<') || bare.startsWith('Set<')) {
+      final items = example is Set
+          ? example
+          : example is List
+          ? example
+          : null;
+      if (items == null) return false;
+      final element = bare.substring(bare.indexOf('<') + 1, bare.length - 1);
+      return items.every((item) => _exampleFitsType(item, element));
+    }
+    if (bare.startsWith('Map<')) {
+      if (example is! Map) return false;
+      final args = bare.substring('Map<'.length, bare.length - 1);
+      final comma = _topLevelComma(args);
+      if (comma <= 0) return false;
+      final keyType = args.substring(0, comma).trim();
+      final valueType = args.substring(comma + 1).trim();
+      return example.entries.every(
+        (entry) =>
+            _exampleFitsType(entry.key, keyType) &&
+            _exampleFitsType(entry.value, valueType),
+      );
+    }
+    return switch (bare) {
+      'String' => example is String,
+      'int' => example is int,
+      'num' || 'double' => example is num,
+      'bool' => example is bool,
+      _ => false,
+    };
+  }
+
+  /// [type] with its nullability marker and any surrounding whitespace gone.
+  static String _bareType(String type) =>
+      type.trim().replaceAll('?', '').trim();
 
   /// The literal for a `@ZorphyMock(example: …)` hint, element-wise for a
   /// collection so it types against the field it seeds.
+  ///
+  /// A map key keeps its own Dart type ([_scalarLiteral]) rather than being
+  /// stringified: `Map<int, int>` with an example `{1: 10}` must render
+  /// `{1: 10}`, not the `Map<String, int>`-shaped `{'1': 10}`.
   Expression _exampleLiteral(Object? example) {
     if (example is List) {
       return literalList(example.map(_scalarLiteral));
     }
+    if (example is Set) {
+      return literalSet(example.map(_scalarLiteral));
+    }
     if (example is Map) {
       return literalMap({
         for (final entry in example.entries)
-          entry.key.toString(): _scalarLiteral(entry.value),
+          _scalarLiteral(entry.key): _scalarLiteral(entry.value),
       });
     }
     return _scalarLiteral(example);
@@ -360,13 +541,19 @@ final class MockFixtureEmitter {
     };
   }
 
-  /// The type-derived default seed for [field].
+  /// The type-derived default seed for [field], or `null` when the type has no
+  /// honest seed.
   ///
-  /// Total: an unrecognized type seeds as a string, the only value that can be
-  /// handed to a field this emitter knows nothing about. Collections recurse so
-  /// `List<String>` gets a real element rather than an empty list.
-  Expression _defaultSeedValue(ZorphyFieldIr field, Expression seed) {
-    final bare = field.type.trim().replaceAll('?', '');
+  /// Total over the seeder's surface — `String`, `int`/`num`, `double`, `bool`,
+  /// `DateTime`, `Duration`, and a `List`/`Set`/`Map` of those — and `null`
+  /// everywhere else. A nested Zorphy reference (bare, or as a collection
+  /// element), an enum, `Uint8List`, `Uri` and a type variable all land in that
+  /// `null`: this emitter cannot construct one, and the old catch-all
+  /// pretending it was a `String` is what made the emitted source fail to
+  /// compile. The callers decide what to do with a `null` (see the
+  /// seedability note on the library).
+  Expression? _defaultSeedValue(ZorphyFieldIr field, Expression seed) {
+    final bare = _bareType(field.type);
 
     return switch (bare) {
       'String' => _stringSeed(field.name, seed),
@@ -397,39 +584,50 @@ final class MockFixtureEmitter {
   Expression _stringSeed(String fieldName, Expression seed) =>
       _code("'${slug(fieldName)}-\${${_render(seed)}}'");
 
-  /// A seed for a collection or an unrecognized type.
+  /// A seed for a collection, or `null` for any other unrecognized type.
   ///
   /// `List<T>` and `Set<T>` seed one element — the minimum a page or a decoder
-  /// can render — and `Map<K, V>` one entry. Anything else falls back to its
-  /// type name as the string seed.
-  Expression _structuredSeed(
+  /// can render — and `Map<K, V>` one entry, each only when the element/value
+  /// type itself has a seed. Anything else is not seedable (the caller decides
+  /// whether the field is merely omitted or blocks the node).
+  Expression? _structuredSeed(
     String type,
     ZorphyFieldIr field,
     Expression seed,
   ) {
     if (type.startsWith('List<') && type.endsWith('>')) {
       final element = type.substring('List<'.length, type.length - 1);
-      return literalList([_elementSeed(element, field, seed)]);
+      final seeded = _elementSeed(element, field, seed);
+      return seeded == null ? null : literalList([seeded]);
     }
     if (type.startsWith('Set<') && type.endsWith('>')) {
       final element = type.substring('Set<'.length, type.length - 1);
-      return literalSet([_elementSeed(element, field, seed)]);
+      final seeded = _elementSeed(element, field, seed);
+      return seeded == null ? null : literalSet([seeded]);
     }
     if (type.startsWith('Map<') && type.endsWith('>')) {
       final args = type.substring('Map<'.length, type.length - 1);
       final comma = _topLevelComma(args);
       if (comma > 0) {
+        final keyType = args.substring(0, comma).trim();
         final valueType = args.substring(comma + 1).trim();
-        return literalMap({
-          literalString(slug(field.name)): _elementSeed(valueType, field, seed),
-        });
+        final seeded = _elementSeed(valueType, field, seed);
+        if (seeded == null) return null;
+        // The key keeps its declared type too: a `Map<int, int>` must not be
+        // seeded with a `String` key.
+        final key = _defaultSeedValue(
+          ZorphyFieldIr(name: field.name, type: keyType),
+          seed,
+        );
+        if (key == null) return null;
+        return literalMap({key: seeded});
       }
     }
-    return _stringSeed(field.name, seed);
+    return null;
   }
 
-  /// A seed for one collection element of [type].
-  Expression _elementSeed(String type, ZorphyFieldIr field, Expression seed) =>
+  /// A seed for one collection element of [type], or `null` when it has none.
+  Expression? _elementSeed(String type, ZorphyFieldIr field, Expression seed) =>
       _defaultSeedValue(ZorphyFieldIr(name: field.name, type: type), seed);
 
   /// The index of the first top-level comma in a type-argument list, or `-1`.
@@ -474,14 +672,26 @@ final class MockFixtureEmitter {
   ///
   /// A `$`-prefixed nested reference carries a `PatchNested` instead, and an
   /// abstract/sealed form (`$$Node`) has no concrete patch to instantiate, so
-  /// neither has a builder this sample can call.
+  /// neither has a builder this sample can call. The `$` test is on the
+  /// RESOLVED type, not on the leading character: `List<$CategoryNode>` and
+  /// `Map<String, $Tag>` are the common shapes, and a `startsWith(r'$')` gate
+  /// let them through to a `List<String>` seed the field would reject.
   static bool hasFluentBuilder(ZorphyFieldIr field) {
     final type = field.type.trim();
     if (type.isEmpty) return false;
     if (type.contains('Function')) return false;
-    if (type.startsWith(r'$')) return false;
+    if (_namesZorphyType(type)) return false;
     return true;
   }
+
+  /// Whether [type] names a Zorphy reference anywhere inside it — the type
+  /// itself (`$Box`), or an element/value argument of a collection
+  /// (`List<$Box>`, `Map<String, $Box>`, `List<Map<String, $Box>>`).
+  ///
+  /// Every `$` in a field type is a Zorphy reference: `$` is not legal in an
+  /// ordinary Dart identifier, so no false positive is possible and no
+  /// wrapper-stripping grammar is needed.
+  static bool _namesZorphyType(String type) => type.contains(r'$');
 
   /// The whole payload of [node], nearest declaration first: its own fields,
   /// then each ancestor's, with the first declaration of a name winning.
@@ -562,16 +772,24 @@ const num defaultMockPrice = 19.99;
 /// Shaped like a UUID (8-4-4-4-12) so a consumer that parses ids keeps working,
 /// but derived purely from its inputs — never from `Random`, whose sequence is
 /// not part of this contract.
+///
+/// Every group is a fixed-width slice of the hash rendered in UNSIGNED space:
+/// Dart's `int` is 64-bit SIGNED, so `hash & 0xFFFFFFFFFFFFFFFF` is a no-op
+/// (`0xFFFFFFFFFFFFFFFF == -1`) and `toRadixString(16)` then renders a leading
+/// `-`. Masking with `0x7FFFFFFFFFFFFFFF` keeps the high bit clear, and
+/// `padLeft` per group keeps each slice its declared width — a consumer that
+/// validates ids with the canonical regex depends on both.
 String uuidSeed(String slug, int seed) {
   var hash = 0xcbf29ce484222325;
   for (final unit in '$slug-$seed'.codeUnits) {
     hash = (hash ^ unit) * 0x100000001b3;
     hash &= 0xFFFFFFFFFFFFFFFF;
   }
-  final hex = hash.toRadixString(16).padLeft(16, '0');
-  final tail = ((hash >> 8) & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0');
-  final block = (hash >> 16) & 0xFFFFFFFF;
+  final bits = hash & 0x7FFFFFFFFFFFFFFF;
+  final hex = bits.toRadixString(16).padLeft(16, '0');
+  final tail = (bits & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0');
   return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-4'
-      '${hex.substring(12, 15)}-a${block.toRadixString(16).padLeft(4, '0')}'
+      '${hex.substring(12, 15)}-8'
+      '${((bits >> 12) & 0x3FF).toRadixString(16).padLeft(3, '0')}'
       '-$tail${hex.substring(0, 4)}';
 }
