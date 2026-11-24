@@ -114,12 +114,17 @@ const _fixtures = r'''
 sealed class Address {
   const Address();
   String get id;
+
+  Map<String, Object?> toWire();
 }
 
 final class AddressNode extends Address {
   const AddressNode.fromTrusted({required this.id});
   @override
   final String id;
+
+  @override
+  Map<String, Object?> toWire() => <String, Object?>{'id': id};
 }
 
 enum OrderStatus { pending, paid }
@@ -138,6 +143,8 @@ final class Order {
   final OrderStatus status;
   final List<Address> items;
   final Map<String, Address> tags;
+
+  Map<String, Object?> toWire() => <String, Object?>{'id': id};
 }
 
 class OrderPatch {
@@ -163,6 +170,8 @@ final class Cfg {
   final String id;
   final Address? address;
   final Map<int, int> scores;
+
+  Map<String, Object?> toWire() => <String, Object?>{'id': id};
 }
 
 class CfgPatch {
@@ -181,6 +190,8 @@ class CfgPatch {
 final class Qty {
   const Qty.fromTrusted({required this.count});
   final int count;
+
+  Map<String, Object?> toWire() => <String, Object?>{'count': count};
 }
 
 class QtyPatch {
@@ -250,8 +261,20 @@ void main() {
         isNot(contains('address:')),
         reason: 'an optional parameter is left off when there is no seed',
       );
+      // The seeding sites must never treat scores as a String-keyed map; the
+      // WireFixtures half (ISSUE-016) legitimately names the field as a map
+      // key in corruptMaps, so scope the guard to the MockData class body.
       expect(
         emitted,
+        contains('class CfgWireFixtures'),
+        reason: 'the WireFixtures class must be emitted before it is scoped',
+      );
+      final mockDataOnly = emitted.substring(
+        0,
+        emitted.indexOf('class CfgWireFixtures'),
+      );
+      expect(
+        mockDataOnly,
         isNot(contains("'scores'")),
         reason: 'a Map<int, int> must not be seeded with a String key',
       );

@@ -140,6 +140,8 @@ sealed class Notification {
   const Notification();
   String get id;
   DateTime get createdAt;
+
+  Map<String, Object?> toWire();
 }
 
 final class OrderNotification extends Notification {
@@ -156,6 +158,15 @@ final class OrderNotification extends Notification {
   final DateTime createdAt;
   final String orderId;
   final String? note;
+
+  @override
+  Map<String, Object?> toWire() => <String, Object?>{
+    'kind': 'order_notification',
+    'id': id,
+    'createdAt': createdAt.toIso8601String(),
+    'orderId': orderId,
+    if (note != null) 'note': note,
+  };
 }
 
 final class PriceDropNotification extends Notification {
@@ -172,6 +183,15 @@ final class PriceDropNotification extends Notification {
   final DateTime createdAt;
   final double oldPrice;
   final double newPrice;
+
+  @override
+  Map<String, Object?> toWire() => <String, Object?>{
+    'kind': 'price_drop_notification',
+    'id': id,
+    'createdAt': createdAt.toIso8601String(),
+    'oldPrice': oldPrice,
+    'newPrice': newPrice,
+  };
 }
 
 final class Product {
@@ -188,6 +208,14 @@ final class Product {
   final double price;
   final bool inStock;
   final List<String> tags;
+
+  Map<String, Object?> toWire() => <String, Object?>{
+    'id': id,
+    'name': name,
+    'price': price,
+    'inStock': inStock,
+    'tags': tags,
+  };
 }
 
 class ProductPatch {
