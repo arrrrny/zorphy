@@ -756,7 +756,11 @@ void main() {
       // build; generation now completes and the target is resolved per-declarer.
       final dir = Directory('${fixtureDir.path}/covariant_nested_shape')
         ..createSync(recursive: true);
-      final covariant = await _generate(dir, 'covariant_nested', _covariantNestedSource);
+      final covariant = await _generate(
+        dir,
+        'covariant_nested',
+        _covariantNestedSource,
+      );
       expect(
         covariant.keys,
         containsAll(<String>['Node', 'Child', 'DraftA', 'DraftB']),
@@ -772,7 +776,8 @@ void main() {
       expect(
         diagnostics,
         isEmpty,
-        reason: 'the covariant hierarchy must analyze clean:\n'
+        reason:
+            'the covariant hierarchy must analyze clean:\n'
             '${diagnostics.join('\n')}',
       );
     });
@@ -833,5 +838,15 @@ Future<List<String>> _analyzeFixture(
   File(
     '${dir.path}/$libraryName.zorphy.dart',
   ).writeAsStringSync(part.toString());
-  return _diagnostics('${dir.path}/$libraryName.dart');
+  final diagnostics = await _diagnostics('${dir.path}/$libraryName.dart');
+  if (diagnostics.isNotEmpty) {
+    // TEMP DIAGNOSTIC (merge task 2753e4cd): CI reports two crossed
+    // argument_type_not_assignable diagnostics for the sibling fixture that
+    // this host cannot reproduce on either analyzer major. Dump the exact part
+    // CI analyzed so the emission can be read instead of guessed.
+    stderr.writeln('=== PART DUMP $libraryName BEGIN ===');
+    stderr.writeln(part.toString());
+    stderr.writeln('=== PART DUMP $libraryName END ===');
+  }
+  return diagnostics;
 }

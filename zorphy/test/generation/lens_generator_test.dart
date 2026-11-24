@@ -98,7 +98,10 @@ ClassMetadata _concreteMeta({
   );
 }
 
-GenerationConfig _config({bool generateCopyWith = true, bool generatePatch = false}) {
+GenerationConfig _config({
+  bool generateCopyWith = true,
+  bool generatePatch = false,
+}) {
   return GenerationConfig(
     outputExtension: '.zorphy.dart',
     preset: ZorphyPreset.standard,

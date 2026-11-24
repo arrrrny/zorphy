@@ -147,14 +147,17 @@ void main() {
     if (tmp.existsSync()) tmp.deleteSync(recursive: true);
   });
 
-  test('set(root, null) clears a nullable field and preserves siblings',
-      () async {
-    final result = await Process.run('dart', [
-      'run',
-      '${dir.path}/lens_null_fixture.dart',
-    ], workingDirectory: Directory.current.path);
-    final stdout = '${result.stdout}\n${result.stderr}';
-    expect(stdout, contains('ALL CHECKS PASSED'), reason: stdout);
-    expect(result.exitCode, 0, reason: stdout);
-  }, timeout: const Timeout(Duration(minutes: 2)));
+  test(
+    'set(root, null) clears a nullable field and preserves siblings',
+    () async {
+      final result = await Process.run('dart', [
+        'run',
+        '${dir.path}/lens_null_fixture.dart',
+      ], workingDirectory: Directory.current.path);
+      final stdout = '${result.stdout}\n${result.stderr}';
+      expect(stdout, contains('ALL CHECKS PASSED'), reason: stdout);
+      expect(result.exitCode, 0, reason: stdout);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
 }
