@@ -207,6 +207,10 @@ class PolymorphicPatchEmitter {
       c.methods.add(_rootComposeMethod(root));
       c.methods.add(_rootInvertMethod(root));
       c.methods.add(_rootToWireMethod(fields));
+      c.methods.add(_rootToEnvelopeMethod(fields));
+      c.methods.add(
+        _rootFromWireMethod(root, fields, subtypeNames: subtypeNames),
+      );
     });
   }
 
@@ -260,6 +264,14 @@ class PolymorphicPatchEmitter {
         ),
       );
       c.methods.add(_concreteToWireMethod(fields));
+      c.methods.add(
+        _concreteToEnvelopeMethod(
+          entityType: root,
+          fields: fields,
+          patchKind: 'shared',
+        ),
+      );
+      c.methods.add(_sharedFromWireMethod(root, fields));
     });
   }
 
@@ -314,6 +326,14 @@ class PolymorphicPatchEmitter {
         ),
       );
       c.methods.add(_concreteToWireMethod(fields));
+      c.methods.add(
+        _concreteToEnvelopeMethod(
+          entityType: subtype,
+          fields: fields,
+          patchKind: subtype,
+        ),
+      );
+      c.methods.add(_subtypeFromWireMethod(subtype, root, fields, shared));
     });
   }
 
@@ -436,6 +456,15 @@ class PolymorphicPatchEmitter {
       ..returns = referType('Map<String, Object?>');
     m.annotations.add(refer('override'));
   });
+
+  /// The root's `toEnvelope`, abstract — every concrete patch answers with the
+  /// envelope its own class name requires.
+  Method _rootToEnvelopeMethod(List<NameTypeClassComment> fields) =>
+      Method((m) {
+        m
+          ..name = 'toEnvelope'
+          ..returns = referType('Map<String, Object?>');
+      });
 
   /// The shared patch's `apply`: dispatch each concrete subtype to its own
   /// patch, so the target keeps its subtype and its own fields survive.
@@ -660,6 +689,284 @@ class PolymorphicPatchEmitter {
       ..covariant = true
       ..type = referType(type);
   });
+
+  /// The root's `static fromWire(raw)` — dispatch on the envelope's
+  /// `patchKind` (ISSUE-017).
+  ///
+  /// The root patch is ABSTRACT, so it can build no instance of its own: a
+  /// decode reads `patchKind` and builds the concrete patch that answers to
+  /// it. `shared` is the hierarchy's own [sharedPatchSuffix] class.
+  ///
+  /// ## Why a subtype kind decodes onto the SHARED surface
+  ///
+  /// A generated library gives the sealed root [emitRoot]'s patch but gives
+  /// each concrete leaf its own `PatchEmitter` patch, and that one extends
+  /// `PatchBase<Leaf, Leaf$>` — NOT the root patch. So a leaf patch is not a
+  /// `RootPatch`, and a root-typed `fromWire` cannot return one; the
+  /// polymorphism here is real only when [emitSubtypePatch] built the leaves,
+  /// which the code generator does not do (the same constraint
+  /// `_sharedApplyMethod` documents: dispatch must survive a subtype patch
+  /// that does not exist).
+  ///
+  /// A subtype envelope therefore decodes onto the SHARED surface, and every
+  /// op key that surface cannot express is a `FieldViolation` at
+  /// `/ops/<field>` — never a silently dropped change. A caller that wants the
+  /// subtype's own patch decodes the same `ops` through that subtype's
+  /// `fromWire`, which `PatchEmitter` emits for every concrete leaf.
+  ///
+  /// `entityType` is validated against the WHOLE hierarchy — the root name or
+  /// any subtype — because a subtype patch names its own entity, and only a
+  /// name outside the hierarchy is a decode error.
+  Method _rootFromWireMethod(
+    String root,
+    List<NameTypeClassComment> fields, {
+    required List<String> subtypeNames,
+  }) => Method((m) {
+    final patchName = '${root}Patch';
+    final sharedName = '$root$sharedPatchSuffix';
+    m
+      ..name = 'fromWire'
+      ..static = true
+      ..returns = referType('ZorphyBoundaryResult<$patchName>')
+      ..requiredParameters.add(
+        Parameter((p) {
+          p
+            ..name = 'raw'
+            ..type = referType('Map<String, Object?>');
+        }),
+      );
+
+    final cleanSubtypes = subtypeNames.map(_clean).toList();
+    final kinds = ['shared', ...cleanSubtypes].join(', ');
+    final hierarchy =
+        "const <String>['$root'"
+        '${cleanSubtypes.map((s) => ", '$s'").join()}]';
+    final sharedKeys = fields.map((f) => _memberName(f.name)).toList();
+    final sharedKeyList =
+        'const <String>['
+        '${sharedKeys.map((k) => "'$k'").join(', ')}]';
+
+    final lines = <String>[
+      'final kind = ZorphyPatchWire.patchKindOf(raw);',
+      'if (kind == null) {',
+      '  return BoundaryErr<$patchName>('
+          "targetType: '$patchName', violations: <FieldViolation>["
+          'FieldViolation('
+          "path: '/$_patchKindKey', "
+          "expected: 'String (one of: $kinds)', "
+          'actual: ZorphyPatchWire.describe(null))]);',
+      '}',
+      'final hierarchy = $hierarchy;',
+      'final entityType = ZorphyPatchWire.entityTypeOf(raw);',
+      'if (entityType != null && !hierarchy.contains(entityType)) {',
+      '  return BoundaryErr<$patchName>('
+          "targetType: '$patchName', violations: <FieldViolation>["
+          'FieldViolation('
+          "path: '/$_entityTypeKey', "
+          "expected: 'one of: \${hierarchy.join(', ')}', "
+          'actual: ZorphyPatchWire.describe(entityType))]);',
+      '}',
+      "final ops = ZorphyPatchWire.opsOf(raw, '', <FieldViolation>[]);",
+      'if (ops == null) {',
+      '  return BoundaryErr<$patchName>('
+          "targetType: '$patchName', violations: <FieldViolation>["
+          'FieldViolation('
+          "path: '/$_opsKey', expected: 'Map<String, Object?>', "
+          "actual: ZorphyPatchWire.describe(raw['$_opsKey']))]);",
+      '}',
+      'if (kind == \'shared\' || hierarchy.contains(kind)) {',
+      // Shared-surface decode: the shared patch IS a root patch, and it is the
+      // one concrete root-typed patch a generated library always declares.
+      '  final prefix = ZorphyPatchWire.opsPathOf(raw);',
+      '  final decoded = $sharedName.fromWire(ops);',
+      '  if (kind == \'shared\') return decoded'
+          '.fold<ZorphyBoundaryResult<$patchName>>(',
+      '    (value) => BoundaryOk<$patchName>(value),',
+      '    (error) => BoundaryErr<$patchName>('
+          'targetType: error.targetType, '
+          'violations: ZorphyPatchWire.prefix(error.violations, prefix)),',
+      '  );',
+      // A subtype envelope carries that subtype's ops; the root patch can only
+      // express the shared fields, so anything else is a violation rather than
+      // a silently dropped change.
+      '  final sharedKeys = $sharedKeyList;',
+      '  final unknown = <FieldViolation>[];',
+      '  for (final key in ops.keys) {',
+      '    if (!sharedKeys.contains(key)) {',
+      '      unknown.add(FieldViolation('
+          "path: '/$_opsKey/\$key', "
+          "expected: 'one of: \${sharedKeys.join(', ')}', "
+          'actual: ZorphyPatchWire.describe(ops[key])));',
+      '    }',
+      '  }',
+      '  return decoded.fold<ZorphyBoundaryResult<$patchName>>(',
+      '    (value) => unknown.isEmpty',
+      '        ? BoundaryOk<$patchName>(value)',
+      '        : BoundaryErr<$patchName>('
+          "targetType: '$patchName', violations: unknown),",
+      '    (error) => BoundaryErr<$patchName>('
+          'targetType: error.targetType, '
+          'violations: <FieldViolation>[...error.violations, ...unknown]),',
+      '  );',
+      '}',
+      'return BoundaryErr<$patchName>('
+          "targetType: '$patchName', violations: <FieldViolation>["
+          'FieldViolation('
+          "path: '/$_patchKindKey', "
+          "expected: 'String (one of: $kinds)', "
+          'actual: ZorphyPatchWire.describe(kind))]);',
+    ];
+    m.body = Code(lines.join('\n'));
+  });
+
+  /// A concrete subtype's `static fromWire(raw)` — its own ops map.
+  Method _subtypeFromWireMethod(
+    String subtype,
+    String root,
+    List<NameTypeClassComment> fields,
+    Set<String> shared,
+  ) => _concreteFromWire('${subtype}Patch', fields);
+
+  /// The shared patch's `static fromWire(raw)` — the root fields' ops map.
+  ///
+  /// The root's `fromWire` dispatches `patchKind: 'shared'` here, so the
+  /// shared patch has to be decodable on its own even though the sealed ROOT
+  /// patch is what a caller usually holds.
+  Method _sharedFromWireMethod(
+    String root,
+    List<NameTypeClassComment> fields,
+  ) => _concreteFromWire('$root$sharedPatchSuffix', fields);
+
+  /// The `fromWire` body both concrete patches share.
+  ///
+  /// Accepts the bare `toWire()` map and the envelope's `ops` alike, so the
+  /// root's dispatch and a transport that already knows the kind both reach
+  /// the same decode. A field absent from the map stays
+  /// [PatchValue.unchanged]; a field present but corrupt is a violation and
+  /// makes the whole result an error.
+  Method _concreteFromWire(
+    String patchName,
+    List<NameTypeClassComment> fields,
+  ) => Method((m) {
+    m
+      ..name = 'fromWire'
+      ..static = true
+      ..returns = referType('ZorphyBoundaryResult<$patchName>')
+      ..requiredParameters.add(
+        Parameter((p) {
+          p
+            ..name = 'raw'
+            ..type = referType('Map<String, Object?>');
+        }),
+      );
+
+    final lines = <String>[
+      'final violations = <FieldViolation>[];',
+      "final ops = ZorphyPatchWire.opsOf(raw, '', violations);",
+    ];
+    for (final field in fields) {
+      final name = _memberName(field.name);
+      final declaredType = _concreteType(field.type);
+      lines
+        ..add('PatchValue<$declaredType>? ${name}Value;')
+        ..add("if (ops != null && ops.containsKey('$name')) {")
+        ..add(
+          '  final Object? rawValue = ZorphyPatchWire.fieldValue('
+          "ops['$name'], '/$name', violations);",
+        )
+        ..add(
+          '  ${name}Value = '
+          '${_wireDecodeExpression(field, 'rawValue', nome: name)};',
+        )
+        ..add('}');
+    }
+    final args = fields
+        .map((f) {
+          final name = _memberName(f.name);
+          final declaredType = _concreteType(f.type);
+          return '$name: ${name}Value ?? '
+              'const PatchValue<$declaredType>.unchanged()';
+        })
+        .join(', ');
+    lines
+      ..add('if (violations.isNotEmpty) {')
+      ..add(
+        '  return BoundaryErr<$patchName>('
+        "targetType: '$patchName', violations: violations);",
+      )
+      ..add('}')
+      ..add('return BoundaryOk<$patchName>($patchName($args));');
+    m.body = Code(lines.join('\n'));
+  });
+
+  /// The decode expression for one field's wire value.
+  ///
+  /// Every arm answers a `PatchValue<T>?`: `PatchValue.set(<decoded>)` on a
+  /// clean read, `null` when the read recorded a violation.
+  String _wireDecodeExpression(
+    NameTypeClassComment field,
+    String value, {
+    required String nome,
+  }) {
+    final declared = _concreteType(field.type);
+    final bare = declared.replaceAll('?', '').trim();
+    final path = _literal('/$nome');
+    final String read;
+    if (field.isEnum) {
+      read =
+          'ZorphyPatchWire.enumByName<$bare>('
+          '$bare.values, $value, $path, violations)';
+    } else if (bare == 'DateTime') {
+      read = 'ZorphyPatchWire.asDateTime($value, $path, violations)';
+    } else if (bare == 'double' || bare == 'num') {
+      read = 'ZorphyPatchWire.asDouble($value, $path, violations)';
+    } else {
+      read = 'ZorphyPatchWire.as<$declared>($value, $path, violations)';
+    }
+    // A local is what promotes: `switch` over a nullable result does not
+    // narrow the binder itself, and `PatchValue.set` needs the non-null value.
+    final local = '${nome}Decoded';
+    return '(() { final $local = $read; '
+        'return $local == null '
+        '? null '
+        ': PatchValue<$declared>.set($local); })()';
+  }
+
+  /// `toEnvelope()` — the polymorphic envelope a concrete patch travels in.
+  ///
+  /// `entityType` names the ENTITY the ops belong to and `patchKind` names the
+  /// discriminator a receiver dispatches on: `shared` for the hierarchy-wide
+  /// patch, the subtype name for a narrowing one. The two differ on purpose —
+  /// a subtype patch is still about that subtype's entity, while `shared` is
+  /// the only kind that is not an entity name.
+  Method _concreteToEnvelopeMethod({
+    required String entityType,
+    required List<NameTypeClassComment> fields,
+    required String patchKind,
+  }) => Method((m) {
+    m
+      ..name = 'toEnvelope'
+      ..returns = referType('Map<String, Object?>');
+    m.body = Code(
+      'return <String, Object?>{'
+      "'$_entityTypeKey': '$entityType', "
+      "'$_patchKindKey': '$patchKind', "
+      "'$_opsKey': toWire(),"
+      '};',
+    );
+  });
+
+  static String _literal(String value) =>
+      "'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'";
+
+  /// The envelope key naming the entity (or hierarchy root) type.
+  static const String _entityTypeKey = 'entityType';
+
+  /// The envelope key naming which patch class the ops belong to.
+  static const String _patchKindKey = 'patchKind';
+
+  /// The envelope key carrying a patch's own `toWire()` map.
+  static const String _opsKey = 'ops';
 
   static void _requireSubtypes(List<String> subtypeNames) {
     if (subtypeNames.isEmpty) {

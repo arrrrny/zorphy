@@ -2,6 +2,23 @@
 
 ### Added
 
+- Patch wire codecs (#192): `ZorphyPatchWire` is the total decode layer a
+  generated patch `fromWire` calls. Every read is an `is` test, so a corrupt
+  payload becomes a `FieldViolation` at a JSON pointer instead of a thrown
+  `TypeError`/`CastError`; `as` / `asDouble` / `asDateTime` / `enumByName` /
+  `asObject` decode one value each, and `listDelta` / `mapDelta` decode a
+  collection delta ALL-OR-NOTHING (a single bad step fails the field rather
+  than silently dropping that step). `enumByName` matches a value by NAME,
+  never by index, so inserting an enum member cannot re-point a wire message;
+  `as` takes `nullable: true` for a field whose `null` is a deliberate clear.
+  The polymorphic envelope keys (`entityType`, `patchKind`,
+  `principalKey`, `ops`) are named here, and `opsOf` / `opsPathOf` accept a
+  bare `toWire()` map and an envelope alike, reporting a violation under
+  `/ops/<field>` when the caller sent an envelope.
+- `boundary.dart` is exported from `package:zorphy_annotation/zorphy.dart`,
+  the surface generated code imports, so an emitted `fromWire` can name
+  `ZorphyBoundaryResult` without a second import (#192).
+
 - Collection delta patches (#183): `ListPatchDelta<E>` and
   `MapPatchDelta<K, V>` carry an ordered sequence of `ListPatchOp` /
   `MapPatchOp` steps and implement the full v3 algebra — minimal `diff`

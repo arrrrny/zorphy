@@ -19,20 +19,20 @@ import 'dart:io';
 
 /// The `Notification` root's shared fields — the ones a polymorphic patch
 /// mutates across every subtype.
-List<NameTypeClassComment> _rootFields() => [
+List<NameTypeClassComment> rootFields() => [
   NameTypeClassComment('id', 'String', ''),
   NameTypeClassComment('readAt', 'DateTime?', ''),
 ];
 
-List<String> _subtypes() => ['OrderNotification', 'PriceDropNotification'];
+List<String> subtypes() => ['OrderNotification', 'PriceDropNotification'];
 
-List<NameTypeClassComment> _orderFields() => [
+List<NameTypeClassComment> orderFields() => [
   NameTypeClassComment('id', 'String', ''),
   NameTypeClassComment('readAt', 'DateTime?', ''),
   NameTypeClassComment('itemCount', 'int', ''),
 ];
 
-List<NameTypeClassComment> _priceDropFields() => [
+List<NameTypeClassComment> priceDropFields() => [
   NameTypeClassComment('id', 'String', ''),
   NameTypeClassComment('readAt', 'DateTime?', ''),
   NameTypeClassComment('newPrice', 'double', ''),
@@ -55,8 +55,8 @@ void main() {
     test('emits a sealed root patch class', () {
       final emitted = PolymorphicPatchEmitter().emitRoot(
         rootName: 'Notification',
-        fields: _rootFields(),
-        subtypeNames: _subtypes(),
+        fields: rootFields(),
+        subtypeNames: subtypes(),
       );
 
       expect(
@@ -69,8 +69,8 @@ void main() {
     test('the root patch declares shared fields as PatchValue getters', () {
       final emitted = PolymorphicPatchEmitter().emitRoot(
         rootName: 'Notification',
-        fields: _rootFields(),
-        subtypeNames: _subtypes(),
+        fields: rootFields(),
+        subtypeNames: subtypes(),
       );
 
       expect(
@@ -90,8 +90,8 @@ void main() {
     test('the root apply is covariant so subtypes may narrow it', () {
       final emitted = PolymorphicPatchEmitter().emitRoot(
         rootName: 'Notification',
-        fields: _rootFields(),
-        subtypeNames: _subtypes(),
+        fields: rootFields(),
+        subtypeNames: subtypes(),
       );
 
       expect(
@@ -106,8 +106,8 @@ void main() {
     test('the root patch is const-constructible', () {
       final emitted = PolymorphicPatchEmitter().emitRoot(
         rootName: 'Notification',
-        fields: _rootFields(),
-        subtypeNames: _subtypes(),
+        fields: rootFields(),
+        subtypeNames: subtypes(),
       );
 
       expect(
@@ -123,7 +123,7 @@ void main() {
       final emitted = PolymorphicPatchEmitter().emitRoot(
         rootName: 'Notification',
         fields: const [],
-        subtypeNames: _subtypes(),
+        subtypeNames: subtypes(),
       );
 
       expect(emitted, contains('sealed class NotificationPatch'));
@@ -138,7 +138,7 @@ void main() {
       expect(
         () => PolymorphicPatchEmitter().emitRoot(
           rootName: 'Lonely',
-          fields: _rootFields(),
+          fields: rootFields(),
           subtypeNames: const [],
         ),
         throwsA(isA<ArgumentError>()),
@@ -151,8 +151,8 @@ void main() {
     test('the root emission matches the runtime fixture byte for byte', () {
       final emitted = PolymorphicPatchEmitter().emitRoot(
         rootName: 'Notification',
-        fields: _rootFields(),
-        subtypeNames: _subtypes(),
+        fields: rootFields(),
+        subtypeNames: subtypes(),
       );
       expect(
         emitted.trim(),
@@ -169,7 +169,7 @@ void main() {
       final emitted = PolymorphicPatchEmitter().emitSubtypePatch(
         subtypeName: 'OrderNotification',
         rootName: 'Notification',
-        fields: _orderFields(),
+        fields: orderFields(),
         sharedFields: const ['id', 'readAt'],
       );
 
@@ -189,7 +189,7 @@ void main() {
       final emitted = PolymorphicPatchEmitter().emitSubtypePatch(
         subtypeName: 'OrderNotification',
         rootName: 'Notification',
-        fields: _orderFields(),
+        fields: orderFields(),
         sharedFields: const ['id', 'readAt'],
       );
 
@@ -206,7 +206,7 @@ void main() {
       final emitted = PolymorphicPatchEmitter().emitSubtypePatch(
         subtypeName: 'OrderNotification',
         rootName: 'Notification',
-        fields: _orderFields(),
+        fields: orderFields(),
         sharedFields: const ['id', 'readAt'],
       );
 
@@ -222,8 +222,8 @@ void main() {
     test('subtype fields never reach the root patch', () {
       final emitted = PolymorphicPatchEmitter().emitRoot(
         rootName: 'Notification',
-        fields: _rootFields(),
-        subtypeNames: _subtypes(),
+        fields: rootFields(),
+        subtypeNames: subtypes(),
       );
 
       expect(
@@ -239,7 +239,7 @@ void main() {
       final emitted = PolymorphicPatchEmitter().emitSubtypePatch(
         subtypeName: 'OrderNotification',
         rootName: 'Notification',
-        fields: _orderFields(),
+        fields: orderFields(),
         sharedFields: const ['id', 'readAt'],
       );
       expect(
@@ -256,7 +256,7 @@ void main() {
       final emitted = PolymorphicPatchEmitter().emitSubtypePatch(
         subtypeName: 'PriceDropNotification',
         rootName: 'Notification',
-        fields: _priceDropFields(),
+        fields: priceDropFields(),
         sharedFields: const ['id', 'readAt'],
       );
       expect(

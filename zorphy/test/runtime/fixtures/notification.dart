@@ -94,6 +94,102 @@ sealed class NotificationPatch implements ZorphyPatch<Notification> {
   NotificationPatch invert(Notification before);
   @override
   Map<String, Object?> toWire();
+  Map<String, Object?> toEnvelope();
+  static ZorphyBoundaryResult<NotificationPatch> fromWire(
+    Map<String, Object?> raw,
+  ) {
+    final kind = ZorphyPatchWire.patchKindOf(raw);
+    if (kind == null) {
+      return BoundaryErr<NotificationPatch>(
+        targetType: 'NotificationPatch',
+        violations: <FieldViolation>[
+          FieldViolation(
+            path: '/patchKind',
+            expected: 'String (one of: shared, OrderNotification, PriceDropNotification)',
+            actual: ZorphyPatchWire.describe(null),
+          ),
+        ],
+      );
+    }
+    final hierarchy = const <String>[
+      'Notification',
+      'OrderNotification',
+      'PriceDropNotification',
+    ];
+    final entityType = ZorphyPatchWire.entityTypeOf(raw);
+    if (entityType != null && !hierarchy.contains(entityType)) {
+      return BoundaryErr<NotificationPatch>(
+        targetType: 'NotificationPatch',
+        violations: <FieldViolation>[
+          FieldViolation(
+            path: '/entityType',
+            expected: 'one of: ${hierarchy.join(', ')}',
+            actual: ZorphyPatchWire.describe(entityType),
+          ),
+        ],
+      );
+    }
+    final ops = ZorphyPatchWire.opsOf(raw, '', <FieldViolation>[]);
+    if (ops == null) {
+      return BoundaryErr<NotificationPatch>(
+        targetType: 'NotificationPatch',
+        violations: <FieldViolation>[
+          FieldViolation(
+            path: '/ops',
+            expected: 'Map<String, Object?>',
+            actual: ZorphyPatchWire.describe(raw['ops']),
+          ),
+        ],
+      );
+    }
+    if (kind == 'shared' || hierarchy.contains(kind)) {
+      final prefix = ZorphyPatchWire.opsPathOf(raw);
+      final decoded = NotificationSharedPatch.fromWire(ops);
+      if (kind == 'shared')
+        return decoded.fold<ZorphyBoundaryResult<NotificationPatch>>(
+          (value) => BoundaryOk<NotificationPatch>(value),
+          (error) => BoundaryErr<NotificationPatch>(
+            targetType: error.targetType,
+            violations: ZorphyPatchWire.prefix(error.violations, prefix),
+          ),
+        );
+      final sharedKeys = const <String>['id', 'readAt'];
+      final unknown = <FieldViolation>[];
+      for (final key in ops.keys) {
+        if (!sharedKeys.contains(key)) {
+          unknown.add(
+            FieldViolation(
+              path: '/ops/$key',
+              expected: 'one of: ${sharedKeys.join(', ')}',
+              actual: ZorphyPatchWire.describe(ops[key]),
+            ),
+          );
+        }
+      }
+      return decoded.fold<ZorphyBoundaryResult<NotificationPatch>>(
+        (value) => unknown.isEmpty
+            ? BoundaryOk<NotificationPatch>(value)
+            : BoundaryErr<NotificationPatch>(
+                targetType: 'NotificationPatch',
+                violations: unknown,
+              ),
+        (error) => BoundaryErr<NotificationPatch>(
+          targetType: error.targetType,
+          violations: <FieldViolation>[...error.violations, ...unknown],
+        ),
+      );
+    }
+    return BoundaryErr<NotificationPatch>(
+      targetType: 'NotificationPatch',
+      violations: <FieldViolation>[
+        FieldViolation(
+          path: '/patchKind',
+          expected: 'String (one of: shared, OrderNotification, PriceDropNotification)',
+          actual: ZorphyPatchWire.describe(kind),
+        ),
+      ],
+    );
+  }
 }
 
 final class NotificationSharedPatch extends NotificationPatch {
@@ -176,6 +272,67 @@ final class NotificationSharedPatch extends NotificationPatch {
     if (id.isSet) wire['id'] = id.valueOrNull;
     if (readAt.isSet) wire['readAt'] = readAt.valueOrNull;
     return wire;
+  }
+
+  Map<String, Object?> toEnvelope() {
+    return <String, Object?>{
+      'entityType': 'Notification',
+      'patchKind': 'shared',
+      'ops': toWire(),
+    };
+  }
+
+  static ZorphyBoundaryResult<NotificationSharedPatch> fromWire(
+    Map<String, Object?> raw,
+  ) {
+    final violations = <FieldViolation>[];
+    final ops = ZorphyPatchWire.opsOf(raw, '', violations);
+    PatchValue<String>? idValue;
+    if (ops != null && ops.containsKey('id')) {
+      final Object? rawValue = ZorphyPatchWire.fieldValue(
+        ops['id'],
+        '/id',
+        violations,
+      );
+      idValue = (() {
+        final idDecoded = ZorphyPatchWire.as<String>(
+          rawValue,
+          '/id',
+          violations,
+        );
+        return idDecoded == null ? null : PatchValue<String>.set(idDecoded);
+      })();
+    }
+    PatchValue<DateTime?>? readAtValue;
+    if (ops != null && ops.containsKey('readAt')) {
+      final Object? rawValue = ZorphyPatchWire.fieldValue(
+        ops['readAt'],
+        '/readAt',
+        violations,
+      );
+      readAtValue = (() {
+        final readAtDecoded = ZorphyPatchWire.asDateTime(
+          rawValue,
+          '/readAt',
+          violations,
+        );
+        return readAtDecoded == null
+            ? null
+            : PatchValue<DateTime?>.set(readAtDecoded);
+      })();
+    }
+    if (violations.isNotEmpty) {
+      return BoundaryErr<NotificationSharedPatch>(
+        targetType: 'NotificationSharedPatch',
+        violations: violations,
+      );
+    }
+    return BoundaryOk<NotificationSharedPatch>(
+      NotificationSharedPatch(
+        id: idValue ?? const PatchValue<String>.unchanged(),
+        readAt: readAtValue ?? const PatchValue<DateTime?>.unchanged(),
+      ),
+    );
   }
 }
 // GOLDEN-POLY-ROOT-END
@@ -268,6 +425,86 @@ final class OrderNotificationPatch extends NotificationPatch {
     if (itemCount.isSet) wire['itemCount'] = itemCount.valueOrNull;
     return wire;
   }
+
+  Map<String, Object?> toEnvelope() {
+    return <String, Object?>{
+      'entityType': 'OrderNotification',
+      'patchKind': 'OrderNotification',
+      'ops': toWire(),
+    };
+  }
+
+  static ZorphyBoundaryResult<OrderNotificationPatch> fromWire(
+    Map<String, Object?> raw,
+  ) {
+    final violations = <FieldViolation>[];
+    final ops = ZorphyPatchWire.opsOf(raw, '', violations);
+    PatchValue<String>? idValue;
+    if (ops != null && ops.containsKey('id')) {
+      final Object? rawValue = ZorphyPatchWire.fieldValue(
+        ops['id'],
+        '/id',
+        violations,
+      );
+      idValue = (() {
+        final idDecoded = ZorphyPatchWire.as<String>(
+          rawValue,
+          '/id',
+          violations,
+        );
+        return idDecoded == null ? null : PatchValue<String>.set(idDecoded);
+      })();
+    }
+    PatchValue<DateTime?>? readAtValue;
+    if (ops != null && ops.containsKey('readAt')) {
+      final Object? rawValue = ZorphyPatchWire.fieldValue(
+        ops['readAt'],
+        '/readAt',
+        violations,
+      );
+      readAtValue = (() {
+        final readAtDecoded = ZorphyPatchWire.asDateTime(
+          rawValue,
+          '/readAt',
+          violations,
+        );
+        return readAtDecoded == null
+            ? null
+            : PatchValue<DateTime?>.set(readAtDecoded);
+      })();
+    }
+    PatchValue<int>? itemCountValue;
+    if (ops != null && ops.containsKey('itemCount')) {
+      final Object? rawValue = ZorphyPatchWire.fieldValue(
+        ops['itemCount'],
+        '/itemCount',
+        violations,
+      );
+      itemCountValue = (() {
+        final itemCountDecoded = ZorphyPatchWire.as<int>(
+          rawValue,
+          '/itemCount',
+          violations,
+        );
+        return itemCountDecoded == null
+            ? null
+            : PatchValue<int>.set(itemCountDecoded);
+      })();
+    }
+    if (violations.isNotEmpty) {
+      return BoundaryErr<OrderNotificationPatch>(
+        targetType: 'OrderNotificationPatch',
+        violations: violations,
+      );
+    }
+    return BoundaryOk<OrderNotificationPatch>(
+      OrderNotificationPatch(
+        id: idValue ?? const PatchValue<String>.unchanged(),
+        readAt: readAtValue ?? const PatchValue<DateTime?>.unchanged(),
+        itemCount: itemCountValue ?? const PatchValue<int>.unchanged(),
+      ),
+    );
+  }
 }
 // GOLDEN-POLY-ORDER-END
 
@@ -356,6 +593,86 @@ final class PriceDropNotificationPatch extends NotificationPatch {
     if (readAt.isSet) wire['readAt'] = readAt.valueOrNull;
     if (newPrice.isSet) wire['newPrice'] = newPrice.valueOrNull;
     return wire;
+  }
+
+  Map<String, Object?> toEnvelope() {
+    return <String, Object?>{
+      'entityType': 'PriceDropNotification',
+      'patchKind': 'PriceDropNotification',
+      'ops': toWire(),
+    };
+  }
+
+  static ZorphyBoundaryResult<PriceDropNotificationPatch> fromWire(
+    Map<String, Object?> raw,
+  ) {
+    final violations = <FieldViolation>[];
+    final ops = ZorphyPatchWire.opsOf(raw, '', violations);
+    PatchValue<String>? idValue;
+    if (ops != null && ops.containsKey('id')) {
+      final Object? rawValue = ZorphyPatchWire.fieldValue(
+        ops['id'],
+        '/id',
+        violations,
+      );
+      idValue = (() {
+        final idDecoded = ZorphyPatchWire.as<String>(
+          rawValue,
+          '/id',
+          violations,
+        );
+        return idDecoded == null ? null : PatchValue<String>.set(idDecoded);
+      })();
+    }
+    PatchValue<DateTime?>? readAtValue;
+    if (ops != null && ops.containsKey('readAt')) {
+      final Object? rawValue = ZorphyPatchWire.fieldValue(
+        ops['readAt'],
+        '/readAt',
+        violations,
+      );
+      readAtValue = (() {
+        final readAtDecoded = ZorphyPatchWire.asDateTime(
+          rawValue,
+          '/readAt',
+          violations,
+        );
+        return readAtDecoded == null
+            ? null
+            : PatchValue<DateTime?>.set(readAtDecoded);
+      })();
+    }
+    PatchValue<double>? newPriceValue;
+    if (ops != null && ops.containsKey('newPrice')) {
+      final Object? rawValue = ZorphyPatchWire.fieldValue(
+        ops['newPrice'],
+        '/newPrice',
+        violations,
+      );
+      newPriceValue = (() {
+        final newPriceDecoded = ZorphyPatchWire.asDouble(
+          rawValue,
+          '/newPrice',
+          violations,
+        );
+        return newPriceDecoded == null
+            ? null
+            : PatchValue<double>.set(newPriceDecoded);
+      })();
+    }
+    if (violations.isNotEmpty) {
+      return BoundaryErr<PriceDropNotificationPatch>(
+        targetType: 'PriceDropNotificationPatch',
+        violations: violations,
+      );
+    }
+    return BoundaryOk<PriceDropNotificationPatch>(
+      PriceDropNotificationPatch(
+        id: idValue ?? const PatchValue<String>.unchanged(),
+        readAt: readAtValue ?? const PatchValue<DateTime?>.unchanged(),
+        newPrice: newPriceValue ?? const PatchValue<double>.unchanged(),
+      ),
+    );
   }
 }
 // GOLDEN-POLY-PRICE-END

@@ -32,7 +32,7 @@ const _endMarker = '// GOLDEN-PROFILE-PATCH-END';
 /// `Map<String, int>` and the rest scalars — one field per shape the issue
 /// names. `scores` has an `int` value type so the emitted cast site is a plain
 /// generic and not a nested-map conversion.
-List<NameTypeClassComment> _profileFields() => [
+List<NameTypeClassComment> profileFields() => [
   NameTypeClassComment('id', 'String', ''),
   NameTypeClassComment('displayName', 'String', ''),
   NameTypeClassComment('address', 'Address', ''),
@@ -41,14 +41,27 @@ List<NameTypeClassComment> _profileFields() => [
   NameTypeClassComment('previousAddress', 'Address?', ''),
 ];
 
+/// The `Address` entity's fields, in declaration order.
+///
+/// `postalCode` is nullable, so the emitted patch exercises a nullable scalar
+/// beside the nullable nested `previousAddress` above.
+List<NameTypeClassComment> addressFields() => [
+  NameTypeClassComment('street', 'String', ''),
+  NameTypeClassComment('city', 'String', ''),
+  NameTypeClassComment('postalCode', 'String?', ''),
+];
+
 /// The patch region of the fixture, markers excluded.
-String _fixturePatchRegion() {
+String _fixturePatchRegion() => _fixtureRegionOf(_startMarker, _endMarker);
+
+/// Any marked region of the fixture, markers excluded.
+String _fixtureRegionOf(String startMarker, String endMarker) {
   final source = File(_fixturePath).readAsStringSync();
-  final start = source.indexOf(_startMarker);
-  final end = source.indexOf(_endMarker);
-  expect(start, isNot(-1), reason: 'fixture must carry $_startMarker');
-  expect(end, isNot(-1), reason: 'fixture must carry $_endMarker');
-  return source.substring(start + _startMarker.length, end).trim();
+  final start = source.indexOf(startMarker);
+  final end = source.indexOf(endMarker);
+  expect(start, isNot(-1), reason: 'fixture must carry $startMarker');
+  expect(end, isNot(-1), reason: 'fixture must carry $endMarker');
+  return source.substring(start + startMarker.length, end).trim();
 }
 
 void main() {
@@ -58,7 +71,7 @@ void main() {
     setUp(() {
       emitted = PatchEmitter().emit(
         className: 'Profile',
-        fields: _profileFields(),
+        fields: profileFields(),
         knownClasses: const ['Address'],
       );
     });
@@ -69,6 +82,24 @@ void main() {
         _fixturePatchRegion(),
         reason:
             'the runtime suite must exercise the real emitted patch — '
+            'regenerate $_fixturePath if the emission changed on purpose',
+      );
+    });
+
+    test('the Address emission matches the runtime fixture byte for byte', () {
+      // The Address patch is what `ProfilePatch`'s nested field decodes
+      // through, so a drift here breaks the profile suite rather than this
+      // one — which is exactly why it needs its own assertion.
+      expect(
+        PatchEmitter()
+            .emit(className: 'Address', fields: addressFields())
+            .trim(),
+        _fixtureRegionOf(
+          '// GOLDEN-ADDRESS-PATCH-START',
+          '// GOLDEN-ADDRESS-PATCH-END',
+        ),
+        reason:
+            'the runtime suite must exercise the real emitted Address patch — '
             'regenerate $_fixturePath if the emission changed on purpose',
       );
     });

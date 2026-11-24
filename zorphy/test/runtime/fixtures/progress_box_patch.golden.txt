@@ -75,6 +75,84 @@ class ProgressBoxPatch<T> extends PatchBase<ProgressBox<T>, ProgressBox$> {
     return wire;
   }
 
+  static ZorphyBoundaryResult<ProgressBoxPatch<T>> fromWire<T>(
+    Map<String, Object?> raw,
+  ) {
+    final violations = <FieldViolation>[];
+    final ops = ZorphyPatchWire.opsOf(raw, '', violations);
+    final prefix = ZorphyPatchWire.opsPathOf(raw);
+    if (ops != null) {
+      final patch = ProgressBoxPatch<T>();
+      if (ops.containsKey('value')) {
+        final Object? valueRaw = ZorphyPatchWire.fieldValue(
+          ops['value'],
+          '$prefix/value',
+          violations,
+        );
+        final before = violations.length;
+        final decoded = ZorphyPatchWire.as<T>(
+          valueRaw,
+          '$prefix/value',
+          violations,
+          nullable: true,
+        );
+        if (violations.length == before) {
+          patch.patchMap[ProgressBox$.value] = decoded;
+        }
+      }
+      if (ops.containsKey('label')) {
+        final Object? labelRaw = ZorphyPatchWire.fieldValue(
+          ops['label'],
+          '$prefix/label',
+          violations,
+        );
+        final before = violations.length;
+        final decoded = ZorphyPatchWire.as<String>(
+          labelRaw,
+          '$prefix/label',
+          violations,
+        );
+        if (violations.length == before) {
+          patch.patchMap[ProgressBox$.label] = decoded;
+        }
+      }
+      if (ops.containsKey('token')) {
+        final Object? tokenRaw = ZorphyPatchWire.fieldValue(
+          ops['token'],
+          '$prefix/token',
+          violations,
+        );
+        final nestedRaw = ZorphyPatchWire.asObject(
+          tokenRaw,
+          '$prefix/token',
+          violations,
+        );
+        if (nestedRaw != null) {
+          TokenPatch.fromWire(nestedRaw).fold(
+            (value) => patch.patchMap[ProgressBox$.token] =
+                PatchNested<Token, TokenPatch>(value),
+            (error) => violations.addAll(
+              ZorphyPatchWire.prefix(error.violations, '$prefix/token'),
+            ),
+          );
+        }
+      }
+      if (violations.isEmpty) return BoundaryOk<ProgressBoxPatch<T>>(patch);
+    }
+    return BoundaryErr<ProgressBoxPatch<T>>(
+      targetType: 'ProgressBoxPatch',
+      violations: violations,
+    );
+  }
+
+  Map<String, Object?> toEnvelope() {
+    return <String, Object?>{
+      'entityType': 'ProgressBox',
+      'patchKind': 'ProgressBox',
+      'ops': toWire(),
+    };
+  }
+
   ProgressBoxPatch withValue(dynamic value) {
     patchMap[ProgressBox$.value] = value;
     return this;

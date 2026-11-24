@@ -2,6 +2,18 @@
 
 ### Added
 
+- Generated patches now carry a trust-boundary codec (#192). Every concrete
+  `<Name>Patch` gets `static ZorphyBoundaryResult<X> fromWire(Map<String,
+  Object?> raw)` — decoding each field it carries per shape (scalar, enum by
+  NAME, `DateTime` from ISO-8601, `PatchNested`, `ListPatchOp` /
+  `MapPatchOp` deltas) and collecting `FieldViolation`s at JSON pointers
+  instead of throwing, plus `toEnvelope()` rendering
+  `{entityType, patchKind, ops}` for the polymorphic transport. A nullable
+  field's deliberate `null` decodes as a clear, never as a failed read
+  (the guard is the violation count). Polymorphic roots get a dispatching
+  `fromWire` keyed on `patchKind` (`shared` vs subtype) that rejects a
+  missing/unknown kind and a foreign `entityType`, and rejects any op the
+  root patch cannot express rather than silently dropping it.
 - Generated `<Name>Patch` classes now patch nested and collection fields
   deeply instead of overwriting them (#183). `diff` carries a
   `PatchNested<Sub, SubPatch>` built from `SubPatch.diff(previous.x, next.x)`
