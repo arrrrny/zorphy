@@ -102,19 +102,26 @@ final class ZorphyValue {
 /// Field-level escape hatch from `ZORPHY_LINT_NO_BOOL_FLAGS` (ISSUE-005, #180).
 ///
 /// A `bool` on a `@ZorphyState` / `@ZorphyIntent` / polymorphic variant is
-/// rejected by the generator when its NAME is a behavioral or lifecycle flag
+/// reported by the generator when its NAME is a behavioral or lifecycle flag
 /// (`isLoading`, `hasError`, `force*`, `skip*`, `silent`, ...): those exist to
 /// model two commands or two states as one node, which is what polymorphic
 /// subtypes and `AsyncSlice<T>` exist to replace.
 ///
+/// It is a diagnostic on the resolved IR (`ZORPHY_LINT_NO_BOOL_FLAGS`), not
+/// yet a `build_runner` failure — see `zorphy/lib/src/lints/no_bool_flags_lint.dart`.
+///
 /// A boolean that is genuinely part of the domain — `Product.inStock`,
-/// `InteractiveUiNode.enabled` — is not a flag and must be able to say so:
+/// `InteractiveUiNode.enabled` — is not a flag and must be able to say so.
+/// The annotation works on both declaration forms the generator reads:
 ///
 /// ```dart
 /// @ZorphyState()
 /// abstract class $UiNode {
 ///   @ZorphyDomainBool()
-///   bool get isLoading; // a domain fact of THIS node, not a mode switch
+///   bool get isLoading; // an abstract getter — annotated on the getter
+///
+///   @ZorphyDomainBool()
+///   final bool hasError; // a real field — annotated on the FIELD
 /// }
 /// ```
 final class ZorphyDomainBool {

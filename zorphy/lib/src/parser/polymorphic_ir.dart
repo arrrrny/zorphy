@@ -159,14 +159,12 @@ final class ZorphyNodeIr {
   /// The declared class name, `$`/`$$` prefixes included.
   final String className;
 
-  /// The fully-qualified name (`libraryUri#ClassName`) that uniquely identifies
-  /// this node across libraries.
+  /// The node's identity across libraries: `libraryUri#ClassName`.
   ///
-  /// [className] is only unique within one library; two libraries may each
-  /// declare `$UiState`. A walk that dedupes visited nodes MUST key on this,
-  /// not [className], or the second library's same-named node is dropped
-  /// unexamined (the collapse `PolymorphicIr.nodes` keys by qualified name to
-  /// avoid). Empty only on hand-built test nodes that never set it.
+  /// [className] alone is NOT unique — two libraries may declare the same
+  /// `$UiState`, which is exactly why [PolymorphicIr.nodes] is keyed this
+  /// way. A rule that dedupes a graph walk must dedupe on this, or the first
+  /// same-named node silently hides every other one.
   final String qualifiedName;
 
   /// The generated class name, prefixes stripped.
@@ -249,7 +247,6 @@ final class ZorphyNodeIr {
 
   const ZorphyNodeIr({
     required this.className,
-    this.qualifiedName = '',
     required this.cleanName,
     required this.archetype,
     required this.isSealedRoot,
@@ -260,6 +257,7 @@ final class ZorphyNodeIr {
     required this.allConcreteLeaves,
     required this.discriminatorKey,
     required this.discriminatorValue,
+    this.qualifiedName = '',
     this.principalKey,
     this.replaySafe,
     this.isSyntheticLeaf = false,
@@ -295,9 +293,9 @@ final class ZorphyNodeIr {
   }) {
     return ZorphyNodeIr(
       className: className,
-      qualifiedName: qualifiedName,
       cleanName: cleanName,
       archetype: archetype,
+      qualifiedName: qualifiedName,
       isSealedRoot: isSealedRoot ?? this.isSealedRoot,
       isAbstractIntermediate:
           isAbstractIntermediate ?? this.isAbstractIntermediate,

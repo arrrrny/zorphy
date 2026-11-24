@@ -1,7 +1,34 @@
 ## [Unreleased]
 
+### Changed
+
+- Patch wire codecs hardened from the #215 review: generated `toWire()` writes
+  enum NAMES (so `jsonEncode(toEnvelope())` survives a transport hop),
+  `toEnvelope({principalKey: ...})` carries caller-supplied row identity beside
+  `ops`, a nested whole-value replacement is wrapped so it is never decoded as
+  an edit of the old value, explicit nulls are handled before shape dispatch,
+  a `num` field keeps integers, and nested `List<List<T>>` / `Map<K, Map<...>>`
+  decoders keep their full type arguments. Generating a patch with a field
+  named after an envelope key (`ops`, `patchKind`, `entityType`,
+  `principalKey`) is now refused — the bare/envelope dual shape cannot tell
+  such a field apart from metadata. A nested class inside a collection that
+  arrives as a JSON map still needs the entity's own boundary codec; the
+  emitted decoder documents that limitation.
+
 ### Added
 
+- Generated patches now carry a trust-boundary codec (#192). Every concrete
+  `<Name>Patch` gets `static ZorphyBoundaryResult<X> fromWire(Map<String,
+  Object?> raw)` — decoding each field it carries per shape (scalar, enum by
+  NAME, `DateTime` from ISO-8601, `PatchNested`, `ListPatchOp` /
+  `MapPatchOp` deltas) and collecting `FieldViolation`s at JSON pointers
+  instead of throwing, plus `toEnvelope()` rendering
+  `{entityType, patchKind, ops}` for the polymorphic transport. A nullable
+  field's deliberate `null` decodes as a clear, never as a failed read
+  (the guard is the violation count). Polymorphic roots get a dispatching
+  `fromWire` keyed on `patchKind` (`shared` vs subtype) that rejects a
+  missing/unknown kind and a foreign `entityType`, and rejects any op the
+  root patch cannot express rather than silently dropping it.
 - Generated `<Name>Patch` classes now patch nested and collection fields
   deeply instead of overwriting them (#183). `diff` carries a
   `PatchNested<Sub, SubPatch>` built from `SubPatch.diff(previous.x, next.x)`

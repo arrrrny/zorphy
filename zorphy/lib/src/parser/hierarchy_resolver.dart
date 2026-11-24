@@ -285,8 +285,8 @@ final class HierarchyResolver {
     final cleanName = className.replaceAll(r'$', '');
     return ZorphyNodeIr(
       className: className,
-      qualifiedName: _qualifiedName(element),
       cleanName: cleanName,
+      qualifiedName: _qualifiedName(element),
       archetype: declaration.kind,
       isSealedRoot: false,
       isAbstractIntermediate: false,
@@ -321,25 +321,21 @@ final class HierarchyResolver {
   static List<ZorphyFieldIr> _declaredFields(ClassElement element) {
     final fields = <ZorphyFieldIr>[];
     final seen = <String>{};
+    // `element.getters` yields a REAL field's implicit getter too, and that
+    // implicit getter carries none of the field's annotations. Build the
+    // name→field lookup ONCE here instead of rescanning every field for every
+    // getter: O(fields + getters) rather than O(fields × getters). The getter
+    // loop claims the name first, so this is the only chance to honour a
+    // field-form `@ZorphyDomainBool()` hatch.
+    final declaredByName = <String, FieldElement>{
+      for (final field in element.fields)
+        if (!field.isStatic && field.name != null) field.name!: field,
+    };
     for (final getter in element.getters) {
       if (getter.isStatic) continue;
       final name = getter.name ?? '';
       if (name.isEmpty || !seen.add(name)) continue;
       final type = getter.returnType;
-      // A real field ALSO surfaces here as its implicit getter, so this loop
-      // claims the name first and the `element.fields` loop below — the only
-      // branch that reads the field's own annotation — would be skipped. The
-      // `@ZorphyDomainBool()` escape hatch sits on the FIELD for a real field,
-      // so resolve the declaring field and read its annotation too; otherwise
-      // an author who annotates a real field gets a generation error telling
-      // them to annotate the thing they already annotated.
-      FieldElement? declaringField;
-      for (final f in element.fields) {
-        if (!f.isStatic && f.name == name) {
-          declaringField = f;
-          break;
-        }
-      }
       fields.add(
         ZorphyFieldIr(
           name: name,
@@ -347,7 +343,7 @@ final class HierarchyResolver {
           isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
           isDomainBool:
               _isDomainBool(getter) ||
-              (declaringField != null && _isDomainBool(declaringField)),
+              _isDomainBool(_declaringField(declaredByName, name)),
         ),
       );
     }
@@ -368,13 +364,29 @@ final class HierarchyResolver {
     return List.unmodifiable(fields);
   }
 
+  /// The statically declared field called [name] in [declaredByName], or `null`.
+  ///
+  /// `element.getters` yields a REAL field's implicit getter too, and that
+  /// implicit getter carries none of the field's annotations. Without this
+  /// lookup the getter loop claims the name first and the annotation on the
+  /// field is never read — the escape hatch documented for fields silently
+  /// did nothing (finding on PR #216). The map is built once per class in
+  /// `_declaredFields`, so the lookup is O(1) per getter.
+  static FieldElement? _declaringField(
+    Map<String, FieldElement> declaredByName,
+    String name,
+  ) => declaredByName[name];
+
   /// Whether [element] carries `@ZorphyDomainBool()`.
   ///
   /// An abstract getter's annotation sits on the getter element; on a real
   /// field it sits on the field. Both are checked because a fixture may
-  /// declare either shape.
-  static bool _isDomainBool(Element element) =>
-      zorphyDomainBoolChecker.hasAnnotationOf(element);
+  /// declare either shape — the getter loop asks this of the getter and of
+  /// the field behind it ([_declaringField]).
+  static bool _isDomainBool(Element? element) {
+    if (element == null) return false;
+    return zorphyDomainBoolChecker.hasAnnotationOf(element);
+  }
 
   /// A field type as source text, WITHOUT a trailing `?`.
   ///

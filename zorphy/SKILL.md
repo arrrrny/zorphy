@@ -27,16 +27,25 @@ author: zorphy
 
 ## Quick Start
 
-CLI:
+CLI (from a project that depends on `zorphy_annotation` and lists `zorphy` under `dev_dependencies` — `dart run zorphy`
+alone only resolves inside the `zorphy` package itself):
 
 ```bash
-dart run zorphy create --name User --output lib/src/domain/entities
+dart run zorphy:zorphy_cli create --name User --output lib/src/domain/entities
 ```
 
-MCP:
+MCP — this repo's server registers `create_entity`; `arrrrny/zuraffa`'s server
+registers `zuraffa_entity_create`. Arguments are a JSON object, not CLI flags,
+and both write under the fixed `lib/src/domain/entities` path:
 
-```bash
-mcp__zuraffa__generate --name User --output lib/src/domain/entities --generate_json true
+```jsonc
+// zorphy MCP server
+{ "name": "create_entity",
+  "arguments": { "name": "User", "generateJson": true } }
+
+// zuraffa MCP server
+{ "name": "zuraffa_entity_create",
+  "arguments": { "name": "User", "json": true } }
 ```
 
 ## Workflow
@@ -563,7 +572,7 @@ contract, not an `@override`.
 
 ### `ZORPHY_LINT_NO_BOOL_FLAGS` and `@ZorphyDomainBool()` (3.0.0+)
 
-The Chord no-boolean-flags rule rejects behavioral mode switches and lifecycle
+The Chord no-boolean-flags rule flags behavioral mode switches and lifecycle
 flags modelled as booleans on `@ZorphyState`, `@ZorphyIntent`, and polymorphic
 subtypes:
 
@@ -573,19 +582,23 @@ subtypes:
 - **Behavioral switches** on `@ZorphyIntent` or polymorphic variants (`isRetry`,
   `silent`, `noCache`, `force*`, `skip*`, `bypass*`) must be distinct polymorphic
   subtypes.
-- **Escape hatch:** `@ZorphyDomainBool()` exempts genuine domain booleans
-  (e.g., `@ZorphyDomainBool() bool get inStock;`). It is read on BOTH declaration
-  forms — an abstract getter (`bool get inStock;`) and a real field
-  (`bool inStock;`) — so annotating either shape works. Genuine domain booleans on
-  `@ZorphyEntity` / `@ZorphyValue` (like `inStock`, `enabled`) are permitted by default.
+- **Escape hatch:** `@ZorphyDomainBool()` exempts genuine domain booleans, on
+  either declaration form — an abstract getter (`@ZorphyDomainBool() bool get
+  inStock;`) or a real field (`@ZorphyDomainBool() final bool inStock;`).
+  Genuine domain booleans on `@ZorphyEntity` / `@ZorphyValue` (like `inStock`,
+  `enabled`) are permitted by default.
 
-**Enforcement status:** the rule runs during v3 hierarchy resolution and reports
-through `PolymorphicIr.diagnostics` (so `PolymorphicIr.hasErrors` is `true` on a
-hit); `NoBoolFlagsLint.enforce(ir)` raises `InvalidGenerationSourceError` for a
-hard stop. The v3 resolver/emitter pipeline is not yet wired into the
-`build_runner` builder (which still drives the legacy `ZorphyGenerator`), so the
-rule does not yet fail a real `build_runner` run — that lands with the v3 builder
-cutover, which will call `enforce` before emitting.
+**Where the rule reports.** `HierarchyResolver` runs the rule on the resolved
+`PolymorphicIr` and appends each hit to `PolymorphicIr.diagnostics` (code
+`ZORPHY_LINT_NO_BOOL_FLAGS`), and `NoBoolFlagsLint.enforce(ir)` is the
+fail-the-build entry point a v3 caller invokes itself. The v3 IR pipeline is
+not yet the path `build_runner` drives — `ZorphyGenerator` still runs the v2
+`Orchestrator` pipeline — so a flagged hierarchy does not fail a real
+`build_runner` run today. Do not document or assume otherwise until
+`enforce` is called from the generator.
+
+Union membership for the rule's scope includes a member that only
+`implements` the union root, not just the factory variants.
 
 ## v3 trust-boundary wire codecs (3.0.0+)
 

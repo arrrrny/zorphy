@@ -21,7 +21,7 @@ const _startMarker = '// GOLDEN-PATCH-START';
 const _endMarker = '// GOLDEN-PATCH-END';
 
 /// The `Account` entity's fields, in declaration order.
-List<NameTypeClassComment> _accountFields() => [
+List<NameTypeClassComment> accountFields() => [
   NameTypeClassComment('id', 'String', ''),
   NameTypeClassComment('name', 'String', ''),
   NameTypeClassComment('score', 'int', ''),
@@ -44,7 +44,7 @@ void main() {
     test('emitted patch matches the runtime fixture byte for byte', () {
       final emitted = PatchEmitter().emit(
         className: 'Account',
-        fields: _accountFields(),
+        fields: accountFields(),
       );
       expect(
         emitted.trim(),
@@ -58,7 +58,7 @@ void main() {
     test('emits the algebra surface the issue names', () {
       final emitted = PatchEmitter().emit(
         className: 'Account',
-        fields: _accountFields(),
+        fields: accountFields(),
       );
 
       // Static O(1) diff with the identical() fast path.
