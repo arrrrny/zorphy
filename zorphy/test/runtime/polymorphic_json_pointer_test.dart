@@ -19,6 +19,17 @@
 // Orchestrator.generate), so this pins the REAL generator, not a hand-built
 // spec. The emitted parts are additionally handed to the analyzer, so a
 // `resolvePath` that does not compile can never reach consumers.
+//
+// This file drives the analyzer over generated fixtures (issue #222): under
+// coverage instrumentation the analyzer-clean cases exceed the default 30s
+// per-test timeout on a loaded host, so the file carries the same file-level
+// timeout the other analyzer-heavy suites use (e.g.
+// hierarchical_from_wire_test.dart, polymorphic_mock_data_test.dart). The
+// standard `dart test --coverage` / CI commands then pass without a
+// command-line `--timeout` override.
+
+@Timeout(Duration(minutes: 5))
+library;
 
 import 'dart:io';
 
