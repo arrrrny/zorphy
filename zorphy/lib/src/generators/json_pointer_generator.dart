@@ -369,8 +369,15 @@ class JsonPointerGenerator extends UniversalGenerator {
   ) {
     if (field.isVisibleHere) {
       // The receiver's own type carries the getter, so the value is non-null
-      // and [ZorphyLens.then] composes it directly.
-      return 'final nested = ${_fieldTypeName(field)}.resolvePath(remainder);\n'
+      // and [ZorphyLens.then] composes it directly — but only when a SINGLE
+      // nested type names the target. A legal covariant redeclaration records
+      // more than one, and the base-typed arm would shadow the narrowing
+      // subtypes, so such a field is resolved as a plain segment (see
+      // [_isNested]) rather than delegated. Reaching the empty here would mean
+      // [_isNested] and this method disagree.
+      final typeName = _fieldTypeName(field);
+      if (typeName == null) return '';
+      return 'final nested = $typeName.resolvePath(remainder);\n'
           'if (nested == null) return null;\n'
           'return ZorphyLens<$className, ${field.type}>('
           "path: '/${field.name}', "
@@ -812,6 +819,12 @@ class JsonPointerGenerator extends UniversalGenerator {
   /// vetoing the delegation for a sibling that does name a class.
   bool _isNested(_PointerField field) {
     if (field.nestedTargets.isEmpty || field.type.endsWith('?')) return false;
+    // A field VISIBLE on this class delegates through [ZorphyLens.then] with a
+    // single static target. A legal covariant redeclaration records more than
+    // one, and the base-typed arm would shadow the narrowing subtypes — so such
+    // a field is resolved as a plain segment rather than delegated, which keeps
+    // the build from crashing on `.single` (see [_fieldTypeName]).
+    if (field.isVisibleHere && field.nestedClass == null) return false;
     return field.nestedTargets.entries.any(
       (entry) => _targetEmitsResolver(entry.value),
     );
@@ -846,12 +859,17 @@ class JsonPointerGenerator extends UniversalGenerator {
     return fields.any((f) => _writerArms(f).isNotEmpty);
   }
 
-  String _fieldTypeName(_PointerField field) {
-    // The visible case has exactly one target; a subtype-only field always
-    // dispatches (see [_nestedDispatch]), so this is only reached for the
-    // former.
-    final targets = field.nestedTargets.values.toSet();
-    return targets.single.replaceAll(r'$', '');
+  /// The single delegation target when exactly one annotated type names it, or
+  /// `null` when none do or several disagree.
+  ///
+  /// A field visible here normally has exactly one target; a legal covariant
+  /// redeclaration can record more than one, and [`_PointerField.nestedClass`]
+  /// already answers `null` for that — which routes the caller
+  /// ([_nestedDispatch]) to the runtime-subtype composition rather than
+  /// throwing `Bad state: Too many elements` on `.single`.
+  String? _fieldTypeName(_PointerField field) {
+    final target = field.nestedClass;
+    return target?.replaceAll(r'$', '');
   }
 }
 

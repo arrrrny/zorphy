@@ -17,7 +17,10 @@ import 'base_generator.dart';
 /// The emitted `set` routes through the class's own `copyWith`, which is why
 /// the surface is gated on [GenerationConfig.generateCopyWith]: without it
 /// there is no writer to route through, and a lens whose `set` cannot replace
-/// its field would silently violate the get-put law.
+/// its field would silently violate the get-put law. A NULLABLE field cannot be
+/// cleared through `copyWith` (`field: field ?? this.field`), so — when
+/// [GenerationConfig.generatePatch] is also on — its `set` routes an explicit
+/// `null` through the generated Patch, whose `containsKey` gate can express it.
 ///
 /// Static registries cannot be generic, and an abstract class has no
 /// constructor to rebuild through, so both are skipped rather than emitted
@@ -45,18 +48,49 @@ class LensGenerator extends ConcreteClassGenerator {
     // generated class declares.
     final fields = _lensFields(metadata);
 
-    return [
-      _buildLensesClass(className, fields),
-      ClassMemberCode.field(
-        Field((f) {
-          f.name = 'lenses';
-          f.static = true;
-          f.modifier = FieldModifier.constant;
-          f.type = referType('${className}Lenses');
-          f.assignment = Code('${className}Lenses()');
-        }),
-      ),
+    final specs = <Spec>[
+      _buildLensesClass(className, fields, context.config.generatePatch),
     ];
+
+    // A model that declares its own `lenses` member cannot also carry the
+    // static `lenses` registry (conflicting_static_and_instance), so the
+    // registry moves to the first free name — or is skipped when a model
+    // occupies every candidate, since an uncompilable part is worse than a
+    // class without a registry (the `<Name>Lenses` accessor is still emitted
+    // and reachable by constructor).
+    final registryName = _registryFieldName(metadata);
+    if (registryName != null) {
+      specs.add(
+        ClassMemberCode.field(
+          Field((f) {
+            f.name = registryName;
+            f.static = true;
+            f.modifier = FieldModifier.constant;
+            f.type = referType('${className}Lenses');
+            f.assignment = Code('${className}Lenses()');
+          }),
+        ),
+      );
+    }
+
+    return specs;
+  }
+
+  /// The static registry field name, or `null` when no candidate is free.
+  ///
+  /// Prefers the documented `lenses`; a model that already declares a `lenses`
+  /// member moves the registry to `lensesView` (then `$$lenses`). A model that
+  /// occupies every candidate gets no registry at all rather than an
+  /// uncompilable part.
+  String? _registryFieldName(dynamic metadata) {
+    final taken = <String>{
+      for (final field in metadata.allFields)
+        if (field.name != null) field.name as String,
+    };
+    for (final candidate in const ['lenses', 'lensesView', r'$$lenses']) {
+      if (!taken.contains(candidate)) return candidate;
+    }
+    return null;
   }
 
   /// The writable fields of this class, deduplicated by name.
@@ -79,7 +113,17 @@ class LensGenerator extends ConcreteClassGenerator {
     return fields;
   }
 
-  Class _buildLensesClass(String className, List<_LensField> fields) {
+  Class _buildLensesClass(
+    String className,
+    List<_LensField> fields,
+    bool generatePatch,
+  ) {
+    // Helper method names must be unique across the whole generated class —
+    // including the public field getters — or two fields that differ only in
+    // their first letter (`title` / `Title`) would both map to `_getTitle` /
+    // `_setTitle` and emit duplicate static methods that do not compile.
+    final usedNames = <String>{for (final field in fields) field.name};
+
     return Class((c) {
       c.name = '${className}Lenses';
       c.modifier = ClassModifier.final$;
@@ -100,8 +144,8 @@ class LensGenerator extends ConcreteClassGenerator {
 
       for (final field in fields) {
         final lensType = 'ZorphyLens<$className, ${field.type}>';
-        final getter = '_get${_pascal(field.name)}';
-        final setter = '_set${_pascal(field.name)}';
+        final getter = _uniqueHelperName('get', field.name, usedNames);
+        final setter = _uniqueHelperName('set', field.name, usedNames);
 
         c.methods.add(
           Method((m) {
@@ -150,12 +194,41 @@ class LensGenerator extends ConcreteClassGenerator {
                 p.type = referType(field.type);
               }),
             );
-            m.lambda = true;
-            m.body = Code('root.copyWith(${field.name}: value)');
+            // A nullable field's write must be null-capable: `copyWith` is
+            // `field: field ?? this.field`, so it silently drops an explicit
+            // null and breaks the put-get law documented on [ZorphyLens]. Route
+            // the null through the generated Patch, whose `containsKey` gate can
+            // express it (mirrors JsonPointerGenerator._setter). Gated on
+            // generatePatch — without a Patch there is no null-capable writer.
+            final hasNullBranch = field.type.endsWith('?') && generatePatch;
+            if (hasNullBranch) {
+              m.lambda = false;
+              m.body = Code(
+                'if (value == null) {\n'
+                '  return root.patchWith$className('
+                '${className}Patch()..with${_pascal(field.name)}(null));\n'
+                '}\n'
+                'return root.copyWith(${field.name}: value);',
+              );
+            } else {
+              m.lambda = true;
+              m.body = Code('root.copyWith(${field.name}: value)');
+            }
           }),
         );
       }
     });
+  }
+
+  /// A static helper name (`_get<X>` / `_set<X>`) that no member of the
+  /// generated class already uses, registered in [used] as it is allocated.
+  String _uniqueHelperName(String prefix, String fieldName, Set<String> used) {
+    var candidate = '_$prefix${_pascal(fieldName)}';
+    while (used.contains(candidate)) {
+      candidate = '_$candidate';
+    }
+    used.add(candidate);
+    return candidate;
   }
 
   /// Upper-cases the first character so a field `editDraft` becomes the

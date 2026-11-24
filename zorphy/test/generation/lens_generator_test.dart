@@ -98,7 +98,7 @@ ClassMetadata _concreteMeta({
   );
 }
 
-GenerationConfig _config({bool generateCopyWith = true}) {
+GenerationConfig _config({bool generateCopyWith = true, bool generatePatch = false}) {
   return GenerationConfig(
     outputExtension: '.zorphy.dart',
     preset: ZorphyPreset.standard,
@@ -109,7 +109,7 @@ GenerationConfig _config({bool generateCopyWith = true}) {
     generateCopyWith: generateCopyWith,
     generateCopyWithFn: false,
     generateCompareTo: false,
-    generatePatch: false,
+    generatePatch: generatePatch,
     hidePublicConstructor: false,
     generateFilter: false,
     generatePropertyHelpers: false,
@@ -286,6 +286,122 @@ void main() {
         ),
       );
       expect(emitted, contains('ZorphyLens<Draft, String?> get note'));
+    });
+
+    // Finding A (zuraffa/coderabbit, lens_generator.dart:154) — a nullable
+    // field's `set(root, null)` must actually clear it. `copyWith` is
+    // `note: note ?? this.note`, so only a Patch-routed write can express an
+    // explicit null. Pinned at the emission level, exactly as the json-pointer
+    // twin (#206) is, because the value is the generated source itself.
+    test('a nullable field routes set(null) through the Patch', () {
+      final meta = _concreteMeta(
+        name: 'Draft',
+        fields: [
+          NameTypeClassComment('title', 'String', 'Draft'),
+          NameTypeClassComment('note', 'String?', 'Draft'),
+        ],
+      );
+      final emitted = _emitSpecs(
+        generator.generateSpec(
+          GenerationContext(
+            metadata: meta,
+            config: _config(generatePatch: true),
+          ),
+        ),
+      );
+      expect(
+        emitted,
+        matches(
+          RegExp(
+            r'if \(value == null\) \{\s*'
+            r'return root\.patchWithDraft\(DraftPatch\(\)\.\.withNote\(null\)\);',
+          ),
+        ),
+        reason: 'an explicit null must reach the null-capable Patch writer',
+      );
+      // The ordinary non-null write survives for the nullable field (inside the
+      // block body), and a non-nullable field keeps its plain copyWith write.
+      expect(emitted, contains('return root.copyWith(note: value);'));
+      expect(emitted, contains('root.copyWith(title: value)'));
+    });
+
+    test('without generatePatch a nullable field keeps the plain copyWith '
+        'write', () {
+      // No Patch exists, so there is no null-capable writer — the branch must
+      // not be emitted against a method that does not exist.
+      final meta = _concreteMeta(
+        name: 'Draft',
+        fields: [NameTypeClassComment('note', 'String?', 'Draft')],
+      );
+      final emitted = _emitSpecs(
+        generator.generateSpec(
+          GenerationContext(metadata: meta, config: _config()),
+        ),
+      );
+      expect(emitted, isNot(contains('patchWithDraft')));
+      expect(emitted, contains('root.copyWith(note: value)'));
+    });
+
+    // Finding B (zuraffa/coderabbit, lens_generator.dart:52/58) — a model that
+    // declares its own `lenses` member cannot carry the static `lenses`
+    // registry (conflicting_static_and_instance), so the registry moves to a
+    // free name and the field's own lens is preserved.
+    test('a `lenses` field moves the static registry to a free name', () {
+      final meta = _concreteMeta(
+        name: 'Bag',
+        fields: [
+          NameTypeClassComment('lenses', 'String', 'Bag'),
+          NameTypeClassComment('color', 'String', 'Bag'),
+        ],
+      );
+      final specs = generator.generateSpec(
+        GenerationContext(metadata: meta, config: _config()),
+      );
+      expect(
+        specs.whereType<ClassMemberCode>(),
+        hasLength(1),
+        reason: 'the registry is renamed, not dropped',
+      );
+      final emitted = _emitSpecs(specs);
+      expect(
+        emitted,
+        isNot(contains('static const BagLenses lenses =')),
+        reason: 'a static `lenses` would clash with the instance field',
+      );
+      expect(
+        emitted,
+        contains('static const BagLenses lensesView = BagLenses()'),
+      );
+      // The model's own `lenses` field still gets its lens.
+      expect(emitted, contains('ZorphyLens<Bag, String> get lenses'));
+    });
+
+    // Finding C (coderabbit, lens_generator.dart:104) — two fields that differ
+    // only in their first letter (`title` / `Title`) map to the same `_getTitle`
+    // / `_setTitle` helper, emitting duplicate methods that do not compile.
+    // The helpers are allocated uniquely; the public getters are unchanged.
+    test('fields differing only by first letter get unique helpers', () {
+      final meta = _concreteMeta(
+        name: 'Odd',
+        fields: [
+          NameTypeClassComment('title', 'String', 'Odd'),
+          NameTypeClassComment('Title', 'String', 'Odd'),
+        ],
+      );
+      final emitted = _emitSpecs(
+        generator.generateSpec(
+          GenerationContext(metadata: meta, config: _config()),
+        ),
+      );
+      // Both public getters are present and keep the field's own name.
+      expect(emitted, contains('ZorphyLens<Odd, String> get title'));
+      expect(emitted, contains('ZorphyLens<Odd, String> get Title'));
+      // The first field keeps `_getTitle` / `_setTitle`; the second is
+      // deduplicated to a `_`-prefixed variant — never a second `_getTitle`.
+      expect(emitted, contains('String _getTitle('));
+      expect(emitted, contains('String __getTitle('));
+      expect(emitted, contains('Odd _setTitle('));
+      expect(emitted, contains('Odd __setTitle('));
     });
 
     test('getter-only fields are skipped — copyWith cannot write them', () {

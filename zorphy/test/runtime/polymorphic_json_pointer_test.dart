@@ -235,6 +235,41 @@ abstract class \$Draft {
 }
 ''';
 
+/// A COVARIANT redeclaration of a nested field on a sealed root: a legal Dart
+/// narrowing (`$Child.payload` is a `$DraftB`, a subtype of `$DraftA`) records
+/// more than one nested target for a field that is still VISIBLE on the root.
+/// The single-target composition's `.single` threw `Bad state: Too many
+/// elements` here, so the whole codegen build failed on an ordinary hierarchy
+/// (review finding on PR #201, json_pointer_generator.dart:855). The target is
+/// only knowable per-declarer, so the generator must fall through rather than
+/// assume one.
+const _covariantNestedSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'covariant_nested.zorphy.dart';
+
+@Zorphy()
+abstract class \$DraftA {
+  String get title;
+}
+
+@Zorphy()
+abstract class \$DraftB implements \$DraftA {
+  String get title;
+  String get extra;
+}
+
+@Zorphy(explicitSubTypes: [\$Child])
+abstract class \$\$Node {
+  \$DraftA get payload;
+}
+
+@Zorphy()
+abstract class \$Child implements \$\$Node {
+  \$DraftB get payload;
+}
+''';
+
 Future<Map<String, String>> _generateHierarchy(Directory fixtureDir) =>
     _generate(fixtureDir, 'ui_node', _hierarchy);
 
@@ -711,6 +746,34 @@ void main() {
         node,
         isNot(matches(RegExp(r'case PlainNode _node:\s*final nested = '))),
         reason: 'the String-bearing sibling must not delegate',
+      );
+    });
+
+    test('a covariant redeclaration on a sealed root no longer throws', () async {
+      // `$Child.payload` narrows `$DraftA` to `$DraftB`, so the visible `payload`
+      // field on the sealed root records TWO nested targets. `_fieldTypeName`'s
+      // `.single` threw `Bad state: Too many elements` and failed the whole
+      // build; generation now completes and the target is resolved per-declarer.
+      final dir = Directory('${fixtureDir.path}/covariant_nested_shape')
+        ..createSync(recursive: true);
+      final covariant = await _generate(dir, 'covariant_nested', _covariantNestedSource);
+      expect(
+        covariant.keys,
+        containsAll(<String>['Node', 'Child', 'DraftA', 'DraftB']),
+        reason: 'every class of the covariant hierarchy must generate',
+      );
+      // The root still resolves its own nested segment rather than dropping it.
+      expect(covariant['Node'], contains("'/payload' =>"));
+      final diagnostics = await _analyzeFixture(
+        dir,
+        'covariant_nested',
+        covariant,
+      );
+      expect(
+        diagnostics,
+        isEmpty,
+        reason: 'the covariant hierarchy must analyze clean:\n'
+            '${diagnostics.join('\n')}',
       );
     });
 
