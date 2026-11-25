@@ -13,8 +13,9 @@
 //     own patch
 //   * nullable nested — a null on either side is a whole-value transition, not
 //     a sub-patch
-//   * collection deltas — `List`/`Map` changes travel as granular ops and
-//     apply to the target collection
+//   * collection patches — a `List` change is an atomic whole-value
+//     replacement and a `Map` change travels as granular ops, each applied to
+//     the target collection
 //   * round-trip — `diff -> apply -> invert` restores the previous entity
 //   * composition — `(a.compose(b)).apply(x) == b.apply(a.apply(x))`
 
@@ -183,8 +184,8 @@ void main() {
     });
   });
 
-  group('collection deltas', () {
-    test('an appended tag travels as one append op', () {
+  group('collection patches', () {
+    test('a changed list is carried as the whole atomic value', () {
       final previous = Profile(
         id: 'p1',
         displayName: 'ada',
@@ -197,14 +198,11 @@ void main() {
         previous.copyWith(tags: const ['x', 'y', 'z']),
       );
 
+      // zorphy#248: a list is replaced atomically, never edited by index, so
+      // the carried value is the whole new list.
       final carried = patch.patchMap[Profile$.tags];
-      expect(carried, isA<ListPatchDelta<String>>());
-      expect(
-        carried,
-        ListPatchDelta<String>(<ListPatchOp<String>>[
-          const ListPatchOp<String>.append('z'),
-        ]),
-      );
+      expect(carried, isA<List<String>>());
+      expect(carried, ['x', 'y', 'z']);
       expect(patch.apply(previous).tags, ['x', 'y', 'z']);
     });
 
@@ -244,7 +242,7 @@ void main() {
       }
     });
 
-    test('the delta renders its ops on the wire, not an opaque object', () {
+    test('a changed list renders as a bare JSON array on the wire', () {
       final previous = Profile(
         id: 'p1',
         displayName: 'ada',
@@ -257,11 +255,9 @@ void main() {
         previous.copyWith(tags: const ['x', 'y']),
       ).toWire();
 
-      expect(wire['tags'], <String, Object?>{
-        'ops': <Object?>[
-          <String, Object?>{'op': 'append', 'item': 'y'},
-        ],
-      });
+      // Atomic replacement (zorphy#248): the list is the whole new value, a
+      // bare JSON array — not an `{'ops': [...]}` delta.
+      expect(wire['tags'], ['x', 'y']);
     });
 
     test(

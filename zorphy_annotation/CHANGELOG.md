@@ -21,6 +21,13 @@
 
 ### Added
 
+- **Three-way merge primitives on `PatchBase` (#248).** `PatchBase` (the base
+  every generated `<Name>Patch` extends) gains `Set<String> get changedPaths`
+  (the JSON pointers a patch touches, expanding a carried `PatchNested` to its
+  leaf paths), `Set<String> conflictingPaths(PatchBase other)` (the exact
+  intersection of two patches' changed paths) and `composePatches(next)` (an
+  alias of `compose`). `ZorphyPatchWire.listValue<E>` decodes an atomic list
+  field's bare JSON array, all-or-nothing like `listDelta`.
 - Patch wire codecs (#192): `ZorphyPatchWire` is the total decode layer a
   generated patch `fromWire` calls. Every read is an `is` test, so a corrupt
   payload becomes a `FieldViolation` at a JSON pointer instead of a thrown

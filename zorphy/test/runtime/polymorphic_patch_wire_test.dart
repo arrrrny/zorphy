@@ -139,19 +139,16 @@ void main() {
       );
     });
 
-    test('a corrupt list op names its position', () {
+    test('a corrupt list element names its position', () {
+      // Atomic list replacement (zorphy#248): the list is a bare JSON array, so
+      // a bad element is named at its index, not at a delta op.
       final result = ProfilePatch.fromWire(const {
-        'tags': {
-          'ops': [
-            {'op': 'append', 'item': 'y'},
-            {'op': 'teleport'},
-          ],
-        },
+        'tags': ['a', 123],
       });
 
       expect(result.isOk, isFalse);
       final error = result as BoundaryErr<ProfilePatch>;
-      expect(error.violations.map((v) => v.path), contains('/tags/ops/1'));
+      expect(error.violations.map((v) => v.path), contains('/tags/1'));
     });
 
     test('a non-map nested value is a violation', () {
@@ -182,8 +179,9 @@ void main() {
     test('the shared envelope reaches every subtype after a round-trip', () {
       final readAt = DateTime.utc(2026, 11, 22, 10);
       final patch = NotificationPatch.shared(readAt: PatchValue.set(readAt));
-      final decoded = NotificationPatch.fromWire(patch.toEnvelope())
-          .getOrThrow();
+      final decoded = NotificationPatch.fromWire(
+        patch.toEnvelope(),
+      ).getOrThrow();
 
       final notifications = <Notification>[
         const OrderNotification(id: 'o1', itemCount: 2),
@@ -226,8 +224,9 @@ void main() {
       final readAt = DateTime.utc(2026, 11, 22, 10);
       final patch = OrderNotificationPatch(readAt: PatchValue.set(readAt));
 
-      final decoded = NotificationPatch.fromWire(patch.toEnvelope())
-          .getOrThrow();
+      final decoded = NotificationPatch.fromWire(
+        patch.toEnvelope(),
+      ).getOrThrow();
 
       expect(
         decoded.apply(const OrderNotification(id: 'o1', itemCount: 1)).readAt,
@@ -240,8 +239,9 @@ void main() {
       // that already knows the kind must not be forced through an envelope.
       final patch = OrderNotificationPatch(itemCount: const PatchValue.set(3));
 
-      final decoded = OrderNotificationPatch.fromWire(patch.toWire())
-          .getOrThrow();
+      final decoded = OrderNotificationPatch.fromWire(
+        patch.toWire(),
+      ).getOrThrow();
 
       // The fixture entities carry no `operator ==`, so equivalence is read
       // off the field the patch set.
@@ -418,40 +418,31 @@ void main() {
       expect(decoded.apply(before).previousAddress, next.previousAddress);
     });
 
-    test('a negative list index is a decode violation', () {
+    test('a non-array list value is a decode violation', () {
+      // The old `{'ops': [...]}` delta form is no longer a list wire value
+      // (zorphy#248): a map where a bare array is required fails at the field.
       final result = ProfilePatch.fromWire(const {
-        'tags': {
-          'ops': [
-            {'op': 'removeAt', 'index': -1},
-          ],
-        },
+        'tags': {'ops': <Object?>[]},
       });
 
       expect(result.isOk, isFalse);
       expect(
         (result as BoundaryErr<ProfilePatch>).violations.map((v) => v.path),
-        contains('/tags/ops/0/index'),
+        contains('/tags'),
       );
     });
 
-    test('an index that cannot be valid after replaceAll is rejected', () {
+    test('a list with one bad element is rejected whole', () {
+      // All-or-nothing, like every other wire read: a single bad element fails
+      // the field rather than shipping a silently short list.
       final result = ProfilePatch.fromWire(const {
-        'tags': {
-          'ops': [
-            {
-              'op': 'replaceAll',
-              'items': ['a'],
-            },
-            {'op': 'append', 'item': 'b'},
-            {'op': 'updateAt', 'index': 2, 'item': 'c'},
-          ],
-        },
+        'tags': ['a', 'b', 3],
       });
 
       expect(result.isOk, isFalse);
       expect(
         (result as BoundaryErr<ProfilePatch>).violations.map((v) => v.path),
-        contains('/tags/ops/2/index'),
+        contains('/tags/2'),
       );
     });
 

@@ -2,6 +2,14 @@
 
 ### Changed (BREAKING — v3.0.0)
 
+- **List patch fields are replaced atomically (#248).** A generated `<Name>Patch`
+  now carries a changed `List<E>` field as the whole new list value (a bare JSON
+  array on the wire), never as positional index ops (`ListPatchOp` /
+  `ListPatchDelta`). Concurrent edits to the same list are therefore an exact
+  `/tags` conflict instead of silent index corruption. The `ListPatchDelta` /
+  `ListPatchOp` types remain in `zorphy_annotation` for direct use but are no
+  longer emitted for entity list fields; the list wire form changes from
+  `{'ops': [...]}` to a bare array. Map fields keep their `MapPatchDelta`.
 - **Legacy `@Zorphy` / `@Zorphy2` generation path removed (#233).** After the
   v3 migration gate the generator runs only the zero-preset archetype pass
   (`@ZorphyEntity` / `@ZorphyValue` / `@ZorphyUnion` / `@ZorphyState` /
@@ -23,6 +31,15 @@
 
 ### Added
 
+- **Three-way merge primitives on every generated patch (#248).**
+  `<Name>Patch` now exposes `Set<String> get changedPaths` (the JSON pointers it
+  touches, e.g. `{'/price', '/title'}`, with nested edits expanded to the leaf),
+  `Set<String> conflictingPaths(other)` (the exact intersection — disjoint edits
+  return `{}`, an overlapping scalar or concurrent list replacement returns the
+  shared pointer), and `composePatches(next)` (an alias of `compose` with the
+  same left-to-right semantics, so three-way sync has one composition behaviour
+  under its own name). They live on `PatchBase` in `zorphy_annotation`, so every
+  generated patch inherits one implementation.
 - `dart run zorphy:migrate_v3 <path>` — a v2 → v3 AST migration codemod
   (#194). It strips every v2 `preset:` and `generate*` boolean argument and
   rewrites the zero-preset archetypes: `@Zorphy` / `@Zorphy2` on an

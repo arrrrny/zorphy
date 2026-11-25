@@ -380,22 +380,12 @@ class PatchEmitter {
               ),
             );
           case _FieldShapeKind.list:
-            // A nullable field's prior value may be null, and `invert` takes
-            // the non-nullable collection; the else arm below restores the
-            // raw prior value (including null) wholesale.
+            // Atomic list replacement (zorphy#248): the patch carries the whole
+            // prior list value, so the inverse restores it wholesale — the same
+            // shape as a scalar. No positional history to replay.
             b.statements.add(
               Code(
-                'if ($patchMapName[$key] is ListPatchDelta<${shape.valueType}>'
-                '${shape.isNullable ? ' && before.$member != null' : ''}) '
-                'undo.$patchMapName[$key] = '
-                '($patchMapName[$key] as ListPatchDelta<${shape.valueType}>)'
-                '.invert(before.$member${shape.isNullable ? '!' : ''});',
-              ),
-            );
-            b.statements.add(
-              Code(
-                'if ($patchMapName.containsKey($key) && '
-                '$patchMapName[$key] is! ListPatchDelta<${shape.valueType}>) '
+                'if ($patchMapName.containsKey($key)) '
                 'undo.$patchMapName[$key] = before.$member;',
               ),
             );
@@ -549,45 +539,23 @@ class PatchEmitter {
               ),
             );
           case _FieldShapeKind.list when shape.isNullable:
-            b.statements.add(
-              Code('if (previous.$member != null && next.$member != null) {'),
-            );
-            b.statements.add(
-              Code(
-                '  final ${member}Delta = '
-                'ListPatchDelta.diff<${shape.valueType}>('
-                'previous.$member!, next.$member!);',
-              ),
-            );
+            // Atomic list replacement (zorphy#248): a changed list is carried
+            // as the whole value, never as positional index ops. ListEquality
+            // accepts the nullable list on either side, so one content-equality
+            // check covers both the both-present and the null-transition cases.
             b.statements.add(
               Code(
-                '  if (${member}Delta.isNotEmpty) '
-                'changes.$patchMapName[$key] = ${member}Delta;',
-              ),
-            );
-            b.statements.add(const Code('}'));
-            b.statements.add(
-              Code('if (previous.$member == null || next.$member == null) {'),
-            );
-            b.statements.add(
-              Code(
-                '  if (previous.$member != next.$member) '
+                'if (!const ListEquality<Object?>().equals('
+                'previous.$member, next.$member)) '
                 'changes.$patchMapName[$key] = next.$member;',
               ),
             );
-            b.statements.add(const Code('}'));
           case _FieldShapeKind.list:
             b.statements.add(
               Code(
-                'final ${member}Delta = '
-                'ListPatchDelta.diff<${shape.valueType}>(previous.$member, '
-                'next.$member);',
-              ),
-            );
-            b.statements.add(
-              Code(
-                'if (${member}Delta.isNotEmpty) '
-                'changes.$patchMapName[$key] = ${member}Delta;',
+                'if (!const ListEquality<Object?>().equals('
+                'previous.$member, next.$member)) '
+                'changes.$patchMapName[$key] = next.$member;',
               ),
             );
           case _FieldShapeKind.map when shape.isNullable:
@@ -679,10 +647,9 @@ class PatchEmitter {
         // Both unwrap to plain JSON so a wire map never carries an opaque patch
         // object.
         final wireValue = switch (shape.kind) {
-          _FieldShapeKind.list =>
-            '$patchMapName[$key] is ListPatchDelta<${shape.valueType}>'
-                ' ? ($patchMapName[$key] as ListPatchDelta<${shape.valueType}>)'
-                '.toWire() : $patchMapName[$key]',
+          // Atomic list replacement (zorphy#248): a list field carries the raw
+          // list value (a JSON array), rendered verbatim — never a delta.
+          _FieldShapeKind.list => '$patchMapName[$key]',
           // A map delta carries a BARE step list: a replacement map may hold a
           // literal `ops` key, so a wrapper keyed `ops` would be ambiguous
           // (#215). The field-level `toWireSteps()` keeps that distinction.
@@ -842,9 +809,11 @@ class PatchEmitter {
 
     switch (shape.kind) {
       case _FieldShapeKind.list:
+        // Atomic list replacement (zorphy#248): the wire form is a bare JSON
+        // array decoded by `listValue`, not an ops delta.
         body
           ..add(
-            'final decoded = ZorphyPatchWire.listDelta<'
+            'final decoded = ZorphyPatchWire.listValue<'
             '${shape.valueType}>($local, $path, violations, '
             '${_valueDecoder(shape.valueType)});',
           )

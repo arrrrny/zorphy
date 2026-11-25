@@ -66,9 +66,9 @@ void main() {
         className: 'Doc',
         fields: [NameTypeClassComment('grid', 'List<List<int>>', '')],
       );
-      expect(source, contains('listDelta<List<int>>'));
+      expect(source, contains('listValue<List<int>>'));
       expect(source, contains('final out = <int>[]'));
-      expect(source, isNot(contains('listDelta<List>')));
+      expect(source, isNot(contains('listValue<List>')));
     });
   });
 }

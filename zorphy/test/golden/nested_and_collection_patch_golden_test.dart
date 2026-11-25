@@ -113,9 +113,16 @@ void main() {
       expect(emitted, contains('previousAddress != null'));
     });
 
-    test('a List field is carried as a ListPatchDelta', () {
-      expect(emitted, contains('ListPatchDelta<String>'));
-      expect(emitted, contains('ListPatchDelta.diff<String>('));
+    test('a List field is carried as an atomic whole-value replacement', () {
+      // zorphy#248: a list field is replaced atomically, never edited by
+      // positional index ops, so a concurrent list edit is an exact conflict.
+      expect(emitted, contains('ListEquality<Object?>().equals('));
+      expect(
+        emitted,
+        contains('changes.patchMap[Profile\$.tags] = next.tags;'),
+      );
+      expect(emitted, isNot(contains('ListPatchDelta<String>')));
+      expect(emitted, isNot(contains('ListPatchDelta.diff<String>(')));
     });
 
     test('a Map field is carried as a MapPatchDelta', () {
@@ -139,11 +146,11 @@ void main() {
       expect(emitted, contains('PatchNested<Address, AddressPatch>'));
     });
 
-    test('a nullable collection keeps the whole-value transition', () {
-      // A delta needs two non-null collections to diff, and `invert` takes
-      // the non-nullable collection, so a null on either side is carried
-      // verbatim. The repo's analyze-clean gate caught this regression when
-      // a nullable `List<TaskStatus>?` field was diffed unconditionally.
+    test('a nullable list keeps the whole-value transition', () {
+      // A list field is replaced atomically (zorphy#248): one content-equality
+      // check covers both the both-present and the null-transition cases, so a
+      // nullable `List<T>?` needs no two-phase diff. A MAP field stays a delta,
+      // so its nullable whole-value transition is unchanged.
       final nullable = PatchEmitter().emit(
         className: 'Task',
         fields: [
@@ -152,17 +159,22 @@ void main() {
           NameTypeClassComment('index', 'Map<String, int>?', ''),
         ],
       );
-      expect(nullable, contains('previous.history != null &&'));
-      expect(nullable, contains('previous.history!'));
-      expect(nullable, contains('before.history != null'));
-      expect(nullable, contains('before.history!'));
+      expect(
+        nullable,
+        contains(
+          'ListEquality<Object?>().equals(previous.history, next.history)',
+        ),
+      );
+      expect(
+        nullable,
+        contains('changes.patchMap[Task\$.history] = next.history;'),
+      );
       expect(nullable, contains('previous.index != null &&'));
       expect(nullable, contains('before.index != null'));
     });
 
-    test('invert captures the prior collection state', () {
-      expect(emitted, contains('ListPatchDelta.diff<String>('));
-      expect(emitted, contains('before.tags'));
+    test('invert restores the prior list and map state', () {
+      expect(emitted, contains('undo.patchMap[Profile\$.tags] = before.tags;'));
       expect(emitted, contains('before.scores'));
     });
   });

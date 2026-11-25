@@ -40,6 +40,52 @@ abstract class PatchBase<TEntity, TEnum extends Enum>
   @override
   bool get isNotEmpty => !isEmpty;
 
+  /// The JSON pointers this patch changes, e.g. `{'/price', '/title'}`.
+  ///
+  /// Each touched field contributes `/<field>`. A nested field carries a
+  /// [PatchNested] whose own sub-patch is a [PatchBase]; its leaf paths are
+  /// expanded under the field, so `/address/street` and `/address/city` are
+  /// distinct paths and two edits under one object conflict only on the leaf
+  /// they share. A whole-value transition (a null on either side, or a fluent
+  /// `with*` builder that wrote a raw value) is the field path itself.
+  Set<String> get changedPaths {
+    final paths = <String>{};
+    patchMap.forEach((key, value) {
+      final name = key.name;
+      final nested = value is PatchNested ? value.patch : null;
+      if (nested is PatchBase) {
+        final child = nested.changedPaths;
+        if (child.isEmpty) {
+          paths.add('/$name');
+        } else {
+          for (final path in child) {
+            paths.add('/$name$path');
+          }
+        }
+      } else {
+        paths.add('/$name');
+      }
+    });
+    return paths;
+  }
+
+  /// The exact set of paths BOTH this patch and [other] change — the conflict
+  /// set a three-way sync surfaces as `AppFailure.conflict`.
+  ///
+  /// Disjoint edits return an empty set; an overlapping scalar or a concurrent
+  /// atomic list replacement returns the shared pointer(s).
+  Set<String> conflictingPaths(PatchBase<TEntity, TEnum> other) =>
+      changedPaths.intersection(other.changedPaths);
+
+  /// Applies [next] over this patch — the three-way-merge name for [compose].
+  ///
+  /// This is an ALIAS of [compose] with identical left-to-right semantics
+  /// (`apply(x) == next.apply(apply(x))`); it exists so three-way sync reads
+  /// naturally without leaving two composition behaviours to tell apart. The
+  /// result is narrowed covariantly so a chain keeps its static patch type.
+  ZorphyPatch<TEntity> composePatches(covariant ZorphyPatch<TEntity> next) =>
+      compose(next);
+
   Map<TEnum, dynamic> toPatch() => Map.from(patchMap);
 
   Map<String, dynamic> toJson() {

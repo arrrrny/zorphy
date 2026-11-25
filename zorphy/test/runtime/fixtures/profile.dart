@@ -429,13 +429,7 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
     if (patchMap.containsKey(Profile$.address) &&
         addressCarried is! PatchNested)
       undo.patchMap[Profile$.address] = before.address;
-    if (patchMap[Profile$.tags] is ListPatchDelta<String>)
-      undo.patchMap[Profile$.tags] =
-          (patchMap[Profile$.tags] as ListPatchDelta<String>).invert(
-            before.tags,
-          );
-    if (patchMap.containsKey(Profile$.tags) &&
-        patchMap[Profile$.tags] is! ListPatchDelta<String>)
+    if (patchMap.containsKey(Profile$.tags))
       undo.patchMap[Profile$.tags] = before.tags;
     if (patchMap[Profile$.scores] is MapPatchDelta<String, int>)
       undo.patchMap[Profile$.scores] =
@@ -471,8 +465,8 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
       changes.patchMap[Profile$.address] = PatchNested<Address, AddressPatch>(
         addressDelta,
       );
-    final tagsDelta = ListPatchDelta.diff<String>(previous.tags, next.tags);
-    if (tagsDelta.isNotEmpty) changes.patchMap[Profile$.tags] = tagsDelta;
+    if (!const ListEquality<Object?>().equals(previous.tags, next.tags))
+      changes.patchMap[Profile$.tags] = next.tags;
     final scoresDelta = MapPatchDelta.diff<String, int>(
       previous.scores,
       next.scores,
@@ -504,9 +498,7 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
           ? (patchMap[Profile$.address] as PatchNested).toWire()
           : PatchWireReplacement(patchMap[Profile$.address]);
     if (patchMap.containsKey(Profile$.tags))
-      wire['tags'] = patchMap[Profile$.tags] is ListPatchDelta<String>
-          ? (patchMap[Profile$.tags] as ListPatchDelta<String>).toWire()
-          : patchMap[Profile$.tags];
+      wire['tags'] = patchMap[Profile$.tags];
     if (patchMap.containsKey(Profile$.scores))
       wire['scores'] = patchMap[Profile$.scores] is MapPatchDelta<String, int>
           ? (patchMap[Profile$.scores] as MapPatchDelta<String, int>)
@@ -641,7 +633,7 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
             ),
           );
         } else {
-          final decoded = ZorphyPatchWire.listDelta<String>(
+          final decoded = ZorphyPatchWire.listValue<String>(
             tagsRaw,
             '$prefix/tags',
             violations,
