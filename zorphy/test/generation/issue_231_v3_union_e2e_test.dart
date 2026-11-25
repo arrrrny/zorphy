@@ -98,10 +98,13 @@ void main() {
       expect(v3, contains('extension OpenTaskMorphing on OpenTask'));
       expect(v3, contains('DoneTask changeToDoneTask({'));
       expect(v3, contains('required String result'));
+      // dart format wraps the fromTrusted(...) call across lines and keeps a
+      // trailing comma, so compare with whitespace collapsed rather than
+      // pinning one line layout.
       expect(
-        v3,
+        v3.replaceAll(RegExp(r'\s+'), ' '),
         contains(
-          'return DoneTask.fromTrusted(result: result, id: id, createdAt: createdAt, tags: tags);',
+          'return DoneTask.fromTrusted( result: result, id: id, createdAt: createdAt, tags: tags, );',
         ),
       );
       expect(v3, contains('extension DoneTaskMorphing on DoneTask'));
