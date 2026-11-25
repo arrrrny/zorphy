@@ -410,8 +410,24 @@ NO_LOCAL_CONTEXT = ("secrets.", "inputs.", "vars.", "steps.", "needs.",
 # printed — a value reaches the step's environment and nothing else.
 LOCAL_SECRETS = {}
 SECRETS_MISSING = []   # LOCAL_CI_SECRETS names the ambient env cannot back
+SECRETS_MULTILINE = []  # rejected at intake — cannot be masked across streamed lines
 SECRETS_REAL = []      # secrets resolved from a supplied value, in use order
 SECRETS_BLANKED = []   # secrets that resolved to "" for lack of a local value
+
+
+def _accept_local_secret(name, value):
+    """Store a single-line value; reject a multiline one before it can leak.
+
+    stream_command() masks each line as it is emitted (#256 review): a value
+    containing a newline never appears whole in any one line, so both halves of
+    a printed credential would reach the console and the captured log. Until
+    cross-line masking exists, a multiline value is refused at intake — it
+    resolves empty like a missing secret, never unmasked.
+    """
+    if "\n" in value or "\r" in value:
+        SECRETS_MULTILINE.append(name)
+        return
+    LOCAL_SECRETS[name] = value
 
 
 def _collect_local_secrets():
@@ -420,14 +436,14 @@ def _collect_local_secrets():
         if key.startswith(direct_prefix):
             name = key[len(direct_prefix):]
             if name and value:
-                LOCAL_SECRETS[name] = value
+                _accept_local_secret(name, value)
     listed = os.environ.get("LOCAL_CI_SECRETS", "")
     for name in (p.strip() for p in re.split(r"[,\s]+", listed)):
         if not name or name in LOCAL_SECRETS:
             continue
         value = os.environ.get(name, "")
         if value:
-            LOCAL_SECRETS[name] = value
+            _accept_local_secret(name, value)
         else:
             SECRETS_MISSING.append(name)
 
@@ -615,10 +631,15 @@ def eval_condition(text, ctx, unresolved):
         return True
     if t in ("false",):
         return False
+    # Explicit success()/failure() must match the implicit gate (#256 review):
+    # a step-level continue-on-error failure is recorded as SUCCESS in CI and
+    # later default steps still run, but it still leaves job_ok False. Keying
+    # these conditions on job_ok inverted them; job_unsoftened is the flag the
+    # implicit gate uses. Unsoftened and job-level failures keep their result.
     if t == "success()":
-        return ctx.get("job_ok", True)
+        return not ctx.get("job_unsoftened", False)
     if t == "failure()":
-        return not ctx.get("job_ok", True)
+        return ctx.get("job_unsoftened", False)
     for op, fn in (("||", any), ("&&", all)):
         parts = _split_top(t, op)
         if len(parts) > 1:
@@ -744,8 +765,18 @@ LOCAL_ONLY_HOST_CLASSES = ("sqlite3-ffi", "shared-kernel-cache")
 
 
 def host_fingerprint(output):
-    """`(class, sentence)` for the host fact a failure output carries, or None."""
+    """`(class, sentence)` for the host fact a failure output carries, or None.
+
+    disk-full is checked FIRST (#256 review): a suite that filled the disk can
+    also print a sqlite3 FFI loader error (a truncated download, a half-written
+    library), and classifying that as sqlite3-ffi would take the LOCAL ONLY path
+    and hide a real disk-full red. A step that reports only the sqlite3
+    fingerprint still takes the LOCAL ONLY path as before.
+    """
     text = output or ""
+    if DISK_FULL_RE.search(text):
+        return ("disk-full",
+                "the filesystem filled up while the step ran")
     if SQLITE_FFI_RE.search(text):
         return ("sqlite3-ffi",
                 "the host has no libsqlite3.so for package:sqlite3's FFI loader "
@@ -755,9 +786,6 @@ def host_fingerprint(output):
         return ("shared-kernel-cache",
                 "a concurrent run deleted this gate's dart_test.kernel.* cache — "
                 "the ambient TMPDIR was shared")
-    if DISK_FULL_RE.search(text):
-        return ("disk-full",
-                "the filesystem filled up while the step ran")
     return None
 
 
@@ -850,7 +878,10 @@ def stale_kernel_caches(max_age_hours=DEFAULT_STALE_CACHE_HOURS, limit=3):
             found.append((path, kib, (time.time() - stat.st_mtime) / 3600))
         if len(found) >= max_probe:
             break
-    found.sort(key=lambda item: (item[1] is None, -(item[1] or 0)))
+    # Unknown sizes FIRST (#256 review): the earlier key put numeric sizes
+    # before None, so a cache whose `du` timed out — the strongest signal —
+    # was dropped from a top-three report whenever three others were measured.
+    found.sort(key=lambda item: (item[1] is not None, -(item[1] or 0)))
     return found[:limit]
 
 
@@ -988,7 +1019,11 @@ class HostPreflight:
         # cleanup: the base is shared (and may be the ambient TMPDIR itself, which
         # the run must never remove), while `tmpdir` dies with the run.
         self.tmpdir = None
-        if self.tmp_base and not self.verdict:
+        # `create=False` is --plan: measure and report, never touch the disk
+        # (#256 review). Without this guard a plan on a roomy host still made a
+        # real per-run directory here, which the wrapper TERMs before the
+        # atexit cleanup can run.
+        if create and self.tmp_base and not self.verdict:
             self.tmpdir = tempfile.mkdtemp(prefix="local_ci_", dir=self.tmp_base)
         self.sqlite_state, self.sqlite_payload = sqlite3_ffi_plan(
             sqlite3_search_dirs())
@@ -1006,50 +1041,51 @@ class HostPreflight:
     # ------------------------------------------------------------------ disk
 
     def _plan_disk(self):
-        """`(tmp_base, free, mount, verdict)` — the tightest measured filesystem.
+        """`(tmp_base, free, mount, verdict)` — checkout and temp judged apart.
 
         EVERY filesystem this run writes to is measured: the temp candidates and
         the checkout root. `.dart_tool` and every build artifact land in the
-        checkout, so a full checkout root is a full run even when /tmp has room —
-        the tighter filesystem names the verdict (FR-007). Measuring the root only
-        when every temp candidate was already short is the bug #941 review caught:
-        on a normal host the first candidate returns and the root is never read.
+        checkout, so a full checkout root is a full run even when /tmp has room
+        (FR-007). But they are TWO separate verdicts (#256 review): an UNUSED
+        /tmp with 64M free must not block a run whose LOCAL_CI_TMPDIR and
+        checkout each have 1 GiB — the suggested override cannot clear a verdict
+        that /tmp keeps supplying. The checkout is measured for its own verdict
+        and is never a candidate for the temp base: its empty path would make
+        `max()` choose it, and the constructor would then fall back to the
+        ambient (unmeasured) temp location.
 
         A filesystem too small to be measured (no `df`, no readable mount) is not
         an opinion; an unreadable root is likewise skipped, never treated as full.
         """
         watermark = self.watermark
-        measured = []
+        temp_measured = []
         for path in tmpdir_candidates():
             m = disk_free_kib(path)
             if m is not None:
-                measured.append((path, m[0], m[1]))
+                temp_measured.append((path, m[0], m[1]))
         root = disk_free_kib(str(ROOT))
-        if root is not None:
-            measured.append(("", root[0], root[1]))
-        if not measured:
-            return None, None, None, None
-
-        # The tightest filesystem names the verdict, whatever its role.
-        tightest = min(measured, key=lambda item: item[1])
-        # The temp base is the roomiest candidate WITH room: a tight one still
-        # names the verdict, but the run writes to the base with the most
-        # headroom. A host where nothing has room has no base — the verdict
-        # already says so, and the caller falls back to the ambient temp dir.
-        with_room = [item for item in measured if item[1] >= watermark]
-        chosen = max(with_room, key=lambda item: item[1], default=None)
-
-        if tightest[1] < watermark:
-            _, free, mount = tightest
-            where = "the checkout root" if not tightest[0] else tightest[0]
+        if root is not None and root[0] < watermark:
+            free, mount = root
             verdict = (f"disk full: {mount} has {free // 1024}M free, the gate "
-                       f"needs {watermark // 1024}M ({where}) — free space, or "
-                       "point LOCAL_CI_TMPDIR at a filesystem with headroom")
+                       f"needs {watermark // 1024}M (the checkout root) — free "
+                       "space, or move the checkout to a filesystem with headroom")
             return None, None, None, verdict
-        if chosen is None:
-            # Nothing measured has room (every reading was unreadable or short).
-            return None, None, None, None
-        return chosen[0], chosen[1], chosen[2], None
+
+        # The temp base is the roomiest MEASURED candidate WITH room. A tight
+        # candidate names the verdict only when NO eligible candidate has room.
+        with_room = [item for item in temp_measured if item[1] >= watermark]
+        if with_room:
+            chosen = max(with_room, key=lambda item: item[1])
+            return chosen[0], chosen[1], chosen[2], None
+        if temp_measured:
+            tightest = min(temp_measured, key=lambda item: item[1])
+            _, free, mount = tightest
+            verdict = (f"disk full: {mount} has {free // 1024}M free, the gate "
+                       f"needs {watermark // 1024}M ({tightest[0]}) — free space, "
+                       "or point LOCAL_CI_TMPDIR at a filesystem with headroom")
+            return None, None, None, verdict
+        # No temp filesystem could be measured — no opinion, use the fallback.
+        return None, None, None, None
 
     # --------------------------------------------------------------- sqlite3
 
@@ -1058,8 +1094,11 @@ class HostPreflight:
         directory = os.path.join(self.tmpdir, "sqlite-ffi")
         try:
             os.makedirs(directory, exist_ok=True)
-            os.symlink(self.sqlite_payload,
-                       os.path.join(directory, SQLITE_FFI_NAME))
+            # Absolute target (#256 review): LOCAL_CI_SQLITE_LIB_DIRS may carry
+            # a relative dir; the symlink lives in the private sqlite-ffi dir,
+            # where a relative payload would resolve to nothing.
+            target = os.path.abspath(self.sqlite_payload)
+            os.symlink(target, os.path.join(directory, SQLITE_FFI_NAME))
         except OSError:
             return None
         return directory
@@ -1094,8 +1133,12 @@ class HostPreflight:
                     f"(a real run would abort){RESET}"] + self.culprit_lines()
         lines = []
         if self.tmp_base:
+            # `df` can be unavailable: the free reading is then unknown, and
+            # arithmetic on it used to raise TypeError here (#256 review).
+            free = (f"{self.tmp_free // 1024}M free" if self.tmp_free is not None
+                    else "free space unknown")
             lines.append(f"  tmpdir   : {self.tmp_base} would hold a private "
-                         f"per-run TMPDIR ({self.tmp_free // 1024}M free) — "
+                         f"per-run TMPDIR ({free}) — "
                          "created for a real run, not for a plan")
         if self.sqlite_state == "remedy":
             lines.append(f"  sqlite3  : {SQLITE_FFI_NAME} does not resolve; a "
@@ -1120,8 +1163,12 @@ class HostPreflight:
             note = ("" if self.tmp_base == ambient
                     else f"; the ambient TMPDIR ({os.environ.get('TMPDIR') or 'unset'}) "
                          "is not inherited")
+            # An unmeasurable `df` leaves tmp_free None: report unknown, never
+            # crash in the startup banner before atexit is registered (#256).
+            free = (f"{self.tmp_free // 1024}M free" if self.tmp_free is not None
+                    else "free space unknown")
             lines.append(f"  tmpdir   : {self.tmpdir} "
-                         f"({self.tmp_free // 1024}M free) — private per-run "
+                         f"({free}) — private per-run "
                          f"TMPDIR{note}")
         if self.sqlite_state == "remedy":
             lines.append(
@@ -1735,6 +1782,7 @@ class Runner:
             "env_chain": env_chain or [dict(os.environ)],
             "environ": environ or dict(os.environ),
             "job_ok": self.job_ok,
+            "job_unsoftened": self.job_unsoftened,
         }
 
     # ------------------------------------------------------------- step runner
@@ -1793,10 +1841,10 @@ class Runner:
             self.skip(head, "needs GitHub context: "
                             + ", ".join(sorted(set(probe))[:3]))
             return
-        # The body runs with the values it resolved (#708): claimed here, after
-        # the probe check — a body skipped for unresolvable context must not
-        # report its secret as real either.
-        record_real_secrets(body_hits)
+        # The body's real-secret claim is recorded only AFTER every skip guard
+        # below has passed (#256 review): an apt_step or forbidden-clean skip
+        # must not report a secret as used when the body never executes. The
+        # claim now sits next to the env-hit promotion, at the run boundary.
 
         # An `env:` entry that needed GitHub context is exported EMPTY, never as
         # its literal `${{ … }}` text (forklift#701). Say so on the step, so a
@@ -1827,7 +1875,10 @@ class Runner:
         # ported to the canonical copy by forklift#1011).
         banned = forbidden_clean_commands(body_expanded)
         if banned:
-            self.skip(head, ", ".join(banned)
+            # The body already had secrets substituted before this check, so a
+            # `flutter clean ${{ secrets.TOKEN }}` would put the raw value in
+            # the skip message (and the skipped list) without this mask (#256).
+            self.skip(head, mask_secrets(", ".join(banned))
                       + " is forbidden locally (fleet hard rule) — CI-only step; "
                       "the caches it destroys take 20–30 min to rebuild on this "
                       "shared host, and the follow-up pub get step re-resolves "
@@ -1964,12 +2015,25 @@ class Runner:
         cmd = [shell, *flags, body_expanded]
         # Every skip guard has passed — the child env below is final and a
         # process is about to run with it (or --plan is about to show it). The
-        # env entries' real-secret claims are promoted HERE, not at expansion
-        # time (dart_curl#76 review): a step skipped by its `if:` never
-        # materializes its env, and an entry a later layer overrode with a
-        # literal no longer carries the secret — neither may report it real.
-        for hits in (ctx.get("secret_env_hits") or {}).values():
-            record_real_secrets(hits)
+        # body's AND the env entries' real-secret claims are promoted HERE, not
+        # at expansion time (dart_curl#76 review, #256 review): a step skipped
+        # by `if:`, an apt step, a forbidden clean, or an unresolvable context
+        # never materializes its secret, and an entry a later layer overrode
+        # with a literal no longer carries it — none may report it real.
+        record_real_secrets(body_hits)
+        # Runner-provided values below overwrite `env:` entries of the same
+        # name (#256 review): a secret referenced by RUNNER_TEMP (or a sibling
+        # runner/GITHUB var) never survives into the child, so its hit must not
+        # be promoted as used.
+        runner_overwritten = {
+            "RUNNER_TEMP", "RUNNER_OS", "RUNNER_ARCH", "RUNNER_TOOL_CACHE",
+            "GITHUB_WORKSPACE", "GITHUB_REF_NAME", "GITHUB_EVENT_NAME",
+        }
+        if self.github.get("repository"):
+            runner_overwritten.add("GITHUB_REPOSITORY")
+        for key, hits in (ctx.get("secret_env_hits") or {}).items():
+            if key not in runner_overwritten:
+                record_real_secrets(hits)
 
         if self.args.get("verbose") or self.args.get("plan"):
             where = f" (in {wd})" if wd else ""
@@ -2302,10 +2366,37 @@ def mask_secrets(text):
     ${{ secrets.* }} already substituted, so both must mask (dart_curl#76
     review) — the body echo bypassed the masking before this helper.
     """
-    for v in LOCAL_SECRETS.values():
-        if v and v in text:
-            text = text.replace(v, "***")
-    return text
+    # Find every match against the ORIGINAL text and redact the UNION of their
+    # spans (#256 review): replacing one value at a time mangles overlapping
+    # secrets. With A="abc" and B="abcXYZ", masking A first leaves "***XYZ" —
+    # B no longer matches and its suffix leaks into the log.
+    spans = []
+    for value in LOCAL_SECRETS.values():
+        if not value:
+            continue
+        start = 0
+        while True:
+            i = text.find(value, start)
+            if i < 0:
+                break
+            spans.append((i, i + len(value)))
+            start = i + 1
+    if not spans:
+        return text
+    spans.sort()
+    merged = []
+    for lo, hi in spans:
+        if merged and lo <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], hi))
+        else:
+            merged.append((lo, hi))
+    out, prev = [], 0
+    for lo, hi in merged:
+        out.append(text[prev:lo])
+        out.append("***")
+        prev = hi
+    out.append(text[prev:])
+    return "".join(out)
 
 
 def stream_command(cmd, cwd, env, cap=400_000):
@@ -2485,8 +2576,12 @@ VERSION_RE = re.compile(r"\d+\.\d+(?:\.\d+)*")
 # KILLed after the grace window restores nothing — atexit never runs for a
 # SIGKILL, and unlike the per-run temp tree (#941 has a cache-sweep arm),
 # the protected files have no sweep backstop. Recover by hand there:
-# `git status --porcelain` names them, `git checkout -- pubspec.lock
-# analysis_options.yaml` puts them back.
+# `git status --porcelain` names them. FIRST inspect and save any remaining
+# diff (`git diff -- pubspec.lock analysis_options.yaml`) — the snapshot was of
+# the WORKING-TREE bytes, so unstaged edits that predate the run cannot be
+# recovered from the index at all (#256 review). `git checkout -- pubspec.lock
+# analysis_options.yaml` restores the INDEX version (an option only when that
+# is the version wanted) and can discard edits that survived the kill.
 PROTECTED_NAMES = ("pubspec.lock", "analysis_options.yaml")
 PROTECTED_PRUNE = {".git", ".dart_tool", "build", "node_modules", "Pods"}
 
@@ -2516,13 +2611,43 @@ def snapshot_protected_files(root):
     found, unreadable = {}, set()
     for path in _walk_protected(root):
         try:
-            found[path] = path.read_bytes()
+            if path.is_symlink() and path.exists():
+                # Record the DIRECTORY ENTRY, not its target (#256 review):
+                # a later write_bytes() on a replaced symlink would follow it
+                # and corrupt the target. A broken link stays unreadable — the
+                # restore cannot know its intended content either.
+                found[path] = (os.readlink(path), "link")
+            else:
+                found[path] = (path.read_bytes(), "file")
         except OSError:
             unreadable.add(path)
             print(f"local_ci: WARNING could not read {path} while "
                   "snapshotting — it was NOT snapshotted and will be left "
                   "untouched when this run ends", file=sys.stderr)
     return found, unreadable
+
+
+def _atomic_write_bytes(path, data):
+    """Write `data` to `path` without ever truncating it first (#256 review).
+
+    A plain write_bytes() truncates the destination and then writes; if the
+    write fails (disk full, permissions) the protected file is left empty or
+    partial. Write a temp file BESIDE it and os.replace() only on success, so
+    a failed restore leaves the existing file intact.
+    """
+    tmp = path.with_name(f".{path.name}.local_ci.{os.getpid()}.tmp")
+    try:
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def restore_protected_files(snapshot, root, unreadable=()):
@@ -2539,9 +2664,11 @@ def restore_protected_files(snapshot, root, unreadable=()):
     rewritten = removed = recreated = failed = 0
     seen = set()
     unreadable = set(unreadable)
+    unreadable_seen = set()
     for path in _walk_protected(root):
         seen.add(path)
         if path in unreadable:
+            unreadable_seen.add(path)
             failed += 1
             print(f"local_ci: WARNING could not restore {path} "
                   "(unreadable before the run — left untouched)",
@@ -2549,8 +2676,25 @@ def restore_protected_files(snapshot, root, unreadable=()):
             continue
         try:
             if path in snapshot:
-                if path.read_bytes() != snapshot[path]:
-                    path.write_bytes(snapshot[path])
+                payload, kind = snapshot[path]
+                if path.is_symlink():
+                    # Compare and replace the ENTRY, never its target (#256
+                    # review): a step that swapped a regular file for a link
+                    # must not take the write through to the other file.
+                    same = kind == "link" and os.readlink(path) == payload
+                    if not same:
+                        path.unlink()
+                        if kind == "link":
+                            path.symlink_to(payload)
+                        else:
+                            _atomic_write_bytes(path, payload)
+                        rewritten += 1
+                elif kind == "link":
+                    path.unlink()
+                    path.symlink_to(payload)
+                    rewritten += 1
+                elif path.read_bytes() != payload:
+                    _atomic_write_bytes(path, payload)
                     rewritten += 1
             else:
                 path.unlink()
@@ -2559,11 +2703,23 @@ def restore_protected_files(snapshot, root, unreadable=()):
             failed += 1
             print(f"local_ci: WARNING could not restore {path}",
                   file=sys.stderr)
-    for path, data in snapshot.items():
+    # A path that was unreadable at snapshot time still counts as a failed
+    # restore when a STEP deleted it and the second walk cannot see it (#256
+    # review). Report the original set, not just what the walk happened to
+    # find — without this, "0 failed" can hide a mutation that survived.
+    for path in sorted(unreadable - unreadable_seen):
+        failed += 1
+        print(f"local_ci: WARNING could not restore {path} "
+              "(unreadable before the run — left untouched)",
+              file=sys.stderr)
+    for path, (payload, kind) in snapshot.items():
         if path not in seen:
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(data)
+                if kind == "link":
+                    path.symlink_to(payload)
+                else:
+                    _atomic_write_bytes(path, payload)
                 recreated += 1
             except OSError:
                 failed += 1
@@ -2902,6 +3058,12 @@ def run(args):
               f"{', '.join(SECRETS_MISSING)}, but the ambient environment has "
               "no value for it — it will resolve empty"
               f"{RESET}")
+    if SECRETS_MULTILINE:
+        print(f"  {YELLOW}note     : {', '.join(sorted(set(SECRETS_MULTILINE)))} "
+              "was rejected — a multiline secret cannot be masked across "
+              "streamed output lines; it resolves empty until the runner "
+              "masks across lines"
+              f"{RESET}")
 
     runner = Runner(wf, doc, args)
     runner.github = build_github(guess_slug(), run_git("rev-parse", "--abbrev-ref", "HEAD"),
@@ -2910,14 +3072,20 @@ def run(args):
     runner.host = host
     # The runner's own temp tree lives INSIDE the run's private TMPDIR, so one
     # cleanup removes everything the run created and nothing lands in the shared
-    # /tmp the gate just stopped using.
-    runner.runner_temp = tempfile.mkdtemp(prefix="local_ci_", dir=host.tmpdir)
+    # /tmp the gate just stopped using. A --plan run still must not mkdtemp
+    # (#256 review): it gets a display-only path so runner.temp expands, and the
+    # plan branch below returns before any step would need a real directory.
+    if args["plan"]:
+        runner.runner_temp = str(Path(tempfile.gettempdir()) / "local_ci_plan")
+    else:
+        runner.runner_temp = tempfile.mkdtemp(prefix="local_ci_", dir=host.tmpdir)
 
     # The gate is run under `bounded-command.sh --timeout`, which TERMs and then
     # KILLs the process group on expiry — so `atexit` alone leaks the per-run
     # TMPDIR (forklift#941 review). A signal handler reclaims it on the way out,
     # and the cache sweep carries a `local_ci_*` arm as the backstop for a kill.
-    run_temp_dirs = [host.tmpdir, runner.runner_temp]
+    run_temp_dirs = [host.tmpdir,
+                     None if args["plan"] else runner.runner_temp]
 
     def _reclaim_run_temp(*_a):
         for path in run_temp_dirs:
@@ -2942,7 +3110,34 @@ def run(args):
               "committed tree")
     protected_snapshot = {}
     protected_unreadable = set()
+    checkout_lock = None
     if not args["plan"]:
+        # Two gates in one checkout can interleave snapshot/restore and leave a
+        # step's pubspec.lock behind (#256 review): run 1 snapshots A, run 2
+        # snapshots the mutated B, run 1 restores A, run 2 restores B. Take a
+        # checkout-level, non-blocking flock from here through the atexit
+        # restore; a competing gate REFUSES with an actionable message instead
+        # of waiting forever on a shared host. The OS releases the lock if the
+        # process is killed before its handlers run.
+        try:
+            import fcntl
+        except ImportError:  # a platform without advisory locks: no guard
+            fcntl = None
+        if fcntl is not None:
+            git_dir = ROOT / ".git"
+            lock_path = (git_dir if git_dir.is_dir() else ROOT) / ".local_ci.run.lock"
+            try:
+                checkout_lock = open(lock_path, "a+")
+                fcntl.flock(checkout_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                if checkout_lock is not None:
+                    checkout_lock.close()
+                    checkout_lock = None
+                print(f"{RED}local_ci: another gate is already running in "
+                      f"{ROOT} (lock: {lock_path}). Refusing to start a second "
+                      "run in one checkout — wait for it to finish, then "
+                      f"retry.{RESET}", file=sys.stderr)
+                return 3
         protected_snapshot, protected_unreadable = snapshot_protected_files(ROOT)
         if protected_snapshot:
             print(f"  note     : snapshotted {len(protected_snapshot)} "
