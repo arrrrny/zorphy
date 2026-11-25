@@ -10,11 +10,14 @@
   `@ZorphyIntent`) are the only class annotations, and none carries a codegen
   toggle.
 - **Dependency gate reconciled (#175, #176).** The #176 zero-external-dependency
-  goal is met except for `crypto`, which the SHA-256 intent-digest requirement
-  (#189) needs and the stdlib cannot provide — a reviewed amendment recorded in
-  #175. `collection` is replaced by a local `ListEquality` / `MapEquality`
-  shim (`src/equality.dart`), and the `json_annotation` / `meta` / `quiver`
-  re-exports and dependencies are removed.
+  goal is met except for two runtime requirements recorded as a reviewed
+  amendment in #175: `crypto` (the SHA-256 intent-digest requirement, #189, the
+  stdlib cannot provide) and `json_annotation` (`@JsonKey` is the v3 field-level
+  wire annotation the generator reads by name and the migrator emits — it is
+  re-exported so the documented single `zorphy_annotation` import resolves it).
+  `collection` is replaced by a local `ListEquality` / `MapEquality` shim
+  (`src/equality.dart`); the `meta` / `quiver` re-exports and dependencies are
+  removed.
 
 ### Added
 

@@ -1,3 +1,5 @@
+import 'package:dart_style/dart_style.dart';
+
 import 'model.dart';
 
 /// Renders a [FreezedClassModel] as zorphy v3 source text.
@@ -55,7 +57,15 @@ class ZorphyRenderer {
       case ModelDialect.exchangeableEnum:
         _renderExchangeableEnum(model, sb);
     }
-    return sb.toString().trimRight();
+    // Emit format-clean code: the rendered fragment is the only span the
+    // migrator rewrites, so formatting it (rather than the whole file) keeps
+    // untouched source byte-for-byte while guaranteeing the inserted class is
+    // idiomatic and matches `dart format` (the golden fixtures compare the
+    // migrator's output byte-for-byte and CI runs `dart format --set-exit-if-
+    // changed .`).
+    return DartFormatter(
+      languageVersion: DartFormatter.latestLanguageVersion,
+    ).format(sb.toString()).trimRight();
   }
 
   /// Rewrites a field type for the exchangeable dialect: references to

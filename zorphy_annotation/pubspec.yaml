@@ -8,9 +8,12 @@ environment:
 
 dependencies:
   # `ZorphyIntentDigest` hashes the canonical intent payload with SHA-256
-  # (issue #189). This is the one external dependency the v3 surface keeps:
-  # the #176 zero-dependency gate is reconciled against the SHA-256/runtime
-  # requirement in #175 (a reviewed amendment — see CHANGELOG / #175).
+  # (issue #189). `json_annotation` provides `@JsonKey`, the v3 field-level
+  # wire annotation the generator reads by name (zorphy #88) and the migrator
+  # emits — re-exported so the documented single import resolves it. The
+  # #176 zero-dependency gate is reconciled against these runtime
+  # requirements in #175 (a reviewed amendment — see CHANGELOG / #175).
   crypto: ^3.0.7
+  json_annotation: ^4.12.0
 dev_dependencies:
   test: ^1.33.0

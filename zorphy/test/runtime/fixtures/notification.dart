@@ -116,8 +116,7 @@ sealed class NotificationPatch implements ZorphyPatch<Notification> {
         violations: <FieldViolation>[
           FieldViolation(
             path: '/patchKind',
-            expected:
-                'String (one of: shared, OrderNotification, PriceDropNotification)',
+            expected: 'String (one of: shared, OrderNotification, PriceDropNotification)',
             actual: ZorphyPatchWire.describe(null),
           ),
         ],
@@ -195,8 +194,7 @@ sealed class NotificationPatch implements ZorphyPatch<Notification> {
       violations: <FieldViolation>[
         FieldViolation(
           path: '/patchKind',
-          expected:
-              'String (one of: shared, OrderNotification, PriceDropNotification)',
+          expected: 'String (one of: shared, OrderNotification, PriceDropNotification)',
           actual: ZorphyPatchWire.describe(kind),
         ),
       ],
