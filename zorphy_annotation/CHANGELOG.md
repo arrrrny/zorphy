@@ -88,8 +88,8 @@
   is no longer keyed by `ops`, so a literal map key named `op` or `ops`
   round-trips. `PatchWireSet` is the unambiguous explicit-set spelling and
   `PatchWireReplacement` marks a whole-value nested replacement.
-- `ZorphyNamedConstructor` moved to `src/annotations.dart` — the library URI
-  the generator resolves it from — so the move is source-compatible.
+- `ZorphyNamedConstructor` is removed. No library in this package declares or
+  exports it, so code that uses `@ZorphyNamedConstructor` must be migrated.
 - SDK floor raised to `>=3.11.0` to match what the tracked lockfile resolves
   and what `zorphy` / `zorphy_migrator` already declare. `dartx` dropped: it
   had no reference in this package. The package also gains its first dev
@@ -101,8 +101,9 @@
 - Version synced with `zorphy` 3.0.0. The 3.0.0 breaking change in this
   package is the removal of the legacy annotation surface (see Changed above),
   alongside the generator's shared-part output layout (`lib/_br_/`). Consumers
-  on the pre-v3 surface must run the `zorphy:migrate_v3` codemod before
-  upgrading.
+  on the pre-v3 surface must first set their dependency to `^3.0.0` and run
+  `dart pub get`, then run the `zorphy:migrate_v3` codemod (which ships with
+  v3) before upgrading.
 
 ## [2.5.0] - 2026-11-16
 
