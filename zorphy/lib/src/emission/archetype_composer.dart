@@ -282,7 +282,13 @@ final class ArchetypeComposer {
               leafFieldTypes: {
                 for (final leaf in leaves)
                   leaf.cleanName: {
-                    for (final field in _payloadFields(child))
+                    // The leaf's OWN payload, not the intermediate's: the
+                    // intermediate `apply` dispatches through each leaf's
+                    // `copyWith`, so a leaf that covariantly narrows an
+                    // inherited field must be cast to ITS declared type —
+                    // the same rule `_sharedApplyMethod` follows for the
+                    // root's shared patch.
+                    for (final field in _payloadFields(leaf))
                       field.name: field.isNullable
                           ? '${field.type}?'
                           : field.type,

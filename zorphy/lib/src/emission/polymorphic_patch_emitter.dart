@@ -175,10 +175,11 @@ class PolymorphicPatchEmitter {
   /// algebra. A leaf below it extends THIS patch, so the intermediate's fields
   /// are patchable through the intermediate surface.
   ///
-  /// The intermediate class is abstract (sealed) and has no `copyWith`, so its
-  /// [applyMethodName] dispatches to the concrete leaves under it — the same
-  /// shape the root's shared patch uses — rebuilding each through its own
-  /// `copyWith` while leaving the leaf-only fields untouched.
+  /// The intermediate class is concrete (it is instantiated directly by
+  /// `diff`, the fluent builders, `compose`, `invert` and `fromWire`) and has
+  /// no `copyWith`, so its [applyMethodName] dispatches to the concrete leaves
+  /// under it — the same shape the root's shared patch uses — rebuilding each
+  /// through its own `copyWith` while leaving the leaf-only fields untouched.
   String emitIntermediatePatch({
     required String name,
     required String rootName,

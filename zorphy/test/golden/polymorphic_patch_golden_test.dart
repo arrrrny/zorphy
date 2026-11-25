@@ -50,6 +50,82 @@ String _fixtureRegion(String start, String end) {
   return source.substring(from + start.length, to).trim();
 }
 
+/// A three-level hierarchy whose concrete leaves narrow an inherited field:
+/// `SystemEvent.payload` is `Object`, `DeployEvent.payload` is `String` and
+/// `AlertEvent.payload` is `int`. The intermediate `apply` must dispatch to
+/// each leaf's `copyWith` through the leaf's declared type (#229 §3).
+String _emitIntermediateHierarchy() {
+  return const PolymorphicPatchEmitter().emitIntermediatePatch(
+    name: 'SystemEvent',
+    rootName: 'Event',
+    basePatchName: 'EventPatch',
+    fields: [
+      NameTypeClassComment('id', 'String', ''),
+      NameTypeClassComment('source', 'String', ''),
+      NameTypeClassComment('payload', 'Object', ''),
+    ],
+    sharedFields: const ['id'],
+    leafNames: const ['DeployEvent', 'AlertEvent'],
+    leafFieldTypes: const {
+      'DeployEvent': {'id': 'String', 'source': 'String', 'payload': 'String'},
+      'AlertEvent': {'id': 'String', 'source': 'String', 'payload': 'int'},
+    },
+  );
+}
+
+/// Entity half of the compile probe: the emitted root patch supplies
+/// `EventPatch`, so only the entities live in the fixture.
+const _intermediateEntitiesFixture = r'''
+abstract class Event {
+  const Event({required this.id});
+  final String id;
+}
+
+abstract class SystemEvent extends Event {
+  const SystemEvent({
+    required super.id,
+    required this.source,
+    required this.payload,
+  });
+  final String source;
+  final Object payload;
+}
+
+class DeployEvent extends SystemEvent {
+  const DeployEvent({
+    required super.id,
+    required super.source,
+    required super.payload,
+  });
+  @override
+  String get payload => super.payload as String;
+  DeployEvent copyWith({String? id, String? source, String? payload}) {
+    return DeployEvent(
+      id: id ?? this.id,
+      source: source ?? this.source,
+      payload: payload ?? this.payload,
+    );
+  }
+}
+
+class AlertEvent extends SystemEvent {
+  const AlertEvent({
+    required super.id,
+    required super.source,
+    required super.payload,
+  });
+  @override
+  int get payload => super.payload as int;
+  AlertEvent copyWith({String? id, String? source, int? payload}) {
+    return AlertEvent(
+      id: id ?? this.id,
+      source: source ?? this.source,
+      payload: payload ?? this.payload,
+    );
+  }
+}
+''';
+
 void main() {
   group('ISSUE-009 PolymorphicPatchEmitter — sealed root patch', () {
     test('emits a sealed root patch class', () {
@@ -446,6 +522,74 @@ void main() {
 
       final result = _analyzeEmitted(emitted, _standaloneCollisionsFixture);
       expect(result.exitCode, 0, reason: result.output);
+    });
+  });
+
+  group('ISSUE-0229 PolymorphicPatchEmitter — intermediate patch surface', () {
+    test('emits a concrete patch with its own fields and the full algebra', () {
+      final emitted = _emitIntermediateHierarchy();
+
+      expect(emitted, contains('class SystemEventPatch extends EventPatch'));
+      expect(
+        emitted,
+        isNot(contains('abstract class SystemEventPatch')),
+        reason: 'the intermediate is concrete — diff and the builders use it',
+      );
+      expect(emitted, contains('SystemEventPatch withSource(String value)'));
+      expect(
+        emitted,
+        contains('static SystemEventPatch diff('),
+        reason: 'the intermediate carries the same diff surface as its leaves',
+      );
+      expect(
+        emitted,
+        contains('if (identical(previous, next)) return SystemEventPatch()'),
+      );
+      expect(emitted, contains('if (target is DeployEvent)'));
+      expect(emitted, contains('if (target is AlertEvent)'));
+      // Each leaf's copyWith gets the LEAF's declared payload type, not the
+      // intermediate's wider `Object` — the same narrowing rule the root's
+      // shared apply follows.
+      expect(emitted, contains('as String'));
+      expect(emitted, contains('as int'));
+      expect(emitted, contains('EventPatch compose(covariant EventPatch next)'));
+      expect(emitted, contains('SystemEventPatch invert(Event before)'));
+      expect(emitted, contains("'patchKind': 'SystemEvent'"));
+      expect(emitted, contains('static ZorphyBoundaryResult<SystemEventPatch> fromWire('));
+    });
+
+    test('the intermediate emission compiles against the annotation library', () {
+      final emitted = [
+        const PolymorphicPatchEmitter().emitRoot(
+          rootName: 'Event',
+          fields: [NameTypeClassComment('id', 'String', '')],
+          subtypeNames: const ['DeployEvent', 'AlertEvent'],
+        ),
+        _emitIntermediateHierarchy(),
+      ].join('\n\n');
+
+      final result = _analyzeEmitted(emitted, _intermediateEntitiesFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+
+    test('the runtime fixture carries the exact emitted intermediate patch', () {
+      final source = File('test/runtime/fixtures/intermediate.dart')
+          .readAsStringSync();
+      final from = source.indexOf('// GOLDEN-POLY-INTERMEDIATE-START');
+      final to = source.indexOf('// GOLDEN-POLY-INTERMEDIATE-END');
+      expect(from, isNot(-1));
+      expect(to, isNot(-1));
+      final region = source
+          .substring(from + '// GOLDEN-POLY-INTERMEDIATE-START'.length, to)
+          .trim();
+      expect(
+        region,
+        _emitIntermediateHierarchy().trim(),
+        reason:
+            'the runtime suite must exercise the real emitted intermediate '
+            'patch — regenerate test/runtime/fixtures/intermediate.dart if '
+            'the emission changed on purpose',
+      );
     });
   });
 
