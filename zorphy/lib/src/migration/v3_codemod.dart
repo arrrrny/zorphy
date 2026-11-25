@@ -27,12 +27,21 @@
 /// The transform is span-based over the analyzer's parse tree (the same
 /// approach `zorphy_migrator` uses): only the matched annotation / method-name
 /// spans are replaced, so file order, comments and unrelated code survive
-/// untouched. A file with no v2 construct is returned byte-for-byte unchanged.
+/// untouched. The stale v2 part directives go with it (#249):
+/// `PartDirectiveCleaner` strips every `part '*.zorphy.dart';` (v3's shared
+/// part is attached by build_runner itself), drops the migrated file's
+/// `part '*.g.dart';` unless it declares its own `@JsonSerializable` classes
+/// (which get exactly one clean directive back), and reports the removed
+/// URIs so the CLI can delete the stale `.zorphy.dart` files under `--apply`.
+/// A file with no v2 construct and no stale part is returned byte-for-byte
+/// unchanged.
 library;
 
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+
+import 'part_directive_cleaner.dart';
 
 /// One source-span replacement (`[start, end)` -> [text]).
 class _Span {
@@ -139,8 +148,13 @@ class V3Codemod {
     return edges;
   }
 
-  /// Returns [source] with every v2 construct migrated to v3.
-  String transform(String source) {
+  /// Returns [source] with every v2 construct migrated to v3 and the stale
+  /// v2 part directives stripped (#249).
+  ///
+  /// [fileName] is the library file's own name (`user.dart`); it names the
+  /// clean `part '<name>.g.dart';` restored for a file that declares its own
+  /// `@JsonSerializable` classes.
+  String transform(String source, {String? fileName}) {
     final unit = _parse(source);
     if (unit == null) return source;
 
@@ -158,10 +172,19 @@ class V3Codemod {
     );
     _collectCodecs(unit, source, types, variables, spans);
 
-    if (spans.isNotEmpty) _collectStaleJsonParts(unit, spans);
-
-    if (spans.isEmpty) return source;
-    return _apply(source, spans);
+    // Spans apply to the ORIGINAL source; the cleaner then re-parses the
+    // rewritten text, so its directive offsets stay valid. The json part is
+    // stripped only from a file the codemod actually migrated — an unrelated
+    // json_serializable file passes through untouched.
+    final migrated = spans.isEmpty ? source : _apply(source, spans);
+    final cleaned = PartDirectiveCleaner.clean(
+      PartDirectiveCleanArg(
+        source: migrated,
+        libraryFileName: fileName,
+        stripJsonParts: spans.isNotEmpty,
+      ),
+    );
+    return cleaned.source;
   }
 
   static CompilationUnit? _parse(String source) {
@@ -393,26 +416,6 @@ class V3Codemod {
             ),
           );
         }
-      }
-    }
-  }
-
-  /// Drops a v2 file's `part '*.g.dart';` directive once its zorphy classes are
-  /// migrated: v3 emits wire codecs instead of `@JsonSerializable`, so that
-  /// part would be a dangling URI in the generated consumer (#235). A file
-  /// that still declares its own `@JsonSerializable` classes keeps its part.
-  static void _collectStaleJsonParts(CompilationUnit unit, List<_Span> spans) {
-    for (final declaration in unit.declarations) {
-      if (declaration is! ClassDeclaration) continue;
-      for (final meta in declaration.metadata) {
-        if (meta.name.name == 'JsonSerializable') return;
-      }
-    }
-    for (final directive in unit.directives) {
-      if (directive is! PartDirective) continue;
-      final uri = directive.uri.stringValue;
-      if (uri != null && uri.endsWith('.g.dart')) {
-        spans.add(_Span(directive.offset, directive.end, ''));
       }
     }
   }

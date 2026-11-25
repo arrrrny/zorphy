@@ -1369,7 +1369,11 @@ zorphy build --clean
   `adds_to_library: true`, so `build_runner` emits a single
   `<library>.part.dart` per annotated library and inserts the `part`
   directive itself. Delete any hand-written `part '*.zorphy.dart';` line and
-  the 2.x `<file>.zorphy.dart` files, then rebuild. (2.x wrote one
+  the 2.x `<file>.zorphy.dart` files, then rebuild — or let
+  `dart run zorphy:migrate_v3 <path> --apply` do both: it strips the stale
+  directives (and the `part '*.g.dart';` of migrated files that declare no
+  own `@JsonSerializable` classes) and deletes the stale files; the dry run
+  lists them. (2.x wrote one
   `<file>.zorphy.dart` beside every source file; that layout is gone, and
   build_runner 2.17 removed `--delete-conflicting-outputs` — passing it is
   ignored with a warning, so the stale files are yours to delete.) Each
@@ -1442,7 +1446,8 @@ If you get type not found errors, ensure:
 2. You removed any leftover `part 'filename.zorphy.dart';` line and any stale
    `filename.zorphy.dart` from the 2.x layout — 3.0 no longer writes per-file
    generated libraries, and `build_runner` adds the shared-part directive
-   itself
+   itself; `dart run zorphy:migrate_v3 <path> --apply` strips the directives
+   and deletes the stale files for you
 3. The import includes `package:zorphy_annotation/zorphy_annotation.dart`
 
 ### Generic Type Issues
