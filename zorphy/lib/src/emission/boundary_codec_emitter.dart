@@ -119,10 +119,30 @@ enum _Shape {
 /// (ISSUE-003/#178 emits `fromTrusted`); a test or an alternative class shape
 /// can pin its own and keep the codec unchanged.
 class BoundaryCodecEmitter {
-  /// The trusted constructor each leaf's `fromWire` calls.
-  final String trustedConstructor;
+  /// The trusted constructor each leaf's `fromWire` calls, `fromTrusted` by
+  /// default (ISSUE-003/#178 emits it).
+  ///
+  /// `null` names NO constructor: the leaf decode then constructs through the
+  /// class's plain (unnamed) generative constructor — the shape the intent
+  /// surface emits (`IntentEmitter`), which carries no `fromTrusted` (#232).
+  final String? trustedConstructor;
 
-  const BoundaryCodecEmitter({this.trustedConstructor = 'fromTrusted'});
+  /// Whether a `num` field widens to `double` on decode.
+  ///
+  /// The entity/value codec widens: a JSON hop spells `1.0` as `1`, so encode
+  /// and decode must agree on `double` or the round trip truncates. An intent
+  /// codec must NOT: `ZorphyIntentDigest` keeps the int `2` and the double
+  /// `2.0` distinct by contract, so widening an int into a double would change
+  /// the digest across `fromWire(intent.toWire())` — and #232's acceptance
+  /// gate pins digest stability across exactly that round trip. A `double`
+  /// field still widens (only a JSON hop delivers an `int` where a `double`
+  /// was written, and widening restores the written value).
+  final bool widenNumbers;
+
+  const BoundaryCodecEmitter({
+    this.trustedConstructor = 'fromTrusted',
+    this.widenNumbers = true,
+  });
 
   // ── Public API ────────────────────────────────────────────────────
 
@@ -389,11 +409,19 @@ class BoundaryCodecEmitter {
     body.add(
       Code(
         'return BoundaryOk<$clean>('
-        '$clean.$trustedConstructor($arguments));',
+        '${_constructorCall(clean, arguments)});',
       ),
     );
     return body;
   }
+
+  /// The constructor call a leaf decode builds its value with: through
+  /// [trustedConstructor] when one is named, otherwise the plain generative
+  /// constructor (`IntentEmitter`'s intent classes, #232).
+  String _constructorCall(String clean, String arguments) =>
+      trustedConstructor == null
+      ? '$clean($arguments)'
+      : '$clean.$trustedConstructor($arguments)';
 
   /// The statements that read one field off `raw`, bind it to a local, and
   /// record a violation instead of throwing when the shape is wrong.
@@ -747,7 +775,9 @@ class BoundaryCodecEmitter {
   _Shape _shapeOfType(String type, {Set<String>? known}) {
     final base = _strip(type);
     if (base == 'DateTime') return _Shape.dateTime;
-    if (base == 'double' || base == 'num') return _Shape.number;
+    if (base == 'double' || (widenNumbers && base == 'num')) {
+      return _Shape.number;
+    }
     if (base.startsWith('List<')) return _Shape.list;
     if (base.startsWith('Map<')) return _Shape.map;
     if (known != null && known.contains(base)) return _Shape.node;

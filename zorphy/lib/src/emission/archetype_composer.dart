@@ -28,8 +28,13 @@
 ///   work). State/value/union hierarchies get no patch: nothing in the
 ///   composed surface references one.
 /// - **intent** — [IntentEmitter] alone: it emits its own class declarations
-///   (a second class emitter would duplicate every intent class), and its
-///   `toWire` would collide with the codec's.
+///   (a second class emitter would duplicate every intent class) and its own
+///   `toWire`/`fromWire` — the fromWire through the shared
+///   [BoundaryCodecEmitter] with the intent constructor (#232) — so the
+///   composer's codec loop must stay closed to intent roots or every intent
+///   class would be declared twice. The composer still hands the codec the
+///   intent NAMES as known nodes (#232): an intent-typed field on an entity
+///   decodes through `<Intent>.fromWire` and encodes through its `toWire`.
 ///
 /// The output is a PART-FILE BODY: directive-free source the owning library
 /// composes into its shared part. The fragment names `ZorphyEntityBase`,
@@ -69,46 +74,47 @@ final class ArchetypeComposer {
             root.typeParameters.isEmpty)
           root,
     ];
-    if (codecRoots.isNotEmpty) {
-      final ownFields = _ownFields(ir);
-      final payloads = _payloads(ir);
-      // A node under a generic ancestor is pruned WITH that ancestor: the
-      // class emitter and the codec never declare its surface, so a field
-      // naming it must not be classified as a nested node either.
-      bool underGeneric(ZorphyNodeIr node) {
-        if (node.typeParameters.isNotEmpty) return true;
-        for (final ancestor in node.superTypes) {
-          if (underGeneric(ancestor)) return true;
-        }
-        return false;
+    final intentRoots = <ZorphyNodeIr>[
+      for (final root in ir.roots)
+        if (root.archetype == ArchetypeKind.intent) root,
+    ];
+    final payloads = _payloads(ir);
+    // A node under a generic ancestor is pruned WITH that ancestor: the
+    // class emitter and the codec never declare its surface, so a field
+    // naming it must not be classified as a nested node either.
+    bool underGeneric(ZorphyNodeIr node) {
+      if (node.typeParameters.isNotEmpty) return true;
+      for (final ancestor in node.superTypes) {
+        if (underGeneric(ancestor)) return true;
       }
+      return false;
+    }
 
-      // Intent names are deliberately NOT known nodes for the codec: intents
-      // are emitted by [IntentEmitter], which provides `toWire`/`intentDigest`
-      // but no `fromWire`. Classifying an intent-typed field as a nested node
-      // would make the codec emit `<Intent>.fromWire(...)`, which does not
-      // exist in the generated library. An intent value therefore travels as
-      // a plain field on the wire, as it does in `IntentEmitter.toWire`.
-      // Generic-subtree nodes are excluded for the same fail-closed reason as
-      // the patch and mock surfaces: `PolymorphicClassEmitter` declares no
-      // type parameters and the codec would emit `_boundaryAs<T>` with an
-      // unbound `T`. A generic root (and its subtree) is not composed at all,
-      // so a field naming it must not be classified as a nested node either.
-      final knownNodes = <String>{
-        for (final node in ir.nodes.values)
-          if (node.archetype != ArchetypeKind.intent && !underGeneric(node))
-            node.cleanName,
-      };
-      // A composed field may not NAME a pruned node: with the name absent
-      // from [knownNodes] the codec would classify the field as a scalar and
-      // write the raw object onto the wire — silently, because nothing fails
-      // to compile. Refuse the generation loudly instead, the way the patch
-      // surface refuses a root with no concrete subtypes.
-      final prunedNames = <String>{
-        for (final node in ir.nodes.values)
-          if (node.archetype != ArchetypeKind.intent && underGeneric(node))
-            node.cleanName,
-      };
+    // Every emitted class IS a codec node now (#232): the non-intent
+    // hierarchies carry the codec's `fromWire`/`toWire`, and the intent
+    // hierarchies carry `IntentEmitter`'s own `toWire` plus the `fromWire`
+    // it emits through the shared codec — so an intent-typed field decodes
+    // and encodes through the intent's boundary surface instead of
+    // travelling as an unvalidated raw wire value. Generic-subtree nodes are
+    // excluded for the fail-closed reason documented on the pruned set: the
+    // emitted surfaces declare no type parameters, and a codec would emit
+    // `_boundaryAs<T>` with an unbound `T`. A generic root (and its subtree)
+    // is not composed at all, so a field naming it must not be classified as
+    // a nested node either.
+    final knownNodes = <String>{
+      for (final node in ir.nodes.values)
+        if (!underGeneric(node)) node.cleanName,
+    };
+    // A composed field may not NAME a pruned node: with the name absent
+    // from [knownNodes] the codec would classify the field as a scalar and
+    // write the raw object onto the wire — silently, because nothing fails
+    // to compile. Refuse the generation loudly instead, the way the patch
+    // surface refuses a root with no concrete subtypes.
+    final prunedNames = <String>{
+      for (final node in ir.nodes.values)
+        if (underGeneric(node)) node.cleanName,
+    };
+    if (codecRoots.isNotEmpty) {
       for (final root in codecRoots) {
         for (final node in _walk(root)) {
           for (final field in node.fields) {
@@ -126,6 +132,7 @@ final class ArchetypeComposer {
         }
       }
       const codec = BoundaryCodecEmitter();
+      final ownFields = _ownFields(ir);
       var firstRoot = true;
       for (final root in codecRoots) {
         final extraMethods = <String, List<Method>>{
@@ -152,29 +159,43 @@ final class ArchetypeComposer {
         }
         fragments.add(MockFixtureEmitter().emit(root));
       }
-      // The codec's shared helpers are emitted ONCE per library — a second
-      // copy is a duplicate-definition error — and only the helpers this
-      // library's field shapes actually call, or the unreferenced ones are
-      // `unused_element` warnings in the consumer's analysis.
+    }
+
+    // Intent hierarchies emit their own class surface (see the library doc) —
+    // now WITH the validated `fromWire` (#232) — plus their mock-first
+    // fixtures: deterministic `<Intent>MockData` seeds across every concrete
+    // leaf and `<Intent>WireFixtures.validMap/corruptMaps`, the same surface
+    // every non-intent root already receives.
+    final intents = IntentEmitter().emitIntents(ir);
+    if (intents.isNotEmpty) fragments.add(intents);
+    for (final root in intentRoots) {
+      fragments.add(MockFixtureEmitter().emit(root));
+    }
+
+    // The codec's shared helpers are emitted ONCE per library — a second
+    // copy is a duplicate-definition error — and only the helpers the
+    // library's field shapes actually call, or the unreferenced ones are
+    // `unused_element` warnings in the consumer's analysis. Every node that
+    // RECEIVES a codec counts: the non-intent hierarchies and, since #232,
+    // the intent hierarchies whose `fromWire` calls the same helpers (their
+    // fields are the resolver's canonical JSON allowlist, so `DateTime`
+    // — rejected by ZORPHY_E004 before any emission — can never select
+    // `_boundaryDateTime` from here).
+    final codecNodes = <ZorphyNodeIr>[
+      ...codecRoots.expand(_walk),
+      ...intentRoots.expand(_walk),
+    ];
+    if (codecNodes.isNotEmpty) {
       fragments.add(
         ZorphyEmitter().emitSpecs(
-          // Select helpers only from the nodes that actually receive codecs.
-          // Passing every IR node lets an intent's (or a skipped generic
-          // node's) `DateTime` field select `_boundaryDateTime` even though
-          // no emitted codec calls it — an `unused_element` warning in the
-          // consumer, exactly what the guard above exists to prevent.
           BoundaryCodecEmitter.usedHelperSpecs(
-            codecRoots.expand(_walk),
+            codecNodes,
             payloads,
             additionalNodes: knownNodes,
           ),
         ),
       );
     }
-
-    // Intent hierarchies emit their own class surface (see the library doc).
-    final intents = IntentEmitter().emitIntents(ir);
-    if (intents.isNotEmpty) fragments.add(intents);
 
     return fragments.where((fragment) => fragment.isNotEmpty).join('\n\n');
   }
