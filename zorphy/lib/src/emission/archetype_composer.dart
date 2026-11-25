@@ -207,12 +207,22 @@ final class ArchetypeComposer {
       ...intentRoots.expand(_walk),
     ];
     if (codecNodes.isNotEmpty) {
+      // Intent decoders disable numeric widening (#232), so their `num`
+      // fields select `_boundaryAs<num>` rather than `_boundaryDouble`.
+      // Tell helper selection which nodes those are: classifying every node
+      // with the entity/value configuration would omit `_boundaryAs` from a
+      // library whose only numeric field is an intent's (#242 review).
+      final noWidenClassNames = {
+        for (final node in codecNodes)
+          if (node.archetype == ArchetypeKind.intent) node.className,
+      };
       fragments.add(
         ZorphyEmitter().emitSpecs(
           BoundaryCodecEmitter.usedHelperSpecs(
             codecNodes,
             payloads,
             additionalNodes: knownNodes,
+            noWidenClassNames: noWidenClassNames,
           ),
         ),
       );

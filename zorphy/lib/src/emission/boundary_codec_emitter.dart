@@ -231,16 +231,27 @@ class BoundaryCodecEmitter {
     Iterable<ZorphyNodeIr> nodes,
     Map<String, List<BoundaryField>> fields, {
     Set<String> additionalNodes = const {},
+    /// Class names whose decoder disables numeric widening (intents, #232).
+    ///
+    /// An intent's `num` decodes value-exact via `_boundaryAs<num>` while an
+    /// entity/value `num` widens via `_boundaryDouble`; helper selection must
+    /// use the SAME configuration as the decoder that calls it, or a
+    /// standalone numeric intent references a `_boundaryAs` that was never
+    /// emitted (#242 review).
+    Set<String> noWidenClassNames = const {},
   }) {
     const emitter = BoundaryCodecEmitter();
+    const noWidenEmitter = BoundaryCodecEmitter(widenNumbers: false);
     final shapes = <_Shape>{};
     final elementShapes = <_Shape>{};
     var hasDispatch = false;
     for (final node in nodes) {
+      final activeEmitter =
+          noWidenClassNames.contains(node.className) ? noWidenEmitter : emitter;
       if (!node.isConcreteLeaf) hasDispatch = true;
-      final known = emitter._known(node, additionalNodes);
+      final known = activeEmitter._known(node, additionalNodes);
       for (final field in fields[node.className] ?? const <BoundaryField>[]) {
-        final type = emitter._classify(field, known);
+        final type = activeEmitter._classify(field, known);
         shapes.add(type.shape);
         // `elementShape` defaults to scalar for a non-collection field, so it
         // only names a real decode path for a list/map.
@@ -580,9 +591,10 @@ class BoundaryCodecEmitter {
     required String assign,
   }) {
     final variable = 'element_$suffix';
+    final List<Code> body;
     switch (elementShape) {
       case _Shape.node:
-        return [
+        body = [
           Code(
             '    final $variable = '
             '_boundaryObject($element, $pathVar, violations);',
@@ -597,7 +609,7 @@ class BoundaryCodecEmitter {
           const Code('    }'),
         ];
       case _Shape.dateTime:
-        return [
+        body = [
           Code(
             '    final $variable = '
             '_boundaryDateTime($element, $pathVar, violations);',
@@ -605,7 +617,7 @@ class BoundaryCodecEmitter {
           Code('    if ($variable != null) { $assign }'),
         ];
       case _Shape.number:
-        return [
+        body = [
           Code(
             '    final $variable = '
             '_boundaryDouble($element, $pathVar, violations);',
@@ -617,7 +629,7 @@ class BoundaryCodecEmitter {
       case _Shape.scalar:
         // A nested collection or a plain scalar: the reified `is` test keeps
         // the read total (a mismatch is a violation, never a cast).
-        return [
+        body = [
           Code(
             '    final $variable = '
             '_boundaryAs<$elementType>($element, $pathVar, violations);',
@@ -625,6 +637,20 @@ class BoundaryCodecEmitter {
           Code('    if ($variable != null) { $assign }'),
         ];
     }
+
+    // A nullable element/value type accepts a wire `null` as a genuine
+    // `null`, so the entry must be KEPT, not skipped by the decode guard
+    // below (#242 review — `['a', null]` used to decode to `['a']`, changing
+    // an intent's digest across `fromWire(intent.toWire())`). Short-circuit
+    // BEFORE calling any helper so a legitimate null records no violation;
+    // a wrong-typed NON-null value still takes the decode path and reports
+    // one. Non-nullable element types keep the current violation for null.
+    if (!elementType.trim().endsWith('?')) return body;
+    return [
+      Code('    if ($element == null) { ${assign.replaceAll(variable, 'null')} } else {'),
+      ...body,
+      const Code('    }'),
+    ];
   }
 
   List<Code> _leafToWireBody(

@@ -143,6 +143,14 @@ abstract class \$Checkout {
   String get id;
   \$ProductIntent? get pending;
 }
+
+// #242 review: nullable collection elements/values must survive the wire
+// round trip instead of being dropped by the decode guard.
+@ZorphyIntent(replaySafe: false)
+abstract class \$NullableCollectionsIntent {
+  List<String?>? get items;
+  Map<String, String?>? get labels;
+}
 ''';
 
 Map<String, String> _lines(String out) => {
@@ -498,6 +506,78 @@ void main() {
       expect(lines['pendingProduct'], 'p-9');
       expect(lines['pendingDigestSame'], 'true');
       expect(lines['corruptErr'], 'true');
+    });
+  });
+
+  group('#242 — review findings', () {
+    test('a standalone numeric intent gets its value-exact helper', () async {
+      // The composed program must COMPILE: with helper selection using the
+      // entity/value (widening) config for every node, a `num`-only intent
+      // referenced `_boundaryAs<num>` without the helper being emitted. A
+      // DEDICATED fixture (no scalar fields) isolates that selection — the
+      // shared fixture's `String` fields would emit `_boundaryAs` anyway.
+      final numericSource = '''
+$_annotationImport
+part 'intents.zorphy.dart';
+
+@ZorphyIntent(replaySafe: true)
+abstract class \$AmountIntent {
+  num get amount;
+}
+''';
+      final numericIr = await _resolve({'intents.dart': numericSource});
+      final out = await _runComposed(
+        numericIr,
+        {'intents.dart': numericSource},
+        '''
+  final amount = AmountIntent(amount: 2);
+  final back = AmountIntent.fromWire(amount.toWire());
+  stdout.writeln('ok=' + (back is BoundaryOk).toString());
+  if (back is BoundaryOk<AmountIntent>) {
+    stdout.writeln('amount=' + back.value.amount.toString());
+    stdout.writeln('intExact=' + (back.value.amount is int).toString());
+    stdout.writeln('digestSame=' +
+        (back.value.intentDigest() == amount.intentDigest()).toString());
+  }
+''',
+      );
+
+      final lines = _lines(out);
+      expect(lines['ok'], 'true');
+      expect(lines['amount'], '2');
+      expect(
+        lines['intExact'],
+        'true',
+        reason: 'widenNumbers:false keeps the int 2 distinct from 2.0',
+      );
+      expect(lines['digestSame'], 'true');
+    });
+
+    test('nullable list/map elements survive the round trip', () async {
+      final out = await _runComposed(
+        ir,
+        {'intents.dart': _fixtures},
+        '''
+  final value = NullableCollectionsIntent(
+    items: ['a', null, 'c'],
+    labels: {'k': null, 'v': 'x'},
+  );
+  final back = NullableCollectionsIntent.fromWire(value.toWire());
+  stdout.writeln('ok=' + (back is BoundaryOk).toString());
+  if (back is BoundaryOk<NullableCollectionsIntent>) {
+    stdout.writeln('items=' + back.value.items.toString());
+    stdout.writeln('labels=' + back.value.labels.toString());
+    stdout.writeln('digestSame=' +
+        (back.value.intentDigest() == value.intentDigest()).toString());
+  }
+''',
+      );
+
+      final lines = _lines(out);
+      expect(lines['ok'], 'true');
+      expect(lines['items'], '[a, null, c]');
+      expect(lines['labels'], '{k: null, v: x}');
+      expect(lines['digestSame'], 'true');
     });
   });
 }
