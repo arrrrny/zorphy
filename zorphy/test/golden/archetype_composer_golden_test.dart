@@ -231,9 +231,72 @@ void main() {
           contains('Leaf'),
           reason: 'the non-generic leaf still composes',
         );
-        expect(emitted, isNot(contains('\$Box')));
+        // The class emitter names emitted classes by their clean name, so
+        // the pruned leaf would appear as `class Box` — assert that spelling.
+        expect(emitted, isNot(contains('class Box')));
         expect(emitted, isNot(contains("'box'")));
       },
     );
+
+    test('a field naming a pruned generic node fails generation loudly', () {
+      final root = _node(
+        name: 'Shelf',
+        isRoot: true,
+        fields: const [ZorphyFieldIr(name: 'boxes', type: 'List<Box>')],
+      );
+      final generic = _node(
+        name: 'Box',
+        isRoot: true,
+        typeParameters: const ['T'],
+        fields: const [ZorphyFieldIr(name: 'value', type: 'T')],
+      );
+      final ir = PolymorphicIr(
+        nodes: {'\$Shelf': root, '\$Box': generic},
+        roots: [root, generic],
+        diagnostics: const [],
+      );
+
+      // With the pruned name absent from the codec's known-node set the
+      // field would classify as a scalar and the raw object would reach the
+      // wire silently; the composer must refuse the generation instead.
+      expect(() => const ArchetypeComposer().compose(ir), throwsArgumentError);
+    });
+
+    test('a non-generic descendant of a generic node is not a codec node', () {
+      final root = _node(
+        name: 'Node',
+        isRoot: true,
+        fields: const [
+          ZorphyFieldIr(name: 'id', type: 'String'),
+          ZorphyFieldIr(name: 'leaf', type: 'Leaf'),
+        ],
+      );
+      final generic = _node(
+        name: 'Box',
+        typeParameters: const ['T'],
+        fields: const [ZorphyFieldIr(name: 'value', type: 'T')],
+        superTypes: [root],
+      );
+      final leaf = _node(
+        name: 'Leaf',
+        superTypes: [generic],
+        fields: const [ZorphyFieldIr(name: 'tag', type: 'String')],
+      );
+      final wiredRoot = root.copyWith(
+        directSubTypes: [generic],
+        isConcreteLeaf: false,
+      );
+      final ir = PolymorphicIr(
+        nodes: {'\$Node': wiredRoot, '\$Box': generic, '\$Leaf': leaf},
+        roots: [wiredRoot],
+        diagnostics: const [],
+      );
+
+      // `Leaf` carries no type parameters of its own but hangs under the
+      // generic `Box`, so no codec is emitted for it: classifying a field
+      // named `Leaf` as a nested node would emit a `fromWire` that does not
+      // exist. The field must refuse the generation (see the guard above).
+      expect(() => const ArchetypeComposer().compose(ir), throwsArgumentError);
+    });
   });
 }

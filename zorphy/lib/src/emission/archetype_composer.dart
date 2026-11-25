@@ -72,23 +72,59 @@ final class ArchetypeComposer {
     if (codecRoots.isNotEmpty) {
       final ownFields = _ownFields(ir);
       final payloads = _payloads(ir);
+      // A node under a generic ancestor is pruned WITH that ancestor: the
+      // class emitter and the codec never declare its surface, so a field
+      // naming it must not be classified as a nested node either.
+      bool underGeneric(ZorphyNodeIr node) {
+        if (node.typeParameters.isNotEmpty) return true;
+        for (final ancestor in node.superTypes) {
+          if (underGeneric(ancestor)) return true;
+        }
+        return false;
+      }
+
       // Intent names are deliberately NOT known nodes for the codec: intents
       // are emitted by [IntentEmitter], which provides `toWire`/`intentDigest`
       // but no `fromWire`. Classifying an intent-typed field as a nested node
       // would make the codec emit `<Intent>.fromWire(...)`, which does not
       // exist in the generated library. An intent value therefore travels as
       // a plain field on the wire, as it does in `IntentEmitter.toWire`.
-      // Generic nodes are excluded for the same fail-closed reason as the
-      // patch and mock surfaces: `PolymorphicClassEmitter` declares no type
-      // parameters and the codec would emit `_boundaryAs<T>` with an
+      // Generic-subtree nodes are excluded for the same fail-closed reason as
+      // the patch and mock surfaces: `PolymorphicClassEmitter` declares no
+      // type parameters and the codec would emit `_boundaryAs<T>` with an
       // unbound `T`. A generic root (and its subtree) is not composed at all,
       // so a field naming it must not be classified as a nested node either.
       final knownNodes = <String>{
         for (final node in ir.nodes.values)
-          if (node.archetype != ArchetypeKind.intent &&
-              node.typeParameters.isEmpty)
+          if (node.archetype != ArchetypeKind.intent && !underGeneric(node))
             node.cleanName,
       };
+      // A composed field may not NAME a pruned node: with the name absent
+      // from [knownNodes] the codec would classify the field as a scalar and
+      // write the raw object onto the wire — silently, because nothing fails
+      // to compile. Refuse the generation loudly instead, the way the patch
+      // surface refuses a root with no concrete subtypes.
+      final prunedNames = <String>{
+        for (final node in ir.nodes.values)
+          if (node.archetype != ArchetypeKind.intent && underGeneric(node))
+            node.cleanName,
+      };
+      for (final root in codecRoots) {
+        for (final node in _walk(root)) {
+          for (final field in node.fields) {
+            if (prunedNames.contains(_wireTypeBase(field.type))) {
+              throw ArgumentError.value(
+                field.type,
+                '${node.cleanName}.${field.name}',
+                '${_wireTypeBase(field.type)} sits inside a generic subtree '
+                    'the composer does not emit, so the codec has no wire '
+                    'surface for it. Narrow the field to a non-generic type '
+                    'or move it out of the composed hierarchy.',
+              );
+            }
+          }
+        }
+      }
       const codec = BoundaryCodecEmitter();
       var firstRoot = true;
       for (final root in codecRoots) {
@@ -291,6 +327,23 @@ final class ArchetypeComposer {
     for (final child in root.directSubTypes) {
       yield* _walk(child);
     }
+  }
+
+  /// The bare class name a field's declared type may reference, for the
+  /// pruned-node guard: nullability stripped, a `List<T>`'s element and a
+  /// `Map<K, V>`'s value unwrapped one level (the shapes `_classify`
+  /// recurses into), everything else taken as written.
+  String _wireTypeBase(String type) {
+    var base = type;
+    if (base.endsWith('?')) base = base.substring(0, base.length - 1);
+    if (base.startsWith('List<') && base.endsWith('>')) {
+      base = base.substring(5, base.length - 1);
+    } else if (base.startsWith('Map<') && base.endsWith('>')) {
+      final arguments = base.substring(4, base.length - 1).split(', ');
+      base = arguments.length == 2 ? arguments[1] : base;
+    }
+    if (base.endsWith('?')) base = base.substring(0, base.length - 1);
+    return base;
   }
 
   /// Each node's OWN declared fields, keyed by `className` — the shape
