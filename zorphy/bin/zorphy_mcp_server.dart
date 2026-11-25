@@ -118,7 +118,8 @@ List<Map<String, dynamic>> _getTools() {
   return [
     {
       'name': 'create_entity',
-      'description': 'Create a Zorphy entity in lib/src/domain/entities/entity_snake/entity_snake.dart',
+      'description':
+          'Create a Zorphy entity in lib/src/domain/entities/entity_snake/entity_snake.dart',
       'inputSchema': {
         'type': 'object',
         'properties': {
@@ -539,10 +540,9 @@ String _toSnakeCase(String text) {
 
 Set<String> _extractTypeRefs(String type) {
   type = type.replaceAll('?', '');
-  return RegExp(r'\$*[A-Z][a-zA-Z0-9]*')
-      .allMatches(type)
-      .map((m) => m.group(0)!)
-      .toSet();
+  return RegExp(
+    r'\$*[A-Z][a-zA-Z0-9]*',
+  ).allMatches(type).map((m) => m.group(0)!).toSet();
 }
 
 bool _isPrimitive(String type) {

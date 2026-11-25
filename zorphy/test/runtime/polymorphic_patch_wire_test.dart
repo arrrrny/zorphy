@@ -182,8 +182,9 @@ void main() {
     test('the shared envelope reaches every subtype after a round-trip', () {
       final readAt = DateTime.utc(2026, 11, 22, 10);
       final patch = NotificationPatch.shared(readAt: PatchValue.set(readAt));
-      final decoded = NotificationPatch.fromWire(patch.toEnvelope())
-          .getOrThrow();
+      final decoded = NotificationPatch.fromWire(
+        patch.toEnvelope(),
+      ).getOrThrow();
 
       final notifications = <Notification>[
         const OrderNotification(id: 'o1', itemCount: 2),
@@ -226,8 +227,9 @@ void main() {
       final readAt = DateTime.utc(2026, 11, 22, 10);
       final patch = OrderNotificationPatch(readAt: PatchValue.set(readAt));
 
-      final decoded = NotificationPatch.fromWire(patch.toEnvelope())
-          .getOrThrow();
+      final decoded = NotificationPatch.fromWire(
+        patch.toEnvelope(),
+      ).getOrThrow();
 
       expect(
         decoded.apply(const OrderNotification(id: 'o1', itemCount: 1)).readAt,
@@ -240,8 +242,9 @@ void main() {
       // that already knows the kind must not be forced through an envelope.
       final patch = OrderNotificationPatch(itemCount: const PatchValue.set(3));
 
-      final decoded = OrderNotificationPatch.fromWire(patch.toWire())
-          .getOrThrow();
+      final decoded = OrderNotificationPatch.fromWire(
+        patch.toWire(),
+      ).getOrThrow();
 
       // The fixture entities carry no `operator ==`, so equivalence is read
       // off the field the patch set.
