@@ -161,6 +161,48 @@ void main() {
       expect(v3, contains('OrderNotificationPatch withId(String value)'));
     });
 
+    test('every entity patch declares a static diff(previous, next)', () {
+      // #229 §1: standalone and polymorphic entity patches carry a static
+      // `diff` with the O(1) identical fast path and unchanged-field omission.
+      expect(
+        v3,
+        contains('static ProductPatch diff(Product previous, Product next)'),
+        reason: 'a standalone entity patch must declare diff',
+      );
+      expect(
+        v3,
+        contains('static NotificationPatch diff('),
+        reason: 'a polymorphic root patch must declare diff',
+      );
+      expect(
+        v3,
+        contains('static OrderNotificationPatch diff('),
+        reason: 'a concrete subtype patch must declare diff',
+      );
+      // The O(1) fast path returns the canonical empty patch.
+      expect(v3, contains('if (identical(previous, next)) return'));
+    });
+
+    test('@ZorphyState gets a concrete and polymorphic patch surface', () {
+      // #229 §2: @ZorphyState emits diff/apply/compose/invert like entities.
+      expect(
+        v3,
+        contains('sealed class UiStatePatch'),
+        reason: 'a state root must emit a polymorphic patch',
+      );
+      expect(
+        v3,
+        contains('final class ReadyStatePatch extends UiStatePatch'),
+        reason: 'a state leaf must emit a concrete patch',
+      );
+      expect(
+        v3,
+        contains('static ReadyStatePatch diff('),
+        reason: 'a state patch must declare diff',
+      );
+      expect(v3, contains('ReadyState apply(covariant ReadyState target)'));
+    });
+
     test(
       'a standalone entity gets a single ZorphyPatch-implementing patch',
       () {
@@ -178,10 +220,31 @@ void main() {
       },
     );
 
-    test('a three-level hierarchy aliases the intermediate patch', () {
+    test('a three-level hierarchy emits a real intermediate patch surface', () {
+      // #229 §3: the intermediate is a concrete patch carrying its OWN declared
+      // field (`source`), not a typedef alias to the root patch.
       expect(v3, contains('sealed class EventPatch'));
-      expect(v3, contains('typedef SystemEventPatch = EventPatch;'));
-      expect(v3, contains('final class DeployEventPatch extends EventPatch'));
+      expect(
+        v3,
+        isNot(contains('typedef SystemEventPatch = EventPatch;')),
+        reason: 'the typedef-only intermediate gap must be closed',
+      );
+      expect(
+        v3,
+        contains('class SystemEventPatch extends EventPatch'),
+        reason: 'the intermediate emits a real patch class',
+      );
+      expect(
+        v3,
+        contains('SystemEventPatch withSource(String value)'),
+        reason: 'the intermediate-declared field is patchable through it',
+      );
+      expect(
+        v3,
+        contains('final class DeployEventPatch extends SystemEventPatch'),
+        reason: 'the leaf extends the nearest intermediate patch',
+      );
+      expect(v3, contains('static SystemEventPatch diff('));
     });
 
     test('legacy @Zorphy control still generates beside the v3 surface', () {

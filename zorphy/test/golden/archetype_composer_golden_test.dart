@@ -13,6 +13,7 @@ ZorphyNodeIr _node({
   required String name,
   ArchetypeKind archetype = ArchetypeKind.entity,
   bool isRoot = false,
+  bool isUnion = false,
   List<ZorphyFieldIr> fields = const [],
   List<ZorphyNodeIr> superTypes = const [],
   List<ZorphyNodeIr> directSubTypes = const [],
@@ -32,6 +33,7 @@ ZorphyNodeIr _node({
     discriminatorValue: name.toLowerCase(),
     fields: fields,
     typeParameters: typeParameters,
+    isUnion: isUnion,
   );
 }
 
@@ -108,32 +110,53 @@ void main() {
       );
     });
 
-    test('a generic root emits no codec or class surface', () {
+    test('a generic union root emits its class surface but no codec, patch or '
+        'mock', () {
       final box = _node(
         name: 'Box',
+        archetype: ArchetypeKind.value,
         isRoot: true,
+        isUnion: true,
         typeParameters: const ['T'],
         fields: const [
           ZorphyFieldIr(name: 'id', type: 'String'),
           ZorphyFieldIr(name: 'value', type: 'T'),
         ],
       );
+      final leaf = _node(
+        name: 'Filled',
+        archetype: ArchetypeKind.value,
+        isUnion: true,
+        typeParameters: const ['T'],
+        superTypes: [box],
+        fields: const [ZorphyFieldIr(name: 'extra', type: 'T')],
+      );
+      final wiredBox = box.copyWith(
+        directSubTypes: [leaf],
+        isConcreteLeaf: false,
+      );
       final ir = PolymorphicIr(
-        nodes: {'\$Box': box},
-        roots: [box],
+        nodes: {'\$Box': wiredBox, '\$Filled': leaf},
+        roots: [wiredBox],
         diagnostics: const [],
       );
 
       final emitted = const ArchetypeComposer().compose(ir);
 
-      // Neither the class emitter nor the codec declares type parameters, so
-      // emitting this root would leave `T` unbound in the generated library.
-      // Fail closed — the same rule the patch and mock surfaces apply.
+      // Issue #231: the generic root is no longer pruned — the class
+      // emitter declares the type parameter, so the surface compiles.
+      expect(emitted, contains('sealed class Box<T>'));
+      expect(emitted, contains('final class Filled<T> extends Box<T>'));
+      // The codec is still withheld: a static member cannot reference the
+      // class type parameters, so `static Box<T> fromWire` is not emittable.
       expect(
         emitted,
-        isEmpty,
-        reason: 'a generic root must not reach class or codec emission',
+        isNot(contains('fromWire')),
+        reason: 'a generic hierarchy still has no wire surface',
       );
+      // The patch and mock surfaces stay fail-closed the same way.
+      expect(emitted, isNot(contains('BoxPatch')));
+      expect(emitted, isNot(contains('BoxMockData')));
     });
 
     test('helper selection covers the intent codecs', () {
@@ -215,49 +238,45 @@ void main() {
       },
     );
 
-    test(
-      'a generic leaf under a live root is pruned from class and dispatch',
-      () {
-        final root = _node(
-          name: 'Node',
-          isRoot: true,
-          fields: const [ZorphyFieldIr(name: 'id', type: 'String')],
-        );
-        final leaf = _node(name: 'Leaf', superTypes: [root]);
-        final generic = _node(
-          name: 'Box',
-          typeParameters: const ['T'],
-          fields: const [ZorphyFieldIr(name: 'value', type: 'T')],
-          superTypes: [root],
-        );
-        final wiredRoot = root.copyWith(
-          directSubTypes: [leaf, generic],
-          isConcreteLeaf: false,
-        );
-        final ir = PolymorphicIr(
-          nodes: {'\$Node': wiredRoot, '\$Leaf': leaf, '\$Box': generic},
-          roots: [wiredRoot],
-          diagnostics: const [],
-        );
+    test('a generic leaf under a live root emits with its type parameters but '
+        'keeps no wire or rotation surface', () {
+      final root = _node(
+        name: 'Node',
+        isRoot: true,
+        fields: const [ZorphyFieldIr(name: 'id', type: 'String')],
+      );
+      final leaf = _node(name: 'Leaf', superTypes: [root]);
+      final generic = _node(
+        name: 'Box',
+        typeParameters: const ['T'],
+        fields: const [ZorphyFieldIr(name: 'value', type: 'T')],
+        superTypes: [root],
+      );
+      final wiredRoot = root.copyWith(
+        directSubTypes: [leaf, generic],
+        isConcreteLeaf: false,
+      );
+      final ir = PolymorphicIr(
+        nodes: {'\$Node': wiredRoot, '\$Leaf': leaf, '\$Box': generic},
+        roots: [wiredRoot],
+        diagnostics: const [],
+      );
 
-        final emitted = const ArchetypeComposer().compose(ir);
+      final emitted = const ArchetypeComposer().compose(ir);
 
-        // The composer's own walks prune the generic subtree (no codec, no
-        // class spec), so neither the class-emission walk nor the codec's leaf
-        // enumeration may reach it: an emitted `$Box` would leave `T` unbound,
-        // and a `box` dispatch arm would reference a `fromWire` the library
-        // never declares.
-        expect(
-          emitted,
-          contains('Leaf'),
-          reason: 'the non-generic leaf still composes',
-        );
-        // The class emitter names emitted classes by their clean name, so
-        // the pruned leaf would appear as `class Box` — assert that spelling.
-        expect(emitted, isNot(contains('class Box')));
-        expect(emitted, isNot(contains("'box'")));
-      },
-    );
+      // Issue #231: the generic leaf is no longer pruned from the CLASS
+      // surface — a non-generic parent needs no type argument, so `Box<T>`
+      // compiles as-is.
+      expect(emitted, contains('Leaf'));
+      expect(emitted, contains('class Box<T> extends Node'));
+      // The codec walk still prunes it: no `Box.fromWire` and no `box`
+      // dispatch arm may reference a decoder the library never declares.
+      expect(emitted, isNot(contains('Box.fromWire')));
+      expect(emitted, isNot(contains("'box'")));
+      // And the mock rotation names only leaves it actually emits seeds
+      // for — a generic leaf stays out of it.
+      expect(emitted, isNot(contains('BoxMockData')));
+    });
 
     test('a field naming a pruned generic node fails generation loudly', () {
       final root = _node(
