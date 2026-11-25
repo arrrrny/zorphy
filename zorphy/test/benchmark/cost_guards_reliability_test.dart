@@ -218,24 +218,13 @@ void main() {
     });
   });
 
-  group('the live evaluation reports load + an aggregate outcome (#237)', () {
-    test(
-      'evaluateCostGuards returns a report carrying environment metadata',
-      () {
-        final report = evaluateCostGuards();
-        // Identity/correctness guards (1) must always be conclusive and green.
-        final guard1 = report.guards.first;
-        expect(guard1.name, contains('Guard 1'));
-        expect(guard1.outcome, GuardOutcome.green);
-        // Every guard carries a numeric measurement and a budget.
-        for (final g in report.guards) {
-          expect(g.timing.budget, greaterThan(0));
-        }
-        // The environment/load snapshot is always present.
-        expect(report.environment.cpuCount, greaterThan(0));
-        expect(report.environment.loadAverage1m, greaterThan(0));
-      },
-    );
+  group('the suite aggregate outcome (#237)', () {
+    // NOTE (#234): the live `evaluateCostGuards()` assertion moved to
+    // `cost_guards_test.dart`, which drives the generated-code benchmark as a
+    // subprocess — `evaluateCostGuards` now lives in `cost_guards_impl.dart` and
+    // needs the generated part, so it cannot be imported from this pure
+    // reliability suite. The aggregate-outcome rules below stay here as pure
+    // functions over hand-built reports.
 
     test(
       'aggregate outcome is inconclusive when any guard is inconclusive',
