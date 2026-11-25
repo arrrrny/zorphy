@@ -145,6 +145,7 @@ final class PolymorphicClassEmitter {
     required ZorphyNodeIr root,
     required Map<String, List<PolymorphicField>> fields,
     Map<String, List<Method>> extraMethods = const {},
+    Map<String, List<Field>> extraFields = const {},
     bool includeSentinelDeclarations = true,
   }) {
     final specs = <Spec>[];
@@ -158,6 +159,7 @@ final class PolymorphicClassEmitter {
           fields,
           ancestors,
           extraMethods: extraMethods[node.className] ?? const [],
+          extraFields: extraFields[node.className] ?? const [],
         ),
       );
       for (final child in node.directSubTypes) {
@@ -207,6 +209,7 @@ final class PolymorphicClassEmitter {
     Map<String, List<PolymorphicField>> fields,
     List<ZorphyNodeIr> ancestors, {
     List<Method> extraMethods = const [],
+    List<Field> extraFields = const [],
   }) {
     final ownFields = fields[node.className] ?? const <PolymorphicField>[];
     // A leaf redeclares its inherited fields (`@override final String id;`),
@@ -324,9 +327,11 @@ final class PolymorphicClassEmitter {
       }
 
       // Members owned by another emitter (the boundary codec's
-      // `fromWire`/`toWire`, #223) land inside this class, after the value
-      // methods — a dispatch node and a leaf both carry them.
+      // `fromWire`/`toWire`, #223; the lens registry's static `lenses`, #230)
+      // land inside this class, after the value methods — a dispatch node and a
+      // leaf both carry them.
       c.methods.addAll(extraMethods);
+      c.fields.addAll(extraFields);
     });
   }
 
