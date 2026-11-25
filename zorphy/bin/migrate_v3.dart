@@ -58,10 +58,22 @@ Future<void> main(List<String> args) async {
     exit(2);
   }
 
-  const codemod = V3Codemod();
-  var changed = 0;
+  // First pass: discover every zorphy-generated type in the tree so codec
+  // calls in files that do not carry the annotation are still in scope.
+  // Without this, a `User.fromJson(...)` in a service file would be mistaken
+  // for an unrelated serializer and silently left behind.
+  final sources = <String, String>{};
+  final knownTypes = <String>{};
   for (final file in files) {
     final source = await File(file).readAsString();
+    sources[file] = source;
+    knownTypes.addAll(V3Codemod.zorphyTypesIn(source));
+  }
+  final codemod = V3Codemod(knownTypes: knownTypes);
+
+  var changed = 0;
+  for (final file in files) {
+    final source = sources[file]!;
     final migrated = codemod.transform(source);
     if (migrated == source) continue;
     changed++;
