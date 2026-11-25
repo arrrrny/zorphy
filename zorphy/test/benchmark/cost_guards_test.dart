@@ -93,43 +93,83 @@ Future<_RunResult> runWithDeadline(
       return -1;
     },
   );
-  await Future.wait(<Future<void>>[stdoutDone, stderrDone]);
+  // The launcher's children inherit its stdio, so a descendant that outlives
+  // the launcher keeps these pipes open. Bound the wait and drop our
+  // subscriptions on expiry: output capture must never hang cleanup on an
+  // inherited pipe held by an orphan.
+  await Future.wait(<Future<void>>[stdoutDone, stderrDone]).timeout(
+    const Duration(seconds: 10),
+    onTimeout: () {
+      stdoutSub.cancel();
+      stderrSub.cancel();
+      return <void>[];
+    },
+  );
   return _RunResult(exitCode, stdout.toString(), stderr.toString());
 }
 
 /// Terminates [rootPid] and every descendant. The launcher spawns build_runner
-/// and the impl as independent processes, so killing it alone would leave them
-/// running after a timeout.
+/// and the impl as independent processes with inherited stdio, so killing it
+/// alone would leave them running — and holding the test's output pipes — after
+/// a timeout.
 Future<void> _killProcessTree(int rootPid) async {
   if (Platform.isWindows) {
     await Process.run('taskkill', <String>['/PID', '$rootPid', '/T', '/F']);
     return;
   }
-  // One bounded process snapshot (ps, not a filesystem walk), then a BFS from
-  // the launcher. Snapshot first: a child reparented after its parent dies
-  // could otherwise be missed.
-  final snapshot = await Process.run('ps', <String>['-ax', '-o', 'pid=,ppid=']);
-  final children = <int, List<int>>{};
-  for (final line in (snapshot.stdout as String).split('\n')) {
-    final parts = line.trim().split(RegExp(r'\s+'));
-    if (parts.length < 2) continue;
-    final pid = int.tryParse(parts[0]);
-    final ppid = int.tryParse(parts[1]);
-    if (pid == null || ppid == null) continue;
-    children.putIfAbsent(ppid, () => <int>[]).add(pid);
+  // Freeze the launcher BEFORE snapshotting: it promotes the impl to a direct
+  // child the moment build_runner exits, and a stopped process cannot spawn
+  // that child between our snapshot and the kill below.
+  try {
+    Process.killPid(rootPid, ProcessSignal.sigstop);
+  } on Object {
+    // Already exited; the bounded stream wait handles any orphan it left.
   }
-  final pending = <int>[rootPid];
-  final seen = <int>{rootPid};
-  while (pending.isNotEmpty) {
-    final pid = pending.removeLast();
+
+  // Bounded `ps` snapshots (never a filesystem walk), repeated until the
+  // descendant set stops growing, so a child spawned just before the freeze
+  // cannot escape the sweep.
+  final doomed = <int>{rootPid};
+  for (var pass = 0; pass < 3; pass++) {
+    final snapshot = await Process.run('ps', <String>[
+      '-ax',
+      '-o',
+      'pid=,ppid=',
+    ]);
+    final children = <int, List<int>>{};
+    for (final line in (snapshot.stdout as String).split('\n')) {
+      final parts = line.trim().split(RegExp(r'\s+'));
+      if (parts.length < 2) continue;
+      final pid = int.tryParse(parts[0]);
+      final ppid = int.tryParse(parts[1]);
+      if (pid == null || ppid == null) continue;
+      children.putIfAbsent(ppid, () => <int>[]).add(pid);
+    }
+    final before = doomed.length;
+    final pending = doomed.toList();
+    while (pending.isNotEmpty) {
+      final pid = pending.removeLast();
+      for (final child in children[pid] ?? const <int>[]) {
+        if (doomed.add(child)) pending.add(child);
+      }
+    }
+    if (doomed.length == before) break;
+  }
+
+  // Kill descendants before the frozen launcher: killing the launcher first
+  // would reparent its children and break the ppid links we just walked.
+  for (final pid in doomed) {
+    if (pid == rootPid) continue;
     try {
       Process.killPid(pid, ProcessSignal.sigkill);
     } on Object {
-      // Already exited — nothing left to terminate.
+      // Already exited.
     }
-    for (final child in children[pid] ?? const <int>[]) {
-      if (seen.add(child)) pending.add(child);
-    }
+  }
+  try {
+    Process.killPid(rootPid, ProcessSignal.sigkill);
+  } on Object {
+    // Already exited.
   }
 }
 
