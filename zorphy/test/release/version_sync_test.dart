@@ -19,12 +19,15 @@ void main() {
       expect(zorphyVer, migratorVer);
     });
 
-    test('publish.sh version regex accepts SemVer prerelease like 3.0.0-dev.2', () {
-      final regex = RegExp(r'^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$');
-      expect(regex.hasMatch('3.0.0'), isTrue);
-      expect(regex.hasMatch('3.0.0-dev.2'), isTrue);
-      expect(regex.hasMatch('3.0.0-rc.1'), isTrue);
-      expect(regex.hasMatch('invalid'), isFalse);
-    });
+    test(
+      'publish.sh version regex accepts SemVer prerelease like 3.0.0-dev.2',
+      () {
+        final regex = RegExp(r'^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$');
+        expect(regex.hasMatch('3.0.0'), isTrue);
+        expect(regex.hasMatch('3.0.0-dev.2'), isTrue);
+        expect(regex.hasMatch('3.0.0-rc.1'), isTrue);
+        expect(regex.hasMatch('invalid'), isFalse);
+      },
+    );
   });
 }

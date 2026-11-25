@@ -9,6 +9,7 @@
 // here. This is the field-level wire annotation, not the removed legacy class
 // surface.
 export 'package:json_annotation/json_annotation.dart';
+
 export 'src/archetypes.dart';
 export 'src/archetype_bases.dart';
 export 'src/equality.dart';
