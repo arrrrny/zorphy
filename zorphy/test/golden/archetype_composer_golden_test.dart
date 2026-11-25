@@ -101,6 +101,61 @@ void main() {
       );
     });
 
+    test('a generic root emits no codec or class surface', () {
+      final box = _node(
+        name: 'Box',
+        isRoot: true,
+        typeParameters: const ['T'],
+        fields: const [
+          ZorphyFieldIr(name: 'id', type: 'String'),
+          ZorphyFieldIr(name: 'value', type: 'T'),
+        ],
+      );
+      final ir = PolymorphicIr(
+        nodes: {'\$Box': box},
+        roots: [box],
+        diagnostics: const [],
+      );
+
+      final emitted = const ArchetypeComposer().compose(ir);
+
+      // Neither the class emitter nor the codec declares type parameters, so
+      // emitting this root would leave `T` unbound in the generated library.
+      // Fail closed — the same rule the patch and mock surfaces apply.
+      expect(
+        emitted,
+        isEmpty,
+        reason: 'a generic root must not reach class or codec emission',
+      );
+    });
+
+    test('helper selection ignores an intent field that no codec reads', () {
+      final intent = _node(
+        name: 'StampIntent',
+        archetype: ArchetypeKind.intent,
+        isRoot: true,
+        fields: const [ZorphyFieldIr(name: 'at', type: 'DateTime')],
+      );
+      final order = _node(
+        name: 'Order',
+        isRoot: true,
+        fields: const [ZorphyFieldIr(name: 'id', type: 'String')],
+      );
+      final ir = PolymorphicIr(
+        nodes: {'\$Order': order, '\$StampIntent': intent},
+        roots: [order, intent],
+        diagnostics: const [],
+      );
+
+      final emitted = const ArchetypeComposer().compose(ir);
+
+      expect(
+        emitted,
+        isNot(contains('_boundaryDateTime')),
+        reason: 'helper set must come only from nodes that receive codecs',
+      );
+    });
+
     test('the shared apply narrows an inherited field the leaf did not redeclare', () {
       final root = _node(
         name: 'Node',

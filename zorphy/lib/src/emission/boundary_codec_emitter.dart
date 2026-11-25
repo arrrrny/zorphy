@@ -624,8 +624,11 @@ class BoundaryCodecEmitter {
         // compile. Bind it to a local, guard the local, encode the local.
         final local = _local(field);
         final value = _wireExpression(field, type, source: local);
+        // Read through `this`: a field named `map` would otherwise bind the
+        // output `map` local declared above, feeding the map into itself and
+        // losing the field's value.
         body
-          ..add(Code('final $local = ${field.name};'))
+          ..add(Code('final $local = this.${field.name};'))
           ..add(
             Code('if ($local != null) { '
                 'map[${_literal(field.name)}] = $value; }'),
@@ -647,7 +650,10 @@ class BoundaryCodecEmitter {
     _FieldType type, {
     String? source,
   }) {
-    final name = source ?? field.name;
+    // An unqualified field name can be shadowed by the output `map` local in
+    // `toWire` (e.g. a non-nullable field named `map`). Nullable fields arrive
+    // with an explicit [source] local, so only the direct read is qualified.
+    final name = source ?? 'this.${field.name}';
     switch (type.shape) {
       case _Shape.node:
         return '$name.toWire()';

@@ -219,14 +219,18 @@ final class NotificationSharedPatch extends NotificationPatch {
     if (isEmpty) return target;
     if (target is OrderNotification) {
       return target.copyWith(
-        id: id.isUnchanged ? target.id : id.valueOrNull,
-        readAt: readAt.isUnchanged ? target.readAt : readAt.valueOrNull,
+        id: this.id.isUnchanged ? target.id : this.id.valueOrNull,
+        readAt: this.readAt.isUnchanged
+            ? target.readAt
+            : this.readAt.valueOrNull,
       );
     }
     if (target is PriceDropNotification) {
       return target.copyWith(
-        id: id.isUnchanged ? target.id : id.valueOrNull,
-        readAt: readAt.isUnchanged ? target.readAt : readAt.valueOrNull,
+        id: this.id.isUnchanged ? target.id : this.id.valueOrNull,
+        readAt: this.readAt.isUnchanged
+            ? target.readAt
+            : this.readAt.valueOrNull,
       );
     }
     throw ArgumentError.value(
@@ -394,11 +398,11 @@ final class OrderNotificationPatch extends NotificationPatch {
   OrderNotification apply(covariant OrderNotification target) {
     if (isEmpty) return target;
     return target.copyWith(
-      id: id.isUnchanged ? target.id : id.valueOrNull,
-      readAt: readAt.isUnchanged ? target.readAt : readAt.valueOrNull,
-      itemCount: itemCount.isUnchanged
+      id: this.id.isUnchanged ? target.id : this.id.valueOrNull,
+      readAt: this.readAt.isUnchanged ? target.readAt : this.readAt.valueOrNull,
+      itemCount: this.itemCount.isUnchanged
           ? target.itemCount
-          : itemCount.valueOrNull,
+          : this.itemCount.valueOrNull,
     );
   }
 
@@ -591,9 +595,11 @@ final class PriceDropNotificationPatch extends NotificationPatch {
   PriceDropNotification apply(covariant PriceDropNotification target) {
     if (isEmpty) return target;
     return target.copyWith(
-      id: id.isUnchanged ? target.id : id.valueOrNull,
-      readAt: readAt.isUnchanged ? target.readAt : readAt.valueOrNull,
-      newPrice: newPrice.isUnchanged ? target.newPrice : newPrice.valueOrNull,
+      id: this.id.isUnchanged ? target.id : this.id.valueOrNull,
+      readAt: this.readAt.isUnchanged ? target.readAt : this.readAt.valueOrNull,
+      newPrice: this.newPrice.isUnchanged
+          ? target.newPrice
+          : this.newPrice.valueOrNull,
     );
   }
 

@@ -356,8 +356,53 @@ void main() {
       final result = _analyzeEmitted(emitted, _standaloneValueFixture);
       expect(result.exitCode, 0, reason: result.output);
     });
+
+    test('a field named target does not shadow the apply entity', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Targeted',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('target', 'String', ''),
+        ],
+      );
+
+      // `apply(covariant Targeted target)` names its entity parameter
+      // `target`. An unqualified patch-field read resolves to that parameter
+      // (which has neither `isUnchanged` nor `valueOrNull`) and cannot compile.
+      expect(
+        emitted,
+        contains(
+          'target: this.target.isUnchanged ? target.target : '
+          'this.target.valueOrNull',
+        ),
+      );
+      expect(
+        emitted,
+        contains(
+          'id: this.id.isUnchanged ? target.id : this.id.valueOrNull',
+        ),
+      );
+
+      final result = _analyzeEmitted(emitted, _standaloneTargetFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
   });
 }
+
+/// Standalone entity carrying a field literally named `target` — the name
+/// collides with the `apply` method's entity parameter.
+const _standaloneTargetFixture = r'''
+final class Targeted {
+  const Targeted({required this.id, required this.target});
+
+  final String id;
+  final String target;
+
+  Targeted copyWith({String? id, String? target}) {
+    return Targeted(id: id ?? this.id, target: target ?? this.target);
+  }
+}
+''';
 
 /// The minimal entity surface a standalone patch applies to.
 const _standaloneFixture = r'''

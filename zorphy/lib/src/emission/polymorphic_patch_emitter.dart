@@ -606,11 +606,13 @@ class PolymorphicPatchEmitter {
       for (final f in fields) {
         final name = _memberName(f.name);
         final narrowed = subtypeFieldTypes[subtype]?[f.name];
-        final value = '${name}.valueOrNull';
+        // The entity parameter is named `target`: qualify the PATCH field
+        // with `this` so a field named `target` is not shadowed by it.
+        final value = 'this.${name}.valueOrNull';
         final written = narrowed == null
             ? value
             : '$value as ${_concreteType(narrowed)}';
-        lines.add('  $name: $name.isUnchanged ? target.$name : $written,');
+        lines.add('  $name: this.$name.isUnchanged ? target.$name : $written,');
       }
       lines.add(');');
       lines.add('}');
@@ -646,8 +648,10 @@ class PolymorphicPatchEmitter {
     ];
     for (final field in fields) {
       final name = _memberName(field.name);
+      // `target` is the entity parameter; qualify the patch field with `this`
+      // so a field named `target` reads the patch, not the parameter.
       lines.add(
-        '  $name: $name.isUnchanged ? target.$name : $name.valueOrNull,',
+        '  $name: this.$name.isUnchanged ? target.$name : this.$name.valueOrNull,',
       );
     }
     lines.add(');');

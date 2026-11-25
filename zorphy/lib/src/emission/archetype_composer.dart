@@ -65,7 +65,9 @@ final class ArchetypeComposer {
 
     final codecRoots = <ZorphyNodeIr>[
       for (final root in ir.roots)
-        if (root.archetype != ArchetypeKind.intent) root,
+        if (root.archetype != ArchetypeKind.intent &&
+            root.typeParameters.isEmpty)
+          root,
     ];
     if (codecRoots.isNotEmpty) {
       final ownFields = _ownFields(ir);
@@ -76,9 +78,16 @@ final class ArchetypeComposer {
       // would make the codec emit `<Intent>.fromWire(...)`, which does not
       // exist in the generated library. An intent value therefore travels as
       // a plain field on the wire, as it does in `IntentEmitter.toWire`.
+      // Generic nodes are excluded for the same fail-closed reason as the
+      // patch and mock surfaces: `PolymorphicClassEmitter` declares no type
+      // parameters and the codec would emit `_boundaryAs<T>` with an
+      // unbound `T`. A generic root (and its subtree) is not composed at all,
+      // so a field naming it must not be classified as a nested node either.
       final knownNodes = <String>{
         for (final node in ir.nodes.values)
-          if (node.archetype != ArchetypeKind.intent) node.cleanName,
+          if (node.archetype != ArchetypeKind.intent &&
+              node.typeParameters.isEmpty)
+            node.cleanName,
       };
       const codec = BoundaryCodecEmitter();
       var firstRoot = true;
@@ -113,8 +122,13 @@ final class ArchetypeComposer {
       // `unused_element` warnings in the consumer's analysis.
       fragments.add(
         ZorphyEmitter().emitSpecs(
+          // Select helpers only from the nodes that actually receive codecs.
+          // Passing every IR node lets an intent's (or a skipped generic
+          // node's) `DateTime` field select `_boundaryDateTime` even though
+          // no emitted codec calls it — an `unused_element` warning in the
+          // consumer, exactly what the guard above exists to prevent.
           BoundaryCodecEmitter.usedHelperSpecs(
-            ir.nodes.values,
+            codecRoots.expand(_walk),
             payloads,
             additionalNodes: knownNodes,
           ),
@@ -265,8 +279,14 @@ final class ArchetypeComposer {
       ),
   ];
 
-  /// Every node of [root]'s hierarchy, depth-first pre-order.
+  /// Every emittable node of [root]'s hierarchy, depth-first pre-order.
+  ///
+  /// A generic node (and everything below it) is pruned: neither the class
+  /// emitter nor the codec declares type parameters, so emitting it would
+  /// leave `T` unbound in the generated library. This is the same fail-closed
+  /// rule the patch and mock surfaces apply.
   Iterable<ZorphyNodeIr> _walk(ZorphyNodeIr root) sync* {
+    if (root.typeParameters.isNotEmpty) return;
     yield root;
     for (final child in root.directSubTypes) {
       yield* _walk(child);
