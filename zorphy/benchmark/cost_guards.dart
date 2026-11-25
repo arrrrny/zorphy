@@ -745,7 +745,9 @@ PerformanceVerdict _timedVerdict({
   );
   if (verdict.outcome == PerformanceOutcome.inconclusive) {
     withRetries(
-      maxAttempts: retryBudget,
+      // attempt(0) is the initial sample (already collected above); the
+      // remaining retryBudget attempts are the actual re-samples.
+      maxAttempts: retryBudget + 1,
       attempt: (i) {
         if (i == 0)
           return SampleVerdict.inconclusive; // first sample already in
@@ -899,13 +901,14 @@ CostGuardReport _guard4BoundaryThroughput(bool loadAdmitted) {
 
   // Correctness is MANDATORY and runs regardless of timing/load: every entity
   // must validate. This is never skipped under overload (#237).
-  var correctnessOk = true;
+  var ok = 0;
   for (var i = 0; i < total; i++) {
     final raw = i.isEven
         ? <String, Object?>{'kind': 'product', 'id': 'c$i', 'price': 9.99}
         : <String, Object?>{'kind': 'order', 'id': 'c$i', 'itemCount': i};
-    if (Entity.fromWire(raw) is! BoundaryOk<Entity>) correctnessOk = false;
+    if (Entity.fromWire(raw) is BoundaryOk<Entity>) ok++;
   }
+  final correctnessOk = ok == total;
 
   const budgetMs = 30; // nominal; the noise band supplies the headroom
   // Each timed sample is one full 10k validation pass, in milliseconds.
@@ -928,7 +931,7 @@ CostGuardReport _guard4BoundaryThroughput(bool loadAdmitted) {
   return CostGuardReport(
     name: 'Guard 4: boundary validation throughput (<30ms/10k)',
     correctnessOk: correctnessOk,
-    correctnessDetail: '$total/$total validated',
+    correctnessDetail: '$ok/$total validated',
     timing: timing,
   );
 }
