@@ -173,42 +173,68 @@ Future<void> _killProcessTree(int rootPid) async {
   }
 }
 
+/// The major version of the `analyzer` package resolved in [root], or `null`
+/// when it cannot be determined.
+///
+/// The benchmark drives `build_runner`, and build_runner 2.17.x uses the
+/// `AnalysisOptionsBuilder` API that only analyzer 14 defines — so under the
+/// analyzer-13 compat leg (`analyzer: ^13.0.0`) build_runner fails to compile
+/// and generation cannot run at all. That leg exists to prove the zorphy
+/// LIBRARY resolves, analyzes and tests under analyzer 13 (`dart analyze lib`),
+/// not to re-run codegen; the default `test` job and the analyzer-14 leg both
+/// resolve analyzer 14 and exercise this benchmark in full.
+Future<int?> _resolvedAnalyzerMajor(Directory root) async {
+  final result = await Process.run(Platform.resolvedExecutable, <String>[
+    'pub',
+    'deps',
+    '--style=compact',
+  ], workingDirectory: root.path);
+  if (result.exitCode != 0) return null;
+  final match = RegExp(r'\banalyzer (\d+)\.').firstMatch('${result.stdout}');
+  return match == null ? null : int.tryParse(match.group(1)!);
+}
+
 void main() {
   group('Chord v2 cost guards (ISSUE-018 / #234)', () {
-    test(
-      'the generated-code benchmark passes all four guards (exit 0, green)',
-      () async {
-        final root = _packageRoot();
-        final dart = Platform.resolvedExecutable;
-        // The internal deadline is shorter than the test's timeout so a stalled
-        // generation is killed and reported here, rather than leaving package:test
-        // to tear down an isolate whose child processes are still alive.
-        final result = await runWithDeadline(
-          dart,
-          <String>['run', 'benchmark/cost_guards_benchmark.dart'],
-          cwd: root.path,
-          deadline: const Duration(minutes: 4),
+    test('the generated-code benchmark passes all four guards (exit 0, green)', () async {
+      final root = _packageRoot();
+      final analyzerMajor = await _resolvedAnalyzerMajor(root);
+      if (analyzerMajor != null && analyzerMajor < 14) {
+        markTestSkipped(
+          'build_runner 2.17.x requires analyzer 14+ (AnalysisOptionsBuilder); '
+          'codegen cannot run under the analyzer-$analyzerMajor compat leg. '
+          'The default test job and the analyzer-14 leg cover this benchmark.',
         );
+        return;
+      }
+      final dart = Platform.resolvedExecutable;
+      // The internal deadline is shorter than the test's timeout so a stalled
+      // generation is killed and reported here, rather than leaving package:test
+      // to tear down an isolate whose child processes are still alive.
+      final result = await runWithDeadline(
+        dart,
+        <String>['run', 'benchmark/cost_guards_benchmark.dart'],
+        cwd: root.path,
+        deadline: const Duration(minutes: 4),
+      );
 
-        final out = '${result.stdout}\n${result.stderr}';
-        expect(
-          result.exitCode,
-          0,
-          reason:
-              'benchmark exited ${result.exitCode} (-1=TIMEOUT, 1=RED, '
-              '2=INCONCLUSIVE; a compile failure here means a generated surface '
-              'the guards name — diff / changeTo* / resolvePath / fromWire — is '
-              'missing):\n$out',
-        );
-        expect(
-          result.stdout,
-          contains('ALL 4 COST GUARDS GREEN'),
-          reason:
-              'the benchmark must exercise generated output and pass all '
-              'four guards:\n$out',
-        );
-      },
-      timeout: const Timeout(Duration(minutes: 5)),
-    );
+      final out = '${result.stdout}\n${result.stderr}';
+      expect(
+        result.exitCode,
+        0,
+        reason:
+            'benchmark exited ${result.exitCode} (-1=TIMEOUT, 1=RED, '
+            '2=INCONCLUSIVE; a compile failure here means a generated surface '
+            'the guards name — diff / changeTo* / resolvePath / fromWire — is '
+            'missing):\n$out',
+      );
+      expect(
+        result.stdout,
+        contains('ALL 4 COST GUARDS GREEN'),
+        reason:
+            'the benchmark must exercise generated output and pass all '
+            'four guards:\n$out',
+      );
+    }, timeout: const Timeout(Duration(minutes: 5)));
   });
 }
