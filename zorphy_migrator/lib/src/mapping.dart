@@ -119,7 +119,16 @@ class ZorphyRenderer {
     sb.writeln('}');
   }
 
-  void _renderField(FreezedField field, StringBuffer sb) {
+  /// Emits the doc comment and `@JsonKey(...)` / `@Default(...)` annotations
+  /// that a freezed field carries, indented for a class member.
+  ///
+  /// Both the plain-class getter path ([_renderField]) and the concrete
+  /// union-variant field path ([_renderUnion]) go through this helper: a
+  /// union variant is a real `final` field (not a getter), but it must keep
+  /// its wire name / default just like a plain class field, otherwise a
+  /// migrated `@JsonKey(name: 'x')` or `@Default(y)` silently changes wire
+  /// shape.
+  void _renderFieldAnnotations(FreezedField field, StringBuffer sb) {
     if (field.docComment != null) sb.writeln('  ${field.docComment}');
     final jsonKeys = [...field.jsonKeyAnnotations];
     // freezed @Default(expr) → @JsonKey(defaultValue: expr): the archetype
@@ -138,6 +147,10 @@ class ZorphyRenderer {
     for (final jsonKey in jsonKeys) {
       sb.writeln('  $jsonKey');
     }
+  }
+
+  void _renderField(FreezedField field, StringBuffer sb) {
+    _renderFieldAnnotations(field, sb);
     sb.writeln('  ${convertType(field.type)} get ${field.name};');
   }
 
@@ -252,6 +265,10 @@ class ZorphyRenderer {
           '${_typeParams(model)} {',
         );
       for (final field in variant.fields) {
+        // Same annotation-aware path a plain class field takes: the concrete
+        // `final` declaration keeps any @JsonKey / @Default the freezed
+        // factory parameter carried (they used to be dropped here).
+        _renderFieldAnnotations(field, sb);
         sb.writeln('  final ${convertType(field.type)} ${field.name};');
       }
       final ctorParams = variant.fields.map((f) => 'this.${f.name}').join(', ');

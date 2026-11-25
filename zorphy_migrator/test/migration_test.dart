@@ -17,6 +17,7 @@ const convertibleFixtures = [
   'nullable_fields',
   'generics',
   'union',
+  'union_annotations',
   'default_value',
   'json_key',
   'json_roundtrip',
