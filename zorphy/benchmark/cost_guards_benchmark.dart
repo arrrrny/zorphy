@@ -1,74 +1,87 @@
 // Standalone `dart run` entry for the Chord v2 in-memory cost guards
-// (ISSUE-018, arrrrny/zorphy#193), with the reliability contract from
-// arrrrny/zorphy#237.
+// (ISSUE-018, arrrrny/zorphy#193; reliability #237; real-generated-code #234).
 //
-// The guard logic lives in `benchmark/cost_guards.dart` so the same evaluation
-// backs both this gate and `test/benchmark/cost_guards_test.dart` (which rides
-// the existing `dart test` CI step). Both agree on three-valued semantics:
+// #234 requires the guards to measure the REAL `build_runner`-generated v3
+// classes, with generation as a PREREQUISITE so a missing generated API
+// (`<Entity>Patch.diff`, `changeTo*`, `resolvePath`, polymorphic `fromWire`)
+// fails loudly at build time. This launcher is that prerequisite made explicit:
+//
+//   1. It runs the production generator scoped to the benchmark fixture
+//      (`dart run build_runner build --delete-conflicting-outputs
+//      --build-filter 'benchmark/**'` — the same flag CI uses, so a second run
+//      in a checkout with an existing `_br_` cannot abort on conflicting
+//      outputs), which writes `_br_/benchmark/cost_guard_fixtures.part.dart`.
+//      If generation fails, the launcher exits non-zero BEFORE any guard runs
+//      — the loud failure the acceptance gate names.
+//   2. It then spawns `benchmark/cost_guards_impl.dart`, which imports the
+//      generated classes and measures them. Because that library only compiles
+//      against real generated output, removing a surface from the generator
+//      makes this step fail to compile — again loudly.
+//
+// The launcher itself imports NO generated code (only `dart:io`), so it always
+// compiles; the compile-time dependency on generated output lives in the impl
+// the launcher spawns. Both agree on three-valued semantics (#237):
 //
 //   * GREEN        — all four guards green; exit 0.
 //   * RED          — a correctness failure or a stable timing regression; exit 1.
 //   * INCONCLUSIVE — the host failed load admission (overloaded) or a timing
-//     measurement was too noisy to call; exit 2. The release gate treats this as
-//     NOT passing, so it can never close on an inconclusive result (#237).
-//
-// On an overloaded host this no longer reports a misleading red: it reports the
-// documented INCONCLUSIVE outcome with the load metadata that caused it. A
-// deliberate CPU-saturation probe therefore produces retry/inconclusive
-// behaviour, never a false green or an unexplained red.
+//     measurement was too noisy to call; exit 2. The release gate treats this
+//     as NOT passing, so it can never close on an inconclusive result.
 //
 // Run: `dart run benchmark/cost_guards_benchmark.dart`
 
 import 'dart:io';
 
-import 'cost_guards.dart';
+/// The package root — the parent of this script's `benchmark/` directory —
+/// resolved from the script URI so the launcher works regardless of the cwd it
+/// is invoked from.
+Uri get _packageRoot => Platform.script.resolve('../').normalizePath();
 
-void main() {
-  print('Chord v2 cost guards (ISSUE-018) — zorphy#193 / #237');
-  print('');
+void main() async {
+  final root = _packageRoot;
+  final dart = Platform.resolvedExecutable;
 
-  final suite = evaluateCostGuards();
-  final env = suite.environment;
-  print(
-    'Environment: ${env.cpuCount} cores, '
-    'loadavg(1m)=${env.loadAverage1m.toStringAsFixed(2)}, '
-    'admission budget ${env.maxLoadPerCore.toStringAsFixed(2)}/core → '
-    '${env.admitted ? 'ADMITTED' : 'INCONCLUSIVE (overloaded)'}',
+  // Step 1 — generation is the prerequisite. A non-zero exit here is the loud
+  // build-time failure #234's acceptance gate requires; nothing is measured on
+  // a tree the generator could not produce.
+  stdout.writeln(
+    'Generating v3 fixtures (build_runner, scoped to benchmark/)…',
   );
-  print('');
-
-  for (final result in suite.guards) {
-    final tag = switch (result.outcome) {
-      GuardOutcome.green => 'PASS',
-      GuardOutcome.red => 'FAIL',
-      GuardOutcome.inconclusive => 'INCONCLUSIVE',
-    };
-    print('[$tag] ${result.name} — ${result.detail}');
+  final gen = await _runInherit(dart, <String>[
+    'run',
+    'build_runner',
+    'build',
+    '--delete-conflicting-outputs',
+    '--build-filter',
+    'benchmark/**',
+  ], root.toFilePath());
+  if (gen != 0) {
+    stderr.writeln(
+      'FAILED: build_runner generation exited $gen — the cost guards measure '
+      'generated code and cannot run without it (#234).',
+    );
+    exitCode = 1;
+    return;
   }
 
-  print('');
-  switch (suite.aggregate) {
-    case GuardOutcome.green:
-      print('ALL ${suite.guards.length} COST GUARDS GREEN');
-    case GuardOutcome.red:
-      final failures = suite.guards
-          .where((r) => r.outcome == GuardOutcome.red)
-          .length;
-      print('$failures COST GUARD(S) FAILED');
-      // Non-zero exit fails the CI step that runs this benchmark. `exitCode`
-      // (rather than a `throw`, which exits 255 with a stack trace) reads as a
-      // deliberate CI-gate failure.
-      exitCode = 1;
-    case GuardOutcome.inconclusive:
-      final count = suite.guards
-          .where((r) => r.outcome == GuardOutcome.inconclusive)
-          .length;
-      print(
-        '$count COST GUARD(S) INCONCLUSIVE — host overloaded or too noisy to '
-        'measure; NOT a pass (release gate cannot close on inconclusive)',
-      );
-      // Distinct exit code (2) so a caller can tell "regression" from
-      // "could not measure"; both are non-zero, so neither closes the gate.
-      exitCode = 2;
-  }
+  // Step 2 — run the generated-aware guards. The impl imports the generated
+  // part, so a missing surface fails to compile here (loud), and its exit code
+  // carries the green/red/inconclusive verdict.
+  final impl = await _runInherit(dart, <String>[
+    'run',
+    'benchmark/cost_guards_impl.dart',
+  ], root.toFilePath());
+  exitCode = impl;
+}
+
+/// Runs [exe] with [args] in [cwd] with inherited stdio (so the child's output
+/// reaches the caller's terminal directly) and returns its exit code.
+Future<int> _runInherit(String exe, List<String> args, String cwd) async {
+  final proc = await Process.start(
+    exe,
+    args,
+    workingDirectory: cwd,
+    mode: ProcessStartMode.inheritStdio,
+  );
+  return proc.exitCode;
 }
