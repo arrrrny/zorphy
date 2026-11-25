@@ -1332,6 +1332,36 @@ zorphy build --clean
 
 - **`ClassNamePatch`** - Patch class for partial updates
 
+## 🚀 Migrating v2 → v3 (zero-preset archetypes)
+
+Zorphy 3.0.0 drops every preset (`ZorphyPreset`) and every `generate*`
+boolean toggle. A class is now annotated with exactly ONE archetype that names
+what it IS, and the wire codecs are `fromWire` / `toWire`. Run the bundled
+codemod to upgrade an existing v2 codebase automatically:
+
+```bash
+# preview the changes (dry-run is the default)
+dart run zorphy:migrate_v3 lib/
+
+# rewrite in place, then regenerate
+dart run zorphy:migrate_v3 lib/ --apply
+dart run build_runner build --delete-conflicting-outputs
+```
+
+The codemod rewrites, per file:
+
+| v2 | v3 |
+|---|---|
+| `@Zorphy(...)` on a class with an `id` field | `@ZorphyEntity(principalKey: #id)` |
+| `@Zorphy(...)` on a class without `id` | `@ZorphyValue()` |
+| `@ZorphySealed(...)` | `@ZorphyUnion(...)` |
+| `x.fromJson(map)` | `x.fromWire(map)` + `// TODO(trust-boundary): handle BoundaryErr` |
+| `x.toJson()` | `x.toWire()` |
+
+Every `preset:` and `generate*` argument is stripped — v3 has no feature flags
+to keep in sync. The codemod edits only the matched annotation and call spans,
+so comments, formatting and unrelated code are preserved.
+
 ## 🔄 Migration from Morphy
 
 Zorphy is designed for easy migration from Morphy:

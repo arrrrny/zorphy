@@ -42,3 +42,4 @@ dev_dependencies:
 executables:
   zorphy: zorphy_cli
   zorphy_mcp_server: zorphy_mcp_server
+  migrate_v3: migrate_v3

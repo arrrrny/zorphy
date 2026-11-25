@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+### Added
+
+- `dart run zorphy:migrate_v3 <path>` — a v2 → v3 AST migration codemod
+  (#194). It strips every v2 `preset:` and `generate*` boolean argument and
+  rewrites the zero-preset archetypes: `@Zorphy` on an `id`-bearing class
+  becomes `@ZorphyEntity(principalKey: #id)`, on an `id`-less class
+  `@ZorphyValue()`, and `@ZorphySealed` becomes `@ZorphyUnion`. Call sites move
+  to the wire codecs — `.fromJson(map)` → `.fromWire(map)` (with a
+  `// TODO(trust-boundary): handle BoundaryErr` marker) and `.toJson()` →
+  `.toWire()`. Span-based over the analyzer parse tree, so only the matched
+  annotation / method spans change; dry-run by default, `--apply` rewrites in
+  place.
+
 ### Changed
 
 - Patch wire codecs hardened from the #215 review: generated `toWire()` writes

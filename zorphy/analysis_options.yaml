@@ -3,3 +3,7 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.zorphy.dart"
     - "**/*.zorphy2.dart"
+    # v2 migration fixtures are intentionally not analyzable: they carry the
+    # pre-v3 `@ZorphySealed` / `@Zorphy(preset: ...)` surface the codemod
+    # rewrites, which the v3 annotation package no longer defines.
+    - "test/migration/fixtures/**"

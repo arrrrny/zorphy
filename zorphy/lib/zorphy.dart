@@ -17,3 +17,6 @@ export 'src/plugins/plugin_context.dart';
 export 'src/cli/entity_creator.dart';
 export 'src/cli/models/entity_config.dart';
 export 'src/cli/utils/naming_utils.dart';
+
+// v2 -> v3 migration codemod (ISSUE-019)
+export 'src/migration/v3_codemod.dart';

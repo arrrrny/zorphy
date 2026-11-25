@@ -132,6 +132,20 @@ and CLI reference.
 
 ### Never modify generated zorphy code files.
 
+### Migrating a v2 codebase to v3
+
+Run the bundled codemod — never hand-edit v2 annotations when upgrading:
+
+```bash
+dart run zorphy:migrate_v3 <path>          # dry-run preview
+dart run zorphy:migrate_v3 <path> --apply  # rewrite in place
+```
+
+It strips every `preset:` / `generate*` argument and emits the zero-preset v3
+archetypes (`@ZorphyEntity(principalKey: #id)` / `@ZorphyValue()` /
+`@ZorphyUnion`) plus the `fromWire` / `toWire` codecs. See `README.md`
+("Migrating v2 → v3").
+
 **Rationale:** Zorphy code generator produces code that must not be manually edited. Any modifications to generated `.zorphy.dart` files will cause:
 - Unpredictable behavior in code generation  
 - Build failures due to inconsistent state
