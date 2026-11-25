@@ -1,5 +1,26 @@
 ## [Unreleased]
 
+### Changed (BREAKING — v3.0.0)
+
+- **Legacy `@Zorphy` / `@Zorphy2` generation path removed (#233).** After the
+  v3 migration gate the generator runs only the zero-preset archetype pass
+  (`@ZorphyEntity` / `@ZorphyValue` / `@ZorphyUnion` / `@ZorphyState` /
+  `@ZorphyIntent`). The legacy orchestrator, the 14 legacy generators, the
+  legacy hierarchy emitters and the plugin pipeline are deleted, along with the
+  dead legacy analyzer layer (`class_analyzer`, `annotation_parser`,
+  `class_graph`, `field_resolver`, `interface_collector`, `generation_config`).
+  `ZorphyGenerator` no longer registers the legacy type checkers and emits only
+  the v3 surface.
+- **No generated archetype emits `fromJson` / `toJson` (#188, #233).** The v3
+  wire codecs (`fromWire` / `toWire`) are unconditional; the legacy JSON codec
+  generation is gone.
+- The cross-entity import detector now recognizes every v3 archetype
+  annotation, not just the legacy `@Zorphy` / `@Zorphy2`.
+- The CLI entity scaffolder emits v3 archetypes (`@ZorphyEntity(principalKey:
+  #id)` / `@ZorphyValue()` / `@ZorphyUnion()`) and no longer writes a
+  json_serializable `.g.dart` part; `project_validator` scans for the v3
+  archetypes.
+
 ### Added
 
 - `dart run zorphy:migrate_v3 <path>` — a v2 → v3 AST migration codemod

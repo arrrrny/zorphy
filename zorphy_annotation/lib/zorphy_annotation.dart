@@ -28,11 +28,10 @@ library zorphy_annotation;
 
 // Export all annotations.
 //
-// `src/annotations.dart` is the legacy (pre-v3) annotation surface, exported
-// again so the generator and `zorphy_migrator` keep compiling while they are
-// ported onto the archetypes (#177, #178, #181, #187).
+// The v3 archetype surface is the only class annotation API (issue #233
+// removed the legacy `@Zorphy` / `@Zorphy2` / `ZorphyPreset` /
+// `generate*` surface after the v3 migration gate).
 export 'zorphy.dart';
-export 'src/annotations.dart';
 export 'src/archetype_bases.dart';
 export 'src/archetypes.dart';
 export 'src/intent.dart';

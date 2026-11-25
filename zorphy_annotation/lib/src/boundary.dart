@@ -13,7 +13,7 @@
 /// ```
 library;
 
-import 'package:collection/collection.dart';
+import 'equality.dart';
 
 /// The outcome of decoding untrusted data against an expected type [T].
 ///

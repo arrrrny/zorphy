@@ -27,8 +27,9 @@ class ProjectValidator {
   ProjectValidator({required this.projectDir, List<String>? sourceDirs})
     : sourceDirs = sourceDirs ?? const ['lib'];
 
-  /// Check if the file content has actual @Zorphy or @zorphy annotations
-  /// (not in comments or string literals).
+  /// Check if the file content has a v3 archetype annotation
+  /// (`@ZorphyEntity` / `@ZorphyValue` / `@ZorphyUnion` / `@ZorphyState` /
+  /// `@ZorphyIntent`), not in comments or string literals.
   bool _hasZorphyAnnotation(String content) {
     try {
       final parsed = parseString(content: content);
@@ -38,7 +39,7 @@ class ProjectValidator {
         if (declaration is ClassDeclaration) {
           for (final metadata in declaration.metadata) {
             final name = metadata.name.name;
-            if (name == 'Zorphy' || name == 'zorphy') {
+            if (name.startsWith('Zorphy')) {
               return true;
             }
           }
@@ -47,7 +48,7 @@ class ProjectValidator {
       return false;
     } catch (e) {
       // If parsing fails, fall back to string search to avoid missing files
-      return content.contains('@Zorphy(') || content.contains('@zorphy(');
+      return content.contains('@Zorphy');
     }
   }
 

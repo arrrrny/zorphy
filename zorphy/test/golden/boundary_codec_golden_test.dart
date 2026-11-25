@@ -367,6 +367,8 @@ void main() {
       expect(compact, contains('_boundaryPrefix(error.violations,path_lines)'));
       expect(compact, contains("path_lines='/lines'+'[\$i]'"));
       expect(compact, contains('decoded_lines=<OrderLine>[]'));
+      // The decoded node (the fold's `value`) is added, not the raw JSON map.
+      expect(compact, contains('decoded_lines.add(value)'));
       expect(compact, isNot(contains('asList<OrderLine>')));
     });
 
@@ -488,7 +490,9 @@ void main() {
           ),
         ]),
       );
-      expect(compact, contains('decoded_byId[entry.key]=element_byId;'));
+      // The decoded node (the fold's `value`), not the raw JSON map, is what
+      // lands in the result — and the arrow closure carries no trailing `;`.
+      expect(compact, contains('decoded_byId[entry.key]=value'));
       expect(compact, contains('OrderLine.fromWire(element_byId)'));
       expect(compact, contains("path_byId='/byId'+'/'+entry.key"));
     });

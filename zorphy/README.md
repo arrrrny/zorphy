@@ -1,5 +1,21 @@
 # Zorphy
 
+> **⚠️ v3.0.0 — zero-preset archetypes only.** The legacy `@Zorphy` /
+> `@Zorphy2` / `ZorphyPreset` / `generate*` surface was removed after the v3
+> migration gate (#233). A class is now annotated with exactly one archetype —
+> `@ZorphyEntity(principalKey: #id)`, `@ZorphyValue()`, `@ZorphyUnion()`,
+> `@ZorphyState` or `@ZorphyIntent` — and the generated surface (class shape,
+> `fromWire`/`toWire` codecs, patches, lenses, mocks) is unconditional. Migrate
+> an existing v2 codebase with the bundled codemod:
+>
+> ```bash
+> dart run zorphy:migrate_v3 <path>          # dry-run preview
+> dart run zorphy:migrate_v3 <path> --apply  # rewrite in place
+> ```
+>
+> The sections below that still show `@Zorphy(...)` / `preset:` are historical
+> v2 examples; the archetype surface above is the API of record.
+
 **Zorphy** is a powerful code generation package for Dart/Flutter that provides clean, immutable class definitions with advanced features including copyWith methods, JSON serialization, equality, toString, inheritance support, and sophisticated patch mechanisms.
 
 ## ✨ Features

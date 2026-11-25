@@ -1,5 +1,3 @@
-import 'package:zorphy_annotation/zorphy_annotation.dart';
-
 import '../models/entity_config.dart';
 
 /// Generates entity template code
@@ -20,26 +18,12 @@ class EntityTemplateGenerator {
         .replaceAll('\t', '\\t'); // tab
   }
 
-  /// Normalizes a subtype name the same way [EntityCreator._formatClassName]
-  /// does, so annotation references match the generated subtype classes
-  /// (e.g. `default_display_mode:DEFAULT_MODE` → `DefaultDisplayMode`).
-  static String _formatSubtypeClassName(String subtype) {
-    final name = subtype.split(':').first.replaceAll(r'$', '').trim();
-    final parts = name.split(RegExp(r'[_\s\-]+'));
-    return parts
-        .map((part) {
-          if (part.isEmpty) return '';
-          return part[0].toUpperCase() + part.substring(1);
-        })
-        .join('');
-  }
-
   /// Generate entity file content
   static String generate(EntityConfig config, List<String> imports) {
     final buffer = StringBuffer();
 
     _writeHeader(buffer);
-    _writeImports(buffer, imports, includeUuidImport: config.autoId);
+    _writeImports(buffer, imports);
     _writePartDirectives(buffer, config);
     _writeClassDefinition(buffer, config);
 
@@ -75,18 +59,10 @@ class EntityTemplateGenerator {
     buffer.writeln();
   }
 
-  static void _writeImports(
-    StringBuffer buffer,
-    List<String> imports, {
-    bool includeUuidImport = false,
-  }) {
+  static void _writeImports(StringBuffer buffer, List<String> imports) {
     buffer.writeln(
       "import 'package:zorphy_annotation/zorphy_annotation.dart';",
     );
-
-    if (includeUuidImport) {
-      buffer.writeln("import 'package:uuid/uuid.dart';");
-    }
 
     if (imports.isNotEmpty) {
       final sorted = imports.toList()..sort();
@@ -99,10 +75,6 @@ class EntityTemplateGenerator {
 
   static void _writePartDirectives(StringBuffer buffer, EntityConfig config) {
     buffer.writeln("part '${config.snakeName}.zorphy.dart';");
-
-    if (config.generateJson && !config.isSealed && !config.isNonSealed) {
-      buffer.writeln("part '${config.snakeName}.g.dart';");
-    }
     buffer.writeln();
   }
 
@@ -111,17 +83,14 @@ class EntityTemplateGenerator {
     EntityConfig config,
   ) {
     buffer.writeln("part '${config.snakeName}.zorphy.dart';");
-    if (config.generateJson) {
-      buffer.writeln("part '${config.snakeName}.g.dart';");
-    }
     buffer.writeln();
   }
 
   static void _writeClassDefinition(StringBuffer buffer, EntityConfig config) {
-    final annotationOptions = _buildAnnotationOptions(config);
+    final annotation = _buildAnnotation(config);
 
     buffer.writeln('/// ${config.className} entity');
-    buffer.writeln('@Zorphy(${annotationOptions.join(', ')})');
+    buffer.writeln(annotation);
 
     final abstractClassName = config.isSealed || config.isNonSealed
         ? '\$\$${config.className}'
@@ -150,7 +119,7 @@ class EntityTemplateGenerator {
     }
     buffer.writeln();
 
-    _writeFields(buffer, config.fields, prependAutoId: config.autoId);
+    _writeFields(buffer, config.fields);
 
     _writeStatics(buffer, config.staticMembers);
 
@@ -164,23 +133,10 @@ class EntityTemplateGenerator {
     String parentClassName,
     bool parentIsSealed,
   ) {
-    final annotationOptions = <String>[];
-    if (config.generateJson) annotationOptions.add('generateJson: true');
-    if (config.generateCopyWithFn)
-      annotationOptions.add('generateCopyWithFn: true');
-    if (config.generateCompareTo)
-      annotationOptions.add('generateCompareTo: true');
-    if (config.generateFilter) annotationOptions.add('generateFilter: true');
-    if (config.subtypeWireValue != null) {
-      annotationOptions.add(
-        "subtypeWireValue: '${escapeDartStringLiteral(config.subtypeWireValue!)}'",
-      );
-    }
-
     buffer.writeln(
       '/// ${config.className} entity (subtype of $parentClassName)',
     );
-    buffer.writeln('@Zorphy(${annotationOptions.join(', ')})');
+    buffer.writeln('@ZorphyValue()');
 
     final parentRef = parentIsSealed || config.isNonSealed
         ? '\$\$$parentClassName'
@@ -213,37 +169,19 @@ class EntityTemplateGenerator {
     return '\$$name';
   }
 
-  static List<String> _buildAnnotationOptions(EntityConfig config) {
-    final options = <String>[];
-    if (config.kind != ZorphyKind.entity) {
-      options.add('kind: ZorphyKind.${config.kind.name}');
+  /// Builds the v3 archetype annotation for [config].
+  ///
+  /// The v3 surface is zero-toggle (issue #233): a sealed class is a
+  /// `@ZorphyUnion`, an entity with its own identity is an
+  /// `@ZorphyEntity(principalKey: #id)`, and everything else is a
+  /// `@ZorphyValue`. The legacy `generate*` / `kind` / `autoId` /
+  /// `typeKey` toggles are gone.
+  static String _buildAnnotation(EntityConfig config) {
+    if (config.isSealed) return '@ZorphyUnion()';
+    if (config.kind == ZorphyKind.entity) {
+      return '@ZorphyEntity(principalKey: #id)';
     }
-    if (config.autoId) options.add('autoId: true');
-    if (config.generateJson) options.add('generateJson: true');
-    if (config.generateCopyWithFn) options.add('generateCopyWithFn: true');
-    if (config.generateCompareTo) options.add('generateCompareTo: true');
-    if (config.isNonSealed) options.add('nonSealed: true');
-    if (config.generateFilter) options.add('generateFilter: true');
-    if (config.typeKey != null) {
-      options.add("typeKey: '${escapeDartStringLiteral(config.typeKey!)}'");
-    }
-    if (config.subtypeWireValue != null) {
-      options.add(
-        "subtypeWireValue: '${escapeDartStringLiteral(config.subtypeWireValue!)}'",
-      );
-    }
-
-    if (config.explicitSubtypes.isNotEmpty) {
-      // Strip optional :wireValue suffix from subtype names and normalize
-      // them with the same class-name rules EntityCreator uses, so the
-      // annotation references match the generated subtype classes.
-      final subtypes = config.explicitSubtypes
-          .map((s) => '\$${_formatSubtypeClassName(s)}')
-          .join(', ');
-      options.add("explicitSubTypes: [$subtypes]");
-    }
-
-    return options;
+    return '@ZorphyValue()';
   }
 
   /// Generate inline subtype (for sealed classes)
@@ -256,17 +194,8 @@ class EntityTemplateGenerator {
   ) {
     final buffer = StringBuffer();
 
-    final annotationOptions = <String>[];
-    if (parentConfig.generateJson) annotationOptions.add('generateJson: true');
-    if (parentConfig.generateCopyWithFn)
-      annotationOptions.add('generateCopyWithFn: true');
-    if (parentConfig.generateCompareTo)
-      annotationOptions.add('generateCompareTo: true');
-    if (parentConfig.generateFilter)
-      annotationOptions.add('generateFilter: true');
-
     buffer.writeln('/// $subtypeName entity (subtype of $parentClassName)');
-    buffer.writeln('@Zorphy(${annotationOptions.join(', ')})');
+    buffer.writeln('@ZorphyValue()');
 
     final parentRef = parentIsSealed || parentConfig.isNonSealed
         ? '\$\$$parentClassName'

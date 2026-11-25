@@ -1,3 +1,14 @@
+## [Unreleased]
+
+### Changed (BREAKING — v3.0.0)
+
+- **`lean` subcommand removed (#233).** The v3 zero-preset archetypes have no
+  presets to minimize, so the `lean` subcommand and its detector are gone. The
+  `migrate` subcommand now emits the zero-preset v3 archetypes
+  (`@ZorphyEntity(principalKey: #id)` / `@ZorphyValue()` / `@ZorphyUnion()`)
+  instead of `@Zorphy(preset: …)`, and the smoke corpus validates migration
+  into the v3 surface rather than back into the legacy one.
+
 ## [3.0.0] - 2026-11-17
 
 ### Change

@@ -60,13 +60,17 @@ void main() {
         };
 
         final expectedAnnotationDeps = <String, String>{
-          'collection': '^1.19.1',
-          // issue #189 added `crypto`: `ZorphyIntentDigest` needs SHA-256 over
-          // the canonical intent payload, and stdlib has no digest.
+          // issue #233 reconciled the #176 zero-dependency gate against the
+          // runtime requirements (#175): the v3 annotation surface keeps
+          // `crypto` (ZorphyIntentDigest needs SHA-256 over the canonical
+          // intent payload) and `json_annotation` (`@JsonKey` is the v3
+          // field-level wire annotation the generator reads by name and the
+          // migrator emits — re-exported for the documented single import).
+          // The former `collection` / `meta` / `quiver` deps were removed —
+          // collection's List/Map equality is now a local shim, and the
+          // quiver/meta re-exports are gone.
           'crypto': '^3.0.7',
           'json_annotation': '^4.12.0',
-          'meta': '^1.17.0',
-          'quiver': '^3.2.2',
         };
 
         final expectedZorphyDevDeps = <String, String>{

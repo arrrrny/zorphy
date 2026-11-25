@@ -55,7 +55,7 @@ class Plain {}
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'self_ref.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$SelfRef {
   \$SelfRef get parent;
   String get id;
@@ -78,7 +78,7 @@ abstract class \$SelfRef {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'self_ref.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$SelfRef {
   SelfRef get parent;
   String get id;
@@ -101,7 +101,7 @@ abstract class \$SelfRef {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
   bool get summarized;
@@ -123,7 +123,7 @@ abstract class \$ArtifactStore {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   \$ArtifactRef? get ref;
 }
@@ -137,7 +137,7 @@ abstract class \$Holder {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   final \$ArtifactRef ref;
   String get id;
@@ -154,7 +154,7 @@ abstract class \$Holder {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   List<\$ArtifactRef> get refs;
 }
@@ -168,7 +168,7 @@ abstract class \$Holder {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   Map<String, \$ArtifactRef> get refs;
 }
@@ -182,7 +182,7 @@ abstract class \$Holder {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'composite.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Composite {
   \$ArtifactRef get ref;
   \$Issue117Ref get issue;
@@ -210,7 +210,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../artifact_ref/artifact_ref.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
   bool get summarized;
@@ -231,7 +231,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import 'package:my_app/src/domain/entities/artifact_ref/artifact_ref.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
 }
@@ -247,7 +247,7 @@ abstract class \$ArtifactStore {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
 }
@@ -269,7 +269,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../other/artifact_ref.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   \$Ref get ref;
 }
@@ -291,7 +291,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../ref/ref.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   \$Ref get ref;
 }
@@ -433,7 +433,7 @@ final doc = 'Usage: import "fake_import.dart";';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
 }
@@ -451,7 +451,7 @@ abstract class \$ArtifactStore {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'composite.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Composite {
   \$ArtifactRef get ref;
   \$Issue117Ref get issue;
@@ -474,7 +474,7 @@ abstract class \$Composite {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   \$ArtifactRef get ref;
 }
@@ -492,7 +492,7 @@ abstract class \$Holder {
 
     group('issue #117 regression', () {
       // The exact fixture from the issue body:
-      //   @Zorphy()
+      //   @ZorphyValue()
       //   abstract class $ArtifactStoreResult {
       //     $ArtifactRef get ref;
       //     bool get summarized;
@@ -509,7 +509,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'artifact_store_result.zorphy.dart';
 part 'artifact_store_result.g.dart';
 
-@Zorphy(generateJson: true, generateCompareTo: true)
+@ZorphyValue()
 abstract class \$ArtifactStoreResult {
   \$ArtifactRef get ref;
   bool get summarized;
@@ -534,7 +534,7 @@ import '../artifact_ref/artifact_ref.dart';
 part 'artifact_store_result.zorphy.dart';
 part 'artifact_store_result.g.dart';
 
-@Zorphy(generateJson: true, generateCompareTo: true)
+@ZorphyValue()
 abstract class \$ArtifactStoreResult {
   \$ArtifactRef get ref;
   bool get summarized;

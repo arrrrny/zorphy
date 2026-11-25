@@ -596,6 +596,15 @@ class BoundaryCodecEmitter {
     final List<Code> body;
     switch (elementShape) {
       case _Shape.node:
+        // The decoded node is the fold's success value, NOT the raw
+        // `element_$suffix` map: substitute it into the assignment and drop
+        // the trailing `;` (the assign is spliced into an arrow closure, not
+        // a block). Without this the list/map element decode added the raw
+        // JSON map and emitted `(value) => decoded.add(element);`, which does
+        // not parse.
+        final nodeAssign = assign
+            .replaceAll(variable, 'value')
+            .replaceFirst(RegExp(r';\s*$'), '');
         body = [
           Code(
             '    final $variable = '
@@ -603,8 +612,8 @@ class BoundaryCodecEmitter {
           ),
           Code('    if ($variable != null) {'),
           Code(
-            '      $elementType.fromWire($variable).fold('
-            '(value) => $assign, '
+            '      $elementType.fromWire($variable).fold'
+            '((value) => $nodeAssign, '
             '(error) => violations.addAll('
             '_boundaryPrefix(error.violations, $pathVar)));',
           ),

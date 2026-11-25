@@ -149,8 +149,9 @@ class FreezedClassModel {
   /// and is not @unfreezed.
   bool get isMigratable => !isUnfreezed && manualItems.isEmpty;
 
-  /// True when the class provably uses only lean-preset features:
-  /// no union, no defaults, plain fields only.
-  bool get isLeanEligible =>
-      !isUnion && fields.every((f) => f.defaultExpression == null);
+  /// Whether the class carries a `String id` field — the v3 signal that it
+  /// is an aggregate root, so the migrator annotates it
+  /// `@ZorphyEntity(principalKey: #id)` rather than `@ZorphyValue()`.
+  bool get hasStringId =>
+      fields.any((f) => f.name == 'id' && f.type == 'String');
 }

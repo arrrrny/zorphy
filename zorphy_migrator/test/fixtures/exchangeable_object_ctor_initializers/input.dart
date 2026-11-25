@@ -4,7 +4,5 @@ class BadgeView_ {
   String text;
 
   @ExchangeableObjectConstructor()
-  BadgeView_({
-    required this.text,
-  }) : assert(text.length < 100);
+  BadgeView_({required this.text}) : assert(text.length < 100);
 }
