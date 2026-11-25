@@ -17,8 +17,10 @@ import '../models/doctor_result.dart';
 
 /// Functional type for listing .zorphy.dart files recursively.
 /// Returns absolute paths of all matching files.
-typedef FindGeneratedFilesFunction =
-    List<String> Function(String projectDir, {List<String> sourceDirs});
+typedef FindGeneratedFilesFunction = List<String> Function(
+  String projectDir, {
+  List<String> sourceDirs,
+});
 
 /// Functional type for deleting a single file.
 /// Returns true if the file was successfully deleted.
@@ -26,12 +28,11 @@ typedef DeleteFileFunction = bool Function(String path);
 
 /// Functional type for running a subprocess (named differently to
 /// avoid export collision with version_checker's RunProcessFunction).
-typedef DoctorProcessRunner =
-    Future<ProcessResult> Function(
-      String executable,
-      List<String> args, {
-      String? workingDirectory,
-    });
+typedef DoctorProcessRunner = Future<ProcessResult> Function(
+  String executable,
+  List<String> args, {
+  String? workingDirectory,
+});
 
 /// Functional type for reading a file's content.
 typedef ReadFileFunction = String Function(String path);
