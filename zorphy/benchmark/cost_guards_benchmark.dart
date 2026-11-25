@@ -7,10 +7,12 @@
 // fails loudly at build time. This launcher is that prerequisite made explicit:
 //
 //   1. It runs the production generator scoped to the benchmark fixture
-//      (`dart run build_runner build --build-filter 'benchmark/**'`), which
-//      writes `_br_/benchmark/cost_guard_fixtures.part.dart`. If generation
-//      fails, the launcher exits non-zero BEFORE any guard runs — the loud
-//      failure the acceptance gate names.
+//      (`dart run build_runner build --delete-conflicting-outputs
+//      --build-filter 'benchmark/**'` — the same flag CI uses, so a second run
+//      in a checkout with an existing `_br_` cannot abort on conflicting
+//      outputs), which writes `_br_/benchmark/cost_guard_fixtures.part.dart`.
+//      If generation fails, the launcher exits non-zero BEFORE any guard runs
+//      — the loud failure the acceptance gate names.
 //   2. It then spawns `benchmark/cost_guards_impl.dart`, which imports the
 //      generated classes and measures them. Because that library only compiles
 //      against real generated output, removing a surface from the generator
@@ -49,6 +51,7 @@ void main() async {
     'run',
     'build_runner',
     'build',
+    '--delete-conflicting-outputs',
     '--build-filter',
     'benchmark/**',
   ], root.toFilePath());

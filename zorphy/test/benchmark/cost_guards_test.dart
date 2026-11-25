@@ -23,6 +23,8 @@
 // INCONCLUSIVE (host overloaded / too noisy); the release gate treats anything
 // but exit 0 as NOT passing, so it can never close on an inconclusive result.
 
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
@@ -48,32 +50,115 @@ Directory _packageRoot() {
       dir = parent;
     }
   }
-  // Fall back to the cwd; the assertion below will surface a clear error if it
-  // is wrong.
-  return Directory.current;
+  // A cwd that is neither the package root nor under it is a mis-invocation;
+  // falling back to it hides the real problem behind a confusing `dart run`
+  // "No such file" error. Fail here so the cause is self-explanatory.
+  fail('could not locate zorphy package root from ${Directory.current}');
+}
+
+/// The captured result of [runWithDeadline].
+final class _RunResult {
+  const _RunResult(this.exitCode, this.stdout, this.stderr);
+
+  final int exitCode;
+  final String stdout;
+  final String stderr;
+}
+
+/// Runs the benchmark launcher asynchronously, capturing both output streams,
+/// and waits at most [deadline]. An asynchronous wait keeps the test isolate
+/// responsive to its own timeout: `Process.runSync` would block that isolate
+/// (and package:test's timer with it) until the subprocess exits. On expiry the
+/// launcher AND the children it spawned (build_runner, the impl) are killed,
+/// and a sentinel exit code of -1 is returned so the assertions below fail with
+/// the captured output as their reason.
+Future<_RunResult> runWithDeadline(
+  String executable,
+  List<String> args, {
+  required String cwd,
+  required Duration deadline,
+}) async {
+  final process = await Process.start(executable, args, workingDirectory: cwd);
+  final stdout = StringBuffer();
+  final stderr = StringBuffer();
+  final stdoutSub = process.stdout.transform(utf8.decoder).listen(stdout.write);
+  final stderrSub = process.stderr.transform(utf8.decoder).listen(stderr.write);
+  final stdoutDone = stdoutSub.asFuture<void>();
+  final stderrDone = stderrSub.asFuture<void>();
+
+  final exitCode = await process.exitCode.timeout(
+    deadline,
+    onTimeout: () async {
+      await _killProcessTree(process.pid);
+      return -1;
+    },
+  );
+  await Future.wait(<Future<void>>[stdoutDone, stderrDone]);
+  return _RunResult(exitCode, stdout.toString(), stderr.toString());
+}
+
+/// Terminates [rootPid] and every descendant. The launcher spawns build_runner
+/// and the impl as independent processes, so killing it alone would leave them
+/// running after a timeout.
+Future<void> _killProcessTree(int rootPid) async {
+  if (Platform.isWindows) {
+    await Process.run('taskkill', <String>['/PID', '$rootPid', '/T', '/F']);
+    return;
+  }
+  // One bounded process snapshot (ps, not a filesystem walk), then a BFS from
+  // the launcher. Snapshot first: a child reparented after its parent dies
+  // could otherwise be missed.
+  final snapshot = await Process.run('ps', <String>['-ax', '-o', 'pid=,ppid=']);
+  final children = <int, List<int>>{};
+  for (final line in (snapshot.stdout as String).split('\n')) {
+    final parts = line.trim().split(RegExp(r'\s+'));
+    if (parts.length < 2) continue;
+    final pid = int.tryParse(parts[0]);
+    final ppid = int.tryParse(parts[1]);
+    if (pid == null || ppid == null) continue;
+    children.putIfAbsent(ppid, () => <int>[]).add(pid);
+  }
+  final pending = <int>[rootPid];
+  final seen = <int>{rootPid};
+  while (pending.isNotEmpty) {
+    final pid = pending.removeLast();
+    try {
+      Process.killPid(pid, ProcessSignal.sigkill);
+    } on Object {
+      // Already exited — nothing left to terminate.
+    }
+    for (final child in children[pid] ?? const <int>[]) {
+      if (seen.add(child)) pending.add(child);
+    }
+  }
 }
 
 void main() {
   group('Chord v2 cost guards (ISSUE-018 / #234)', () {
     test(
       'the generated-code benchmark passes all four guards (exit 0, green)',
-      () {
+      () async {
         final root = _packageRoot();
         final dart = Platform.resolvedExecutable;
-        final result = Process.runSync(dart, <String>[
-          'run',
-          'benchmark/cost_guards_benchmark.dart',
-        ], workingDirectory: root.path);
+        // The internal deadline is shorter than the test's timeout so a stalled
+        // generation is killed and reported here, rather than leaving package:test
+        // to tear down an isolate whose child processes are still alive.
+        final result = await runWithDeadline(
+          dart,
+          <String>['run', 'benchmark/cost_guards_benchmark.dart'],
+          cwd: root.path,
+          deadline: const Duration(minutes: 4),
+        );
 
         final out = '${result.stdout}\n${result.stderr}';
         expect(
           result.exitCode,
           0,
           reason:
-              'benchmark exited ${result.exitCode} (1=RED, 2=INCONCLUSIVE; a '
-              'compile failure here means a generated surface the guards name '
-              '— diff / changeTo* / resolvePath / fromWire — is missing):\n'
-              '$out',
+              'benchmark exited ${result.exitCode} (-1=TIMEOUT, 1=RED, '
+              '2=INCONCLUSIVE; a compile failure here means a generated surface '
+              'the guards name — diff / changeTo* / resolvePath / fromWire — is '
+              'missing):\n$out',
         );
         expect(
           result.stdout,

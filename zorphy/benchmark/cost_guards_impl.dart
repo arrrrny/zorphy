@@ -23,8 +23,9 @@
 //   2. No-op patch identity — `ProductPatch.diff(e, e).apply(e)` returns the
 //      SAME instance and runs in < 50 ns/call.
 //   3. Polymorphic JSON-Pointer lens lookup — generated `resolvePath('/…')`
-//      resolves in < 200 ns/lookup, dispatching on the runtime subtype and
-//      descending into a nested value (`/editDraft/price`).
+//      plus the lens `get` that dispatches on the runtime subtype complete in
+//      < 200 ns/lookup; the nested value (`/editDraft/price`) is checked for
+//      correctness.
 //   4. Boundary validation throughput — the sealed `Task.fromWire` validates
 //      10_000 polymorphic entities in < 30 ms through the trusted constructors.
 
@@ -129,14 +130,17 @@ CostGuardReport guard2NoOpPatch(bool loadAdmitted) {
 
 // Guard 3 — polymorphic JSON-Pointer lens lookup latency.
 //
-// Measures the GENERATED `UiNode` hierarchy's `resolvePath` dispatching on the
-// runtime subtype — the polymorphic lookup this guard is named for. A segment
-// the receiver does not carry (`/text` on a button) answers null rather than
-// throwing, and the nested `ProductUiState.resolvePath('/editDraft/price')`
-// composed pointer is asserted for CORRECTNESS (it descends into the nested
-// value); its heavier string-parse + recursion + lens-composition cost is a
-// distinct "nested descent" capability, not the subtype dispatch the 200 ns
-// budget names.
+// Measures the GENERATED `UiNode` hierarchy's full polymorphic READ:
+// `resolvePath` resolves the pointer to a lens, and the lens `get` dispatches
+// on the runtime subtype (`switch (root) { ZfaButtonNode _node => … }`). The
+// subtype switch lives in the lens `get`, so timing `resolvePath` alone would
+// only measure the static pointer→lens table lookup and miss the polymorphic
+// dispatch the guard is named for. A segment the receiver does not carry
+// (`/text` on a button) answers null rather than throwing, and the nested
+// `ProductUiState.resolvePath('/editDraft/price')` composed pointer is asserted
+// for CORRECTNESS (it descends into the nested value); its heavier string-parse
+// + recursion + lens-composition cost is a distinct "nested descent"
+// capability, not the subtype dispatch the 200 ns budget names.
 CostGuardReport guard3PolymorphicResolvePath(bool loadAdmitted) {
   final button = ZfaButtonNode.fromTrusted(
     contractId: 'c1',
@@ -163,11 +167,14 @@ CostGuardReport guard3PolymorphicResolvePath(bool loadAdmitted) {
     budget: budgetNs,
     loadAdmitted: loadAdmitted,
     collect: () => List<int>.generate(sampleCount, (_) {
+      // Include the lens `get`: that is where the generated subtype switch
+      // (`node is ZfaButtonNode ? … : null`) actually dispatches, so timing
+      // only `resolvePath` would miss the polymorphic read.
       final nanosLabel = meanNanos(50_000, (_) {
-        UiNode.resolvePath('/label');
+        UiNode.resolvePath('/label')?.get(button);
       });
       final nanosText = meanNanos(50_000, (_) {
-        UiNode.resolvePath('/text');
+        UiNode.resolvePath('/text')?.get(button);
       });
       return nanosLabel > nanosText ? nanosLabel : nanosText;
     }),
