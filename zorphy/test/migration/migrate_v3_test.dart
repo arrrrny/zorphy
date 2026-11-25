@@ -186,6 +186,65 @@ User decode(Map a, Map b) {
       expect(annotationLine, isNot(contains('@ZorphyValue()')));
       expect(out, isNot(contains('@Zorphy(')));
     });
+
+    test('id propagates transitively through a cross-file parent', () {
+      // $Root declares `id`; $Middle (other file) implements $Root; $Leaf
+      // (another file) implements $Middle. Only the edges let $Leaf stay an
+      // entity instead of falling back to @ZorphyValue() (#238).
+      const root = '''
+@Zorphy()
+abstract class \$Root {
+  String get id;
+}
+''';
+      const middle = '''
+@Zorphy()
+abstract class \$Middle implements \$Root {}
+''';
+      const leaf = '''
+@Zorphy()
+abstract class \$Leaf implements \$Middle {}
+''';
+      final edges = <String, List<String>>{
+        ...V3Codemod.inheritanceEdgesIn(root),
+        ...V3Codemod.inheritanceEdgesIn(middle),
+        ...V3Codemod.inheritanceEdgesIn(leaf),
+      };
+      final codemod = V3Codemod(
+        knownEntityRoots: V3Codemod.entityRootsIn(root),
+        inheritanceEdges: edges,
+      );
+
+      final out = codemod.transform(leaf);
+      expect(out, contains('@ZorphyEntity(principalKey: #id)'));
+      expect(out, isNot(contains('@ZorphyValue()')));
+    });
+
+    test('a local parent wins over a same-named global entity root', () {
+      // Another file declares an entity `$Base` with `id`; this file declares
+      // its own `$Base` WITHOUT `id`. The child must stay a value — global
+      // bare-name matching must not override the local declaration (#238).
+      const local = '''
+@Zorphy()
+abstract class \$Base {}
+
+@Zorphy()
+abstract class \$Child extends \$Base {}
+''';
+      const foreign = '''
+@Zorphy()
+abstract class \$Base {
+  String get id;
+}
+''';
+      final codemod = V3Codemod(
+        knownEntityRoots: V3Codemod.entityRootsIn(foreign),
+      );
+
+      final out = codemod.transform(local);
+      expect(out, isNot(contains('@ZorphyEntity(principalKey: #id)')));
+      expect('@ZorphyValue()'.allMatches(out), hasLength(2));
+    });
   });
 
   group('v3 codemod — type-correct fromWire rewrites', () {
@@ -222,8 +281,9 @@ Product load(Map<String, Object?> map) {
       expect(out, isNot(contains('Product.fromJson')));
     });
 
-    test('a bare-expression fromJson call is left as a BoundaryResult', () {
-      // No type context to preserve — the result is the natural value.
+    test('an argument-position fromJson call gets .getOrThrow()', () {
+      // `print(...)` takes an argument, not a discarded expression statement:
+      // the result is consumed as a value, so unwrap it (#238).
       const source = '''
 @Zorphy(generateJson: true)
 abstract class \$Product {
@@ -235,9 +295,102 @@ void log(Map<String, Object?> map) {
 }
 ''';
       final out = codemod.transform(source);
-      expect(out, contains('Product.fromWire(map)'));
-      expect(out, isNot(contains('.getOrThrow()')));
+      expect(out, contains('print(Product.fromWire(map).getOrThrow())'));
       expect(out, isNot(contains('Product.fromJson')));
+    });
+
+    test('a discarded fromJson call keeps the BoundaryResult', () {
+      const source = '''
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+
+void ignore(Map<String, Object?> map) {
+  Product.fromJson(map);
+}
+''';
+      final out = codemod.transform(source);
+      expect(out, contains('Product.fromWire(map);'));
+      expect(out, isNot(contains('.getOrThrow()')));
+    });
+
+    test('nested value positions unwrap the BoundaryResult', () {
+      const source = '''
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+
+Product accept(Product p) => p;
+
+Product nested(Map<String, Object?> map, Product fallback) {
+  final a = Product.fromJson(map) ?? fallback;
+  final b = true ? Product.fromJson(map) : fallback;
+  final c = accept(Product.fromJson(map));
+  final d = <Product>[Product.fromJson(map)];
+  final e = (Product.fromJson(map)).id;
+  return a;
+}
+''';
+      final out = codemod.transform(source);
+      expect(out, isNot(contains('Product.fromJson')));
+      expect(
+        'Product.fromWire(map).getOrThrow()'.allMatches(out),
+        hasLength(5),
+      );
+    });
+
+    test('a typed instance fromJson call rewrites to the static type call', () {
+      // The generated `fromWire` is static, so `codec.fromWire(map)` would not
+      // compile; the receiver must become the declared zorphy type (#238).
+      const source = '''
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+
+Product decode(Product codec, Map<String, Object?> map) =>
+    codec.fromJson(map);
+''';
+      final out = codemod.transform(source);
+      expect(out, contains('Product.fromWire(map).getOrThrow()'));
+      expect(out, isNot(contains('codec.fromWire')));
+      expect(out, isNot(contains('codec.fromJson')));
+    });
+
+    test('a stale v2 json_serializable part is dropped on migration', () {
+      const source = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'legacy.g.dart';
+
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+''';
+      final out = codemod.transform(source);
+      expect(out, isNot(contains("part 'legacy.g.dart';")));
+      expect(out, contains('@ZorphyEntity(principalKey: #id)'));
+    });
+
+    test('a json_serializable part is kept for other annotated classes', () {
+      const source = '''
+part 'legacy.g.dart';
+
+@JsonSerializable()
+class Other {
+  final int value;
+}
+
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+''';
+      final out = codemod.transform(source);
+      expect(out, contains("part 'legacy.g.dart';"));
     });
   });
 

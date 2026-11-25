@@ -8,7 +8,10 @@
 ///    `@ZorphyEntity(principalKey: #id)`, on an `id`-less class `@ZorphyValue()`;
 ///  - `@ZorphySealed` becomes `@ZorphyUnion`;
 ///  - `.fromJson(map)` becomes `.fromWire(map)` with a `// TODO(trust-boundary)`
-///    marker, and `.toJson()` becomes `.toWire()`.
+///    marker, and `.toJson()` becomes `.toWire()`. A `fromWire` result that is
+///    consumed as a value gains `.getOrThrow()`; a typed-instance `fromJson`
+///    receiver is rewritten to the static `Type.fromWire(map)` call, because
+///    the generated member is static (#235, #238).
 ///
 /// Codec rewrites are scoped to zorphy types: a call is migrated only when its
 /// receiver is the generated type of a v2-annotated declaration (a `$User`
@@ -57,11 +60,30 @@ class V3Codemod {
   /// `@ZorphyValue()` while its parent becomes `@ZorphyEntity(...)` — the
   /// invalid mixed-archetype hierarchy of #235 Case 2. Empty by default, in
   /// which case only same-file inheritance is walked.
+  ///
+  /// Names are BARE identifiers matched tree-wide: a package where two files
+  /// declare the same class name needs manual review, since an unrelated
+  /// `Base` carrying `id` could otherwise classify a local `Base`-derived
+  /// child as an entity. A parent declared in the file being transformed
+  /// always wins over this global set (see [_hasId]).
   final Set<String> knownEntityRoots;
+
+  /// Direct supertype names per class, keyed by class name, collected across
+  /// the WHOLE tree in the CLI's first pass.
+  ///
+  /// With [knownEntityRoots] alone, classification stops at the first parent
+  /// that does not itself declare `id`: `Leaf implements Middle` where
+  /// `Middle implements Root` and only `Root` declares `id` leaves `Leaf` a
+  /// value. These edges let [V3Codemod] walk that chain transitively (#238).
+  /// Bare names are matched tree-wide, with the same collision caveat as
+  /// [knownEntityRoots]. Empty by default — only same-file declarations are
+  /// walked then.
+  final Map<String, List<String>> inheritanceEdges;
 
   const V3Codemod({
     this.knownTypes = const <String>{},
     this.knownEntityRoots = const <String>{},
+    this.inheritanceEdges = const <String, List<String>>{},
   });
 
   /// The trust-boundary marker inserted beside every rewritten `fromWire`.
@@ -97,6 +119,26 @@ class V3Codemod {
     return roots;
   }
 
+  /// Direct superclass / mixin / interface names for each class in [source].
+  ///
+  /// The CLI unions these across the whole tree into
+  /// [V3Codemod.inheritanceEdges] so a class inheriting `id` through a parent
+  /// in another file is still classified as an entity (#238). An unparseable
+  /// file contributes no edges.
+  static Map<String, List<String>> inheritanceEdgesIn(String source) {
+    final unit = _parse(source);
+    if (unit == null) return <String, List<String>>{};
+    final edges = <String, List<String>>{};
+    for (final declaration in unit.declarations) {
+      if (declaration is ClassDeclaration) {
+        edges[declaration.namePart.typeName.lexeme] = _superTypeNames(
+          declaration,
+        );
+      }
+    }
+    return edges;
+  }
+
   /// Returns [source] with every v2 construct migrated to v3.
   String transform(String source) {
     final unit = _parse(source);
@@ -107,8 +149,16 @@ class V3Codemod {
     final variables = _zorphyVariables(unit, types);
 
     final spans = <_Span>[];
-    _collectAnnotations(unit, classes, knownEntityRoots, spans);
+    _collectAnnotations(
+      unit,
+      classes,
+      knownEntityRoots,
+      inheritanceEdges,
+      spans,
+    );
     _collectCodecs(unit, source, types, variables, spans);
+
+    if (spans.isNotEmpty) _collectStaleJsonParts(unit, spans);
 
     if (spans.isEmpty) return source;
     return _apply(source, spans);
@@ -172,9 +222,14 @@ class V3Codemod {
     return types;
   }
 
-  /// Names of variables, parameters and fields declared with a zorphy type.
-  static Set<String> _zorphyVariables(CompilationUnit unit, Set<String> types) {
-    final names = <String>{};
+  /// Variables, parameters and fields declared with a zorphy type, mapped to
+  /// that type's name. The type is needed to rewrite a typed instance's
+  /// `fromJson` into the static `Type.fromWire(...)` call (#238).
+  static Map<String, String> _zorphyVariables(
+    CompilationUnit unit,
+    Set<String> types,
+  ) {
+    final names = <String, String>{};
     unit.visitChildren(_TypedVariableVisitor(types, names));
     return names;
   }
@@ -184,6 +239,7 @@ class V3Codemod {
     CompilationUnit unit,
     Map<String, ClassDeclaration> classes,
     Set<String> knownEntityRoots,
+    Map<String, List<String>> inheritanceEdges,
     List<_Span> spans,
   ) {
     for (final declaration in unit.declarations) {
@@ -192,7 +248,13 @@ class V3Codemod {
         final name = meta.name.name;
         String? replacement;
         if (name == 'Zorphy' || name == 'Zorphy2') {
-          replacement = _classHasId(declaration, classes, knownEntityRoots)
+          replacement =
+              _classHasId(
+                declaration,
+                classes,
+                knownEntityRoots,
+                inheritanceEdges,
+              )
               ? '@ZorphyEntity(principalKey: #id)'
               : '@ZorphyValue()';
         } else if (name == 'ZorphySealed') {
@@ -206,28 +268,51 @@ class V3Codemod {
   }
 
   /// Whether [declaration] has a field (or getter) named `id`, declared
-  /// directly or inherited from a supertype / mixin declared in this file or,
-  /// via [knownEntityRoots], in another file of the tree being migrated.
+  /// directly or inherited transitively from a supertype declared in this
+  /// file, in another file ([knownEntityRoots]), or reached through
+  /// [inheritanceEdges].
   static bool _classHasId(
     ClassDeclaration declaration,
     Map<String, ClassDeclaration> classes,
-    Set<String> knownEntityRoots, [
-    Set<String>? seen,
-  ]) {
-    seen ??= <String>{};
-    if (!seen.add(declaration.namePart.typeName.lexeme)) return false;
+    Set<String> knownEntityRoots,
+    Map<String, List<String>> inheritanceEdges,
+  ) => _hasId(
+    declaration.namePart.typeName.lexeme,
+    classes,
+    knownEntityRoots,
+    inheritanceEdges,
+    <String>{},
+  );
 
-    if (_declaresId(declaration)) return true;
+  /// Resolve [name] through a declaration in the CURRENT FILE first; only
+  /// consult the whole-tree root set / inheritance edges for parents that are
+  /// not declared locally. This keeps a same-named global entity from
+  /// overriding a local non-entity parent (#238), while [inheritanceEdges]
+  /// carries classification transitively through cross-file parents.
+  /// [seen] breaks cycles in malformed hierarchies.
+  static bool _hasId(
+    String name,
+    Map<String, ClassDeclaration> classes,
+    Set<String> knownEntityRoots,
+    Map<String, List<String>> inheritanceEdges,
+    Set<String> seen,
+  ) {
+    if (!seen.add(name)) return false;
 
-    // An `id` inherited from a superclass, mixin or interface still makes the
-    // class an entity. A parent in another file is resolved through the
-    // whole-tree [knownEntityRoots] set (#235 Case 2); a parent in this file
-    // recurses through its real declaration.
-    for (final parentName in _superTypeNames(declaration)) {
-      if (knownEntityRoots.contains(parentName)) return true;
-      final parent = classes[parentName];
-      if (parent != null &&
-          _classHasId(parent, classes, knownEntityRoots, seen)) {
+    final local = classes[name];
+    if (local != null) {
+      if (_declaresId(local)) return true;
+      for (final parent in _superTypeNames(local)) {
+        if (_hasId(parent, classes, knownEntityRoots, inheritanceEdges, seen)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if (knownEntityRoots.contains(name)) return true;
+    for (final parent in inheritanceEdges[name] ?? const <String>[]) {
+      if (_hasId(parent, classes, knownEntityRoots, inheritanceEdges, seen)) {
         return true;
       }
     }
@@ -256,7 +341,7 @@ class V3Codemod {
     CompilationUnit unit,
     String source,
     Set<String> types,
-    Set<String> variables,
+    Map<String, String> variables,
     List<_Span> spans,
   ) {
     final visitor = _CodecVisitor();
@@ -269,9 +354,18 @@ class V3Codemod {
       final methodName = call.methodName;
       final name = methodName.name;
       if (name != 'fromJson' && name != 'toJson') continue;
-      if (!_isZorphyCall(call.target, types, variables)) continue;
+      final target = call.target;
+      if (!_isZorphyCall(target, types, variables)) continue;
 
       final start = methodName.offset;
+      // The generated `fromWire` is STATIC. A call on a typed instance would
+      // therefore still fail analysis — rewrite the receiver to its declared
+      // type so `codec.fromJson(map)` becomes `Product.fromWire(map)` (#238).
+      if (name == 'fromJson' &&
+          target is SimpleIdentifier &&
+          variables.containsKey(target.name)) {
+        spans.add(_Span(target.offset, target.end, variables[target.name]!));
+      }
       spans.add(
         _Span(
           start,
@@ -280,11 +374,11 @@ class V3Codemod {
         ),
       );
       if (name == 'fromJson') {
-        // `fromWire` returns `ZorphyBoundaryResult<T>`, not `T`. When the call
-        // sits in a context that expects the bare value (a returned or
-        // assigned expression), append `.getOrThrow()` so the migrated
-        // consumer still compiles (#235 Case 1). A bare-expression call has no
-        // type to preserve and keeps the result as-is.
+        // `fromWire` returns `ZorphyBoundaryResult<T>`, not `T`. Append
+        // `.getOrThrow()` wherever the result is consumed as a value, so
+        // arguments, operands, collection elements and chained access stay
+        // type-correct (#235 Case 1, #238). A genuinely discarded call keeps
+        // the wrapped result.
         if (_needsUnwrap(call)) {
           final end = call.offset + call.length;
           spans.add(_Span(end, end, '.getOrThrow()'));
@@ -303,33 +397,62 @@ class V3Codemod {
     }
   }
 
-  /// Whether [call]'s result is consumed as a bare value — a `return` or an
-  /// assignment RHS — so the `BoundaryResult` must be unwrapped with
-  /// `.getOrThrow()` to keep the consumer type-correct (#235 Case 1).
+  /// Drops a v2 file's `part '*.g.dart';` directive once its zorphy classes are
+  /// migrated: v3 emits wire codecs instead of `@JsonSerializable`, so that
+  /// part would be a dangling URI in the generated consumer (#235). A file
+  /// that still declares its own `@JsonSerializable` classes keeps its part.
+  static void _collectStaleJsonParts(CompilationUnit unit, List<_Span> spans) {
+    for (final declaration in unit.declarations) {
+      if (declaration is! ClassDeclaration) continue;
+      for (final meta in declaration.metadata) {
+        if (meta.name.name == 'JsonSerializable') return;
+      }
+    }
+    for (final directive in unit.directives) {
+      if (directive is! PartDirective) continue;
+      final uri = directive.uri.stringValue;
+      if (uri != null && uri.endsWith('.g.dart')) {
+        spans.add(_Span(directive.offset, directive.end, ''));
+      }
+    }
+  }
+
+  /// Whether [call]'s result is consumed as a value, so the
+  /// `ZorphyBoundaryResult<T>` must be unwrapped with `.getOrThrow()` to keep
+  /// the consumer type-correct (#235, #238).
+  ///
+  /// Every position is value-consuming except a genuinely DISCARDED call —
+  /// a standalone expression statement (optionally parenthesized). An
+  /// argument, a binary operand, a conditional branch, a typed collection
+  /// element, a chained member access or a parenthesized return all expect a
+  /// bare `T` there, so leaving the result wrapped would not type-check.
   static bool _needsUnwrap(MethodInvocation call) {
-    final parent = call.parent;
-    if (parent is ReturnStatement) return true;
-    // Arrow form `=> expr` is an ExpressionFunctionBody, not a ReturnStatement.
-    if (parent is ExpressionFunctionBody) return true;
-    if (parent is AssignmentExpression && parent.rightHandSide == call) {
+    AstNode node = call;
+    while (true) {
+      final parent = node.parent;
+      if (parent == null) return true;
+      if (parent is ExpressionStatement && parent.expression == node) {
+        return false;
+      }
+      // Parentheses are transparent: `((call));` is still a discarded call.
+      if (parent is ParenthesizedExpression) {
+        node = parent;
+        continue;
+      }
       return true;
     }
-    if (parent is VariableDeclaration && parent.initializer == call) {
-      return true;
-    }
-    return false;
   }
 
   /// Whether the receiver is a known zorphy type (static call) or a variable
-  /// declared with one (instance call). Unknown receivers are left untouched.
+  /// declared with one (typed instance call). Unknown receivers are untouched.
   static bool _isZorphyCall(
     Expression? target,
     Set<String> types,
-    Set<String> variables,
+    Map<String, String> variables,
   ) {
     if (target is! SimpleIdentifier) return false;
     final name = target.name;
-    return types.contains(name) || variables.contains(name);
+    return types.contains(name) || variables.containsKey(name);
   }
 
   static int _lineStart(String source, int offset) {
@@ -371,15 +494,19 @@ class _CodecVisitor extends RecursiveAstVisitor<void> {
 }
 
 /// Records variables whose declared type is a known zorphy type, so instance
-/// calls such as `user.toJson()` can be scoped as tightly as static ones.
+/// calls such as `user.toJson()` can be scoped as tightly as static ones and
+/// a typed instance's `codec.fromJson(...)` can be rewritten to the static
+/// `Type.fromWire(...)` call.
 class _TypedVariableVisitor extends RecursiveAstVisitor<void> {
   _TypedVariableVisitor(this.types, this.names);
 
   final Set<String> types;
-  final Set<String> names;
+  final Map<String, String> names;
 
   void _record(TypeAnnotation? type, String name) {
-    if (type is NamedType && types.contains(type.name.lexeme)) names.add(name);
+    if (type is NamedType && types.contains(type.name.lexeme)) {
+      names[name] = type.name.lexeme;
+    }
   }
 
   @override

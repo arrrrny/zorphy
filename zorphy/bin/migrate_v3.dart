@@ -65,15 +65,20 @@ Future<void> main(List<String> args) async {
   final sources = <String, String>{};
   final knownTypes = <String>{};
   final knownEntityRoots = <String>{};
+  final inheritanceEdges = <String, List<String>>{};
   for (final file in files) {
     final source = await File(file).readAsString();
     sources[file] = source;
     knownTypes.addAll(V3Codemod.zorphyTypesIn(source));
     knownEntityRoots.addAll(V3Codemod.entityRootsIn(source));
+    // Cross-file inheritance edges let classification propagate through a
+    // parent that itself inherits `id` from a known root (#238).
+    inheritanceEdges.addAll(V3Codemod.inheritanceEdgesIn(source));
   }
   final codemod = V3Codemod(
     knownTypes: knownTypes,
     knownEntityRoots: knownEntityRoots,
+    inheritanceEdges: inheritanceEdges,
   );
 
   var changed = 0;
