@@ -115,9 +115,21 @@ class AccountPatch extends PatchBase<Account, Account$> {
   AccountPatch compose(covariant AccountPatch next) {
     if (next.isEmpty) return this;
     if (isEmpty) return next;
-    return AccountPatch()
+    final composed = AccountPatch()
       ..patchMap.addAll(patchMap)
       ..patchMap.addAll(next.patchMap);
+    return composed;
+  }
+
+  @override
+  String wireNameFor(Account$ key) {
+    return switch (key) {
+      Account$.id => 'id',
+      Account$.name_ => 'name',
+      Account$.score => 'score',
+      Account$.note => 'note',
+      Account$.tier => 'tier',
+    };
   }
 
   AccountPatch invert(Account before) {

@@ -92,9 +92,19 @@ class AddressPatch extends PatchBase<Address, Address$> {
   AddressPatch compose(covariant AddressPatch next) {
     if (next.isEmpty) return this;
     if (isEmpty) return next;
-    return AddressPatch()
+    final composed = AddressPatch()
       ..patchMap.addAll(patchMap)
       ..patchMap.addAll(next.patchMap);
+    return composed;
+  }
+
+  @override
+  String wireNameFor(Address$ key) {
+    return switch (key) {
+      Address$.street => 'street',
+      Address$.city => 'city',
+      Address$.postalCode => 'postalCode',
+    };
   }
 
   AddressPatch invert(Address before) {
@@ -407,9 +417,35 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
   ProfilePatch compose(covariant ProfilePatch next) {
     if (next.isEmpty) return this;
     if (isEmpty) return next;
-    return ProfilePatch()
+    final composed = ProfilePatch()
       ..patchMap.addAll(patchMap)
       ..patchMap.addAll(next.patchMap);
+    final addressCarried = patchMap[Profile$.address];
+    final addressNext = next.patchMap[Profile$.address];
+    if (addressCarried is PatchNested<Address, AddressPatch> &&
+        addressNext is PatchNested<Address, AddressPatch>)
+      composed.patchMap[Profile$.address] = addressCarried.composeNested(
+        addressNext,
+      );
+    final previousAddressCarried = patchMap[Profile$.previousAddress];
+    final previousAddressNext = next.patchMap[Profile$.previousAddress];
+    if (previousAddressCarried is PatchNested<Address, AddressPatch> &&
+        previousAddressNext is PatchNested<Address, AddressPatch>)
+      composed.patchMap[Profile$.previousAddress] = previousAddressCarried
+          .composeNested(previousAddressNext);
+    return composed;
+  }
+
+  @override
+  String wireNameFor(Profile$ key) {
+    return switch (key) {
+      Profile$.id => 'id',
+      Profile$.displayName => 'displayName',
+      Profile$.address => 'address',
+      Profile$.tags => 'tags',
+      Profile$.scores => 'scores',
+      Profile$.previousAddress => 'previousAddress',
+    };
   }
 
   ProfilePatch invert(Profile before) {

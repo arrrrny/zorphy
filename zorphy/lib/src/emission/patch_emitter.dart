@@ -163,7 +163,16 @@ class PatchEmitter {
       c.methods.add(_isEmptyGetter());
       c.methods.add(_applyMethod(entityRef, patchRef));
       c.methods.add(_applyToMethod(entityRef, patchRef));
-      c.methods.add(_composeMethod(patchRef));
+      c.methods.add(
+        _composeMethod(
+          patchRef,
+          enumName,
+          fields,
+          knownClasses: knownClasses,
+          genericTypeNames: genericTypeNames,
+        ),
+      );
+      c.methods.add(_wireNameForMethod(enumName, fields));
       c.methods.add(
         _invertMethod(
           patchRef,
@@ -272,8 +281,18 @@ class PatchEmitter {
   /// `compose(next)` — one patch that applies this and then [next].
   ///
   /// The parameter is narrowed (covariantly, as [ZorphyPatch.compose]
-  /// permits) so a chain keeps its static patch type.
-  Method _composeMethod(String patchRef) => Method((m) {
+  /// permits) so a chain keeps its static patch type. A nested field carried
+  /// by BOTH patches composes its carried sub-patch instead of letting the
+  /// later `addAll` replace it — otherwise disjoint edits such as
+  /// `address.street` and `address.city` lose the earlier one (zorphy#265
+  /// review). Scalar and atomic-list replacements keep later-value precedence.
+  Method _composeMethod(
+    String patchRef,
+    String enumName,
+    List<NameTypeClassComment> fields, {
+    List<String> knownClasses = const [],
+    List<String> genericTypeNames = const [],
+  }) => Method((m) {
     m
       ..name = 'compose'
       ..returns = referType(patchRef)
@@ -290,21 +309,82 @@ class PatchEmitter {
       b.statements.add(const Code('if (isEmpty) return next;'));
       b.statements.add(
         Code(
-          'return $patchRef()'
+          'final composed = $patchRef()'
           '..$patchMapName.addAll($patchMapName)'
           '..$patchMapName.addAll(next.$patchMapName);',
         ),
       );
+      for (final field in fields) {
+        final shape = _fieldShape(
+          field,
+          knownClasses: knownClasses,
+          genericTypeNames: genericTypeNames,
+        );
+        if (shape.kind != _FieldShapeKind.nested) continue;
+        final member = _memberName(field.name);
+        final key = '$enumName.${helpers.enumMemberName(member)}';
+        final carry = 'PatchNested<${shape.valueType}, ${shape.patchType}>';
+        b.statements.add(Code('final ${member}Carried = $patchMapName[$key];'));
+        b.statements.add(
+          Code('final ${member}Next = next.$patchMapName[$key];'),
+        );
+        b.statements.add(
+          Code(
+            'if (${member}Carried is $carry && '
+            '${member}Next is $carry) '
+            'composed.$patchMapName[$key] = '
+            '${member}Carried.composeNested(${member}Next);',
+          ),
+        );
+      }
+      b.statements.add(const Code('return composed;'));
     });
+  });
+
+  /// `wireNameFor(key)` — the ORIGINAL field name a patch key addresses.
+  ///
+  /// Reserved enum members are escaped (`name` becomes `name_`), but `toWire()`
+  /// and JSON use the entity's field name. `PatchBase.changedPaths` calls this
+  /// so a JSON pointer names the field the entity actually has (zorphy#265
+  /// review).
+  Method _wireNameForMethod(
+    String enumName,
+    List<NameTypeClassComment> fields,
+  ) => Method((m) {
+    m
+      ..name = 'wireNameFor'
+      ..returns = referType('String')
+      ..annotations.add(referType('override'))
+      ..requiredParameters.add(
+        Parameter((p) {
+          p
+            ..name = 'key'
+            ..type = referType(enumName);
+        }),
+      );
+    if (fields.isEmpty) {
+      m.body = const Code('return key.name;');
+    } else {
+      // The generated field enum has exactly one member per field, so the
+      // cases are exhaustive — a wildcard would be unreachable (and warned).
+      final cases = fields
+          .map((field) {
+            final member = _memberName(field.name);
+            return '$enumName.${helpers.enumMemberName(member)} => '
+                '${_stringLiteral(member)},';
+          })
+          .join('\n');
+      m.body = Code('return switch (key) {\n$cases\n};');
+    }
   });
 
   /// `invert(before)` — the patch that undoes this one for [before].
   ///
   /// The inverse is built from the value this patch ACTUALLY carried, not from
-  /// a fresh empty patch: a nested field carries a `PatchNested`, and a
-  /// collection field carries a delta, so each is inverted through its own
-  /// carried instance. A scalar carries the value itself, so its inverse is
-  /// simply the prior value.
+  /// a fresh empty patch: a nested field carries a `PatchNested`, a map field
+  /// carries a delta, and a list field carries the whole value, so each is
+  /// inverted through its own carried instance. A scalar carries the value
+  /// itself, so its inverse is simply the prior value.
   Method _invertMethod(
     String patchRef,
     String entityRef,
@@ -426,8 +506,8 @@ class PatchEmitter {
   /// - a nested Zorphy field carries a `PatchNested<Sub, SubPatch>` built from
   ///   `SubPatch.diff(previous.x, next.x)`, so the parent patch delegates to
   ///   the sub-entity's own patch instead of copying it wholesale;
-  /// - a `List<E>` field carries a `ListPatchDelta<E>` — granular ops, never a
-  ///   whole-list overwrite;
+  /// - a `List<E>` field carries the whole new list (atomic replacement, never
+  ///   positional index ops) so a concurrent list edit is an exact conflict;
   /// - a `Map<K, V>` field carries a `MapPatchDelta<K, V>`;
   /// - anything else carries the value itself.
   ///
@@ -538,19 +618,12 @@ class PatchEmitter {
                 '(${member}Delta);',
               ),
             );
-          case _FieldShapeKind.list when shape.isNullable:
+          case _FieldShapeKind.list:
             // Atomic list replacement (zorphy#248): a changed list is carried
             // as the whole value, never as positional index ops. ListEquality
-            // accepts the nullable list on either side, so one content-equality
-            // check covers both the both-present and the null-transition cases.
-            b.statements.add(
-              Code(
-                'if (!const ListEquality<Object?>().equals('
-                'previous.$member, next.$member)) '
-                'changes.$patchMapName[$key] = next.$member;',
-              ),
-            );
-          case _FieldShapeKind.list:
+            // accepts a nullable list on either side, so one content-equality
+            // check covers both the both-present and the null-transition cases
+            // — no separate `when shape.isNullable` arm is needed.
             b.statements.add(
               Code(
                 'if (!const ListEquality<Object?>().equals('

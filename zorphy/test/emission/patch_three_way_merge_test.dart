@@ -17,6 +17,7 @@
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
 
+import '../runtime/fixtures/account.dart';
 import '../runtime/fixtures/profile.dart';
 
 Profile _base() => const Profile(
@@ -49,6 +50,15 @@ void main() {
         ),
       );
       expect(patch.changedPaths, {'/address/street'});
+    });
+
+    test('an escaped enum member reports the original wire field name', () {
+      // `name` is a reserved enum member, so the field enum carries `name_`
+      // while `toWire()` writes `name`. The pointer must name the wire field.
+      final before = const Account(id: 'a', name: 'old', score: 1);
+      final patch = AccountPatch.diff(before, before.copyWith(name: 'new'));
+      expect(patch.changedPaths, {'/name'});
+      expect(patch.toWire(), containsPair('name', 'new'));
     });
   });
 
@@ -111,6 +121,24 @@ void main() {
       );
       expect(a.conflictingPaths(b), isEmpty);
     });
+
+    test('a whole-value replacement conflicts with an edit beneath it', () {
+      final withAddress = _base().copyWith(
+        previousAddress: const Address(street: 'Main', city: 'Springfield'),
+      );
+      // A null on one side carries the raw whole value at `/previousAddress`.
+      final replacement = ProfilePatch.diff(withAddress, _base());
+      final nested = ProfilePatch.diff(
+        withAddress,
+        withAddress.copyWith(
+          previousAddress: const Address(street: 'Elm', city: 'Springfield'),
+        ),
+      );
+      expect(replacement.changedPaths, {'/previousAddress'});
+      expect(nested.changedPaths, {'/previousAddress/street'});
+      expect(replacement.conflictingPaths(nested), {'/previousAddress'});
+      expect(nested.conflictingPaths(replacement), {'/previousAddress'});
+    });
   });
 
   group('composePatches', () {
@@ -133,6 +161,31 @@ void main() {
 
       expect(a.composePatches(b).apply(base), b.apply(a.apply(base)));
       expect(a.composePatches(b).apply(base), end);
+    });
+
+    test('preserves disjoint nested edits instead of replacing the carry', () {
+      final base = _base();
+      final a = ProfilePatch.diff(
+        base,
+        base.copyWith(
+          address: const Address(street: 'Elm', city: 'Springfield'),
+        ),
+      );
+      final b = ProfilePatch.diff(
+        base,
+        base.copyWith(
+          address: const Address(street: 'Main', city: 'Shelbyville'),
+        ),
+      );
+
+      final composed = a.composePatches(b);
+      expect(
+        composed.apply(base).address,
+        const Address(street: 'Elm', city: 'Shelbyville'),
+      );
+      // The composed carry keeps its concrete `PatchNested` type, so `invert`
+      // narrows it without a cast failure.
+      expect(composed.invert(base).apply(composed.apply(base)), base);
     });
   });
 
