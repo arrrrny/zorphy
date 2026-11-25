@@ -1,5 +1,5 @@
 /// Composes the v3 archetype emitters into one library fragment (ISSUE-0223,
-/// arrrrny/zorphy#223).
+/// arrrrny/zorphy#223; matchers, morphing and generic hierarchies #231).
 ///
 /// The closed v3 parser/emitter PRs (#177, #178, #188, #189, #190) each shipped
 /// a tested `PolymorphicIr` consumer, but no production caller composed them:
@@ -13,11 +13,21 @@
 /// class surfaces:
 ///
 /// - **entity / state / value / union** — [PolymorphicClassEmitter] emits the
-///   sealed/final class shape, [BoundaryCodecEmitter] contributes the
+///   sealed/final class shape (generic hierarchies included since #231: the
+///   emitter declares each node's type parameters, so `AsyncSlice<T>` and its
+///   leaves compile), [BoundaryCodecEmitter] contributes the
 ///   `fromWire`/`toWire` members (spliced INTO those classes through the class
-///   emitter's `extraMethods` hook), and [MockFixtureEmitter] emits the
-///   `<Name>MockData` seed builders. [BoundaryCodecEmitter.helperSpecs] are
-///   emitted once per library, after the hierarchies that call them.
+///   emitter's `extraMethods` hook — non-generic hierarchies only, because a
+///   static member cannot reference class type parameters), and
+///   [MockFixtureEmitter] emits the `<Name>MockData` seed builders.
+///   [BoundaryCodecEmitter.helperSpecs] are emitted once per library, after
+///   the hierarchies that call them.
+/// - **union matchers and sibling morphing (#231)** —
+///   [PolymorphicMatcherEmitter] emits the exhaustive `when`/`maybeWhen`
+///   extension of every union root and [PolymorphicMorphingEmitter] the
+///   `changeTo<Sibling>` extensions of every hierarchy with a sibling pair,
+///   both UNCONDITIONALLY: no legacy `generateChangeTo` or property-helper
+///   toggle exists in the v3 pipeline.
 /// - **entity patches** — [PolymorphicPatchEmitter] emits the `<Root>Patch` /
 ///   `<Leaf>Patch` surface every `@ZorphyEntity` mock's `samplePatch()`
 ///   builds through: the sealed root patch plus one concrete patch per leaf
@@ -58,6 +68,8 @@ import 'emitter.dart';
 import 'json_pointer_emitter.dart';
 import 'lens_emitter.dart';
 import 'polymorphic_class_emitter.dart';
+import 'polymorphic_matcher_emitter.dart';
+import 'polymorphic_morphing_emitter.dart';
 import 'polymorphic_patch_emitter.dart';
 
 /// Composes a resolved [PolymorphicIr] into the v3 source fragment of one
@@ -74,15 +86,21 @@ final class ArchetypeComposer {
 
     final fragments = <String>[];
 
+    // The boundary codec stays fail-closed on generic hierarchies (issue
+    // #231): `fromWire` is a static member, and a static cannot reference
+    // the class type parameters, so a generic root has no wire surface to
+    // declare. The CLASS surface is different — the class emitter declares
+    // the node's type parameters, so every root composes.
     final codecRoots = <ZorphyNodeIr>[
       for (final root in ir.roots)
         if (root.archetype != ArchetypeKind.intent &&
             root.typeParameters.isEmpty)
           root,
     ];
+    final ownFields = _ownFields(ir);
+    final payloads = _payloads(ir);
+    final knownNodes = <String>{};
     if (codecRoots.isNotEmpty) {
-      final ownFields = _ownFields(ir);
-      final payloads = _payloads(ir);
       // A node under a generic ancestor is pruned WITH that ancestor: the
       // class emitter and the codec never declare its surface, so a field
       // naming it must not be classified as a nested node either.
@@ -101,15 +119,14 @@ final class ArchetypeComposer {
       // exist in the generated library. An intent value therefore travels as
       // a plain field on the wire, as it does in `IntentEmitter.toWire`.
       // Generic-subtree nodes are excluded for the same fail-closed reason as
-      // the patch and mock surfaces: `PolymorphicClassEmitter` declares no
-      // type parameters and the codec would emit `_boundaryAs<T>` with an
-      // unbound `T`. A generic root (and its subtree) is not composed at all,
-      // so a field naming it must not be classified as a nested node either.
-      final knownNodes = <String>{
+      // the patch and mock surfaces: the codec emits no `fromWire` for them
+      // (static members cannot reference class type parameters), so a field
+      // naming one must not classify as a nested node.
+      knownNodes.addAll(<String>{
         for (final node in ir.nodes.values)
           if (node.archetype != ArchetypeKind.intent && !underGeneric(node))
             node.cleanName,
-      };
+      });
       // A composed field may not NAME a pruned node: with the name absent
       // from [knownNodes] the codec would classify the field as a scalar and
       // write the raw object onto the wire — silently, because nothing fails
@@ -128,56 +145,95 @@ final class ArchetypeComposer {
                 field.type,
                 '${node.cleanName}.${field.name}',
                 '${_wireTypeBase(field.type)} sits inside a generic subtree '
-                    'the composer does not emit, so the codec has no wire '
-                    'surface for it. Narrow the field to a non-generic type '
-                    'or move it out of the composed hierarchy.',
+                    'the composer does not emit a codec for, so the codec has '
+                    'no wire surface for it. Narrow the field to a non-generic '
+                    'type or move it out of the composed hierarchy.',
               );
             }
           }
         }
       }
-      const codec = BoundaryCodecEmitter();
-      // The lens + JSON-Pointer surfaces (ISSUE-0230) are IR-native: they read
-      // the whole graph, not one hierarchy, because a node's resolver dispatches
-      // into its subtypes and nested types. Compute them once per library.
-      final resolvePaths = JsonPointerEmitter(ir).resolvePathMethods();
-      final lensRegistries = const LensEmitter().registryFields(ir);
-      var firstRoot = true;
-      for (final root in codecRoots) {
-        final extraMethods = <String, List<Method>>{};
-        final extraFields = <String, List<Field>>{};
-        for (final node in _walk(root)) {
-          final methods = <Method>[
-            ...codec.emitCodec(node, payloads, additionalNodes: knownNodes),
-          ];
-          final resolvePath = resolvePaths[node.className];
-          if (resolvePath != null) methods.add(resolvePath);
-          extraMethods[node.className] = methods;
-          final registry = lensRegistries[node.className];
-          if (registry != null) extraFields[node.className] = [registry];
-        }
-        fragments.add(
-          const PolymorphicClassEmitter().emit(
-            root: root,
-            fields: ownFields,
-            extraMethods: extraMethods,
-            extraFields: extraFields,
-            // The `_sentinel` declarations are one-per-library: only the first
-            // hierarchy carries them, or the duplicates are a compile error.
-            includeSentinelDeclarations: firstRoot,
+    }
+
+    const codec = BoundaryCodecEmitter();
+    // The lens + JSON-Pointer surfaces (ISSUE-0230) are IR-native: they read
+    // the whole graph, not one hierarchy, because a node's resolver dispatches
+    // into its subtypes and nested types. Compute them once per library.
+    final resolvePaths = JsonPointerEmitter(ir).resolvePathMethods();
+    final lensRegistries = const LensEmitter().registryFields(ir);
+    // `_sentinel` backs the leaf `copyWith` clear-a-nullable-field path. It
+    // is a library-level declaration, so it is emitted only when some
+    // emitted leaf's payload actually carries a nullable field — otherwise
+    // it is an `unused_element` warning in a consumer whose fields are all
+    // non-nullable.
+    var needsSentinel = false;
+    for (final root in ir.roots) {
+      if (root.archetype == ArchetypeKind.intent) continue;
+      final leaves = [
+        if (root.isConcreteLeaf)
+          root
+        else
+          ...PolymorphicClassEmitter.emittableLeaves(root),
+      ];
+      for (final leaf in leaves) {
+        final hasNullable = [leaf, ...leaf.superTypes].any(
+          (owner) => (ownFields[owner.className] ?? const []).any(
+            (field) => field.isNullable,
           ),
         );
-        firstRoot = false;
+        if (hasNullable) {
+          needsSentinel = true;
+          break;
+        }
+      }
+      if (needsSentinel) break;
+    }
+    var firstRoot = true;
+    for (final root in ir.roots) {
+      // Intents emit their own class surface through [IntentEmitter] below.
+      if (root.archetype == ArchetypeKind.intent) continue;
+      final extraMethods = <String, List<Method>>{};
+      final extraFields = <String, List<Field>>{};
+      // `_walk` yields nothing for a generic root and prunes generic children:
+      // exactly the nodes that receive a codec and the lens/resolver surface.
+      for (final node in _walk(root)) {
+        final methods = <Method>[
+          ...codec.emitCodec(node, payloads, additionalNodes: knownNodes),
+        ];
+        final resolvePath = resolvePaths[node.className];
+        if (resolvePath != null) methods.add(resolvePath);
+        extraMethods[node.className] = methods;
+        final registry = lensRegistries[node.className];
+        if (registry != null) extraFields[node.className] = [registry];
+      }
+      fragments.add(
+        const PolymorphicClassEmitter().emit(
+          root: root,
+          fields: ownFields,
+          extraMethods: extraMethods,
+          extraFields: extraFields,
+          // The `_sentinel` declarations are one-per-library: only the first
+          // hierarchy carries them, or the duplicates are a compile error.
+          includeSentinelDeclarations: firstRoot && needsSentinel,
+        ),
+      );
+      firstRoot = false;
+      // The patch and mock surfaces stay fail-closed on a generic root:
+      // no patch can name its type parameter, and the mock emitter skips
+      // generic nodes anyway.
+      if (root.typeParameters.isEmpty) {
         if (root.archetype == ArchetypeKind.entity ||
             root.archetype == ArchetypeKind.state) {
           fragments.add(_emitEntityPatches(root));
         }
         fragments.add(MockFixtureEmitter().emit(root));
       }
-      // The codec's shared helpers are emitted ONCE per library — a second
-      // copy is a duplicate-definition error — and only the helpers this
-      // library's field shapes actually call, or the unreferenced ones are
-      // `unused_element` warnings in the consumer's analysis.
+    }
+    // The codec's shared helpers are emitted ONCE per library — a second
+    // copy is a duplicate-definition error — and only the helpers this
+    // library's field shapes actually call, or the unreferenced ones are
+    // `unused_element` warnings in the consumer's analysis.
+    if (codecRoots.isNotEmpty) {
       fragments.add(
         ZorphyEmitter().emitSpecs(
           // Select helpers only from the nodes that actually receive codecs.
@@ -204,6 +260,22 @@ final class ArchetypeComposer {
     // Intent hierarchies emit their own class surface (see the library doc).
     final intents = IntentEmitter().emitIntents(ir);
     if (intents.isNotEmpty) fragments.add(intents);
+
+    // Issue #231 — the rest of the union contract, unconditional:
+    // `when`/`maybeWhen` matchers on the union roots and `changeTo<Sibling>`
+    // morphing on every hierarchy with a sibling pair. Neither rides a
+    // `generate*` toggle.
+    const matcher = PolymorphicMatcherEmitter();
+    for (final root in ir.roots) {
+      final fragment = matcher.emit(root: root, fields: ownFields);
+      if (fragment.isNotEmpty) fragments.add(fragment);
+    }
+    const morphing = PolymorphicMorphingEmitter();
+    for (final root in ir.roots) {
+      if (root.archetype == ArchetypeKind.intent) continue;
+      final fragment = morphing.emit(root: root, fields: ownFields);
+      if (fragment.isNotEmpty) fragments.add(fragment);
+    }
 
     return fragments.where((fragment) => fragment.isNotEmpty).join('\n\n');
   }

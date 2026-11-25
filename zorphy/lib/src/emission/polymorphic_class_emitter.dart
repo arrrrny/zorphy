@@ -120,6 +120,141 @@ final class PolymorphicClassEmitter {
   /// Creates an emitter with the default page width.
   const PolymorphicClassEmitter();
 
+  /// Whether [child] can be emitted as a class directly under [parent]
+  /// (issue #231).
+  ///
+  /// A generic parent needs the child to bind ALL of the parent's type
+  /// parameters in its `extends` clause, and the IR carries no interface type
+  /// arguments — only each node's own declared parameters. The child binds
+  /// them with its OWN type parameters positionally, so the arities must
+  /// match: `class SliceData<T> extends AsyncSlice<T>` is emittable, while a
+  /// non-generic leaf under a generic parent (it would need a concrete
+  /// binding the IR never saw) is not and stays pruned. A non-generic parent
+  /// takes no arguments, so any child is emittable under it.
+  static bool isEmittableChild(ZorphyNodeIr child, ZorphyNodeIr parent) =>
+      parent.typeParameters.isEmpty ||
+      child.typeParameters.length == parent.typeParameters.length;
+
+  /// The bare names of [typeParameters] (`T extends num` -> `T`), in order.
+  static List<String> bareParameterNames(List<String> typeParameters) => [
+    for (final parameter in typeParameters) _bareName(parameter),
+  ];
+
+  /// The type-argument list a use-site reference to [node] carries —
+  /// `'<T, U>'` for a generic node (its own parameter names, bounds dropped:
+  /// a bound is declared once, at the parameter) or `''` for a non-generic
+  /// one.
+  static String typeArgumentList(ZorphyNodeIr node) =>
+      node.typeParameters.isEmpty
+      ? ''
+      : '<${bareParameterNames(node.typeParameters).join(', ')}>';
+
+  /// The [TypeReference] declaring one type parameter: the name plus its
+  /// bound when the declaration carries one (`T extends num`).
+  static TypeReference genericParameterSpec(String parameter) {
+    final separator = parameter.indexOf(' extends ');
+    if (separator == -1) {
+      return TypeReference((t) => t.symbol = parameter);
+    }
+    final name = parameter.substring(0, separator).trim();
+    final bound = parameter.substring(separator + ' extends '.length).trim();
+    return TypeReference((t) {
+      t.symbol = name;
+      t.bound = referType(bound);
+    });
+  }
+
+  /// Whether the type parameter declared as [source] may be used where
+  /// [target] is declared: the target's bound must be satisfied by the
+  /// source's bound.
+  ///
+  /// Bounds are compared textually — the emission pipeline has no type system
+  /// to ask — so the check is deliberately conservative: an unbounded target
+  /// always accepts, a bounded target accepts only the SAME bound, and a
+  /// bounded target under an unbounded source refuses. A subtype bound that
+  /// would satisfy (`int` under `num`) refuses too; refusing withholds the
+  /// dependent surface (a matcher, a morph method) instead of emitting an
+  /// argument that violates `type_argument_not_matching_bounds`.
+  static bool typeParameterSatisfies(String source, String target) {
+    final targetBound = _boundOf(target);
+    if (targetBound == null) return true;
+    final sourceBound = _boundOf(source);
+    if (sourceBound == null) return false;
+    return sourceBound == targetBound;
+  }
+
+  /// [type] with every identifier in [from] replaced by the name at the same
+  /// index in [to] — the positional binding a child's `extends Parent<Own…>`
+  /// establishes between the parent's type parameters and its own. The
+  /// replacement is one simultaneous pass, so swapped names (`<T, U>` bound
+  /// as `<U, T>`) cannot cascade.
+  static String substituteTypeParameters(
+    String type,
+    List<String> from,
+    List<String> to,
+  ) {
+    final mapping = <String, String>{};
+    for (var i = 0; i < from.length && i < to.length; i++) {
+      if (from[i] != to[i]) mapping[from[i]] = to[i];
+    }
+    if (mapping.isEmpty) return type;
+    return type.replaceAllMapped(
+      RegExp('\\b(${mapping.keys.map(RegExp.escape).join('|')})\\b'),
+      (match) => mapping[match.group(1)]!,
+    );
+  }
+
+  /// [field] with its declared type rebound from one scope's type parameters
+  /// to another's (see [substituteTypeParameters]). An unchanged type returns
+  /// the same instance.
+  static PolymorphicField substituteFieldScope(
+    PolymorphicField field,
+    List<String> from,
+    List<String> to,
+  ) {
+    final substituted = substituteTypeParameters(field.type, from, to);
+    if (substituted == field.type) return field;
+    return PolymorphicField(
+      name: field.name,
+      type: substituted,
+      isNullable: field.isNullable,
+    );
+  }
+
+  /// The bound of one type-parameter declaration (`'T extends num'` ->
+  /// `'num'`), or `null` when it is unbounded. `dynamic` is no bound at all.
+  static String? _boundOf(String parameter) {
+    final separator = parameter.indexOf(' extends ');
+    if (separator == -1) return null;
+    final bound = parameter.substring(separator + ' extends '.length).trim();
+    return bound == 'dynamic' ? null : bound;
+  }
+
+  /// Every emittable concrete leaf at or below [node], depth-first in
+  /// declaration order — the arm set of the matcher emitter and the
+  /// source/target set of the morphing emitter.
+  ///
+  /// A child failing [isEmittableChild] is pruned WITH its subtree (its
+  /// parent class is not emitted, so nothing below it can be named either) —
+  /// the same rule the class-emission walk applies, kept here so the matcher
+  /// and the class emitter can never disagree about what was emitted.
+  static List<ZorphyNodeIr> emittableLeaves(ZorphyNodeIr node) {
+    final leaves = <ZorphyNodeIr>[];
+    void walk(ZorphyNodeIr current) {
+      if (current.isConcreteLeaf) {
+        leaves.add(current);
+        return;
+      }
+      for (final child in current.directSubTypes) {
+        if (!isEmittableChild(child, current)) continue;
+        walk(child);
+      }
+    }
+
+    walk(node);
+    return leaves;
+  }
+
   /// Emits the whole hierarchy under [root] as one formatted source string.
   ///
   /// [fields] is keyed by a node's `className` (`$UiNode`), matching
@@ -163,11 +298,14 @@ final class PolymorphicClassEmitter {
         ),
       );
       for (final child in node.directSubTypes) {
-        // A generic child (and everything below it) is pruned: the class
-        // emitter declares no type parameters, so emitting it would leave `T`
-        // unbound in the generated library. The same fail-closed rule the
-        // codec, patch and mock surfaces apply.
-        if (child.typeParameters.isNotEmpty) continue;
+        // Issue #231: a child is pruned only when it cannot NAME its parent —
+        // a generic parent needs every type parameter bound in the `extends`
+        // clause, and the child binds them with its own parameters, so the
+        // arities must match. A matching-arity child is emitted WITH its type
+        // parameters (`class SliceData<T> extends AsyncSlice<T>`); a
+        // non-matching one (and its subtree) stays pruned, because the parent
+        // class it would extend does not exist in the generated library.
+        if (!isEmittableChild(child, node)) continue;
         walk(child, [node, ...ancestors]);
       }
     }
@@ -201,7 +339,6 @@ final class PolymorphicClassEmitter {
       _classSpec(node, {node.className: fields}, const []),
     ]);
   }
-
   // ── Class shape ───────────────────────────────────────────────────
 
   Class _classSpec(
@@ -223,11 +360,18 @@ final class PolymorphicClassEmitter {
     return Class((c) {
       c.name = node.cleanName;
 
+      // Issue #231: the node's declared type parameters (bounds included)
+      // reach the generated class, so a generic root and its leaves compile:
+      // `sealed class AsyncSlice<T>` and `final class SliceData<T>`.
+      for (final parameter in node.typeParameters) {
+        c.types.add(genericParameterSpec(parameter));
+      }
+
       if (node.isConcreteLeaf) {
         c.modifier = ClassModifier.final$;
         // The nearest ancestor is the superclass; `ancestors` is nearest-first.
         if (ancestors.isNotEmpty) {
-          c.extend = referType(ancestors.first.cleanName);
+          c.extend = referType(_superTypeName(ancestors.first, node));
         }
         // The archetype base is the v3 marker: `ZorphyEntityBase<Id>` for an
         // entity hierarchy, `ZorphyValueBase` for a value one. It is what a
@@ -244,7 +388,7 @@ final class PolymorphicClassEmitter {
         // root, and a leaf's `extends Intermediate` would not make it one
         // either. Only the ROOT has no ancestor and therefore no superclass.
         if (ancestors.isNotEmpty) {
-          c.extend = referType(ancestors.first.cleanName);
+          c.extend = referType(_superTypeName(ancestors.first, node));
         }
         c.implements.add(_archetypeBase(node, fields));
       }
@@ -337,17 +481,30 @@ final class PolymorphicClassEmitter {
 
   /// The fields a leaf redeclares: every ancestor's, then its own, deduped by
   /// name with the leaf's declaration winning.
+  ///
+  /// An ancestor's field is declared in the ANCESTOR's type-parameter scope:
+  /// `Root<T>` with `T get value` under `Child<U> implements Root<U>` must
+  /// redeclare `final U value`, or the emitted field names a parameter that
+  /// is not in scope in the child. Each ancestor's parameters are therefore
+  /// substituted positionally into the leaf's own (the same binding
+  /// [_superTypeName] establishes in the `extends` clause).
   List<PolymorphicField> _withInheritedFields(
     ZorphyNodeIr node,
     List<PolymorphicField> ownFields,
     Map<String, List<PolymorphicField>> fields,
   ) {
     final byName = <String, PolymorphicField>{};
+    final leafParameters = bareParameterNames(node.typeParameters);
     // Ancestors farthest-first, so a nearer declaration overwrites a farther
     // one and the leaf's own list overwrites everything above it.
     for (final ancestor in node.superTypes.reversed) {
+      final ancestorParameters = bareParameterNames(ancestor.typeParameters);
       for (final field in fields[ancestor.className] ?? const []) {
-        byName[field.name] = field;
+        byName[field.name] = substituteFieldScope(
+          field,
+          ancestorParameters,
+          leafParameters,
+        );
       }
     }
     for (final field in ownFields) {
@@ -480,10 +637,15 @@ final class PolymorphicClassEmitter {
   /// `identical(nickname, _sentinel)` — that is what lets `copyWith(nickname:
   /// null)` CLEAR the field, which a plain `nickname ?? this.nickname` can
   /// never express.
+  ///
+  /// A generic class keeps its type arguments in both the return type and the
+  /// `fromTrusted` call (`SliceLoading<T> copyWith(...)`): the bare name
+  /// would re-instantiate them as `dynamic` and lose the receiver's argument.
   Method _copyWith(ZorphyNodeIr node, List<PolymorphicField> fields) {
+    final selfType = '${node.cleanName}${typeArgumentList(node)}';
     return Method((m) {
       m.name = 'copyWith';
-      m.returns = referType(node.cleanName);
+      m.returns = referType(selfType);
       for (final field in fields) {
         m.optionalParameters.add(
           Parameter((p) {
@@ -510,9 +672,7 @@ final class PolymorphicClassEmitter {
           else
             '${field.name}: ${field.name} ?? this.${field.name}',
       ];
-      m.body = Code(
-        'return ${node.cleanName}.fromTrusted(${args.join(', ')});',
-      );
+      m.body = Code('return $selfType.fromTrusted(${args.join(', ')});');
     });
   }
 
@@ -586,6 +746,25 @@ final class PolymorphicClassEmitter {
 
   /// Lowers `$`-prefixed class names the way every other generator does.
   static String _lowerType(String type) => type.replaceAll(r'$', '');
+
+  /// The `extends`-clause spelling of [parent] as seen from [child]
+  /// (issue #231): the bare name for a non-generic parent, the parent name
+  /// bound with the CHILD's own type parameters for a generic one —
+  /// `AsyncSlice<T>` under `class SliceData<T>`. [isEmittableChild] has
+  /// already guaranteed the arities match.
+  static String _superTypeName(ZorphyNodeIr parent, ZorphyNodeIr child) {
+    if (parent.typeParameters.isEmpty) return parent.cleanName;
+    return '${parent.cleanName}<${bareParameterNames(child.typeParameters).join(', ')}>';
+  }
+
+  /// The bare name of one type-parameter declaration:
+  /// `'T extends num'` -> `'T'`.
+  static String _bareName(String parameter) {
+    final separator = parameter.indexOf(' extends ');
+    return separator == -1
+        ? parameter.trim()
+        : parameter.substring(0, separator).trim();
+  }
 
   /// The library-level `_sentinel` the emitted `copyWith` parameters default
   /// to, as the specs that declare it: a distinct private [sentinelType] class
