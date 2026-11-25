@@ -448,6 +448,57 @@ void main() {
       expect(result.exitCode, 0, reason: result.output);
     });
   });
+
+  group('ISSUE-0229 PolymorphicPatchEmitter — static diff (RED→GREEN)', () {
+    test(
+      'a standalone patch declares static diff with the identical fast path',
+      () {
+        final emitted = PolymorphicPatchEmitter().emitStandalone(
+          name: 'Product',
+          fields: [
+            NameTypeClassComment('id', 'String', ''),
+            NameTypeClassComment('name', 'String', ''),
+          ],
+        );
+
+        expect(
+          emitted,
+          contains('static ProductPatch diff(Product previous, Product next)'),
+        );
+        expect(
+          emitted,
+          contains('if (identical(previous, next)) return ProductPatch('),
+          reason: 'the O(1) fast path returns the canonical empty patch',
+        );
+        // Unchanged-field omission: a field equal on both sides is not recorded.
+        expect(emitted, contains('if (previous.id != next.id)'));
+        expect(emitted, contains('if (previous.name != next.name)'));
+
+        final result = _analyzeEmitted(emitted, _standaloneFixture);
+        expect(result.exitCode, 0, reason: result.output);
+      },
+    );
+
+    test('a subtype patch declares static diff returning its own type', () {
+      final emitted = PolymorphicPatchEmitter().emitSubtypePatch(
+        subtypeName: 'OrderNotification',
+        rootName: 'Notification',
+        fields: orderFields(),
+        sharedFields: ['id', 'readAt'],
+      );
+
+      expect(
+        emitted,
+        contains('static OrderNotificationPatch diff('),
+        reason: 'a concrete subtype patch declares static diff',
+      );
+      expect(emitted, contains('OrderNotification previous,'));
+      expect(emitted, contains('OrderNotification next,'));
+      // The subtype's own field is diffed; the identical fast path is present.
+      expect(emitted, contains('if (previous.itemCount != next.itemCount)'));
+      expect(emitted, contains('if (identical(previous, next)) return'));
+    });
+  });
 }
 
 /// Standalone entity carrying a field literally named `target` — the name

@@ -95,6 +95,17 @@ sealed class NotificationPatch implements ZorphyPatch<Notification> {
   @override
   Map<String, Object?> toWire();
   Map<String, Object?> toEnvelope({Object? principalKey});
+  static NotificationPatch diff(Notification previous, Notification next) {
+    if (identical(previous, next)) return NotificationSharedPatch();
+    final id = previous.id != next.id
+        ? PatchValue<String>.set(next.id)
+        : const PatchValue<String>.unchanged();
+    final readAt = previous.readAt != next.readAt
+        ? PatchValue<DateTime?>.set(next.readAt)
+        : const PatchValue<DateTime?>.unchanged();
+    return NotificationSharedPatch(id: id, readAt: readAt);
+  }
+
   static ZorphyBoundaryResult<NotificationPatch> fromWire(
     Map<String, Object?> raw,
   ) {
@@ -464,6 +475,20 @@ final class OrderNotificationPatch extends NotificationPatch {
     };
   }
 
+  static OrderNotificationPatch diff(
+    OrderNotification previous,
+    OrderNotification next,
+  ) {
+    if (identical(previous, next)) return OrderNotificationPatch();
+    var changes = OrderNotificationPatch();
+    if (previous.id != next.id) changes = changes.withId(next.id);
+    if (previous.readAt != next.readAt)
+      changes = changes.withReadAt(next.readAt);
+    if (previous.itemCount != next.itemCount)
+      changes = changes.withItemCount(next.itemCount);
+    return changes;
+  }
+
   static ZorphyBoundaryResult<OrderNotificationPatch> fromWire(
     Map<String, Object?> raw,
   ) {
@@ -659,6 +684,20 @@ final class PriceDropNotificationPatch extends NotificationPatch {
       'principalKey': principalKey,
       'ops': toWire(),
     };
+  }
+
+  static PriceDropNotificationPatch diff(
+    PriceDropNotification previous,
+    PriceDropNotification next,
+  ) {
+    if (identical(previous, next)) return PriceDropNotificationPatch();
+    var changes = PriceDropNotificationPatch();
+    if (previous.id != next.id) changes = changes.withId(next.id);
+    if (previous.readAt != next.readAt)
+      changes = changes.withReadAt(next.readAt);
+    if (previous.newPrice != next.newPrice)
+      changes = changes.withNewPrice(next.newPrice);
+    return changes;
   }
 
   static ZorphyBoundaryResult<PriceDropNotificationPatch> fromWire(

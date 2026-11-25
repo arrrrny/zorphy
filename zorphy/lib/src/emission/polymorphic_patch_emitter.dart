@@ -127,6 +127,7 @@ class PolymorphicPatchEmitter {
     required String rootName,
     required List<NameTypeClassComment> fields,
     required List<String> sharedFields,
+    String? basePatchName,
   }) {
     _requireNoReservedFields(fields);
     return _emit([
@@ -135,6 +136,7 @@ class PolymorphicPatchEmitter {
         rootName: rootName,
         fields: fields,
         sharedFields: sharedFields,
+        basePatchName: basePatchName,
       ),
     ]);
   }
@@ -162,6 +164,168 @@ class PolymorphicPatchEmitter {
       ),
     ]);
   }
+
+  /// Emits the concrete `<Name>Patch` for an ABSTRACT INTERMEDIATE node
+  /// (ISSUE-0229, arrrrny/zorphy#229).
+  ///
+  /// The intermediate is a real patch surface, not a `typedef` alias to the
+  /// root: it extends [basePatchName] (the root patch, or the nearest
+  /// intermediate patch), declares the intermediate's OWN fields as concrete
+  /// [PatchValue] members, and carries the full diff/apply/compose/invert/wire
+  /// algebra. A leaf below it extends THIS patch, so the intermediate's fields
+  /// are patchable through the intermediate surface.
+  ///
+  /// The intermediate class is abstract (sealed) and has no `copyWith`, so its
+  /// [applyMethodName] dispatches to the concrete leaves under it — the same
+  /// shape the root's shared patch uses — rebuilding each through its own
+  /// `copyWith` while leaving the leaf-only fields untouched.
+  String emitIntermediatePatch({
+    required String name,
+    required String rootName,
+    required String basePatchName,
+    required List<NameTypeClassComment> fields,
+    required List<String> sharedFields,
+    required List<String> leafNames,
+    Map<String, Map<String, String>> leafFieldTypes = const {},
+  }) {
+    _requireNoReservedFields(fields);
+    return _emit([
+      buildIntermediateClass(
+        name: name,
+        rootName: rootName,
+        basePatchName: basePatchName,
+        fields: fields,
+        sharedFields: sharedFields,
+        leafNames: leafNames,
+        leafFieldTypes: leafFieldTypes,
+      ),
+    ]);
+  }
+
+  /// Builds the intermediate patch [Class] spec [emitIntermediatePatch] wraps.
+  Class buildIntermediateClass({
+    required String name,
+    required String rootName,
+    required String basePatchName,
+    required List<NameTypeClassComment> fields,
+    required List<String> sharedFields,
+    required List<String> leafNames,
+    Map<String, Map<String, String>> leafFieldTypes = const {},
+  }) {
+    final intermediate = _clean(name);
+    final root = _clean(rootName);
+    final patchName = '${intermediate}Patch';
+    final shared = sharedFields.toSet();
+
+    return Class((c) {
+      c
+        ..name = patchName
+        ..extend = referType(basePatchName);
+
+      c.constructors.add(
+        Constructor((con) {
+          for (final field in fields) {
+            con.optionalParameters.add(_fieldParameter(field));
+            con.initializers.add(_fieldInitializer(field));
+          }
+        }),
+      );
+
+      for (final field in fields) {
+        final isShared =
+            shared.contains(field.name) ||
+            shared.contains(_memberName(field.name));
+        c.fields.add(_patchValueField(field, overridesRoot: isShared));
+      }
+
+      for (final field in fields) {
+        c.methods.add(
+          _fluentBuilder(patchName: patchName, field: field, fields: fields),
+        );
+      }
+
+      c.methods.add(_isEmptyGetter(fields));
+      c.methods.add(_isNotEmptyGetter());
+      c.methods.add(
+        _intermediateApplyMethod(
+          intermediate,
+          fields,
+          leafNames,
+          leafFieldTypes,
+        ),
+      );
+      c.methods.add(_concreteComposeMethod(root, fields, patchName));
+      c.methods.add(
+        _concreteInvertMethod(
+          root,
+          fields,
+          patchName,
+          entityName: intermediate,
+          guardKind: true,
+        ),
+      );
+      c.methods.add(_concreteToWireMethod(fields));
+      c.methods.add(
+        _concreteToEnvelopeMethod(
+          entityType: intermediate,
+          fields: fields,
+          patchKind: intermediate,
+        ),
+      );
+      c.methods.add(_concreteFromWire(patchName, fields));
+      c.methods.add(_diffMethod(intermediate, fields));
+    });
+  }
+
+  /// The intermediate patch's `apply`: dispatch each concrete leaf under the
+  /// intermediate to its own `copyWith`, writing only the fields this patch
+  /// carries (the intermediate's payload) and leaving leaf-only fields intact.
+  Method _intermediateApplyMethod(
+    String intermediate,
+    List<NameTypeClassComment> fields,
+    List<String> leafNames,
+    Map<String, Map<String, String>> leafFieldTypes,
+  ) => Method((m) {
+    m
+      ..name = applyMethodName
+      ..returns = referType(intermediate)
+      ..requiredParameters.add(_covariantTarget(intermediate));
+    m.annotations.add(refer('override'));
+
+    if (leafNames.isEmpty) {
+      // No concrete leaf to dispatch to: the only honest answer is the loud
+      // failure the shared patch uses for an unmatched target.
+      m.body = Code(
+        'throw ArgumentError.value(target, \'target\', '
+        '\'${intermediate}Patch cannot apply to \${target.runtimeType}\');',
+      );
+    } else {
+      final lines = <String>['if (isEmpty) return target;'];
+      for (final leafName in leafNames) {
+        final leaf = _clean(leafName);
+        lines.add('if (target is $leaf) {');
+        lines.add('return target.copyWith(');
+        for (final f in fields) {
+          final name = _memberName(f.name);
+          final narrowed = leafFieldTypes[leaf]?[f.name];
+          final value = 'this.$name.valueOrNull';
+          final written = narrowed == null
+              ? value
+              : '$value as ${_concreteType(narrowed)}';
+          lines.add(
+            '  $name: this.$name.isUnchanged ? target.$name : $written,',
+          );
+        }
+        lines.add(');');
+        lines.add('}');
+      }
+      lines.add(
+        'throw ArgumentError.value(target, \'target\', '
+        '\'${intermediate}Patch cannot apply to \${target.runtimeType}\');',
+      );
+      m.body = Code(lines.join('\n'));
+    }
+  });
 
   /// Formats each spec individually and joins them.
   ///
@@ -235,6 +399,7 @@ class PolymorphicPatchEmitter {
       c.methods.add(_rootInvertMethod(root));
       c.methods.add(_rootToWireMethod(fields));
       c.methods.add(_rootToEnvelopeMethod(fields));
+      c.methods.add(_rootDiffMethod(root, fields));
       c.methods.add(
         _rootFromWireMethod(root, fields, subtypeNames: subtypeNames),
       );
@@ -318,6 +483,7 @@ class PolymorphicPatchEmitter {
     required List<NameTypeClassComment> fields,
     required List<String> sharedFields,
     bool standalone = false,
+    String? basePatchName,
   }) {
     final subtype = _clean(subtypeName);
     final root = _clean(rootName);
@@ -334,7 +500,10 @@ class PolymorphicPatchEmitter {
         // overrides below legal.
         c.implements.add(referType('ZorphyPatch<$subtype>'));
       } else {
-        c.extend = referType('${root}Patch');
+        // A leaf under an abstract intermediate extends THAT intermediate's
+        // patch, so the intermediate's fields are inherited; a leaf directly
+        // under the root extends the root patch.
+        c.extend = referType(basePatchName ?? '${root}Patch');
       }
 
       c.constructors.add(
@@ -391,6 +560,7 @@ class PolymorphicPatchEmitter {
           patchKind: subtype,
         ),
       );
+      c.methods.add(_diffMethod(subtype, fields));
       c.methods.add(_subtypeFromWireMethod(subtype, root, fields, shared));
     });
   }
@@ -657,6 +827,98 @@ class PolymorphicPatchEmitter {
     lines.add(');');
     m.body = Code(lines.join('\n'));
   });
+
+  /// `static diff(previous, next)` for the ABSTRACT root patch
+  /// (ISSUE-0229, arrrrny/zorphy#229).
+  ///
+  /// The sealed root patch is abstract and cannot be instantiated, so the diff
+  /// builds the concrete `<Root>SharedPatch` (which IS a `<Root>Patch`): an
+  /// O(1) `identical` fast path returns the empty shared patch, then each
+  /// shared field is set only when it changed.
+  Method _rootDiffMethod(String root, List<NameTypeClassComment> fields) =>
+      Method((m) {
+        final patchName = '${_clean(root)}Patch';
+        final sharedName = '${_clean(root)}$sharedPatchSuffix';
+        m
+          ..name = 'diff'
+          ..static = true
+          ..returns = referType(patchName);
+        m.requiredParameters.addAll([
+          Parameter((p) {
+            p
+              ..name = 'previous'
+              ..type = referType(root);
+          }),
+          Parameter((p) {
+            p
+              ..name = 'next'
+              ..type = referType(root);
+          }),
+        ]);
+        final lines = <String>[
+          'if (identical(previous, next)) return $sharedName();',
+        ];
+        final args = <String>[];
+        for (final field in fields) {
+          final member = _memberName(field.name);
+          final type = _concreteType(field.type);
+          lines.add(
+            'final $member = previous.$member != next.$member '
+            '? PatchValue<$type>.set(next.$member) '
+            ': const PatchValue<$type>.unchanged();',
+          );
+          args.add('$member: $member');
+        }
+        lines.add('return $sharedName(${args.join(', ')});');
+        m.body = Code(lines.join('\n'));
+      });
+
+  /// `static diff(previous, next)` for a concrete or standalone patch
+  /// (ISSUE-0229, arrrrny/zorphy#229).
+  ///
+  /// An O(1) `identical` fast path returns the canonical empty patch, then
+  /// each field is recorded only when it changed, so unchanged fields stay
+  /// [PatchValue.unchanged] and never reach the wire. Every field is compared
+  /// by value and the whole new value is set: the polymorphic patch carries a
+  /// typed [PatchValue] per field, so a nested node, a list or a map is
+  /// replaced wholesale rather than as a delta — the granular delta algebra
+  /// lives on the legacy [PatchEmitter] surface, whose field map is untyped.
+  Method _diffMethod(String entityName, List<NameTypeClassComment> fields) =>
+      Method((m) {
+        final patchName = '${_clean(entityName)}Patch';
+        m
+          ..name = 'diff'
+          ..static = true
+          ..returns = referType(patchName);
+        m.requiredParameters.addAll([
+          Parameter((p) {
+            p
+              ..name = 'previous'
+              ..type = referType(entityName);
+          }),
+          Parameter((p) {
+            p
+              ..name = 'next'
+              ..type = referType(entityName);
+          }),
+        ]);
+        final lines = <String>[
+          'if (identical(previous, next)) return $patchName();',
+          'var changes = $patchName();',
+        ];
+        for (final field in fields) {
+          final member = _memberName(field.name);
+          lines.add(
+            'if (previous.$member != next.$member) '
+            'changes = changes.with${_capitalize(member)}(next.$member);',
+          );
+        }
+        lines.add('return changes;');
+        m.body = Code(lines.join('\n'));
+      });
+
+  static String _capitalize(String member) =>
+      member.substring(0, 1).toUpperCase() + member.substring(1);
 
   /// `compose` for a concrete patch: `next`'s set fields win, this one's fill
   /// the rest. Kinds must match — merging a sibling subtype's patch, or a
