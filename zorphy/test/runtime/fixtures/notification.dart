@@ -63,6 +63,10 @@ class PriceDropNotification extends Notification {
   );
 }
 
+// dart format off
+// The region below IS PolymorphicPatchEmitter().emitRoot() output: the golden
+// test compares it byte for byte, and the SDK formatter wraps long `expected:`
+// literals the pinned dart_style dependency does not (#246 base fix).
 // GOLDEN-POLY-ROOT-START
 sealed class NotificationPatch implements ZorphyPatch<Notification> {
   const NotificationPatch();
@@ -116,8 +120,7 @@ sealed class NotificationPatch implements ZorphyPatch<Notification> {
         violations: <FieldViolation>[
           FieldViolation(
             path: '/patchKind',
-            expected:
-                'String (one of: shared, OrderNotification, PriceDropNotification)',
+            expected: 'String (one of: shared, OrderNotification, PriceDropNotification)',
             actual: ZorphyPatchWire.describe(null),
           ),
         ],
@@ -195,8 +198,7 @@ sealed class NotificationPatch implements ZorphyPatch<Notification> {
       violations: <FieldViolation>[
         FieldViolation(
           path: '/patchKind',
-          expected:
-              'String (one of: shared, OrderNotification, PriceDropNotification)',
+          expected: 'String (one of: shared, OrderNotification, PriceDropNotification)',
           actual: ZorphyPatchWire.describe(kind),
         ),
       ],
@@ -354,6 +356,7 @@ final class NotificationSharedPatch extends NotificationPatch {
   }
 }
 // GOLDEN-POLY-ROOT-END
+// dart format on
 
 // GOLDEN-POLY-ORDER-START
 final class OrderNotificationPatch extends NotificationPatch {
