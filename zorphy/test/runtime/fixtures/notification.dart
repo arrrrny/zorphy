@@ -63,6 +63,10 @@ class PriceDropNotification extends Notification {
   );
 }
 
+// dart format off
+// The region below IS PolymorphicPatchEmitter().emitRoot() output: the golden
+// test compares it byte for byte, and the SDK formatter wraps long `expected:`
+// literals the pinned dart_style dependency does not (#246 base fix).
 // GOLDEN-POLY-ROOT-START
 sealed class NotificationPatch implements ZorphyPatch<Notification> {
   const NotificationPatch();
@@ -352,6 +356,7 @@ final class NotificationSharedPatch extends NotificationPatch {
   }
 }
 // GOLDEN-POLY-ROOT-END
+// dart format on
 
 // GOLDEN-POLY-ORDER-START
 final class OrderNotificationPatch extends NotificationPatch {

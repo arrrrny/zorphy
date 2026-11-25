@@ -1695,9 +1695,8 @@ class CategoryNodePatch extends PatchBase<CategoryNode, CategoryNode$> {
     patchMap[CategoryNode$.children] = (List<dynamic> list) {
       var updatedList = List<CategoryNode>.from(list);
       if (index >= 0 && index < updatedList.length) {
-        updatedList[index] = patch(
-          CategoryNodePatch(),
-        ).applyTo(updatedList[index] as CategoryNode);
+        updatedList[index] = patch(CategoryNodePatch())
+            .applyTo(updatedList[index] as CategoryNode);
       }
       return updatedList;
     };
@@ -4092,9 +4091,8 @@ class CompanyPatch extends PatchBase<Company, Company$> {
     patchMap[Company$.employees] = (List<dynamic> list) {
       var updatedList = List<Employee>.from(list);
       if (index >= 0 && index < updatedList.length) {
-        updatedList[index] = patch(
-          EmployeePatch(),
-        ).applyTo(updatedList[index] as Employee);
+        updatedList[index] = patch(EmployeePatch())
+            .applyTo(updatedList[index] as Employee);
       }
       return updatedList;
     };
