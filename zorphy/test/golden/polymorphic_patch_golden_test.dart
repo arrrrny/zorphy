@@ -50,6 +50,19 @@ String _fixtureRegion(String start, String end) {
   return source.substring(from + start.length, to).trim();
 }
 
+/// Collapses every run of whitespace to a single space and trims the ends, so
+/// a golden comparison is insensitive to the line-wrapping the locally resolved
+/// `dart_style` (`^3.1.1`) chooses.
+///
+/// The emitted code is formatted by whatever `dart_style` patch release
+/// resolves; a release that wraps a long string literal onto a continuation
+/// line (or back) is semantically identical but used to fail the byte-for-byte
+/// golden whose fixture was produced by an earlier style (zorphy#260). Token
+/// content is still compared exactly — only the wrap is normalized away, and a
+/// real emission change (a renamed field, a dropped getter) still differs.
+String _normalize(String source) =>
+    source.replaceAll(RegExp(r'\s+'), ' ').trim();
+
 /// A three-level hierarchy whose concrete leaves narrow an inherited field:
 /// `SystemEvent.payload` is `Object`, `DeployEvent.payload` is `String` and
 /// `AlertEvent.payload` is `int`. The intermediate `apply` must dispatch to
@@ -224,15 +237,15 @@ void main() {
       );
     });
 
-    test('the root emission matches the runtime fixture byte for byte', () {
+    test('the root emission matches the runtime fixture (whitespace-insensitive)', () {
       final emitted = PolymorphicPatchEmitter().emitRoot(
         rootName: 'Notification',
         fields: rootFields(),
         subtypeNames: subtypes(),
       );
       expect(
-        emitted.trim(),
-        _fixtureRegion('// GOLDEN-POLY-ROOT-START', '// GOLDEN-POLY-ROOT-END'),
+        _normalize(emitted),
+        _normalize(_fixtureRegion('// GOLDEN-POLY-ROOT-START', '// GOLDEN-POLY-ROOT-END')),
         reason:
             'the runtime suite must exercise the real emitted root patch — '
             'regenerate $_fixturePath if the emission changed on purpose',
@@ -319,11 +332,11 @@ void main() {
         sharedFields: const ['id', 'readAt'],
       );
       expect(
-        emitted.trim(),
-        _fixtureRegion(
+        _normalize(emitted),
+        _normalize(_fixtureRegion(
           '// GOLDEN-POLY-ORDER-START',
           '// GOLDEN-POLY-ORDER-END',
-        ),
+        )),
         reason: 'regenerate $_fixturePath if the emission changed on purpose',
       );
     });
@@ -336,11 +349,11 @@ void main() {
         sharedFields: const ['id', 'readAt'],
       );
       expect(
-        emitted.trim(),
-        _fixtureRegion(
+        _normalize(emitted),
+        _normalize(_fixtureRegion(
           '// GOLDEN-POLY-PRICE-START',
           '// GOLDEN-POLY-PRICE-END',
-        ),
+        )),
         reason: 'regenerate $_fixturePath if the emission changed on purpose',
       );
     });
@@ -594,8 +607,8 @@ void main() {
             .substring(from + '// GOLDEN-POLY-INTERMEDIATE-START'.length, to)
             .trim();
         expect(
-          region,
-          _emitIntermediateHierarchy().trim(),
+          _normalize(region),
+          _normalize(_emitIntermediateHierarchy()),
           reason:
               'the runtime suite must exercise the real emitted intermediate '
               'patch — regenerate test/runtime/fixtures/intermediate.dart if '
@@ -650,6 +663,35 @@ void main() {
       // The subtype's own field is diffed; the identical fast path is present.
       expect(emitted, contains('if (previous.itemCount != next.itemCount)'));
       expect(emitted, contains('if (identical(previous, next)) return'));
+    });
+  });
+
+  // Regression for zorphy#260: the byte-for-byte golden broke whenever a
+  // `dart_style` patch release changed how it wraps a long string literal. The
+  // normalizer collapses whitespace so only token content is compared, making
+  // the golden independent of the resolved `dart_style` version.
+  group('ISSUE-260 golden whitespace normalization', () {
+    // The exact shape of the drift from the issue: a long `expected:` string
+    // literal wrapped onto a continuation line by one dart_style version and
+    // kept on one line by another — semantically identical, byte-different.
+    const wrapped =
+        "expected:\n"
+        "            'String (one of: shared, OrderNotification, "
+        "PriceDropNotification)',";
+    const unwrapped =
+        "expected: 'String (one of: shared, OrderNotification, "
+        "PriceDropNotification)',";
+
+    test('a line-wrap-only difference is byte-unequal but normalized-equal', () {
+      // RED condition (the bug): a byte-for-byte compare rejects the drift.
+      expect(wrapped, isNot(unwrapped));
+      // GREEN condition (the fix): normalization treats them as identical.
+      expect(_normalize(wrapped), _normalize(unwrapped));
+    });
+
+    test('a real token change stays unequal after normalization', () {
+      final changed = unwrapped.replaceFirst('shared', 'sharedX');
+      expect(_normalize(unwrapped), isNot(_normalize(changed)));
     });
   });
 }
