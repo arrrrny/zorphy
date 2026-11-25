@@ -516,7 +516,8 @@ void main() {
       // referenced `_boundaryAs<num>` without the helper being emitted. A
       // DEDICATED fixture (no scalar fields) isolates that selection — the
       // shared fixture's `String` fields would emit `_boundaryAs` anyway.
-      final numericSource = '''
+      final numericSource =
+          '''
 $_annotationImport
 part 'intents.zorphy.dart';
 

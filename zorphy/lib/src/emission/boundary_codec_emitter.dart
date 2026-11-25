@@ -231,6 +231,7 @@ class BoundaryCodecEmitter {
     Iterable<ZorphyNodeIr> nodes,
     Map<String, List<BoundaryField>> fields, {
     Set<String> additionalNodes = const {},
+
     /// Class names whose decoder disables numeric widening (intents, #232).
     ///
     /// An intent's `num` decodes value-exact via `_boundaryAs<num>` while an
@@ -246,8 +247,9 @@ class BoundaryCodecEmitter {
     final elementShapes = <_Shape>{};
     var hasDispatch = false;
     for (final node in nodes) {
-      final activeEmitter =
-          noWidenClassNames.contains(node.className) ? noWidenEmitter : emitter;
+      final activeEmitter = noWidenClassNames.contains(node.className)
+          ? noWidenEmitter
+          : emitter;
       if (!node.isConcreteLeaf) hasDispatch = true;
       final known = activeEmitter._known(node, additionalNodes);
       for (final field in fields[node.className] ?? const <BoundaryField>[]) {
@@ -647,7 +649,9 @@ class BoundaryCodecEmitter {
     // one. Non-nullable element types keep the current violation for null.
     if (!elementType.trim().endsWith('?')) return body;
     return [
-      Code('    if ($element == null) { ${assign.replaceAll(variable, 'null')} } else {'),
+      Code(
+        '    if ($element == null) { ${assign.replaceAll(variable, 'null')} } else {',
+      ),
       ...body,
       const Code('    }'),
     ];
