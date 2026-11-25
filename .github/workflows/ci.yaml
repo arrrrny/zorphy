@@ -129,6 +129,9 @@ jobs:
       - name: Verify generated code analyzes clean
         run: dart analyze
         working-directory: zorphy/example
+      - name: Run example runtime tests (v3 union contract, issue #231)
+        run: dart test
+        working-directory: zorphy/example
 
   analyzer_compat:
     runs-on: ubuntu-latest

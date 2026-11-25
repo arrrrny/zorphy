@@ -87,3 +87,51 @@ abstract class $InspectProductIntent {
 abstract class $Greeting {
   String get message;
 }
+
+// ── Issue #231 — generic union hierarchy (the #179 acceptance shape) ────────
+// The v3 composer must carry the type argument through the union classes,
+// their leaves and the matcher/morphing extensions.
+@ZorphyUnion()
+abstract class $AsyncSlice<T> {
+  String get source;
+}
+
+@ZorphyValue()
+abstract class $SliceData<T> implements $AsyncSlice<T> {
+  T get value;
+}
+
+@ZorphyValue()
+abstract class $SliceLoading<T> implements $AsyncSlice<T> {}
+
+// ── Issue #231 — bounded-generic variant ────────────────────────────────────
+@ZorphyUnion()
+abstract class $BoundedSlice<T extends num> {
+  String get source;
+}
+
+@ZorphyValue()
+abstract class $BoundedData<T extends num> implements $BoundedSlice<T> {
+  T get value;
+}
+
+@ZorphyValue()
+abstract class $BoundedLoading<T extends num> implements $BoundedSlice<T> {}
+
+// ── Issue #231 — entity sibling pair for reference-preserving morphing ──────
+@ZorphyEntity(principalKey: #id)
+abstract class $Task {
+  String get id;
+  DateTime get createdAt;
+  List<String> get tags;
+}
+
+@ZorphyEntity()
+abstract class $OpenTask implements $Task {
+  String get assignee;
+}
+
+@ZorphyEntity()
+abstract class $DoneTask implements $Task {
+  String get result;
+}
