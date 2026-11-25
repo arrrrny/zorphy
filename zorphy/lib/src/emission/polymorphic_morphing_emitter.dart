@@ -74,7 +74,13 @@ final class PolymorphicMorphingEmitter {
 
     final extensions = <Extension>[];
     for (final source in leaves) {
-      final sourcePayload = _payload(source, fields);
+      final sourcePayload = _payload(
+        source,
+        fields,
+        scopeParameters: PolymorphicClassEmitter.bareParameterNames(
+          source.typeParameters,
+        ),
+      );
       final methods = <Method>[];
       for (final target in leaves) {
         if (target.className == source.className) continue;
@@ -130,15 +136,42 @@ final class PolymorphicMorphingEmitter {
         target.typeParameters.length != source.typeParameters.length) {
       return null;
     }
+    // The source's parameters flow into the target's declaration, so each
+    // target bound must be satisfied by the corresponding source bound:
+    // `changeToNarrow` on `BroadMorphing<T extends num>` would return
+    // `Narrow<T>` with `T` only satisfying `num` — a
+    // `type_argument_not_matching_bounds` in every build of the hierarchy.
+    // Withhold the method instead (the check is textual and conservative —
+    // see [PolymorphicClassEmitter.typeParameterSatisfies]).
+    for (var i = 0; i < target.typeParameters.length; i++) {
+      if (!PolymorphicClassEmitter.typeParameterSatisfies(
+        source.typeParameters[i],
+        target.typeParameters[i],
+      )) {
+        return null;
+      }
+    }
+    final sourceParameters = PolymorphicClassEmitter.bareParameterNames(
+      source.typeParameters,
+    );
     final targetName = target.cleanName;
     final targetType = targetIsGeneric
-        ? '$targetName<${PolymorphicClassEmitter.bareParameterNames(source.typeParameters).join(', ')}>'
+        ? '$targetName<${sourceParameters.join(', ')}>'
         : targetName;
+
+    // The target's payload is read in the SOURCE extension's scope: a field
+    // the target declares as `U get value` is `T get value` here, and an
+    // unsubstituted `required U value` parameter would not compile.
+    final targetPayload = _payload(
+      target,
+      fields,
+      scopeParameters: sourceParameters,
+    );
 
     final parameters = <Parameter>[];
     final arguments = <String>[];
 
-    for (final field in _payload(target, fields).values) {
+    for (final field in targetPayload.values) {
       final name = field.name;
       final sourceField = sourcePayload[name];
       final shared =
@@ -170,7 +203,7 @@ final class PolymorphicMorphingEmitter {
     // constructor call does not compile. The loop above always adds one —
     // this guard exists for the reader, and to keep a future parameter
     // policy from emitting silently broken bodies.
-    if (arguments.length != _payload(target, fields).length) return null;
+    if (arguments.length != targetPayload.length) return null;
 
     return Method((m) {
       m.name = 'changeTo$targetName';
@@ -187,15 +220,32 @@ final class PolymorphicMorphingEmitter {
 
   /// The full payload of [node] — own fields first, then each ancestor's,
   /// nearest first, the first declaration of a name winning — keyed by name.
+  ///
+  /// Every field is rebound into the [scopeParameters] scope (the source
+  /// extension's type parameters): an ancestor's or the target's declaration
+  /// names ITS OWN parameters, which are not in scope where the payload is
+  /// read. The binding is positional, the same one the `extends` clause
+  /// establishes.
   Map<String, PolymorphicField> _payload(
     ZorphyNodeIr node,
-    Map<String, List<PolymorphicField>> fields,
-  ) {
+    Map<String, List<PolymorphicField>> fields, {
+    required List<String> scopeParameters,
+  }) {
     final payload = <String, PolymorphicField>{};
     for (final owner in <ZorphyNodeIr>[node, ...node.superTypes]) {
+      final ownerParameters = PolymorphicClassEmitter.bareParameterNames(
+        owner.typeParameters,
+      );
       for (final field
           in fields[owner.className] ?? const <PolymorphicField>[]) {
-        payload.putIfAbsent(field.name, () => field);
+        payload.putIfAbsent(
+          field.name,
+          () => PolymorphicClassEmitter.substituteFieldScope(
+            field,
+            ownerParameters,
+            scopeParameters,
+          ),
+        );
       }
     }
     return payload;

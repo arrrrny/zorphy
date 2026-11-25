@@ -198,11 +198,7 @@ final class ArchetypeComposer {
       // exactly the nodes that receive a codec and the lens/resolver surface.
       for (final node in _walk(root)) {
         final methods = <Method>[
-          ...codec.emitCodec(
-            node,
-            payloads,
-            additionalNodes: knownNodes,
-          ),
+          ...codec.emitCodec(node, payloads, additionalNodes: knownNodes),
         ];
         final resolvePath = resolvePaths[node.className];
         if (resolvePath != null) methods.add(resolvePath);

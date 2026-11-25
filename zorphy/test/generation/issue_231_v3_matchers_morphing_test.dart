@@ -120,29 +120,108 @@ abstract class \$DoneTask implements \$Task {
 }
 ''';
 
+/// A variant whose type parameter is RENAMED (`U` under the root's `T`) and
+/// a root-declared generic field the leaf must redeclare in ITS OWN scope:
+/// `Envelope<T> { T get payload }` under `Closed<U>` redeclares
+/// `final U payload`, and the matcher's arm is `Closed<T>` — the root's
+/// parameter is the only one in scope inside the extension.
+const _renamedParamSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'renamed.zorphy.dart';
+
+@ZorphyUnion()
+abstract class \$Envelope<T> {
+  T get payload;
+}
+
+@ZorphyValue()
+abstract class \$Closed<U> implements \$Envelope<U> {}
+
+@ZorphyValue()
+abstract class \$Opened<U> implements \$Envelope<U> {
+  U get note;
+}
+''';
+
+/// A variant bound TIGHTER than the root's (`Narrow<T extends int>` under
+/// `Measure<T extends num>`): the classes still emit, but the matcher must be
+/// withheld (its `Narrow<T>` arm would carry a `num`-bounded `T`) and the
+/// morph method into `Narrow` must be withheld — both would fail
+/// `type_argument_not_matching_bounds` in the consumer.
+const _tightBoundSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'tight_bound.zorphy.dart';
+
+@ZorphyUnion()
+abstract class \$Measure<T extends num> {
+  T get amount;
+}
+
+@ZorphyValue()
+abstract class \$Narrow<T extends int> implements \$Measure<T> {}
+
+@ZorphyValue()
+abstract class \$Wide<T extends num> implements \$Measure<T> {}
+''';
+
+/// Variants whose lower-camel names collide with the matcher's GENERATED
+/// identifiers: `Value` would emit `Value value => value(value)` (the pattern
+/// variable hides the callback) and `OrElse` duplicates the required `orElse`
+/// parameter. The reserved-identifier policy renames the callbacks. The
+/// second union declares `T`, `TResult`, `TValue` AND `TOut`, so the result
+/// parameter falls through to a suffixed `TResult2`.
+const _collisionSource = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'collision.zorphy.dart';
+
+@ZorphyUnion()
+abstract class \$Slot {
+  factory \$Slot.value() = \$Value;
+  factory \$Slot.orElse() = \$OrElse;
+}
+
+@ZorphyValue()
+class \$Value implements \$Slot {
+  const \$Value();
+}
+
+@ZorphyValue()
+class \$OrElse implements \$Slot {
+  const \$OrElse();
+}
+
+@ZorphyUnion()
+abstract class \$Quad<T, TResult, TValue, TOut> {}
+
+@ZorphyValue()
+abstract class \$QuadFirst<T, TResult, TValue, TOut>
+    implements \$Quad<T, TResult, TValue, TOut> {}
+''';
+
 /// Composes the v3 surface for the library at [libraryPath] through the
-/// production pipeline the generator itself calls.
-Future<String> _compose(String libraryPath) async {
-  final collection = AnalysisContextCollection(
-    includedPaths: [Directory(libraryPath).parent.path],
-  );
-  try {
-    final result =
-        await collection
-                .contextFor(libraryPath)
-                .currentSession
-                .getResolvedUnit(libraryPath)
-            as ResolvedUnitResult;
-    final ir = HierarchyResolver.resolveLibrary(result.libraryElement);
-    if (ir.hasErrors) {
-      fail(
-        'resolver diagnostics:\n${ir.diagnostics.map((d) => d.render()).join('\n')}',
-      );
-    }
-    return const ArchetypeComposer().compose(ir);
-  } finally {
-    await collection.dispose();
+/// production pipeline the generator itself calls, on the group's SHARED
+/// [collection] — one analyzer context for every fixture, so composing the
+/// full fixture set in `setUpAll` stays cheap.
+Future<String> _compose(
+  AnalysisContextCollection collection,
+  String libraryPath,
+) async {
+  final result =
+      await collection
+              .contextFor(libraryPath)
+              .currentSession
+              .getResolvedUnit(libraryPath)
+          as ResolvedUnitResult;
+  final ir = HierarchyResolver.resolveLibrary(result.libraryElement);
+  if (ir.hasErrors) {
+    fail(
+      'resolver diagnostics:\n${ir.diagnostics.map((d) => d.render()).join('\n')}',
+    );
   }
+  return const ArchetypeComposer().compose(ir);
 }
 
 /// Writes [composed] next to the library as its generated part file, with the
@@ -202,47 +281,73 @@ void main() {
     timeout: Timeout.factor(10),
     () {
       late Directory fixtureDir;
+      late AnalysisContextCollection collection;
 
-      setUpAll(() {
+      /// The composed part source per fixture library, keyed by file name.
+      final composedByLibrary = <String, String>{};
+
+      /// Every fixture this group composes. The set lives in ONE place so
+      /// the aggregate analysis test can assert it is complete before
+      /// trusting its own result.
+      const fixtureSources = <String, String>{
+        'status.dart': _statusSource,
+        'slice.dart': _genericSliceSource,
+        'bounded.dart': _boundedSliceSource,
+        'task.dart': _taskSource,
+        'renamed.dart': _renamedParamSource,
+        'tight_bound.dart': _tightBoundSource,
+        'collision.dart': _collisionSource,
+      };
+
+      String partNameOf(String libraryName) =>
+          libraryName.replaceAll('.dart', '.zorphy.dart');
+
+      setUpAll(() async {
         final root = Directory('test/.issue_231_tmp').absolute.path;
         Directory(root).createSync(recursive: true);
         fixtureDir = Directory(root).createTempSync('fixture_');
+        // Every fixture is composed HERE, once, so no test depends on another
+        // test's output: selecting any single test still finds the full
+        // fixture set on disk (the order-dependence the #243 review flagged).
+        for (final entry in fixtureSources.entries) {
+          File(
+            '${fixtureDir.path}/${entry.key}',
+          ).writeAsStringSync(entry.value);
+        }
+        collection = AnalysisContextCollection(
+          includedPaths: [fixtureDir.path],
+        );
+        for (final libraryName in fixtureSources.keys) {
+          final composed = await _compose(
+            collection,
+            '${fixtureDir.path}/$libraryName',
+          );
+          expect(
+            composed,
+            isNotEmpty,
+            reason: 'the composer must emit a surface for $libraryName',
+          );
+          _writePart(
+            fixtureDir,
+            libraryName,
+            partNameOf(libraryName),
+            composed,
+          );
+          composedByLibrary[libraryName] = composed;
+        }
       });
 
-      tearDownAll(() {
+      tearDownAll(() async {
+        await collection.dispose();
         if (fixtureDir.existsSync()) fixtureDir.deleteSync(recursive: true);
         final tmp = Directory('test/.issue_231_tmp');
         if (tmp.existsSync() && tmp.listSync().isEmpty) tmp.deleteSync();
       });
 
-      Future<List<String>> composeAndWrite(
-        String source,
-        String libraryName,
-        String partName,
-      ) async {
-        final libraryPath = '${fixtureDir.path}/$libraryName';
-        File(libraryPath).writeAsStringSync(source);
-        final composed = await _compose(libraryPath);
-        expect(
-          composed,
-          isNotEmpty,
-          reason: 'the composer must emit a surface',
-        );
-        _writePart(fixtureDir, libraryName, partName, composed);
-        return [composed];
-      }
-
       test(
         'union matchers: when + maybeWhen on the AsyncStatus repro',
         () async {
-          await composeAndWrite(
-            _statusSource,
-            'status.dart',
-            'status.zorphy.dart',
-          );
-          final composed = File(
-            '${fixtureDir.path}/status.zorphy.dart',
-          ).readAsStringSync();
+          final composed = composedByLibrary['status.dart']!;
 
           expect(
             composed,
@@ -260,9 +365,7 @@ void main() {
       );
 
       test('sibling morphing: changeTo in both directions', () async {
-        final composed = File(
-          '${fixtureDir.path}/status.zorphy.dart',
-        ).readAsStringSync();
+        final composed = composedByLibrary['status.dart']!;
 
         // Ready -> Loading: Loading has no fields of its own, so no parameter.
         expect(composed, contains('extension ReadyMorphing on Ready'));
@@ -280,14 +383,7 @@ void main() {
       test(
         'generic union: AsyncSlice<T> emits classes, arms and morphing',
         () async {
-          await composeAndWrite(
-            _genericSliceSource,
-            'slice.dart',
-            'slice.zorphy.dart',
-          );
-          final composed = File(
-            '${fixtureDir.path}/slice.zorphy.dart',
-          ).readAsStringSync();
+          final composed = composedByLibrary['slice.dart']!;
 
           expect(composed, contains('sealed class AsyncSlice<T>'));
           expect(
@@ -331,20 +427,18 @@ void main() {
               'return SliceData<T>.fromTrusted(value: value, source: source);',
             ),
           );
+          // copyWith keeps the class's type argument in its return type and
+          // its fromTrusted call — the bare name would re-instantiate T as
+          // dynamic.
+          expect(composed, contains('SliceData<T> copyWith({'));
+          expect(composed, contains('SliceLoading<T> copyWith({'));
         },
       );
 
       test(
         'bounded generic union: T extends num reaches every emitted member',
         () async {
-          await composeAndWrite(
-            _boundedSliceSource,
-            'bounded.dart',
-            'bounded.zorphy.dart',
-          );
-          final composed = File(
-            '${fixtureDir.path}/bounded.zorphy.dart',
-          ).readAsStringSync();
+          final composed = composedByLibrary['bounded.dart']!;
 
           expect(
             composed,
@@ -375,10 +469,7 @@ void main() {
         'entity morphing: shared fields pass by reference, only target-owned '
         'fields are asked for',
         () async {
-          await composeAndWrite(_taskSource, 'task.dart', 'task.zorphy.dart');
-          final composed = File(
-            '${fixtureDir.path}/task.zorphy.dart',
-          ).readAsStringSync();
+          final composed = composedByLibrary['task.dart']!;
 
           expect(composed, contains('extension OpenTaskMorphing on OpenTask'));
           expect(composed, contains('DoneTask changeToDoneTask({'));
@@ -398,8 +489,91 @@ void main() {
         },
       );
 
+      test('renamed variant parameters bind positionally, and an inherited '
+          'generic field redeclares in the leaf scope', () async {
+        final composed = composedByLibrary['renamed.dart']!;
+
+        // The class surface keeps the variant's own parameter names.
+        expect(composed, contains('final class Closed<U> extends Envelope<U>'));
+        // The root's `T get payload` is redeclared as `U` in the leaf —
+        // `T` is not in scope there.
+        expect(composed, contains('final U payload;'));
+        // The matcher binds the variant with the ROOT's parameter: `U` is
+        // not in scope inside the extension either.
+        expect(composed, contains('extension EnvelopeWhenE<T> on Envelope<T>'));
+        expect(composed, contains('Closed<T> value => closed(value)'));
+        expect(composed, contains('Opened<T> value => opened(value)'));
+        // Morphing reads the target payload in the SOURCE extension's
+        // scope: Closed's inherited `payload` (declared `T` on the root)
+        // is rebound to the source's `U`, never left an unbound name.
+        expect(composed, contains('extension OpenedMorphing<U> on Opened<U>'));
+        expect(composed, contains('Closed<U> changeToClosed()'));
+        expect(
+          composed,
+          contains('return Closed<U>.fromTrusted(payload: payload);'),
+        );
+      });
+
+      test('a variant bound tighter than the root keeps its classes but loses '
+          'the matcher and the inbound morph', () async {
+        final composed = composedByLibrary['tight_bound.dart']!;
+
+        // The classes compile as declared — nothing is pruned.
+        expect(composed, contains('sealed class Measure<T extends num>'));
+        expect(
+          composed,
+          contains('final class Narrow<T extends int> extends Measure<T>'),
+        );
+        expect(
+          composed,
+          contains('final class Wide<T extends num> extends Measure<T>'),
+        );
+        // The matcher is withheld whole: a `Narrow<T>` arm would carry the
+        // extension's `num`-bounded `T` into an `int` bound.
+        expect(composed, isNot(contains('MeasureWhenE')));
+        // The morph into Narrow is withheld for the same reason; the morph
+        // out of it has no sibling method to pair with either way.
+        expect(composed, isNot(contains('changeToNarrow')));
+        expect(composed, isNot(contains('changeToWide')));
+      });
+
+      test(
+        'variants named Value and OrElse get reserved-safe callback names, '
+        'and an exhausted result-parameter list falls through to a suffix',
+        () async {
+          final composed = composedByLibrary['collision.dart']!;
+
+          // `Value value => value(value)` would hide the callback behind the
+          // pattern variable; the reserved-identifier policy renames it.
+          expect(composed, contains('Value value => value2(value)'));
+          expect(composed, contains('required T Function(Value) value2'));
+          // `OrElse` collides with maybeWhen's required `orElse` parameter.
+          expect(composed, contains('required T Function(OrElse) orElse2'));
+          expect(composed, contains('required T Function() orElse'));
+          // T, TResult, TValue and TOut are all declared by the union, so the
+          // result parameter is a fresh suffixed name, not a shadowed one.
+          expect(composed, contains('TResult2 when<TResult2>({'));
+        },
+      );
+
       test('every composed fixture analyzes clean', () async {
-        // The parts for all four fixtures are on disk by now.
+        // Fixtures are composed in setUpAll, so this test is
+        // order-independent — but only if the full set is actually on disk.
+        // Assert the expected fixture count BEFORE the aggregate analysis:
+        // analyzing a subset would pass vacuously.
+        for (final libraryName in fixtureSources.keys) {
+          expect(
+            File('${fixtureDir.path}/$libraryName').existsSync(),
+            isTrue,
+            reason: '$libraryName was not composed in setUpAll',
+          );
+          expect(
+            File('${fixtureDir.path}/${partNameOf(libraryName)}').existsSync(),
+            isTrue,
+            reason: 'the part for $libraryName was not written in setUpAll',
+          );
+        }
+        expect(composedByLibrary.length, fixtureSources.length);
         final diagnostics = await _diagnostics(fixtureDir);
         expect(diagnostics, isEmpty, reason: diagnostics.join('\n'));
       });

@@ -128,36 +128,67 @@ final class PolymorphicMatcherEmitter {
   /// One arm per emittable concrete variant, depth-first in declaration
   /// order — or `null` when the variant set cannot be armed exhaustively.
   ///
-  /// Two refusals, both fail-closed:
+  /// Three refusals, all fail-closed:
   /// - a variant the class emitter pruned (it cannot name its parent's type
   ///   arguments, [PolymorphicClassEmitter.isEmittableChild]) would leave the
   ///   switch non-exhaustive — `non_exhaustive_switch_expression` in the
   ///   consumer;
-  /// - a variant with a type parameter the ROOT does not declare cannot be
-  ///   named inside the extension — the extension has no way to bind it.
+  /// - a variant whose type-parameter ARITY differs from the root's binds
+  ///   nothing positionally, so its arm type cannot be named inside the
+  ///   extension. The NAMES may differ, though: a variant binds the root's
+  ///   parameters by position, exactly as its `extends` clause does, so
+  ///   `Left<U>` under `Root<T>` arms as `Left<T>`;
+  /// - a variant whose declared bound the root's bound does not satisfy
+  ///   (`Narrow<T extends int>` under `Root<T extends num>`) cannot be armed:
+  ///   the extension's parameter carries the root's bound, and `Narrow<T>`
+  ///   would fail `type_argument_not_matching_bounds`.
+  ///
+  /// Callback names are assigned here too, under a reserved-identifier
+  /// policy: a callback may never take a name the generated bodies use
+  /// (`value`, `self`, `callback`) or the `orElse` parameter, so a variant
+  /// named `Value` or `OrElse` still produces a matcher that compiles.
   List<_Arm>? _arms(ZorphyNodeIr root) {
     final rootParameters = PolymorphicClassEmitter.bareParameterNames(
       root.typeParameters,
-    ).toSet();
+    );
     final arms = <_Arm>[];
     final seen = <String>{};
+    final usedNames = <String>{'value', 'self', 'callback', 'orElse'};
 
     bool walk(ZorphyNodeIr node) {
       if (node.isConcreteLeaf) {
         final className = node.cleanName;
         if (!seen.add(className)) return true;
-        final parameterNames = PolymorphicClassEmitter.bareParameterNames(
-          node.typeParameters,
-        );
-        if (parameterNames.any((name) => !rootParameters.contains(name))) {
+        final parameters = node.typeParameters;
+        if (parameters.length != rootParameters.length) {
           return false;
         }
+        for (var i = 0; i < parameters.length; i++) {
+          if (!PolymorphicClassEmitter.typeParameterSatisfies(
+            root.typeParameters[i],
+            parameters[i],
+          )) {
+            return false;
+          }
+        }
+        var callback = _lowerFirst(className);
+        if (usedNames.contains(callback)) {
+          final base = callback;
+          var suffix = 2;
+          while (usedNames.contains('$base$suffix')) {
+            suffix++;
+          }
+          callback = '$base$suffix';
+        }
+        usedNames.add(callback);
         arms.add(
           _Arm(
             className: className,
+            // The arm names the variant bound with the ROOT's parameters —
+            // the only ones in scope inside the extension.
             typeName:
-                '$className${PolymorphicClassEmitter.typeArgumentList(node)}',
-            parameterName: _lowerFirst(className),
+                '$className${rootParameters.isEmpty ? '' : '<${rootParameters.join(', ')}>'}',
+            parameterName: callback,
           ),
         );
         return true;
@@ -181,7 +212,10 @@ final class PolymorphicMatcherEmitter {
   /// `T` stays the name for a non-generic root, which keeps the emitted
   /// `when<T>` identical to the documented shape; a generic root gets the
   /// first free candidate instead — reusing a variant's `T` would rebind it
-  /// inside the extension and the arms would no longer type-check.
+  /// inside the extension and the arms would no longer type-check. When every
+  /// fixed candidate is taken (`T`, `TResult`, `TValue`, `TOut` all declared),
+  /// a suffixed `TResult<n>` is minted rather than shadowing a hierarchy
+  /// parameter.
   static String _resultTypeParameterName(ZorphyNodeIr root) {
     final taken = <String>{
       ...PolymorphicClassEmitter.bareParameterNames(root.typeParameters),
@@ -191,7 +225,11 @@ final class PolymorphicMatcherEmitter {
     for (final candidate in const ['T', 'TResult', 'TValue', 'TOut']) {
       if (!taken.contains(candidate)) return candidate;
     }
-    return 'TResult';
+    var suffix = 2;
+    while (taken.contains('TResult$suffix')) {
+      suffix++;
+    }
+    return 'TResult$suffix';
   }
 
   /// `ResultType Function(ParameterType)` as a `code_builder` spec.

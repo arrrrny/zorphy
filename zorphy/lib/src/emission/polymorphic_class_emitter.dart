@@ -164,6 +164,72 @@ final class PolymorphicClassEmitter {
     });
   }
 
+  /// Whether the type parameter declared as [source] may be used where
+  /// [target] is declared: the target's bound must be satisfied by the
+  /// source's bound.
+  ///
+  /// Bounds are compared textually — the emission pipeline has no type system
+  /// to ask — so the check is deliberately conservative: an unbounded target
+  /// always accepts, a bounded target accepts only the SAME bound, and a
+  /// bounded target under an unbounded source refuses. A subtype bound that
+  /// would satisfy (`int` under `num`) refuses too; refusing withholds the
+  /// dependent surface (a matcher, a morph method) instead of emitting an
+  /// argument that violates `type_argument_not_matching_bounds`.
+  static bool typeParameterSatisfies(String source, String target) {
+    final targetBound = _boundOf(target);
+    if (targetBound == null) return true;
+    final sourceBound = _boundOf(source);
+    if (sourceBound == null) return false;
+    return sourceBound == targetBound;
+  }
+
+  /// [type] with every identifier in [from] replaced by the name at the same
+  /// index in [to] — the positional binding a child's `extends Parent<Own…>`
+  /// establishes between the parent's type parameters and its own. The
+  /// replacement is one simultaneous pass, so swapped names (`<T, U>` bound
+  /// as `<U, T>`) cannot cascade.
+  static String substituteTypeParameters(
+    String type,
+    List<String> from,
+    List<String> to,
+  ) {
+    final mapping = <String, String>{};
+    for (var i = 0; i < from.length && i < to.length; i++) {
+      if (from[i] != to[i]) mapping[from[i]] = to[i];
+    }
+    if (mapping.isEmpty) return type;
+    return type.replaceAllMapped(
+      RegExp('\\b(${mapping.keys.map(RegExp.escape).join('|')})\\b'),
+      (match) => mapping[match.group(1)]!,
+    );
+  }
+
+  /// [field] with its declared type rebound from one scope's type parameters
+  /// to another's (see [substituteTypeParameters]). An unchanged type returns
+  /// the same instance.
+  static PolymorphicField substituteFieldScope(
+    PolymorphicField field,
+    List<String> from,
+    List<String> to,
+  ) {
+    final substituted = substituteTypeParameters(field.type, from, to);
+    if (substituted == field.type) return field;
+    return PolymorphicField(
+      name: field.name,
+      type: substituted,
+      isNullable: field.isNullable,
+    );
+  }
+
+  /// The bound of one type-parameter declaration (`'T extends num'` ->
+  /// `'num'`), or `null` when it is unbounded. `dynamic` is no bound at all.
+  static String? _boundOf(String parameter) {
+    final separator = parameter.indexOf(' extends ');
+    if (separator == -1) return null;
+    final bound = parameter.substring(separator + ' extends '.length).trim();
+    return bound == 'dynamic' ? null : bound;
+  }
+
   /// Every emittable concrete leaf at or below [node], depth-first in
   /// declaration order — the arm set of the matcher emitter and the
   /// source/target set of the morphing emitter.
@@ -415,17 +481,30 @@ final class PolymorphicClassEmitter {
 
   /// The fields a leaf redeclares: every ancestor's, then its own, deduped by
   /// name with the leaf's declaration winning.
+  ///
+  /// An ancestor's field is declared in the ANCESTOR's type-parameter scope:
+  /// `Root<T>` with `T get value` under `Child<U> implements Root<U>` must
+  /// redeclare `final U value`, or the emitted field names a parameter that
+  /// is not in scope in the child. Each ancestor's parameters are therefore
+  /// substituted positionally into the leaf's own (the same binding
+  /// [_superTypeName] establishes in the `extends` clause).
   List<PolymorphicField> _withInheritedFields(
     ZorphyNodeIr node,
     List<PolymorphicField> ownFields,
     Map<String, List<PolymorphicField>> fields,
   ) {
     final byName = <String, PolymorphicField>{};
+    final leafParameters = bareParameterNames(node.typeParameters);
     // Ancestors farthest-first, so a nearer declaration overwrites a farther
     // one and the leaf's own list overwrites everything above it.
     for (final ancestor in node.superTypes.reversed) {
+      final ancestorParameters = bareParameterNames(ancestor.typeParameters);
       for (final field in fields[ancestor.className] ?? const []) {
-        byName[field.name] = field;
+        byName[field.name] = substituteFieldScope(
+          field,
+          ancestorParameters,
+          leafParameters,
+        );
       }
     }
     for (final field in ownFields) {
@@ -558,10 +637,15 @@ final class PolymorphicClassEmitter {
   /// `identical(nickname, _sentinel)` — that is what lets `copyWith(nickname:
   /// null)` CLEAR the field, which a plain `nickname ?? this.nickname` can
   /// never express.
+  ///
+  /// A generic class keeps its type arguments in both the return type and the
+  /// `fromTrusted` call (`SliceLoading<T> copyWith(...)`): the bare name
+  /// would re-instantiate them as `dynamic` and lose the receiver's argument.
   Method _copyWith(ZorphyNodeIr node, List<PolymorphicField> fields) {
+    final selfType = '${node.cleanName}${typeArgumentList(node)}';
     return Method((m) {
       m.name = 'copyWith';
-      m.returns = referType(node.cleanName);
+      m.returns = referType(selfType);
       for (final field in fields) {
         m.optionalParameters.add(
           Parameter((p) {
@@ -588,9 +672,7 @@ final class PolymorphicClassEmitter {
           else
             '${field.name}: ${field.name} ?? this.${field.name}',
       ];
-      m.body = Code(
-        'return ${node.cleanName}.fromTrusted(${args.join(', ')});',
-      );
+      m.body = Code('return $selfType.fromTrusted(${args.join(', ')});');
     });
   }
 
