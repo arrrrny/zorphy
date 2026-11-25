@@ -39,38 +39,48 @@ ZorphyNodeIr _node({
 
 void main() {
   group('ArchetypeComposer — review findings on #226', () {
-    test('an intent-typed field is not classified as a codec node', () {
-      final intent = _node(
-        name: 'InspectIntent',
-        archetype: ArchetypeKind.intent,
-        isRoot: true,
-        fields: const [ZorphyFieldIr(name: 'target', type: 'String')],
-      );
-      final order = _node(
-        name: 'Order',
-        isRoot: true,
-        fields: const [
-          ZorphyFieldIr(name: 'id', type: 'String'),
-          ZorphyFieldIr(name: 'intent', type: 'InspectIntent'),
-        ],
-      );
-      final ir = PolymorphicIr(
-        nodes: {'\$Order': order, '\$InspectIntent': intent},
-        roots: [order, intent],
-        diagnostics: const [],
-      );
+    test(
+      'an intent-typed field decodes through the intent\'s own fromWire',
+      () {
+        final intent = _node(
+          name: 'InspectIntent',
+          archetype: ArchetypeKind.intent,
+          isRoot: true,
+          fields: const [ZorphyFieldIr(name: 'target', type: 'String')],
+        );
+        final order = _node(
+          name: 'Order',
+          isRoot: true,
+          fields: const [
+            ZorphyFieldIr(name: 'id', type: 'String'),
+            ZorphyFieldIr(name: 'intent', type: 'InspectIntent'),
+          ],
+        );
+        final ir = PolymorphicIr(
+          nodes: {'\$Order': order, '\$InspectIntent': intent},
+          roots: [order, intent],
+          diagnostics: const [],
+        );
 
-      final emitted = const ArchetypeComposer().compose(ir);
+        final emitted = const ArchetypeComposer().compose(ir);
 
-      // IntentEmitter emits toWire/intentDigest but NO fromWire, so treating
-      // an intent as a known node would make the codec call a decoder that
-      // does not exist in the generated library.
-      expect(
-        emitted,
-        isNot(contains('InspectIntent.fromWire(')),
-        reason: 'the codec must not call a decoder the intent does not emit',
-      );
-    });
+        // Since #232 the intent surface carries `fromWire` (emitted by
+        // IntentEmitter through the shared codec), so the entity codec MUST
+        // classify an intent-typed field as a nested node: the value decodes
+        // through the intent's own boundary instead of travelling as an
+        // unvalidated raw wire value.
+        expect(
+          emitted,
+          contains('static ZorphyBoundaryResult<InspectIntent> fromWire('),
+          reason: 'the intent emits the decoder the field names',
+        );
+        expect(
+          emitted,
+          contains('InspectIntent.fromWire('),
+          reason: 'the entity codec decodes the intent-valued field through it',
+        );
+      },
+    );
 
     test('a generic standalone entity emits no unbound patch', () {
       final box = _node(
@@ -149,12 +159,12 @@ void main() {
       expect(emitted, isNot(contains('BoxMockData')));
     });
 
-    test('helper selection ignores an intent field that no codec reads', () {
+    test('helper selection covers the intent codecs', () {
       final intent = _node(
-        name: 'StampIntent',
+        name: 'TagIntent',
         archetype: ArchetypeKind.intent,
         isRoot: true,
-        fields: const [ZorphyFieldIr(name: 'at', type: 'DateTime')],
+        fields: const [ZorphyFieldIr(name: 'tags', type: 'List<String>')],
       );
       final order = _node(
         name: 'Order',
@@ -162,17 +172,28 @@ void main() {
         fields: const [ZorphyFieldIr(name: 'id', type: 'String')],
       );
       final ir = PolymorphicIr(
-        nodes: {'\$Order': order, '\$StampIntent': intent},
+        nodes: {'\$Order': order, '\$TagIntent': intent},
         roots: [order, intent],
         diagnostics: const [],
       );
 
       final emitted = const ArchetypeComposer().compose(ir);
 
+      // Since #232 the intent's `fromWire` IS an emitted codec, so the
+      // helpers its field shapes call must be selected — an unreferenced
+      // helper would be an `unused_element` warning, and a MISSING one would
+      // not compile. The intent's `List<String>` field needs `_boundaryList`.
       expect(
         emitted,
-        isNot(contains('_boundaryDateTime')),
-        reason: 'helper set must come only from nodes that receive codecs',
+        contains('_boundaryList'),
+        reason: 'the intent codec\'s list field selects the list helper',
+      );
+      // A field shape NO emitted codec calls still selects nothing: the
+      // entity's plain `String` field alone would not have pulled the list
+      // helper in.
+      expect(
+        emitted,
+        contains('static ZorphyBoundaryResult<TagIntent> fromWire('),
       );
     });
 

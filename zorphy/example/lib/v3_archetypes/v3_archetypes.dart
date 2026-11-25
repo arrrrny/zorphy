@@ -81,6 +81,34 @@ abstract class $InspectProductIntent {
   String get productId;
 }
 
+// ── @ZorphyIntent — a polymorphic hierarchy (#232) ──────────────────────────
+// The issue's acceptance gate needs real build_runner output for the
+// discriminator dispatch: a sealed intent root, two leaves with their own
+// replaySafe decisions, and the MockData rotation across them.
+@ZorphyIntent(replaySafe: false)
+abstract class $CartIntent {
+  String get cartId;
+}
+
+@ZorphyIntent(replaySafe: true)
+abstract class $AddToCartIntent implements $CartIntent {
+  String get sku;
+}
+
+@ZorphyIntent(replaySafe: false)
+abstract class $RemoveFromCartIntent implements $CartIntent {
+  String get reason;
+}
+
+// ── @ZorphyEntity — carries an intent-valued field (#232) ───────────────────
+// The entity codec must decode `pending` through `$CartIntent`'s own
+// `fromWire` instead of treating it as an unvalidated raw wire value.
+@ZorphyEntity(principalKey: #id)
+abstract class $CheckoutSession {
+  String get id;
+  $CartIntent? get pending;
+}
+
 // ── @ZorphyValue — an immutable value object, no identity ───────────────────
 // The issue's own reproduction shape.
 @ZorphyValue()

@@ -23,6 +23,8 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:test/test.dart';
+import 'package:zorphy/src/emission/boundary_codec_emitter.dart';
+import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/emitters/intent_emitter.dart';
 import 'package:zorphy/src/parser/hierarchy_resolver.dart';
 import 'package:zorphy/src/parser/polymorphic_ir.dart';
@@ -144,7 +146,16 @@ Future<String> _runEmitted(
   Map<String, String> sources,
   String body,
 ) async {
-  final emitted = IntentEmitter().emitIntents(ir);
+  // Since #232 the intent surface carries `fromWire`, whose decode bodies
+  // call the shared boundary helpers (`_boundaryAs`, `_boundaryDescribe`, …).
+  // The production composition supplies them once per library through
+  // `ArchetypeComposer`; this hand-rolled harness mirrors that by appending
+  // them here. The full set is emitted (not `usedHelperSpecs`) because the
+  // probe compiles with `dart run`, where an unreferenced helper is a
+  // warning, never a failure.
+  final emitted =
+      '${IntentEmitter().emitIntents(ir)}\n\n'
+      '${ZorphyEmitter().emitSpecs(BoundaryCodecEmitter.helperSpecs())}';
 
   final root = _tmpRoot.absolute;
   root.createSync(recursive: true);

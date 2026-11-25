@@ -47,7 +47,13 @@ final class JsonPointerEmitter {
   /// of a nested delegation (`<Type>.resolvePath(remainder)`).
   Set<String> get _resolverNames => {
     for (final node in ir.nodes.values)
-      if (node.typeParameters.isEmpty) node.cleanName,
+      // An intent carries no `resolvePath` (see [resolvePathMethods]), so it
+      // is never a legal nested-delegation target: naming it here would emit
+      // `<Intent>.resolvePath(...)`, which the generated library never
+      // declares — #232's intent-typed entity field is the first consumer to
+      // reach this arm.
+      if (node.typeParameters.isEmpty && node.archetype != ArchetypeKind.intent)
+        node.cleanName,
   };
 
   /// The `resolvePath` static method for every non-generic node, keyed by
@@ -84,7 +90,15 @@ final class JsonPointerEmitter {
     final visible = _visibleFields(node);
     final subtypeOnly = _subtypeOnlyFields(node);
     final nested = visible.entries
-        .where((entry) => _nestedTarget(entry.value.type) != null)
+        .where(
+          (entry) =>
+              _nestedTarget(entry.value.type) != null &&
+              // A NULLABLE nested value cannot compose through `then`: the
+              // outer lens would read `T?` where the nested resolver roots at
+              // `T`, a compile error (#232's intent-typed field surfaced it).
+              // The segment answers `null` per the safe-null contract instead.
+              !entry.value.type.endsWith('?'),
+        )
         .toList();
 
     return Method((m) {

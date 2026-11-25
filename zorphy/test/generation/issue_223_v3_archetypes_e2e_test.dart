@@ -83,6 +83,37 @@ void main() {
       expect(v3, contains('String intentDigest()'));
     });
 
+    test('@ZorphyIntent: validated fromWire + mock/wire fixtures (#232)', () {
+      // Every intent class — the standalone leaf and every node of the
+      // polymorphic hierarchy — carries the validated decoder.
+      expect(
+        v3,
+        contains('static ZorphyBoundaryResult<InspectProductIntent> fromWire('),
+      );
+      expect(v3, contains('static ZorphyBoundaryResult<CartIntent> fromWire('));
+      expect(
+        v3,
+        contains('static ZorphyBoundaryResult<AddToCartIntent> fromWire('),
+      );
+      // The polymorphic root dispatches on the discriminator.
+      expect(v3, contains("case 'add_to_cart_intent':"));
+      expect(
+        v3,
+        contains(
+          "'String (one of: add_to_cart_intent, "
+          "remove_from_cart_intent)'",
+        ),
+      );
+      // Mock-first fixtures per intent root, seeded across every leaf.
+      expect(v3, contains('class CartIntentMockData'));
+      expect(v3, contains('class CartIntentWireFixtures'));
+      expect(v3, contains('class AddToCartIntentMockData'));
+      expect(v3, contains('class RemoveFromCartIntentWireFixtures'));
+      // An intent-valued field on an entity decodes through the intent's
+      // own boundary instead of travelling as a raw wire value.
+      expect(v3, contains('CartIntent.fromWire('));
+    });
+
     test("@ZorphyValue: the issue's \$Greeting repro generates", () {
       expect(v3, contains('final class Greeting implements ZorphyValueBase'));
       expect(v3, contains('const Greeting.fromTrusted({'));
