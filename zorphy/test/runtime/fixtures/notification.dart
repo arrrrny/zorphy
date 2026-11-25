@@ -219,14 +219,18 @@ final class NotificationSharedPatch extends NotificationPatch {
     if (isEmpty) return target;
     if (target is OrderNotification) {
       return target.copyWith(
-        id: id.isUnchanged ? target.id : id.valueOrNull,
-        readAt: readAt.isUnchanged ? target.readAt : readAt.valueOrNull,
+        id: this.id.isUnchanged ? target.id : this.id.valueOrNull,
+        readAt: this.readAt.isUnchanged
+            ? target.readAt
+            : this.readAt.valueOrNull,
       );
     }
     if (target is PriceDropNotification) {
       return target.copyWith(
-        id: id.isUnchanged ? target.id : id.valueOrNull,
-        readAt: readAt.isUnchanged ? target.readAt : readAt.valueOrNull,
+        id: this.id.isUnchanged ? target.id : this.id.valueOrNull,
+        readAt: this.readAt.isUnchanged
+            ? target.readAt
+            : this.readAt.valueOrNull,
       );
     }
     throw ArgumentError.value(
@@ -248,18 +252,18 @@ final class NotificationSharedPatch extends NotificationPatch {
       );
     }
     return NotificationSharedPatch(
-      id: next.id.isUnchanged ? id : next.id,
-      readAt: next.readAt.isUnchanged ? readAt : next.readAt,
+      id: next.id.isUnchanged ? this.id : next.id,
+      readAt: next.readAt.isUnchanged ? this.readAt : next.readAt,
     );
   }
 
   @override
   NotificationSharedPatch invert(Notification before) {
     return NotificationSharedPatch(
-      id: id.isUnchanged
+      id: this.id.isUnchanged
           ? const PatchValue.unchanged()
           : PatchValue.set(before.id),
-      readAt: readAt.isUnchanged
+      readAt: this.readAt.isUnchanged
           ? const PatchValue.unchanged()
           : PatchValue.set(before.readAt),
     );
@@ -268,8 +272,8 @@ final class NotificationSharedPatch extends NotificationPatch {
   @override
   Map<String, Object?> toWire() {
     final wire = <String, Object?>{};
-    if (id.isSet) wire['id'] = id.valueOrNull;
-    if (readAt.isSet) wire['readAt'] = readAt.valueOrNull;
+    if (this.id.isSet) wire['id'] = this.id.valueOrNull;
+    if (this.readAt.isSet) wire['readAt'] = this.readAt.valueOrNull;
     return wire;
   }
 
@@ -356,6 +360,30 @@ final class OrderNotificationPatch extends NotificationPatch {
 
   final PatchValue<int> itemCount;
 
+  OrderNotificationPatch withId(String value) {
+    return OrderNotificationPatch(
+      id: PatchValue.set(value),
+      readAt: this.readAt,
+      itemCount: this.itemCount,
+    );
+  }
+
+  OrderNotificationPatch withReadAt(DateTime? value) {
+    return OrderNotificationPatch(
+      id: this.id,
+      readAt: PatchValue.set(value),
+      itemCount: this.itemCount,
+    );
+  }
+
+  OrderNotificationPatch withItemCount(int value) {
+    return OrderNotificationPatch(
+      id: this.id,
+      readAt: this.readAt,
+      itemCount: PatchValue.set(value),
+    );
+  }
+
   @override
   bool get isEmpty {
     return id.isUnchanged && readAt.isUnchanged && itemCount.isUnchanged;
@@ -370,11 +398,11 @@ final class OrderNotificationPatch extends NotificationPatch {
   OrderNotification apply(covariant OrderNotification target) {
     if (isEmpty) return target;
     return target.copyWith(
-      id: id.isUnchanged ? target.id : id.valueOrNull,
-      readAt: readAt.isUnchanged ? target.readAt : readAt.valueOrNull,
-      itemCount: itemCount.isUnchanged
+      id: this.id.isUnchanged ? target.id : this.id.valueOrNull,
+      readAt: this.readAt.isUnchanged ? target.readAt : this.readAt.valueOrNull,
+      itemCount: this.itemCount.isUnchanged
           ? target.itemCount
-          : itemCount.valueOrNull,
+          : this.itemCount.valueOrNull,
     );
   }
 
@@ -390,9 +418,9 @@ final class OrderNotificationPatch extends NotificationPatch {
       );
     }
     return OrderNotificationPatch(
-      id: next.id.isUnchanged ? id : next.id,
-      readAt: next.readAt.isUnchanged ? readAt : next.readAt,
-      itemCount: next.itemCount.isUnchanged ? itemCount : next.itemCount,
+      id: next.id.isUnchanged ? this.id : next.id,
+      readAt: next.readAt.isUnchanged ? this.readAt : next.readAt,
+      itemCount: next.itemCount.isUnchanged ? this.itemCount : next.itemCount,
     );
   }
 
@@ -406,13 +434,13 @@ final class OrderNotificationPatch extends NotificationPatch {
       );
     }
     return OrderNotificationPatch(
-      id: id.isUnchanged
+      id: this.id.isUnchanged
           ? const PatchValue.unchanged()
           : PatchValue.set(before.id),
-      readAt: readAt.isUnchanged
+      readAt: this.readAt.isUnchanged
           ? const PatchValue.unchanged()
           : PatchValue.set(before.readAt),
-      itemCount: itemCount.isUnchanged
+      itemCount: this.itemCount.isUnchanged
           ? const PatchValue.unchanged()
           : PatchValue.set(before.itemCount),
     );
@@ -421,9 +449,9 @@ final class OrderNotificationPatch extends NotificationPatch {
   @override
   Map<String, Object?> toWire() {
     final wire = <String, Object?>{};
-    if (id.isSet) wire['id'] = id.valueOrNull;
-    if (readAt.isSet) wire['readAt'] = readAt.valueOrNull;
-    if (itemCount.isSet) wire['itemCount'] = itemCount.valueOrNull;
+    if (this.id.isSet) wire['id'] = this.id.valueOrNull;
+    if (this.readAt.isSet) wire['readAt'] = this.readAt.valueOrNull;
+    if (this.itemCount.isSet) wire['itemCount'] = this.itemCount.valueOrNull;
     return wire;
   }
 
@@ -529,6 +557,30 @@ final class PriceDropNotificationPatch extends NotificationPatch {
 
   final PatchValue<double> newPrice;
 
+  PriceDropNotificationPatch withId(String value) {
+    return PriceDropNotificationPatch(
+      id: PatchValue.set(value),
+      readAt: this.readAt,
+      newPrice: this.newPrice,
+    );
+  }
+
+  PriceDropNotificationPatch withReadAt(DateTime? value) {
+    return PriceDropNotificationPatch(
+      id: this.id,
+      readAt: PatchValue.set(value),
+      newPrice: this.newPrice,
+    );
+  }
+
+  PriceDropNotificationPatch withNewPrice(double value) {
+    return PriceDropNotificationPatch(
+      id: this.id,
+      readAt: this.readAt,
+      newPrice: PatchValue.set(value),
+    );
+  }
+
   @override
   bool get isEmpty {
     return id.isUnchanged && readAt.isUnchanged && newPrice.isUnchanged;
@@ -543,9 +595,11 @@ final class PriceDropNotificationPatch extends NotificationPatch {
   PriceDropNotification apply(covariant PriceDropNotification target) {
     if (isEmpty) return target;
     return target.copyWith(
-      id: id.isUnchanged ? target.id : id.valueOrNull,
-      readAt: readAt.isUnchanged ? target.readAt : readAt.valueOrNull,
-      newPrice: newPrice.isUnchanged ? target.newPrice : newPrice.valueOrNull,
+      id: this.id.isUnchanged ? target.id : this.id.valueOrNull,
+      readAt: this.readAt.isUnchanged ? target.readAt : this.readAt.valueOrNull,
+      newPrice: this.newPrice.isUnchanged
+          ? target.newPrice
+          : this.newPrice.valueOrNull,
     );
   }
 
@@ -561,9 +615,9 @@ final class PriceDropNotificationPatch extends NotificationPatch {
       );
     }
     return PriceDropNotificationPatch(
-      id: next.id.isUnchanged ? id : next.id,
-      readAt: next.readAt.isUnchanged ? readAt : next.readAt,
-      newPrice: next.newPrice.isUnchanged ? newPrice : next.newPrice,
+      id: next.id.isUnchanged ? this.id : next.id,
+      readAt: next.readAt.isUnchanged ? this.readAt : next.readAt,
+      newPrice: next.newPrice.isUnchanged ? this.newPrice : next.newPrice,
     );
   }
 
@@ -577,13 +631,13 @@ final class PriceDropNotificationPatch extends NotificationPatch {
       );
     }
     return PriceDropNotificationPatch(
-      id: id.isUnchanged
+      id: this.id.isUnchanged
           ? const PatchValue.unchanged()
           : PatchValue.set(before.id),
-      readAt: readAt.isUnchanged
+      readAt: this.readAt.isUnchanged
           ? const PatchValue.unchanged()
           : PatchValue.set(before.readAt),
-      newPrice: newPrice.isUnchanged
+      newPrice: this.newPrice.isUnchanged
           ? const PatchValue.unchanged()
           : PatchValue.set(before.newPrice),
     );
@@ -592,9 +646,9 @@ final class PriceDropNotificationPatch extends NotificationPatch {
   @override
   Map<String, Object?> toWire() {
     final wire = <String, Object?>{};
-    if (id.isSet) wire['id'] = id.valueOrNull;
-    if (readAt.isSet) wire['readAt'] = readAt.valueOrNull;
-    if (newPrice.isSet) wire['newPrice'] = newPrice.valueOrNull;
+    if (this.id.isSet) wire['id'] = this.id.valueOrNull;
+    if (this.readAt.isSet) wire['readAt'] = this.readAt.valueOrNull;
+    if (this.newPrice.isSet) wire['newPrice'] = this.newPrice.valueOrNull;
     return wire;
   }
 

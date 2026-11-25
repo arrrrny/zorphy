@@ -4,8 +4,10 @@ import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
 import 'package:source_gen/source_gen.dart';
 import 'package:zorphy/src/analysis/analysis.dart';
+import 'package:zorphy/src/emission/archetype_composer.dart';
 import 'package:zorphy/src/models/models.dart';
 import 'package:zorphy/src/orchestrator.dart';
+import 'package:zorphy/src/parser/hierarchy_resolver.dart';
 import 'package:zorphy/src/plugins/plugin_registry.dart';
 
 /// Unified single-pass generator for `@Zorphy` and `@Zorphy2` classes.
@@ -99,6 +101,22 @@ class ZorphyGenerator extends Generator {
       );
       if (generated.isNotEmpty) values.add(generated);
     }
+
+    // v3 archetype pass (issue #223): resolve the library's [PolymorphicIr],
+    // enforce its diagnostics, and compose the v3 emitter surface (class
+    // shape, boundary codec, intent surface, mock fixtures). Before this the
+    // generator registered only the legacy `@Zorphy`/`@Zorphy2` checkers, so a
+    // consumer's archetype-annotated class generated nothing. The legacy path
+    // above is untouched — it keeps working until the #194 migration gate.
+    final ir = HierarchyResolver.resolveLibrary(library.element);
+    if (ir.hasErrors) {
+      throw InvalidGenerationSourceError(
+        'Zorphy v3 archetype diagnostics:\n'
+        '${ir.diagnostics.map((d) => d.render()).join('\n')}',
+      );
+    }
+    final v3 = const ArchetypeComposer().compose(ir);
+    if (v3.isNotEmpty) values.add(v3);
 
     return values.join('\n\n');
   }

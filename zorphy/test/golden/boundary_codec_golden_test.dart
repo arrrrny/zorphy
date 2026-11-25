@@ -222,8 +222,8 @@ void main() {
         );
         // A `num` may carry an int the decode side widens to double, so encode
         // widens too; a `double` is already a double and is emitted as-is.
-        expect(toWire, contains("map['ratio']=ratio.toDouble();"));
-        expect(toWire, contains("map['price']=price;"));
+        expect(toWire, contains("map['ratio']=this.ratio.toDouble();"));
+        expect(toWire, contains("map['price']=this.price;"));
       },
     );
   });
@@ -270,9 +270,16 @@ void main() {
         ]),
       );
       expect(toWire, contains("<String,Object?>{'kind':'order'}"));
-      expect(toWire, contains("map['orderId']=orderId;"));
-      expect(toWire, contains("map['createdAt']=createdAt.toIso8601String();"));
-      expect(toWire, contains('if(note!=null)'));
+      expect(toWire, contains("map['orderId']=this.orderId;"));
+      expect(
+        toWire,
+        contains("map['createdAt']=this.createdAt.toIso8601String();"),
+      );
+      // A nullable field is read into a local before the null guard: Dart
+      // does not promote a public field, so checking the field directly and
+      // then calling a member on it stays a call on the nullable type.
+      expect(toWire, contains('final_note=this.note;if(_note!=null)'));
+      expect(toWire, contains("map['note']=_note;"));
     });
   });
 
@@ -361,6 +368,78 @@ void main() {
       expect(compact, contains("path_lines='/lines'+'[\$i]'"));
       expect(compact, contains('decoded_lines=<OrderLine>[]'));
       expect(compact, isNot(contains('asList<OrderLine>')));
+    });
+
+    test('a List<Node> field encodes its elements through toWire', () {
+      const fields = <String, List<BoundaryField>>{
+        r'$OrderNotification': [
+          BoundaryField(name: 'lines', type: 'List<OrderLine>'),
+        ],
+      };
+      final compact = _compact(
+        _emit([
+          emitter.toWire(
+            fixture.order,
+            fields,
+            additionalNodes: const {'OrderLine'},
+          ),
+        ]),
+      );
+      // Re-classifying the inner type without the hierarchy's known nodes
+      // would make this a scalar list and leave the objects unencoded.
+      expect(compact, contains('lines.map((e)=>e.toWire()).toList()'));
+    });
+
+    test('a Map<String, Node> field encodes its values through toWire', () {
+      const fields = <String, List<BoundaryField>>{
+        r'$OrderNotification': [
+          BoundaryField(name: 'byId', type: 'Map<String, OrderLine>'),
+        ],
+      };
+      final compact = _compact(
+        _emit([
+          emitter.toWire(
+            fixture.order,
+            fields,
+            additionalNodes: const {'OrderLine'},
+          ),
+        ]),
+      );
+      expect(compact, contains('byId.map((key,e)=>MapEntry(key,e.toWire()))'));
+    });
+
+    test('a nullable member-call field is promoted into a local toWire', () {
+      const fields = <String, List<BoundaryField>>{
+        r'$OrderNotification': [
+          BoundaryField(name: 'lastSeenAt', type: 'DateTime?'),
+        ],
+      };
+      final compact = _compact(_emit([emitter.toWire(fixture.order, fields)]));
+      // Dart does not promote a public field after a null check, so
+      // `lastSeenAt.toIso8601String()` on the guarded field would not compile.
+      expect(compact, contains('final_lastSeenAt=this.lastSeenAt;'));
+      expect(
+        compact,
+        contains(
+          "if(_lastSeenAt!=null){map['lastSeenAt']=_lastSeenAt.toIso8601String();}",
+        ),
+      );
+    });
+
+    test('a field named map reads the entity field, not the output map', () {
+      const fields = <String, List<BoundaryField>>{
+        r'$OrderNotification': [
+          BoundaryField(name: 'map', type: 'Map<String, String>'),
+          BoundaryField(name: 'note', type: 'String?'),
+        ],
+      };
+      final compact = _compact(_emit([emitter.toWire(fixture.order, fields)]));
+
+      // Both reads must be `this`-qualified: the local `map` is the output
+      // map declared at the top of `toWire`, so an unqualified `map` reads it
+      // and inserts the map into itself (a cycle, losing the field value).
+      expect(compact, contains("map['map']=this.map;"));
+      expect(compact, contains('final_note=this.note;if(_note!=null)'));
     });
 
     test('a List<double> decodes element-wise, never a hard list cast', () {
@@ -455,6 +534,81 @@ void main() {
       // The only public knobs are a constructor name; a `bool` parameter on
       // a public member would be a toggle by another spelling.
       expect(RegExp(r'\bbool\s+\w+\s*[,)=]').hasMatch(code), isFalse);
+    });
+  });
+
+  group('ISSUE-0223 usedHelperSpecs — only the called helpers are emitted', () {
+    test('a String-only library gets describe + as, nothing else', () {
+      final fixture = _notification();
+      final helpers = BoundaryCodecEmitter.usedHelperSpecs(
+        [fixture.order],
+        const {
+          r'$OrderNotification': [
+            BoundaryField(name: 'id', type: 'String'),
+            BoundaryField(name: 'note', type: 'String?'),
+          ],
+        },
+      );
+      final names = helpers.map((m) => m.name).toList();
+
+      expect(names, contains('_boundaryDescribe'));
+      expect(names, contains('_boundaryAs'));
+      expect(names, isNot(contains('_boundaryList')));
+      expect(names, isNot(contains('_boundaryDouble')));
+      expect(names, isNot(contains('_boundaryDateTime')));
+      expect(names, isNot(contains('_boundaryObject')));
+      expect(names, isNot(contains('_boundaryPrefix')));
+    });
+
+    test('field shapes pull in exactly their own helpers', () {
+      final fixture = _notification();
+      final helpers = BoundaryCodecEmitter.usedHelperSpecs(
+        [fixture.order],
+        const {
+          r'$OrderNotification': [
+            BoundaryField(name: 'id', type: 'String'),
+            BoundaryField(name: 'createdAt', type: 'DateTime'),
+            BoundaryField(name: 'price', type: 'double'),
+            BoundaryField(name: 'tags', type: 'List<String>'),
+          ],
+        },
+      );
+      final names = helpers.map((m) => m.name).toList();
+
+      expect(names, contains('_boundaryDateTime'));
+      expect(names, contains('_boundaryDouble'));
+      expect(names, contains('_boundaryList'));
+      expect(names, isNot(contains('_boundaryObject')));
+      expect(names, isNot(contains('_boundaryPrefix')));
+    });
+
+    test('a collection of nodes recurses: object + prefix helpers', () {
+      final fixture = _notification();
+      final helpers = BoundaryCodecEmitter.usedHelperSpecs(
+        [fixture.order],
+        const {
+          r'$OrderNotification': [
+            BoundaryField(name: 'lines', type: 'List<OrderLine>'),
+          ],
+        },
+        additionalNodes: const {'OrderLine'},
+      );
+      final names = helpers.map((m) => m.name).toList();
+
+      expect(names, contains('_boundaryList'));
+      expect(names, contains('_boundaryObject'));
+      expect(names, contains('_boundaryPrefix'));
+    });
+
+    test('a dispatch node keeps describe even with no fields at all', () {
+      final fixture = _notification();
+      final helpers = BoundaryCodecEmitter.usedHelperSpecs([
+        fixture.root,
+      ], const {});
+      final names = helpers.map((m) => m.name).toList();
+
+      expect(names, contains('_boundaryDescribe'));
+      expect(names, isNot(contains('_boundaryAs')));
     });
   });
 }

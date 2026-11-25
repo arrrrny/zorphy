@@ -200,10 +200,67 @@ class BoundaryCodecEmitter {
     _dateTimeHelper(),
   ];
 
-  /// Every concrete leaf at or below [node], depth-first.
+  /// The subset of [helperSpecs] the codecs of [nodes] actually call.
+  ///
+  /// An unreferenced helper is an `unused_element` warning in the consuming
+  /// library's analysis, so the composition (#223) emits exactly the used
+  /// set — computed with the same classification the codecs were built with,
+  /// so the two can never drift apart. [helperSpecs] stays the full set for a
+  /// caller that composes its own library by hand.
+  static List<Method> usedHelperSpecs(
+    Iterable<ZorphyNodeIr> nodes,
+    Map<String, List<BoundaryField>> fields, {
+    Set<String> additionalNodes = const {},
+  }) {
+    const emitter = BoundaryCodecEmitter();
+    final shapes = <_Shape>{};
+    final elementShapes = <_Shape>{};
+    var hasDispatch = false;
+    for (final node in nodes) {
+      if (!node.isConcreteLeaf) hasDispatch = true;
+      final known = emitter._known(node, additionalNodes);
+      for (final field in fields[node.className] ?? const <BoundaryField>[]) {
+        final type = emitter._classify(field, known);
+        shapes.add(type.shape);
+        // `elementShape` defaults to scalar for a non-collection field, so it
+        // only names a real decode path for a list/map.
+        if (type.shape == _Shape.list || type.shape == _Shape.map) {
+          elementShapes.add(type.elementShape);
+        }
+      }
+    }
+
+    bool uses(_Shape shape) =>
+        shapes.contains(shape) || elementShapes.contains(shape);
+
+    return [
+      // Every typed helper reports a mismatch through `_boundaryDescribe`,
+      // and a dispatch node's unknown-tag error does too.
+      if (shapes.isNotEmpty || hasDispatch) _describeHelper(),
+      if (uses(_Shape.node)) _prefixHelper(),
+      // A nested collection element decodes through the reified `is` test,
+      // exactly like a scalar field.
+      if (uses(_Shape.scalar) ||
+          elementShapes.contains(_Shape.list) ||
+          elementShapes.contains(_Shape.map))
+        _asHelper(),
+      if (shapes.contains(_Shape.map) || uses(_Shape.node)) _objectHelper(),
+      if (shapes.contains(_Shape.list)) _listHelper(),
+      if (uses(_Shape.number)) _doubleHelper(),
+      if (uses(_Shape.dateTime)) _dateTimeHelper(),
+    ];
+  }
+
+  /// Every emittable concrete leaf at or below [node], depth-first.
+  ///
+  /// A generic node (and everything below it) is pruned: the composer emits
+  /// no codec for it, so a dispatch enumerating it would reference a
+  /// `fromWire` the generated library does not declare. The same fail-closed
+  /// rule the class-emission walk applies.
   static List<ZorphyNodeIr> leavesOf(ZorphyNodeIr node) {
     final out = <ZorphyNodeIr>[];
     void walk(ZorphyNodeIr current) {
+      if (current.typeParameters.isNotEmpty) return;
       if (current.isConcreteLeaf) {
         out.add(current);
         return;
@@ -565,12 +622,28 @@ class BoundaryCodecEmitter {
     }
 
     for (final field in own) {
-      final value = _wireExpression(field, _classify(field, known));
-      final assignment = 'map[${_literal(field.name)}] = $value;';
+      final type = _classify(field, known);
       if (field.isNullable) {
-        body.add(Code('if (${field.name} != null) { $assignment }'));
+        // Dart does not promote a public field after a null check, so an
+        // encoding that calls a member on it (`toWire`, `toIso8601String`,
+        // `toDouble`) would stay a call on the nullable type and fail to
+        // compile. Bind it to a local, guard the local, encode the local.
+        final local = _local(field);
+        final value = _wireExpression(field, type, source: local);
+        // Read through `this`: a field named `map` would otherwise bind the
+        // output `map` local declared above, feeding the map into itself and
+        // losing the field's value.
+        body
+          ..add(Code('final $local = this.${field.name};'))
+          ..add(
+            Code(
+              'if ($local != null) { '
+              'map[${_literal(field.name)}] = $value; }',
+            ),
+          );
       } else {
-        body.add(Code(assignment));
+        final value = _wireExpression(field, type);
+        body.add(Code('map[${_literal(field.name)}] = $value;'));
       }
     }
 
@@ -578,19 +651,32 @@ class BoundaryCodecEmitter {
     return body;
   }
 
-  String _wireExpression(BoundaryField field, _FieldType type) {
-    final name = field.name;
+  /// [source] is the expression to encode — the field itself, or a local a
+  /// nullable field was promoted into by [_leafToWireBody].
+  String _wireExpression(
+    BoundaryField field,
+    _FieldType type, {
+    String? source,
+  }) {
+    // An unqualified field name can be shadowed by the output `map` local in
+    // `toWire` (e.g. a non-nullable field named `map`). Nullable fields arrive
+    // with an explicit [source] local, so only the direct read is qualified.
+    final name = source ?? 'this.${field.name}';
     switch (type.shape) {
       case _Shape.node:
         return '$name.toWire()';
       case _Shape.list:
-        return switch (_shapeOfType(type.inner)) {
+        // `elementShape` is resolved by `_classify` with the hierarchy's
+        // known node names; re-classifying `type.inner` here would lose that
+        // context and turn a `List<Child>` into a scalar list whose elements
+        // are never converted through `toWire()`.
+        return switch (type.elementShape) {
           _Shape.node => '$name.map((e) => e.toWire()).toList()',
           _Shape.dateTime => '$name.map((e) => e.toIso8601String()).toList()',
           _ => name,
         };
       case _Shape.map:
-        return switch (_shapeOfType(type.inner)) {
+        return switch (type.elementShape) {
           _Shape.node => '$name.map((key, e) => MapEntry(key, e.toWire()))',
           _Shape.dateTime =>
             '$name.map((key, e) => MapEntry(key, e.toIso8601String()))',
@@ -615,6 +701,10 @@ class BoundaryCodecEmitter {
   Set<String> _known(ZorphyNodeIr node, Set<String> additional) {
     final names = <String>{...additional};
     void walk(ZorphyNodeIr current) {
+      // A generic node (and everything below it) receives no codec, so its
+      // name must not classify a field as a nested node — the codec would
+      // emit a `fromWire` the generated library does not declare.
+      if (current.typeParameters.isNotEmpty) return;
       names.add(current.cleanName);
       for (final child in current.directSubTypes) {
         walk(child);

@@ -171,8 +171,13 @@ final class HierarchyResolver {
         isSealedRoot: !parents.containsKey(element),
         isAbstractIntermediate:
             parents.containsKey(element) && wiredChildrenList.isNotEmpty,
-        isConcreteLeaf:
-            wiredChildrenList.isEmpty && !definition.element.isAbstract,
+        // A childless node is a concrete leaf. The `$`-prefixed declaration is
+        // a DECLARATION vehicle — real consumers declare it `abstract`, since a
+        // body-less getter in a non-abstract class is a compile error — and the
+        // generated class it names is the concrete one. Gating leaf-ness on the
+        // declaration's `abstract` keyword made every real consumer class a
+        // non-leaf, leaving the v3 surface with no instantiable node (#223).
+        isConcreteLeaf: wiredChildrenList.isEmpty,
       );
       final result = _Declaration(element, node);
       wired[element] = result;
@@ -249,6 +254,13 @@ final class HierarchyResolver {
     for (final entry in refusedParents.entries) {
       final unionRoot = unionVariants[entry.key];
       if (unionRoot == null) continue;
+      // A variant that implements its OWN union root is the normal
+      // real-consumer shape: a redirecting factory (`factory $U.v() = $V;`)
+      // requires its target to be a subtype of the union, so the variant MUST
+      // implement the root — and then the implements edge and the union edge
+      // agree. There is no conflict to report (#223). Only a variant whose
+      // `implements` parent is a DIFFERENT root loses its union edge.
+      if (identical(entry.value, unionRoot)) continue;
       diagnostics.add(
         ZorphyDiagnostic(
           code: ZorphyDiagnosticCode.e002MixedArchetypes,

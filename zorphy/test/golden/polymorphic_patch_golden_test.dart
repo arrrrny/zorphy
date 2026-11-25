@@ -268,5 +268,310 @@ void main() {
         reason: 'regenerate $_fixturePath if the emission changed on purpose',
       );
     });
+
+    test('subtype patches carry the fluent builders samplePatch builds', () {
+      // ISSUE-0223: MockFixtureEmitter.samplePatch() builds through
+      // `with<Name>` builders, so every concrete patch carries them.
+      final emitted = PolymorphicPatchEmitter().emitSubtypePatch(
+        subtypeName: 'OrderNotification',
+        rootName: 'Notification',
+        fields: orderFields(),
+        sharedFields: const ['id', 'readAt'],
+      );
+
+      expect(emitted, contains('OrderNotificationPatch withId(String value)'));
+      expect(
+        emitted,
+        contains('OrderNotificationPatch withItemCount(int value)'),
+      );
+      expect(
+        emitted,
+        contains('OrderNotificationPatch withReadAt(DateTime? value)'),
+      );
+      expect(
+        emitted,
+        contains('itemCount: PatchValue.set(value)'),
+        reason: 'the builder sets its own field and carries the rest over',
+      );
+    });
   });
+
+  group('ISSUE-0223 PolymorphicPatchEmitter — standalone entity patch', () {
+    test('emits one concrete ZorphyPatch-implementing class', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Product',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('name', 'String', ''),
+        ],
+      );
+
+      expect(
+        emitted,
+        contains('final class ProductPatch implements ZorphyPatch<Product>'),
+      );
+      expect(
+        emitted,
+        isNot(contains('extends')),
+        reason: 'a standalone entity has no root patch to extend',
+      );
+      expect(emitted, contains('ProductPatch withName(String value)'));
+      expect(emitted, contains('Product apply(covariant Product target)'));
+      expect(
+        emitted,
+        contains('ProductPatch compose(ZorphyPatch<Product> next)'),
+        reason:
+            'the parameter stays the interface type so the kind guard is not '
+            'dead code',
+      );
+    });
+
+    test('the standalone emission compiles against the annotation library', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Product',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('name', 'String', ''),
+        ],
+      );
+      final result = _analyzeEmitted(emitted, _standaloneFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+
+    test('a field named value does not shadow the carried field', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Box',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('value', 'String', ''),
+        ],
+      );
+
+      // `withId(String value)` must carry `value: this.value` — an
+      // unqualified `value: value` picks up the builder's parameter instead
+      // of the existing patch field and fails to compile.
+      expect(emitted, contains('value: this.value'));
+      expect(emitted, contains('id: this.id'));
+
+      final result = _analyzeEmitted(emitted, _standaloneValueFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+
+    test('a field named target does not shadow the apply entity', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Targeted',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('target', 'String', ''),
+        ],
+      );
+
+      // `apply(covariant Targeted target)` names its entity parameter
+      // `target`. An unqualified patch-field read resolves to that parameter
+      // (which has neither `isUnchanged` nor `valueOrNull`) and cannot compile.
+      expect(
+        emitted,
+        contains(
+          'target: this.target.isUnchanged ? target.target : '
+          'this.target.valueOrNull',
+        ),
+      );
+      expect(
+        emitted,
+        contains('id: this.id.isUnchanged ? target.id : this.id.valueOrNull'),
+      );
+
+      final result = _analyzeEmitted(emitted, _standaloneTargetFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+
+    test('a field named next does not shadow the compose parameter', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Tagged',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('next', 'String', ''),
+        ],
+      );
+
+      // `compose(ZorphyPatch<Tagged> next)` names its parameter `next`. An
+      // unqualified fallback reads that parameter (the incoming patch)
+      // instead of the existing patch field and fails to compile.
+      expect(
+        emitted,
+        contains('next: next.next.isUnchanged ? this.next : next.next'),
+      );
+
+      final result = _analyzeEmitted(emitted, _standaloneCollisionsFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+
+    test('a field named before does not shadow the invert parameter', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Tagged',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('before', 'String', ''),
+        ],
+      );
+
+      // `invert(Tagged before)` names its parameter `before`. An unqualified
+      // unchanged-test resolves to that parameter (which has no
+      // `isUnchanged`) and cannot compile; `before.before` stays the prior
+      // entity value. (The formatter wraps the ternary, so assert the two
+      // halves.)
+      expect(emitted, contains('before: this.before.isUnchanged'));
+      expect(emitted, contains(': PatchValue.set(before.before)'));
+
+      final result = _analyzeEmitted(emitted, _standaloneCollisionsFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+
+    test('a field named wire does not shadow the toWire output map', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Tagged',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('wire', 'String', ''),
+        ],
+      );
+
+      // `toWire` declares `final wire = <String, Object?>{}`. An unqualified
+      // patch-field read resolves to that local map (which has neither
+      // `isSet` nor `valueOrNull`) and cannot compile; the map write stays
+      // `wire[...]`.
+      expect(emitted, contains('if (this.wire.isSet)'));
+      expect(emitted, contains("wire['wire'] = this.wire.valueOrNull"));
+      expect(emitted, contains("wire['id'] = this.id.valueOrNull"));
+
+      final result = _analyzeEmitted(emitted, _standaloneCollisionsFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+  });
+}
+
+/// Standalone entity carrying a field literally named `target` — the name
+/// collides with the `apply` method's entity parameter.
+const _standaloneTargetFixture = r'''
+final class Targeted {
+  const Targeted({required this.id, required this.target});
+
+  final String id;
+  final String target;
+
+  Targeted copyWith({String? id, String? target}) {
+    return Targeted(id: id ?? this.id, target: target ?? this.target);
+  }
+}
+''';
+
+/// The minimal entity surface a standalone patch applies to.
+const _standaloneFixture = r'''
+final class Product {
+  const Product({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  Product copyWith({String? id, String? name}) {
+    return Product(id: id ?? this.id, name: name ?? this.name);
+  }
+}
+''';
+
+/// Standalone entity carrying a field literally named `value` — the name
+/// collides with the `with*` builders' own parameter.
+const _standaloneValueFixture = r'''
+final class Box {
+  const Box({required this.id, required this.value});
+
+  final String id;
+  final String value;
+
+  Box copyWith({String? id, String? value}) {
+    return Box(id: id ?? this.id, value: value ?? this.value);
+  }
+}
+''';
+
+/// Standalone entity whose field names collide with the emitter's own
+/// parameter and local spellings — `compose`'s `next`, `invert`'s `before`
+/// and `toWire`'s output map `wire`. One fixture serves the compile probe of
+/// all three: `copyWith` takes every field optionally, so a patch carrying a
+/// subset still type-checks against it.
+const _standaloneCollisionsFixture = r'''
+final class Tagged {
+  const Tagged({
+    required this.id,
+    required this.next,
+    required this.before,
+    required this.wire,
+  });
+
+  final String id;
+  final String next;
+  final String before;
+  final String wire;
+
+  Tagged copyWith({String? id, String? next, String? before, String? wire}) {
+    return Tagged(
+      id: id ?? this.id,
+      next: next ?? this.next,
+      before: before ?? this.before,
+      wire: wire ?? this.wire,
+    );
+  }
+}
+''';
+
+/// Analyzes [emitted] spliced after [fixture] in a throwaway package that
+/// depends on the real `zorphy_annotation` — the same probe the mock-data
+/// compile suite uses, because a `contains(...)` assertion cannot see a type
+/// error inside the generated code.
+({int exitCode, String output}) _analyzeEmitted(
+  String emitted,
+  String fixture,
+) {
+  final annotationRoot = Directory.current.parent.uri
+      .resolve('zorphy_annotation/')
+      .toFilePath();
+  final probeParent = Directory('test/.poly_patch_compile_$pid')
+    ..createSync(recursive: true);
+  final probe = probeParent.createTempSync('issue_223_');
+  addTearDown(() => probe.deleteSync(recursive: true));
+
+  File('${probe.path}/pubspec.yaml').writeAsStringSync(
+    'name: poly_patch_probe\n'
+    'environment:\n'
+    '  sdk: ">=3.11.0 <4.0.0"\n'
+    'dependencies:\n'
+    '  zorphy_annotation:\n'
+    '    path: $annotationRoot\n',
+  );
+  Directory('${probe.path}/lib').createSync();
+  File('${probe.path}/lib/emitted.dart').writeAsStringSync(
+    "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n"
+    '$fixture\n'
+    '$emitted',
+  );
+
+  final pubGet = Process.runSync('dart', [
+    'pub',
+    'get',
+  ], workingDirectory: probe.path);
+  if (pubGet.exitCode != 0) {
+    return (
+      exitCode: pubGet.exitCode,
+      output: 'dart pub get failed:\n${pubGet.stdout}\n${pubGet.stderr}',
+    );
+  }
+  final analyze = Process.runSync('dart', [
+    'analyze',
+    '--no-fatal-warnings',
+    'lib/emitted.dart',
+  ], workingDirectory: probe.path);
+  return (
+    exitCode: analyze.exitCode,
+    output: '${analyze.stdout}\n${analyze.stderr}',
+  );
 }

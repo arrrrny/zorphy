@@ -139,6 +139,30 @@ class PolymorphicPatchEmitter {
     ]);
   }
 
+  /// Emits the concrete `<Name>Patch` for a STANDALONE entity — one with no
+  /// hierarchy to dispatch across (ISSUE-0223, arrrrny/zorphy#223).
+  ///
+  /// A standalone entity has no root patch to extend, so the result is a
+  /// single concrete class implementing `ZorphyPatch<<Name>>` directly: the
+  /// same field/algebra surface [buildSubtypeClass] emits for a leaf, minus
+  /// the `extends` edge, plus the `with<Name>` fluent builders
+  /// [MockFixtureEmitter]'s `samplePatch()` builds through.
+  String emitStandalone({
+    required String name,
+    required List<NameTypeClassComment> fields,
+  }) {
+    _requireNoReservedFields(fields);
+    return _emit([
+      buildSubtypeClass(
+        subtypeName: name,
+        rootName: name,
+        fields: fields,
+        sharedFields: const [],
+        standalone: true,
+      ),
+    ]);
+  }
+
   /// Formats each spec individually and joins them.
   ///
   /// [ZorphyEmitter.emitSpecs] formats only when it receives a single spec and
@@ -282,11 +306,18 @@ class PolymorphicPatchEmitter {
   ///
   /// Exposed separately so a caller can fold it into a library;
   /// [emitSubtypePatch] wraps it in formatted source.
+  ///
+  /// With [standalone] the class drops the `extends` edge and implements
+  /// `ZorphyPatch<<Subtype>>` directly — the shape a hierarchy-less entity
+  /// takes, where there is no root patch to extend. The `with<Name>` fluent
+  /// builders are emitted either way: they are the surface
+  /// `MockFixtureEmitter.samplePatch()` builds through (ISSUE-0223).
   Class buildSubtypeClass({
     required String subtypeName,
     required String rootName,
     required List<NameTypeClassComment> fields,
     required List<String> sharedFields,
+    bool standalone = false,
   }) {
     final subtype = _clean(subtypeName);
     final root = _clean(rootName);
@@ -296,8 +327,15 @@ class PolymorphicPatchEmitter {
     return Class((c) {
       c
         ..name = patchName
-        ..modifier = ClassModifier.final$
-        ..extend = referType('${root}Patch');
+        ..modifier = ClassModifier.final$;
+      if (standalone) {
+        // No root patch exists to extend; the patch contract is satisfied
+        // directly, which is also what makes the `isEmpty`/`isNotEmpty`
+        // overrides below legal.
+        c.implements.add(referType('ZorphyPatch<$subtype>'));
+      } else {
+        c.extend = referType('${root}Patch');
+      }
 
       c.constructors.add(
         Constructor((con) {
@@ -315,17 +353,34 @@ class PolymorphicPatchEmitter {
         c.fields.add(_patchValueField(field, overridesRoot: isShared));
       }
 
+      for (final field in fields) {
+        c.methods.add(
+          _fluentBuilder(patchName: patchName, field: field, fields: fields),
+        );
+      }
+
       c.methods.add(_isEmptyGetter(fields));
       c.methods.add(_isNotEmptyGetter());
       c.methods.add(_subtypeApplyMethod(subtype, fields));
-      c.methods.add(_concreteComposeMethod(root, fields, patchName));
+      c.methods.add(
+        _concreteComposeMethod(
+          root,
+          fields,
+          patchName,
+          // A standalone patch's own type would make the kind guard dead
+          // code; the interface type keeps it live.
+          parameterType: standalone ? 'ZorphyPatch<$subtype>' : null,
+        ),
+      );
       c.methods.add(
         _concreteInvertMethod(
           root,
           fields,
           patchName,
           entityName: subtype,
-          guardKind: true,
+          // A standalone patch's `before` is already typed as the entity, so
+          // the kind guard would be dead code.
+          guardKind: !standalone,
         ),
       );
       c.methods.add(_concreteToWireMethod(fields));
@@ -337,6 +392,41 @@ class PolymorphicPatchEmitter {
         ),
       );
       c.methods.add(_subtypeFromWireMethod(subtype, root, fields, shared));
+    });
+  }
+
+  /// The fluent builder for [field]: `with<Name>(value)` returns a NEW patch
+  /// with every other field carried over and this one set.
+  ///
+  /// The patches are immutable values, so the builder is a copy-with rather
+  /// than the mutating map write the legacy `PatchBase` surface uses; the
+  /// call shape a consumer writes (`patch = patch.withId('…')`) is the same.
+  Method _fluentBuilder({
+    required String patchName,
+    required NameTypeClassComment field,
+    required List<NameTypeClassComment> fields,
+  }) {
+    final member = _memberName(field.name);
+    final capitalized =
+        member.substring(0, 1).toUpperCase() + member.substring(1);
+    final args = <String>[
+      for (final f in fields)
+        f.name == field.name
+            ? '${_memberName(f.name)}: PatchValue.set(value)'
+            : '${_memberName(f.name)}: this.${_memberName(f.name)}',
+    ];
+    return Method((m) {
+      m
+        ..name = 'with$capitalized'
+        ..returns = referType(patchName)
+        ..requiredParameters.add(
+          Parameter((p) {
+            p
+              ..name = 'value'
+              ..type = referType(_concreteType(field.type));
+          }),
+        );
+      m.body = Code('return $patchName(${args.join(', ')});');
     });
   }
 
@@ -516,11 +606,13 @@ class PolymorphicPatchEmitter {
       for (final f in fields) {
         final name = _memberName(f.name);
         final narrowed = subtypeFieldTypes[subtype]?[f.name];
-        final value = '${name}.valueOrNull';
+        // The entity parameter is named `target`: qualify the PATCH field
+        // with `this` so a field named `target` is not shadowed by it.
+        final value = 'this.${name}.valueOrNull';
         final written = narrowed == null
             ? value
             : '$value as ${_concreteType(narrowed)}';
-        lines.add('  $name: $name.isUnchanged ? target.$name : $written,');
+        lines.add('  $name: this.$name.isUnchanged ? target.$name : $written,');
       }
       lines.add(');');
       lines.add('}');
@@ -556,8 +648,10 @@ class PolymorphicPatchEmitter {
     ];
     for (final field in fields) {
       final name = _memberName(field.name);
+      // `target` is the entity parameter; qualify the patch field with `this`
+      // so a field named `target` reads the patch, not the parameter.
       lines.add(
-        '  $name: $name.isUnchanged ? target.$name : $name.valueOrNull,',
+        '  $name: this.$name.isUnchanged ? target.$name : this.$name.valueOrNull,',
       );
     }
     lines.add(');');
@@ -568,11 +662,17 @@ class PolymorphicPatchEmitter {
   /// the rest. Kinds must match — merging a sibling subtype's patch, or a
   /// subtype patch into a shared one, would silently drop the other side's
   /// subtype-only fields.
+  ///
+  /// [parameterType] is the root patch for a hierarchy leaf (the guard then
+  /// narrows it) and `ZorphyPatch<<Subtype>>` for a standalone patch, whose
+  /// own type would make the guard dead code.
   Method _concreteComposeMethod(
     String root,
     List<NameTypeClassComment> fields,
-    String selfName,
-  ) => Method((m) {
+    String selfName, {
+    String? parameterType,
+  }) => Method((m) {
+    final nextType = parameterType ?? '${root}Patch';
     m
       ..name = 'compose'
       ..returns = referType('${root}Patch')
@@ -580,35 +680,43 @@ class PolymorphicPatchEmitter {
         Parameter((p) {
           p
             ..name = 'next'
-            ..covariant = true
-            ..type = referType('${root}Patch');
+            ..covariant = parameterType == null
+            ..type = referType(nextType);
         }),
       );
     m.annotations.add(refer('override'));
 
-    // `next` is statically the ROOT patch. The type guard is what promotes it
-    // for the fields below, and it is also the loud failure every concrete
-    // patch needs: composing a SIBLING's patch would silently drop that
-    // sibling's fields, and a shared patch composed with a SUBTYPE patch would
-    // drop the subtype's own fields the same way. The guard fires for both
-    // directions, so neither is a silent data loss.
-    final lines = <String>[
-      'if (next.isEmpty) return this;',
-      'if (isEmpty) return next;',
-    ];
-    lines.addAll([
+    // `next` is statically the ROOT patch (or `ZorphyPatch<T>` for a
+    // standalone patch). The type guard is what promotes it for the fields
+    // below, and it is also the loud failure every concrete patch needs:
+    // composing a SIBLING's patch would silently drop that sibling's fields,
+    // and a shared patch composed with a SUBTYPE patch would drop the
+    // subtype's own fields the same way. The guard fires for both directions,
+    // so neither is a silent data loss.
+    //
+    // For a standalone patch the guard must run BEFORE `return next`: `next`
+    // is the interface type there, so the identity-law line only type-checks
+    // once the guard has promoted it.
+    final guard = <String>[
       'if (next is! $selfName) {',
       '  throw ArgumentError.value(next, \'next\', '
           '\'$selfName cannot compose \${next.runtimeType}\');',
       '}',
-    ]);
+    ];
+    final lines = <String>['if (next.isEmpty) return this;'];
+    if (parameterType != null) lines.addAll(guard);
+    lines.add('if (isEmpty) return next;');
+    if (parameterType == null) lines.addAll(guard);
     if (fields.isEmpty) {
       lines.add('return this;');
     } else {
       final args = fields
           .map((f) {
             final name = _memberName(f.name);
-            return '$name: next.$name.isUnchanged ? $name : next.$name';
+            // `next` is the compose parameter: qualify the patch field with
+            // `this` so a field named `next` reads the patch, not the
+            // parameter.
+            return '$name: next.$name.isUnchanged ? this.$name : next.$name';
           })
           .join(', ');
       lines.add('return $selfName($args);');
@@ -662,7 +770,10 @@ class PolymorphicPatchEmitter {
     final args = fields
         .map((f) {
           final name = _memberName(f.name);
-          return '$name: $name.isUnchanged '
+          // `before` is the invert parameter: qualify the patch field with
+          // `this` so a field named `before` reads the patch, not the
+          // parameter. `before.$name` stays the prior entity value.
+          return '$name: this.$name.isUnchanged '
               '? const PatchValue.unchanged() '
               ': PatchValue.set(before.$name)';
         })
@@ -686,8 +797,12 @@ class PolymorphicPatchEmitter {
         final lines = <String>['final wire = <String, Object?>{};'];
         for (final field in fields) {
           final name = _memberName(field.name);
+          // `wire` is the output map: qualify the patch field with `this` so
+          // a field named `wire` reads the patch, not the map. `wire[…]`
+          // stays the map write.
           lines.add(
-            'if ($name.isSet) wire[\'${field.name}\'] = $name.valueOrNull;',
+            'if (this.$name.isSet) '
+            "wire['${field.name}'] = this.$name.valueOrNull;",
           );
         }
         lines.add('return wire;');

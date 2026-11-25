@@ -1,0 +1,89 @@
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part '../_br_/v3_archetypes/v3_archetypes.part.dart';
+
+// Issue #223 e2e fixture: one class per v3 archetype, declared the way a real
+// consumer declares them (abstract `$`-prefixed declarations; the generated
+// classes drop the prefix). The production builder must turn every one of
+// these into its archetype's surface in the shared part.
+
+// ── @ZorphyEntity — an aggregate root with identity + one leaf ──────────────
+@ZorphyEntity(principalKey: #id)
+abstract class $Notification {
+  String get id;
+  String get title;
+}
+
+@ZorphyEntity()
+abstract class $OrderNotification implements $Notification {
+  String get orderId;
+}
+
+// ── @ZorphyEntity — standalone, no hierarchy ────────────────────────────────
+@ZorphyEntity(principalKey: #id)
+abstract class $Product {
+  String get id;
+  String get name;
+}
+
+// ── @ZorphyEntity — three levels: root → abstract intermediate → leaf ───────
+@ZorphyEntity(principalKey: #id)
+abstract class $Event {
+  String get id;
+}
+
+@ZorphyEntity()
+abstract class $SystemEvent implements $Event {
+  String get source;
+}
+
+@ZorphyEntity()
+abstract class $DeployEvent implements $SystemEvent {
+  String get version;
+}
+
+// ── @ZorphyState — a sealed state hierarchy ─────────────────────────────────
+@ZorphyState()
+abstract class $UiState {
+  String get label;
+}
+
+@ZorphyState()
+abstract class $ReadyState implements $UiState {
+  String get detail;
+}
+
+// ── @ZorphyUnion — a closed union with factory variants ─────────────────────
+// Union variants must be CONCRETE and implement the union root: a redirecting
+// factory cannot target an abstract class, and its target must be a subtype
+// of the union.
+@ZorphyUnion()
+abstract class $AsyncStatus {
+  factory $AsyncStatus.loading() = $Loading;
+  factory $AsyncStatus.ready(String value) = $Ready;
+}
+
+@ZorphyValue()
+class $Loading implements $AsyncStatus {
+  const $Loading();
+}
+
+@ZorphyValue()
+class $Ready implements $AsyncStatus {
+  final String value;
+
+  const $Ready(this.value);
+}
+
+// ── @ZorphyIntent — a replay-safe command envelope ──────────────────────────
+@ZorphyIntent(replaySafe: true)
+abstract class $InspectProductIntent {
+  String get productId;
+}
+
+// ── @ZorphyValue — an immutable value object, no identity ───────────────────
+// The issue's own reproduction shape.
+@ZorphyValue()
+abstract class $Greeting {
+  String get message;
+}
