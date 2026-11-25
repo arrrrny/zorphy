@@ -280,32 +280,29 @@ void main() {
       expect(emitted, contains('seed % 1'));
     });
 
-    test(
-      'a required unseedable field refuses instead of fabricating a value',
-      () {
-        final node = _node(
-          className: r'$Order',
-          isSealedRoot: true,
-          fields: const [
-            ZorphyFieldIr(name: 'id', type: 'String'),
-            ZorphyFieldIr(name: 'status', type: 'OrderStatus'),
-          ],
-        );
-        final emitted = MockFixtureEmitter().emitForNode(node);
-        expect(
-          emitted,
-          contains('UnsupportedError'),
-          reason: 'a required enum field has no seed this emitter can supply',
-        );
-        expect(
-          emitted,
-          isNot(contains("'status-")),
-          reason: 'an enum must never be seeded as a String',
-        );
-        // The field it CAN seed still lands, so the rest of the class is usable.
-        expect(emitted, contains("patch = patch.withId('id-"));
-      },
-    );
+    test('a required unseedable field refuses instead of fabricating a value', () {
+      final node = _node(
+        className: r'$Order',
+        isSealedRoot: true,
+        fields: const [
+          ZorphyFieldIr(name: 'id', type: 'String'),
+          ZorphyFieldIr(name: 'status', type: 'OrderStatus'),
+        ],
+      );
+      final emitted = MockFixtureEmitter().emitForNode(node);
+      expect(
+        emitted,
+        contains('UnsupportedError'),
+        reason: 'a required enum field has no seed this emitter can supply',
+      );
+      expect(
+        emitted,
+        isNot(contains("'status-")),
+        reason: 'an enum must never be seeded as a String',
+      );
+      // The field it CAN seed still lands, so the rest of the class is usable.
+      expect(emitted, contains("patch = patch.withId('id-"));
+    });
   });
 
   group('ISSUE-015 MockFixtureEmitter — intents', () {
