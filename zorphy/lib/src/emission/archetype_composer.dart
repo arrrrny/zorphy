@@ -31,6 +31,15 @@
 ///   (a second class emitter would duplicate every intent class), and its
 ///   `toWire` would collide with the codec's.
 ///
+/// Every non-intent node also receives the typed-lens and JSON-Pointer surface
+/// (ISSUE-0230): [LensEmitter] contributes the `static const <Name>Lenses
+/// lenses` registry (spliced into each concrete class) plus the top-level
+/// `<Name>Lenses` accessor classes, and [JsonPointerEmitter] contributes the
+/// `static ZorphyLens<T, Object?>? resolvePath(String)` resolver on every
+/// non-generic node — sealed roots included. Both are IR-native: the legacy
+/// `LensGenerator`/`JsonPointerGenerator` consume the analyzer's
+/// `ClassMetadata`, which the v3 path never builds.
+///
 /// The output is a PART-FILE BODY: directive-free source the owning library
 /// composes into its shared part. The fragment names `ZorphyEntityBase`,
 /// `ZorphyBoundaryResult`, `ZorphyIntentDigest`, ... — all from
@@ -46,6 +55,8 @@ import '../emitters/mock_fixture_emitter.dart';
 import '../parser/polymorphic_ir.dart';
 import 'boundary_codec_emitter.dart';
 import 'emitter.dart';
+import 'json_pointer_emitter.dart';
+import 'lens_emitter.dart';
 import 'polymorphic_class_emitter.dart';
 import 'polymorphic_patch_emitter.dart';
 
@@ -126,21 +137,31 @@ final class ArchetypeComposer {
         }
       }
       const codec = BoundaryCodecEmitter();
+      // The lens + JSON-Pointer surfaces (ISSUE-0230) are IR-native: they read
+      // the whole graph, not one hierarchy, because a node's resolver dispatches
+      // into its subtypes and nested types. Compute them once per library.
+      final resolvePaths = JsonPointerEmitter(ir).resolvePathMethods();
+      final lensRegistries = const LensEmitter().registryFields(ir);
       var firstRoot = true;
       for (final root in codecRoots) {
-        final extraMethods = <String, List<Method>>{
-          for (final node in _walk(root))
-            node.className: codec.emitCodec(
-              node,
-              payloads,
-              additionalNodes: knownNodes,
-            ),
-        };
+        final extraMethods = <String, List<Method>>{};
+        final extraFields = <String, List<Field>>{};
+        for (final node in _walk(root)) {
+          final methods = <Method>[
+            ...codec.emitCodec(node, payloads, additionalNodes: knownNodes),
+          ];
+          final resolvePath = resolvePaths[node.className];
+          if (resolvePath != null) methods.add(resolvePath);
+          extraMethods[node.className] = methods;
+          final registry = lensRegistries[node.className];
+          if (registry != null) extraFields[node.className] = [registry];
+        }
         fragments.add(
           const PolymorphicClassEmitter().emit(
             root: root,
             fields: ownFields,
             extraMethods: extraMethods,
+            extraFields: extraFields,
             // The `_sentinel` declarations are one-per-library: only the first
             // hierarchy carries them, or the duplicates are a compile error.
             includeSentinelDeclarations: firstRoot,
@@ -171,6 +192,13 @@ final class ArchetypeComposer {
           ),
         ),
       );
+      // The `<Name>Lenses` accessor classes are top-level, one per concrete
+      // node, emitted once per library after the classes that own the registry
+      // field referencing them (ISSUE-0230).
+      final lensClasses = const LensEmitter().lensClasses(ir);
+      if (lensClasses.isNotEmpty) {
+        fragments.add(ZorphyEmitter().emitSpecs(lensClasses));
+      }
     }
 
     // Intent hierarchies emit their own class surface (see the library doc).
