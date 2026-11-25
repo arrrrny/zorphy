@@ -63,9 +63,8 @@ void main() {
     });
 
     test('the wire envelope round-trips through fromWire', () {
-      final envelope = SystemEventPatch(
-        payload: PatchValue.set('v2'),
-      ).toEnvelope(principalKey: 'e1');
+      final envelope = SystemEventPatch(payload: PatchValue.set('v2'))
+          .toEnvelope(principalKey: 'e1');
 
       expect(envelope['entityType'], 'SystemEvent');
       expect(envelope['patchKind'], 'SystemEvent');
@@ -78,9 +77,9 @@ void main() {
 
     test('a target outside the hierarchy fails loudly', () {
       expect(
-        () => SystemEventPatch(
-          source: PatchValue.set('x'),
-        ).apply(_Stranger(id: 's') as dynamic),
+        () =>
+            SystemEventPatch(source: PatchValue.set('x'))
+                .apply(_Stranger(id: 's') as dynamic),
         throwsA(isA<TypeError>()),
         reason:
             'apply is narrowed to SystemEvent, so an alien target is refused '

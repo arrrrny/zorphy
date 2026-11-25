@@ -552,76 +552,85 @@ void main() {
       // shared apply follows.
       expect(emitted, contains('as String'));
       expect(emitted, contains('as int'));
-      expect(emitted, contains('EventPatch compose(covariant EventPatch next)'));
+      expect(
+        emitted,
+        contains('EventPatch compose(covariant EventPatch next)'),
+      );
       expect(emitted, contains('SystemEventPatch invert(Event before)'));
       expect(emitted, contains("'patchKind': 'SystemEvent'"));
-      expect(emitted, contains('static ZorphyBoundaryResult<SystemEventPatch> fromWire('));
-    });
-
-    test('the intermediate emission compiles against the annotation library', () {
-      final emitted = [
-        const PolymorphicPatchEmitter().emitRoot(
-          rootName: 'Event',
-          fields: [NameTypeClassComment('id', 'String', '')],
-          subtypeNames: const ['DeployEvent', 'AlertEvent'],
-        ),
-        _emitIntermediateHierarchy(),
-      ].join('\n\n');
-
-      final result = _analyzeEmitted(emitted, _intermediateEntitiesFixture);
-      expect(result.exitCode, 0, reason: result.output);
-    });
-
-    test('the runtime fixture carries the exact emitted intermediate patch', () {
-      final source = File('test/runtime/fixtures/intermediate.dart')
-          .readAsStringSync();
-      final from = source.indexOf('// GOLDEN-POLY-INTERMEDIATE-START');
-      final to = source.indexOf('// GOLDEN-POLY-INTERMEDIATE-END');
-      expect(from, isNot(-1));
-      expect(to, isNot(-1));
-      final region = source
-          .substring(from + '// GOLDEN-POLY-INTERMEDIATE-START'.length, to)
-          .trim();
       expect(
-        region,
-        _emitIntermediateHierarchy().trim(),
-        reason:
-            'the runtime suite must exercise the real emitted intermediate '
-            'patch — regenerate test/runtime/fixtures/intermediate.dart if '
-            'the emission changed on purpose',
+        emitted,
+        contains('static ZorphyBoundaryResult<SystemEventPatch> fromWire('),
       );
     });
-  });
 
-  group('ISSUE-0229 PolymorphicPatchEmitter — static diff (RED→GREEN)', () {
     test(
-      'a standalone patch declares static diff with the identical fast path',
+      'the intermediate emission compiles against the annotation library',
       () {
-        final emitted = PolymorphicPatchEmitter().emitStandalone(
-          name: 'Product',
-          fields: [
-            NameTypeClassComment('id', 'String', ''),
-            NameTypeClassComment('name', 'String', ''),
-          ],
-        );
+        final emitted = [
+          const PolymorphicPatchEmitter().emitRoot(
+            rootName: 'Event',
+            fields: [NameTypeClassComment('id', 'String', '')],
+            subtypeNames: const ['DeployEvent', 'AlertEvent'],
+          ),
+          _emitIntermediateHierarchy(),
+        ].join('\n\n');
 
-        expect(
-          emitted,
-          contains('static ProductPatch diff(Product previous, Product next)'),
-        );
-        expect(
-          emitted,
-          contains('if (identical(previous, next)) return ProductPatch('),
-          reason: 'the O(1) fast path returns the canonical empty patch',
-        );
-        // Unchanged-field omission: a field equal on both sides is not recorded.
-        expect(emitted, contains('if (previous.id != next.id)'));
-        expect(emitted, contains('if (previous.name != next.name)'));
-
-        final result = _analyzeEmitted(emitted, _standaloneFixture);
+        final result = _analyzeEmitted(emitted, _intermediateEntitiesFixture);
         expect(result.exitCode, 0, reason: result.output);
       },
     );
+
+    test(
+      'the runtime fixture carries the exact emitted intermediate patch',
+      () {
+        final source = File('test/runtime/fixtures/intermediate.dart')
+            .readAsStringSync();
+        final from = source.indexOf('// GOLDEN-POLY-INTERMEDIATE-START');
+        final to = source.indexOf('// GOLDEN-POLY-INTERMEDIATE-END');
+        expect(from, isNot(-1));
+        expect(to, isNot(-1));
+        final region = source
+            .substring(from + '// GOLDEN-POLY-INTERMEDIATE-START'.length, to)
+            .trim();
+        expect(
+          region,
+          _emitIntermediateHierarchy().trim(),
+          reason:
+              'the runtime suite must exercise the real emitted intermediate '
+              'patch — regenerate test/runtime/fixtures/intermediate.dart if '
+              'the emission changed on purpose',
+        );
+      },
+    );
+  });
+
+  group('ISSUE-0229 PolymorphicPatchEmitter — static diff (RED→GREEN)', () {
+    test('a standalone patch declares static diff with the identical fast path', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Product',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('name', 'String', ''),
+        ],
+      );
+
+      expect(
+        emitted,
+        contains('static ProductPatch diff(Product previous, Product next)'),
+      );
+      expect(
+        emitted,
+        contains('if (identical(previous, next)) return ProductPatch('),
+        reason: 'the O(1) fast path returns the canonical empty patch',
+      );
+      // Unchanged-field omission: a field equal on both sides is not recorded.
+      expect(emitted, contains('if (previous.id != next.id)'));
+      expect(emitted, contains('if (previous.name != next.name)'));
+
+      final result = _analyzeEmitted(emitted, _standaloneFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
 
     test('a subtype patch declares static diff returning its own type', () {
       final emitted = PolymorphicPatchEmitter().emitSubtypePatch(
