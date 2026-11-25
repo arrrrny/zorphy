@@ -115,10 +115,20 @@ class PartDirectiveCleaner {
       final uri = directive.uri.stringValue;
       if (uri == null) continue;
       if (uri.endsWith('.zorphy.dart')) {
-        removals.add(_Removal(directive.offset, directive.end));
+        removals.add(
+          _Removal(
+            directive.offset,
+            _pastTrailingNewline(source, directive.end),
+          ),
+        );
         zorphyParts.add(uri);
       } else if (arg.stripJsonParts && uri.endsWith('.g.dart')) {
-        removals.add(_Removal(directive.offset, directive.end));
+        removals.add(
+          _Removal(
+            directive.offset,
+            _pastTrailingNewline(source, directive.end),
+          ),
+        );
         jsonParts.add(uri);
       }
     }
@@ -141,6 +151,27 @@ class PartDirectiveCleaner {
       result = result.replaceRange(at, at, "\npart '$restored';");
     }
     return PartDirectiveCleanResult(result, zorphyParts, jsonParts, restored);
+  }
+
+  /// A `PartDirective`'s `end` is its `;`, not the end of the line. Consume the
+  /// trailing newline (LF or CRLF, when present) so removing a directive does
+  /// not leave a stray blank line in the migrated source — the tool does not
+  /// `dart format` its own output (#257 review). A directive followed by
+  /// anything else (a trailing comment, another directive on the same line,
+  /// or end of file) is left exactly as-is.
+  static int _pastTrailingNewline(String source, int end) {
+    const cr = 0x0D;
+    const lf = 0x0A;
+    var i = end;
+    if (i < source.length && source.codeUnitAt(i) == cr) {
+      i++;
+      if (i < source.length && source.codeUnitAt(i) == lf) {
+        i++;
+      }
+    } else if (i < source.length && source.codeUnitAt(i) == lf) {
+      i++;
+    }
+    return i;
   }
 
   /// Whether any class in [unit] carries `@JsonSerializable` — such a file

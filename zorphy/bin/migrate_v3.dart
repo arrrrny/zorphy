@@ -102,12 +102,29 @@ Future<void> main(List<String> args) async {
   // files and --apply deletes them from disk (#249).
   if (staleParts.isNotEmpty) {
     if (apply) {
+      // A delete can fail after the migrated files were already written
+      // (permission denied, file locked, already removed in a race). Never
+      // let one IO error abort main with a raw stack trace and leave a
+      // half-applied tree: warn with the offending path and keep going so
+      // every failure is reported (#257 review).
+      var deleted = 0;
       for (final part in staleParts) {
-        await File(part).delete();
+        try {
+          await File(part).delete();
+          deleted++;
+        } on Object catch (e) {
+          stderr.writeln(
+            'Warning: could not delete stale part ${p.relative(part)}: $e',
+          );
+        }
       }
-      stdout.writeln(
-        'Deleted ${staleParts.length} stale .zorphy.dart file(s).',
-      );
+      stdout.writeln('Deleted $deleted stale .zorphy.dart file(s).');
+      if (deleted != staleParts.length) {
+        stderr.writeln(
+          'Failed to delete ${staleParts.length - deleted} stale '
+          '.zorphy.dart file(s) — see the warnings above.',
+        );
+      }
     } else {
       for (final part in staleParts) {
         stdout.writeln('would delete: ${p.relative(part)}');

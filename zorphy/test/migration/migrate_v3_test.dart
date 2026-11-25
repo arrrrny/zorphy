@@ -511,6 +511,37 @@ class Other {}
       expect(result.source, contains("part 'legacy.g.dart';"));
     });
 
+    test('a removed directive takes its trailing newline with it', () {
+      // A PartDirective's `end` is its `;`, not the line end: without
+      // consuming the newline the migrated library keeps a stray blank line
+      // where every part used to sit (#257 review).
+      const source =
+          "part 'a.zorphy.dart';\n\n@Zorphy()\nabstract class \$A {}\n";
+      final out = PartDirectiveCleaner.clean(
+        PartDirectiveCleanArg(source: source),
+      ).source;
+      expect(out, isNot(contains('part ')));
+      // Only the original blank line survives — not one per removed part.
+      expect(out, startsWith('\n@Zorphy()'));
+    });
+
+    test('a CRLF trailing newline is consumed as one unit', () {
+      const source =
+          "part 'a.zorphy.dart';\r\n@Zorphy()\r\nabstract class \$A {}\r\n";
+      final out = PartDirectiveCleaner.clean(
+        PartDirectiveCleanArg(source: source),
+      ).source;
+      expect(out, startsWith('@Zorphy()'));
+    });
+
+    test('a trailing comment is not swallowed with the directive', () {
+      const source = "part 'a.zorphy.dart'; // keep me\n@Zorphy()\n";
+      final out = PartDirectiveCleaner.clean(
+        PartDirectiveCleanArg(source: source),
+      ).source;
+      expect(out, contains('// keep me'));
+    });
+
     test('an unparseable file is returned unchanged', () {
       const source = 'class {';
       final result = PartDirectiveCleaner.clean(
