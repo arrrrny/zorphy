@@ -23,6 +23,8 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:test/test.dart';
+import 'package:zorphy/src/emission/boundary_codec_emitter.dart';
+import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/emitters/intent_emitter.dart';
 import 'package:zorphy/src/parser/hierarchy_resolver.dart';
 import 'package:zorphy/src/parser/polymorphic_ir.dart';
@@ -144,7 +146,16 @@ Future<String> _runEmitted(
   Map<String, String> sources,
   String body,
 ) async {
-  final emitted = IntentEmitter().emitIntents(ir);
+  // Since #232 the intent surface carries `fromWire`, whose decode bodies
+  // call the shared boundary helpers (`_boundaryAs`, `_boundaryDescribe`, …).
+  // The production composition supplies them once per library through
+  // `ArchetypeComposer`; this hand-rolled harness mirrors that by appending
+  // them here. The full set is emitted (not `usedHelperSpecs`) because the
+  // probe compiles with `dart run`, where an unreferenced helper is a
+  // warning, never a failure.
+  final emitted =
+      '${IntentEmitter().emitIntents(ir)}\n\n'
+      '${ZorphyEmitter().emitSpecs(BoundaryCodecEmitter.helperSpecs())}';
 
   final root = _tmpRoot.absolute;
   root.createSync(recursive: true);
@@ -260,11 +271,13 @@ void main() {
       expect(emitted, contains('Map<String, Object?> toWire()'));
     });
 
-    test('the emitted hierarchy runs: dispatch, replaySafe and digests', () async {
-      final out = await _runEmitted(
-        ir,
-        {'intents.dart': _polymorphic},
-        '''
+    test(
+      'the emitted hierarchy runs: dispatch, replaySafe and digests',
+      () async {
+        final out = await _runEmitted(
+          ir,
+          {'intents.dart': _polymorphic},
+          '''
   final inspect = InspectProductIntent(productId: 'p-1');
   final delete = DeleteProductIntent(productId: 'p-1', reason: 'duplicate');
 
@@ -289,63 +302,65 @@ void main() {
   stdout.writeln('deleteOther=' +
       DeleteProductIntent(productId: 'p-1', reason: 'obsolete').intentDigest());
 ''',
-      );
+        );
 
-      final lines = <String, String>{
-        for (final line in out.split('\n'))
-          if (line.contains('='))
-            line.substring(0, line.indexOf('=')): line.substring(
-              line.indexOf('=') + 1,
-            ),
-      };
+        final lines = <String, String>{
+          for (final line in out.split('\n'))
+            if (line.contains('='))
+              line.substring(0, line.indexOf('=')): line.substring(
+                line.indexOf('=') + 1,
+              ),
+        };
 
-      // `intentName` IS the hierarchy's resolved discriminatorValue: snake_case
-      // of the clean class name, owned by the IR so the wire tag and the name
-      // a receiver verifies can never disagree.
-      expect(
-        lines['labels'],
-        'inspect:inspect_product_intent,delete:delete_product_intent',
-      );
-      expect(lines['inspectSafe'], 'true', reason: 'leaf overrides the root');
-      expect(lines['deleteSafe'], 'false');
+        // `intentName` IS the hierarchy's resolved discriminatorValue: snake_case
+        // of the clean class name, owned by the IR so the wire tag and the name
+        // a receiver verifies can never disagree.
+        expect(
+          lines['labels'],
+          'inspect:inspect_product_intent,delete:delete_product_intent',
+        );
+        expect(lines['inspectSafe'], 'true', reason: 'leaf overrides the root');
+        expect(lines['deleteSafe'], 'false');
 
-      final inspectDigest = lines['inspectDigest']!;
-      final deleteDigest = lines['deleteDigest']!;
-      expect(inspectDigest, hasLength(64), reason: 'a SHA-256 hex digest');
-      expect(inspectDigest, matches(RegExp(r'^[0-9a-f]{64}$')));
-      expect(deleteDigest, hasLength(64));
+        final inspectDigest = lines['inspectDigest']!;
+        final deleteDigest = lines['deleteDigest']!;
+        expect(inspectDigest, hasLength(64), reason: 'a SHA-256 hex digest');
+        expect(inspectDigest, matches(RegExp(r'^[0-9a-f]{64}$')));
+        expect(deleteDigest, hasLength(64));
 
-      expect(
-        lines['again'],
-        inspectDigest,
-        reason: 'the digest is a pure function of the intent',
-      );
-      expect(
-        lines['other'],
-        isNot(inspectDigest),
-        reason: 'a different field value is a different intent',
-      );
-      expect(
-        deleteDigest,
-        isNot(inspectDigest),
-        reason: 'same fields, different intent name: never colliding',
-      );
-      expect(
-        lines['deleteOther'],
-        isNot(deleteDigest),
-        reason: 'the leaf own field participates in its digest',
-      );
+        expect(
+          lines['again'],
+          inspectDigest,
+          reason: 'the digest is a pure function of the intent',
+        );
+        expect(
+          lines['other'],
+          isNot(inspectDigest),
+          reason: 'a different field value is a different intent',
+        );
+        expect(
+          deleteDigest,
+          isNot(inspectDigest),
+          reason: 'same fields, different intent name: never colliding',
+        );
+        expect(
+          lines['deleteOther'],
+          isNot(deleteDigest),
+          reason: 'the leaf own field participates in its digest',
+        );
 
-      // The wire form carries the inherited AND the leaf own fields.
-      expect(lines['inspectWire'], contains('inspect_product'));
-      expect(lines['inspectWire'], contains('productId: p-1'));
-      expect(lines['deleteWire'], contains('delete_product'));
-      expect(lines['deleteWire'], contains('reason: duplicate'));
-    });
+        // The wire form carries the inherited AND the leaf own fields.
+        expect(lines['inspectWire'], contains('inspect_product'));
+        expect(lines['inspectWire'], contains('productId: p-1'));
+        expect(lines['deleteWire'], contains('delete_product'));
+        expect(lines['deleteWire'], contains('reason: duplicate'));
+      },
+    );
 
     test('the emitted surface is code_builder only — no StringBuffer', () {
-      final source = File('lib/src/emitters/intent_emitter.dart')
-          .readAsStringSync();
+      final source = File(
+        'lib/src/emitters/intent_emitter.dart',
+      ).readAsStringSync();
       expect(
         source.contains('StringBuffer'),
         isFalse,

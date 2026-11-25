@@ -16,8 +16,13 @@
 /// may carry no directive other than `part of`. The Owning library is therefore
 /// responsible for importing the symbols the fragment names — at minimum
 /// [annotationImportUrl] — exactly the way `orchestrator.dart` folds
-/// `pluginImports` into the library it generates. Because the fragment is
-/// directive-free it composes into that library (and its `part` wrapper) as-is.
+/// `pluginImports` into the library it generates. Since #232 the fragment also
+/// NAMES the shared boundary helpers (`_boundaryAs`, `_boundaryDescribe`, …)
+/// from its `fromWire` decode bodies, so the Owning library must emit
+/// [BoundaryCodecEmitter.helperSpecs] (or the used subset) once per library —
+/// which `ArchetypeComposer` already does; a hand-rolled composition must do
+/// the same. Because the fragment is directive-free it composes into that
+/// library (and its `part` wrapper) as-is.
 ///
 /// Field types are emitted verbatim from the IR (`ZorphyFieldIr.type`), so a
 /// non-`dart:core` field type resolves against the Owning library's existing
