@@ -101,9 +101,7 @@ String _normalize(String source) {
         frames.removeLast();
       } else if (!frame.triple && c == frame.quote) {
         frames.removeLast();
-      } else if (c == r'$' &&
-          i + 1 < source.length &&
-          source[i + 1] == '{') {
+      } else if (c == r'$' && i + 1 < source.length && source[i + 1] == '{') {
         buffer.write('{');
         i++;
         frames.add(_NormalizeFrame.interpolation());
@@ -121,9 +119,8 @@ String _normalize(String source) {
     if (isQuote) {
       flushSpace();
       final raw = i > 0 && source[i - 1] == 'r';
-      final triple = i + 2 < source.length &&
-          source[i + 1] == c &&
-          source[i + 2] == c;
+      final triple =
+          i + 2 < source.length && source[i + 1] == c && source[i + 2] == c;
       buffer.write(c);
       if (triple) {
         buffer.write(c);
@@ -152,22 +149,22 @@ String _normalize(String source) {
 
 class _NormalizeFrame {
   _NormalizeFrame.code()
-      : quote = '',
-        triple = false,
-        raw = false,
-        escaped = false,
-        braceDepth = 0;
+    : quote = '',
+      triple = false,
+      raw = false,
+      escaped = false,
+      braceDepth = 0;
 
   _NormalizeFrame.interpolation()
-      : quote = '',
-        triple = false,
-        raw = false,
-        escaped = false,
-        braceDepth = 1;
+    : quote = '',
+      triple = false,
+      raw = false,
+      escaped = false,
+      braceDepth = 1;
 
   _NormalizeFrame.string(this.quote, this.triple, this.raw)
-      : escaped = false,
-        braceDepth = 0;
+    : escaped = false,
+      braceDepth = 0;
 
   final String quote;
   final bool triple;
@@ -352,20 +349,28 @@ void main() {
       );
     });
 
-    test('the root emission matches the runtime fixture (whitespace-insensitive)', () {
-      final emitted = PolymorphicPatchEmitter().emitRoot(
-        rootName: 'Notification',
-        fields: rootFields(),
-        subtypeNames: subtypes(),
-      );
-      expect(
-        _normalize(emitted),
-        _normalize(_fixtureRegion('// GOLDEN-POLY-ROOT-START', '// GOLDEN-POLY-ROOT-END')),
-        reason:
-            'the runtime suite must exercise the real emitted root patch — '
-            'regenerate $_fixturePath if the emission changed on purpose',
-      );
-    });
+    test(
+      'the root emission matches the runtime fixture (whitespace-insensitive)',
+      () {
+        final emitted = PolymorphicPatchEmitter().emitRoot(
+          rootName: 'Notification',
+          fields: rootFields(),
+          subtypeNames: subtypes(),
+        );
+        expect(
+          _normalize(emitted),
+          _normalize(
+            _fixtureRegion(
+              '// GOLDEN-POLY-ROOT-START',
+              '// GOLDEN-POLY-ROOT-END',
+            ),
+          ),
+          reason:
+              'the runtime suite must exercise the real emitted root patch — '
+              'regenerate $_fixturePath if the emission changed on purpose',
+        );
+      },
+    );
   });
 
   group('ISSUE-009 PolymorphicPatchEmitter — subtype narrowing', () {
@@ -448,10 +453,12 @@ void main() {
       );
       expect(
         _normalize(emitted),
-        _normalize(_fixtureRegion(
-          '// GOLDEN-POLY-ORDER-START',
-          '// GOLDEN-POLY-ORDER-END',
-        )),
+        _normalize(
+          _fixtureRegion(
+            '// GOLDEN-POLY-ORDER-START',
+            '// GOLDEN-POLY-ORDER-END',
+          ),
+        ),
         reason: 'regenerate $_fixturePath if the emission changed on purpose',
       );
     });
@@ -465,10 +472,12 @@ void main() {
       );
       expect(
         _normalize(emitted),
-        _normalize(_fixtureRegion(
-          '// GOLDEN-POLY-PRICE-START',
-          '// GOLDEN-POLY-PRICE-END',
-        )),
+        _normalize(
+          _fixtureRegion(
+            '// GOLDEN-POLY-PRICE-START',
+            '// GOLDEN-POLY-PRICE-END',
+          ),
+        ),
         reason: 'regenerate $_fixturePath if the emission changed on purpose',
       );
     });
@@ -797,12 +806,15 @@ void main() {
         "expected: 'String (one of: shared, OrderNotification, "
         "PriceDropNotification)',";
 
-    test('a line-wrap-only difference is byte-unequal but normalized-equal', () {
-      // RED condition (the bug): a byte-for-byte compare rejects the drift.
-      expect(wrapped, isNot(unwrapped));
-      // GREEN condition (the fix): normalization treats them as identical.
-      expect(_normalize(wrapped), _normalize(unwrapped));
-    });
+    test(
+      'a line-wrap-only difference is byte-unequal but normalized-equal',
+      () {
+        // RED condition (the bug): a byte-for-byte compare rejects the drift.
+        expect(wrapped, isNot(unwrapped));
+        // GREEN condition (the fix): normalization treats them as identical.
+        expect(_normalize(wrapped), _normalize(unwrapped));
+      },
+    );
 
     test('a real token change stays unequal after normalization', () {
       final changed = unwrapped.replaceFirst('shared', 'sharedX');
@@ -814,7 +826,8 @@ void main() {
       // of these to the same text, letting a changed diagnostic (a doubled
       // space inside the literal) pass the golden. Formatting whitespace is
       // normalized; string-literal content is compared exactly.
-      const oneSpace = "expected: 'String (one of: shared, OrderNotification)',";
+      const oneSpace =
+          "expected: 'String (one of: shared, OrderNotification)',";
       const twoSpaces =
           "expected: 'String (one of: shared,  OrderNotification)',";
       expect(oneSpace, isNot(twoSpaces));

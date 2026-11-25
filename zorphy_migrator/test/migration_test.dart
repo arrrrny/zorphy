@@ -129,42 +129,36 @@ void main() {
       });
     }
 
-    test(
-      'exchangeable_object_ctor_initializers is report-only (untouched, manual item recorded)',
-      () async {
-        final dir = p.join(
-          fixturesDir,
-          'exchangeable_object_ctor_initializers',
-        );
-        final inputFile = File(p.join(dir, 'input.dart'));
-        final source = inputFile.readAsStringSync();
+    test('exchangeable_object_ctor_initializers is report-only (untouched, manual item recorded)', () async {
+      final dir = p.join(fixturesDir, 'exchangeable_object_ctor_initializers');
+      final inputFile = File(p.join(dir, 'input.dart'));
+      final source = inputFile.readAsStringSync();
 
-        final models = await ExchangeableDetector().detect([
-          inputFile.absolute.path,
-        ]);
-        expect(models, isNotEmpty, reason: 'no class detected');
+      final models = await ExchangeableDetector().detect([
+        inputFile.absolute.path,
+      ]);
+      expect(models, isNotEmpty, reason: 'no class detected');
 
-        final renderer = ZorphyRenderer(
-          siblingClassNames: models.map((m) => m.name).toSet(),
-        );
-        final rewriter = Rewriter();
-        final revised = rewriter.applySpans(
-          source,
-          replacementsFor(models, renderer.render),
-        );
+      final renderer = ZorphyRenderer(
+        siblingClassNames: models.map((m) => m.name).toSet(),
+      );
+      final rewriter = Rewriter();
+      final revised = rewriter.applySpans(
+        source,
+        replacementsFor(models, renderer.render),
+      );
 
-        // File content unchanged — nothing migratable was rewritten.
-        expect(revised, source);
-        // Every detected class carries at least one manual item.
-        for (final m in models) {
-          expect(
-            m.manualItems,
-            isNotEmpty,
-            reason: '${m.name} should produce a manual item',
-          );
-        }
-      },
-    );
+      // File content unchanged — nothing migratable was rewritten.
+      expect(revised, source);
+      // Every detected class carries at least one manual item.
+      for (final m in models) {
+        expect(
+          m.manualItems,
+          isNotEmpty,
+          reason: '${m.name} should produce a manual item',
+        );
+      }
+    });
 
     // Focused assertions for static-factory fixtures: manualItems must be
     // empty and informationalItems must record the preserved-factory reason.
@@ -172,43 +166,40 @@ void main() {
       'exchangeable_object_static_factory',
       'exchangeable_object_static_factory_doc',
     ]) {
-      test(
-        '$name has no manual items and records preserved-factory info',
-        () async {
-          final dir = p.join(fixturesDir, name);
-          final inputFile = p.join(dir, 'input.dart');
+      test('$name has no manual items and records preserved-factory info', () async {
+        final dir = p.join(fixturesDir, name);
+        final inputFile = p.join(dir, 'input.dart');
 
-          final models = await ExchangeableDetector().detect([
-            File(inputFile).absolute.path,
-          ]);
+        final models = await ExchangeableDetector().detect([
+          File(inputFile).absolute.path,
+        ]);
+        expect(
+          models.where((m) => m.isMigratable),
+          isNotEmpty,
+          reason: 'no migratable model detected in $name',
+        );
+
+        for (final m in models) {
           expect(
-            models.where((m) => m.isMigratable),
-            isNotEmpty,
-            reason: 'no migratable model detected in $name',
+            m.manualItems,
+            isEmpty,
+            reason: '${m.name} must have no manual items',
           );
-
-          for (final m in models) {
-            expect(
-              m.manualItems,
-              isEmpty,
-              reason: '${m.name} must have no manual items',
-            );
-            expect(
-              m.informationalItems,
-              isNotEmpty,
-              reason: '${m.name} must record a preserved-factory info item',
-            );
-            expect(
-              m.informationalItems.every(
-                (item) => item.reason.contains('preserved verbatim'),
-              ),
-              isTrue,
-              reason:
-                  '${m.name} informational items should mention preserved factory',
-            );
-          }
-        },
-      );
+          expect(
+            m.informationalItems,
+            isNotEmpty,
+            reason: '${m.name} must record a preserved-factory info item',
+          );
+          expect(
+            m.informationalItems.every(
+              (item) => item.reason.contains('preserved verbatim'),
+            ),
+            isTrue,
+            reason:
+                '${m.name} informational items should mention preserved factory',
+          );
+        }
+      });
     }
 
     test(
@@ -305,12 +296,10 @@ void main() {
       return inputFile.absolute.path;
     }
 
-    test(
-      'assert-only bodies convert with a note; non-assert and mixed stay manual',
-      () async {
-        final scratch = Directory.systemTemp.createTempSync('zorphy_assert_99');
-        try {
-          final path = stageInline(scratch, r'''
+    test('assert-only bodies convert with a note; non-assert and mixed stay manual', () async {
+      final scratch = Directory.systemTemp.createTempSync('zorphy_assert_99');
+      try {
+        final path = stageInline(scratch, r'''
 @ExchangeableObject()
 class MultiAssert_ {
   ///The left edge.
@@ -375,83 +364,78 @@ class EmptyBody_ {
   EmptyBody_({required this.templateImage, required this.extensionIdentifier});
 }
 ''');
-          final models = await ExchangeableDetector().detect([path]);
+        final models = await ExchangeableDetector().detect([path]);
 
-          // (1) Assert-only body (multiple asserts) -> converts, and an
-          //     informational note records the dropped asserts. Fields are
-          //     collected from the constructor parameters.
-          final multiAssert = models.singleWhere(
-            (m) => m.name == 'MultiAssert',
-          );
-          expect(
-            multiAssert.isMigratable,
-            isTrue,
-            reason: 'an assert-only body must not block conversion',
-          );
-          expect(multiAssert.manualItems, isEmpty);
-          expect(multiAssert.informationalItems, hasLength(1));
-          expect(
-            multiAssert.informationalItems.single.reason,
-            contains('assert-only constructor body dropped'),
-          );
-          expect(multiAssert.fields.map((f) => f.name).toList(), [
-            'left',
-            'top',
-            'width',
-            'height',
-          ]);
+        // (1) Assert-only body (multiple asserts) -> converts, and an
+        //     informational note records the dropped asserts. Fields are
+        //     collected from the constructor parameters.
+        final multiAssert = models.singleWhere((m) => m.name == 'MultiAssert');
+        expect(
+          multiAssert.isMigratable,
+          isTrue,
+          reason: 'an assert-only body must not block conversion',
+        );
+        expect(multiAssert.manualItems, isEmpty);
+        expect(multiAssert.informationalItems, hasLength(1));
+        expect(
+          multiAssert.informationalItems.single.reason,
+          contains('assert-only constructor body dropped'),
+        );
+        expect(multiAssert.fields.map((f) => f.name).toList(), [
+          'left',
+          'top',
+          'width',
+          'height',
+        ]);
 
-          // (2) Non-assert body (default-computation statement) -> stays
-          //     manual; the custom-ctor manual item is recorded.
-          final defaultComputation = models.singleWhere(
-            (m) => m.name == 'DefaultComputation',
-          );
-          expect(
-            defaultComputation.isMigratable,
-            isFalse,
-            reason: 'a non-assert body statement must stay manual',
-          );
-          expect(
-            defaultComputation.manualItems.any(
-              (mi) =>
-                  mi.reason.contains('custom @ExchangeableObjectConstructor'),
-            ),
-            isTrue,
-          );
-          expect(defaultComputation.informationalItems, isEmpty);
+        // (2) Non-assert body (default-computation statement) -> stays
+        //     manual; the custom-ctor manual item is recorded.
+        final defaultComputation = models.singleWhere(
+          (m) => m.name == 'DefaultComputation',
+        );
+        expect(
+          defaultComputation.isMigratable,
+          isFalse,
+          reason: 'a non-assert body statement must stay manual',
+        );
+        expect(
+          defaultComputation.manualItems.any(
+            (mi) => mi.reason.contains('custom @ExchangeableObjectConstructor'),
+          ),
+          isTrue,
+        );
+        expect(defaultComputation.informationalItems, isEmpty);
 
-          // (3) Mixed assert + non-assert statements -> stays manual (not all
-          //     statements are asserts).
-          final mixed = models.singleWhere((m) => m.name == 'MixedBody');
-          expect(
-            mixed.isMigratable,
-            isFalse,
-            reason: 'a body with any non-assert statement must stay manual',
-          );
-          expect(
-            mixed.manualItems.any(
-              (mi) =>
-                  mi.reason.contains('custom @ExchangeableObjectConstructor'),
-            ),
-            isTrue,
-          );
+        // (3) Mixed assert + non-assert statements -> stays manual (not all
+        //     statements are asserts).
+        final mixed = models.singleWhere((m) => m.name == 'MixedBody');
+        expect(
+          mixed.isMigratable,
+          isFalse,
+          reason: 'a body with any non-assert statement must stay manual',
+        );
+        expect(
+          mixed.manualItems.any(
+            (mi) => mi.reason.contains('custom @ExchangeableObjectConstructor'),
+          ),
+          isTrue,
+        );
 
-          // (4) Empty body with @ExchangeableObjectConstructor -> converts
-          //     with NO informational note (#94 regression guard: an empty
-          //     body is not assert-only and must not emit a note).
-          final empty = models.singleWhere((m) => m.name == 'EmptyBody');
-          expect(empty.isMigratable, isTrue);
-          expect(empty.manualItems, isEmpty);
-          expect(
-            empty.informationalItems,
-            isEmpty,
-            reason: 'empty body must not emit an assert-only note (#94 guard)',
-          );
-        } finally {
-          scratch.deleteSync(recursive: true);
-        }
-      },
-    );
+        // (4) Empty body with @ExchangeableObjectConstructor -> converts
+        //     with NO informational note (#94 regression guard: an empty
+        //     body is not assert-only and must not emit a note).
+        final empty = models.singleWhere((m) => m.name == 'EmptyBody');
+        expect(empty.isMigratable, isTrue);
+        expect(empty.manualItems, isEmpty);
+        expect(
+          empty.informationalItems,
+          isEmpty,
+          reason: 'empty body must not emit an assert-only note (#94 guard)',
+        );
+      } finally {
+        scratch.deleteSync(recursive: true);
+      }
+    });
   });
 
   group('CLI', () {
@@ -570,9 +554,8 @@ class EmptyBody_ {
 
       expect(code, MigratorCli.exitManualItems);
       // Unmigratable file stays untouched.
-      final expected = File(
-        p.join(fixturesDir, 'unfreezed', 'expected.dart'),
-      ).readAsStringSync();
+      final expected = File(p.join(fixturesDir, 'unfreezed', 'expected.dart'))
+          .readAsStringSync();
       expect(
         File(p.join(dir, 'input.dart')).readAsStringSync().trimRight(),
         expected.trimRight(),
@@ -602,9 +585,8 @@ class EmptyBody_ {
     test('dry-run on directory recurses and skips generated files', () async {
       final dir = stageFixture('simple_class');
       // Plant a generated file that must be ignored.
-      File(
-        p.join(dir, 'ignored.freezed.dart'),
-      ).writeAsStringSync('// generated\n');
+      File(p.join(dir, 'ignored.freezed.dart'))
+          .writeAsStringSync('// generated\n');
       File(p.join(dir, 'ignored.g.dart')).writeAsStringSync('// generated\n');
 
       final code = await MigratorCli().run(['migrate', dir]);
