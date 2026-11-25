@@ -109,10 +109,10 @@
 - Removed the deprecated `zorphy2Builder` (`lib/builder2.dart`). `builder2`
   had been a no-op alias since 2.0; `zorphy2Builder` now fails loudly instead
   of resolving to nothing.
-- `zorphy_annotation` moves to 3.0.0 in lockstep (`check_version_sync.sh`); its
-  API is unchanged.
-- `zorphy_migrator` moves to 3.0.0 and gains `zorphy_migrator lean <path>`
-  (see its CHANGELOG).
+- `zorphy_annotation` moves to 3.0.0 in lockstep (`check_version_sync.sh`);
+  its legacy annotation surface is removed in this major (see Changed above).
+- `zorphy_migrator` moves to 3.0.0; its `lean` subcommand is removed and
+  `migrate` now emits the v3 archetypes (see its CHANGELOG).
 
 ### Fix
 

@@ -11,27 +11,12 @@
 
 ### Change
 
-- New `lean` subcommand: `zorphy_migrator lean <path> [--dry-run|--apply]
-  [--report <file>]`. It scans a package and rewrites each `@Zorphy`
-  annotation to the smallest flavor that still covers what the project
-  consumes, so generated code shrinks without losing behaviour. See
-  `zorphy_migrator/README.md`.
-- Evidence is class-attributed and syntactic (no resolution), so a package the
-  size of `zik_zak` scans in ~15s: `FooPatch` / `FooFields` / `copyWithFooFn`
-  name their class and prove their feature unused when absent;
-  `toJson`/`copyWithFn` are instance calls and only drop for a class nothing
-  else references; a live class keeps the preset its author chose.
-- Every non-feature named argument (`autoId`, `kind`, …) is carried over
-  verbatim, and shared parts under `lib/_br_/` are excluded from the scan so
-  generated code cannot make every class look used.
-- A package-root target now also scans `test/` and `integration_test/`, since a
-  feature used only by tests still has to be generated.
-- A file that fails to parse is reported and skipped instead of aborting the
-  whole scan.
-- Version aligned with the `zorphy` 3.0.0 major; the migrator's own `migrate`
-  subcommand is otherwise unchanged — its file collection now also covers
-  `test/`/`integration_test/` for a package-root target and skips generated
-  shared parts.
+- Version aligned with the `zorphy` 3.0.0 major. The `migrate` subcommand's
+  output changed with this major (see Changed above): it now emits the
+  zero-preset v3 archetypes instead of `@Zorphy(preset: …)`.
+- A package-root target also scans `test/` and `integration_test/`, since a
+  feature used only by tests still has to be generated, and skips generated
+  shared parts under `lib/_br_/` so generated code cannot skew the scan.
 
 ## [0.2.4] - 2026-09-18
 

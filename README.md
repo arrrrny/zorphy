@@ -1392,7 +1392,9 @@ Zorphy 3.0.0 is a breaking major that drops every legacy preset and
 `generate*` toggle and unifies all five zero-preset archetypes
 (`@ZorphyEntity`, `@ZorphyValue`, `@ZorphyUnion`, `@ZorphyState`,
 `@ZorphyIntent`). Migrate with the bundled codemod — never hand-edit v2
-annotations:
+annotations. Before running the codemod, bump `zorphy` and
+`zorphy_annotation` to `^3.0.0` (they move in lockstep), then run
+`dart pub get`. The `migrate_v3` executable ships with 3.0, not with 2.x.
 
 ```bash
 dart run zorphy:migrate_v3 <path>          # dry-run preview
@@ -1402,11 +1404,10 @@ dart run zorphy:migrate_v3 <path> --apply  # rewrite in place
 It strips every `preset:` / `generate*` argument and emits the zero-preset v3
 archetypes plus the `fromWire` / `toWire` codecs. After migrating:
 
-1. Bump `zorphy` and `zorphy_annotation` to `^3.0.0` (they move in lockstep).
-2. Delete the 2.x `<file>.zorphy.dart` files and any hand-written
+1. Delete the 2.x `<file>.zorphy.dart` files and any hand-written
    `part '*.zorphy.dart';` line — 3.0 emits one shared `<library>.part.dart`
    under `lib/_br_/` and `build_runner` inserts the `part` directive itself.
-3. Run `dart run build_runner build` to regenerate the shared parts.
+2. Run `dart run build_runner build` to regenerate the shared parts.
 
 The v3 wire codecs (`fromWire` / `toWire`) replace the legacy
 `fromJson` / `toJson`; generated output no longer emits JSON codecs.
