@@ -1,4 +1,4 @@
-## [Unreleased]
+## [3.0.0] - 2026-11-25
 
 ### Changed (BREAKING — v3.0.0)
 
@@ -8,8 +8,6 @@
   (`@ZorphyEntity(principalKey: #id)` / `@ZorphyValue()` / `@ZorphyUnion()`)
   instead of `@Zorphy(preset: …)`, and the smoke corpus validates migration
   into the v3 surface rather than back into the legacy one.
-
-## [3.0.0] - 2026-11-17
 
 ### Change
 

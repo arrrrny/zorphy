@@ -1,4 +1,4 @@
-## [Unreleased]
+## [3.0.0] - 2026-11-25
 
 ### Changed (BREAKING — v3.0.0)
 
@@ -92,8 +92,6 @@
 - `PatchBase` gained a const `PatchBase.empty()` constructor so a generated
   patch can expose `const <Name>Patch.empty()` alongside its mutable default
   constructor (#182).
-
-## [3.0.0] - 2026-11-17
 
 ### Change
 

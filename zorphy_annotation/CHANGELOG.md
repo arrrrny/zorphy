@@ -1,4 +1,4 @@
-## [Unreleased]
+## [3.0.0] - 2026-11-25
 
 ### Changed (BREAKING — v3.0.0)
 
@@ -105,8 +105,6 @@
   and reads its annotations from this library URI, and `zorphy_migrator` emits
   `@Zorphy(...)` text. It is removed once the generator is ported onto the
   archetypes (#177, #178, #181, #187).
-
-## [3.0.0] - 2026-11-17
 
 ### Change
 
