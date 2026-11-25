@@ -31,6 +31,7 @@ import 'package:code_builder/code_builder.dart';
 
 import '../ast/type_ref.dart';
 import '../parser/polymorphic_ir.dart';
+import 'emission_name_helpers.dart';
 
 /// Emits the v3 `<Name>Lenses` accessor classes and their registry fields.
 final class LensEmitter {
@@ -99,7 +100,9 @@ final class LensEmitter {
         fields.add(
           _LensField(
             name: field.name,
-            type: _concrete(field.isNullable ? '${field.type}?' : field.type),
+            type: concreteTypeName(
+              field.isNullable ? '${field.type}?' : field.type,
+            ),
           ),
         );
       }
@@ -210,18 +213,13 @@ final class LensEmitter {
   /// A static helper name (`_get<X>` / `_set<X>`) no member already uses,
   /// registered in [used] as it is allocated.
   String _uniqueHelperName(String prefix, String fieldName, Set<String> used) {
-    var candidate = '_$prefix${_pascal(fieldName)}';
+    var candidate = '_$prefix${pascalCase(fieldName)}';
     while (used.contains(candidate)) {
       candidate = '_$candidate';
     }
     used.add(candidate);
     return candidate;
   }
-
-  String _pascal(String name) =>
-      name.isEmpty ? name : name[0].toUpperCase() + name.substring(1);
-
-  static String _concrete(String type) => type.replaceAll(r'$', '');
 }
 
 /// One writable field, as the lens surface needs it.

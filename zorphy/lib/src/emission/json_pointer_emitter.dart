@@ -31,6 +31,7 @@ import 'package:code_builder/code_builder.dart';
 
 import '../ast/type_ref.dart';
 import '../parser/polymorphic_ir.dart';
+import 'emission_name_helpers.dart';
 
 /// Emits the v3 `resolvePath` static method for every non-generic node.
 final class JsonPointerEmitter {
@@ -72,6 +73,12 @@ final class JsonPointerEmitter {
 
   // ── Table assembly ────────────────────────────────────────────────
 
+  /// Builds the resolver for [node].
+  ///
+  /// Nested delegation is derived only from [visible] fields. A composed field
+  /// carried solely by a strict subtype is not a legal nested head here, so a
+  /// pointer descending through one answers `null` — consistent with the
+  /// safe-null contract and the issue's scope, but explicit for future callers.
   Method _buildResolvePath(ZorphyNodeIr node) {
     final className = node.cleanName;
     final visible = _visibleFields(node);
@@ -129,7 +136,11 @@ final class JsonPointerEmitter {
           'return ZorphyLens<$className, $target>('
           "path: '/${field.name}', "
           'get: (root) => root.${field.name}, '
-          'set: (root, value) => ${_rebuild(className, field.name, target, 'value')}, '
+          // Cast for parity with the visible arm below: the lens generic
+          // carries `$target` today, but an explicit cast keeps this arm safe
+          // if the nested lens type is ever widened to `Object?`.
+          'set: (root, value) => '
+          '${_rebuild(className, field.name, target, 'value as $target')}, '
           ').then(nested);',
         );
         lines.add('}');
@@ -223,10 +234,17 @@ final class JsonPointerEmitter {
     return '(root, value) => switch (root) { ${arms.join(' ')}$fallback }';
   }
 
-  /// Whether [field]'s subtype cases name every concrete leaf below [className],
-  /// which makes a `switch (root)` over those cases exhaustive.
-  bool _coversEveryLeaf(String className, _Field field) =>
-      field.subtypes.length == _concreteLeavesBelow(className).length;
+  /// Whether [field]'s subtype cases name EVERY concrete leaf below
+  /// [className], which makes a `switch (root)` over those cases exhaustive.
+  ///
+  /// Counts alone are not enough: a subset with a coincidental length match
+  /// would silently drop the `_ => null` / `_ => root` fallback and emit a
+  /// non-exhaustive switch, so compare against the actual leaf names.
+  bool _coversEveryLeaf(String className, _Field field) {
+    final leaves = _concreteLeavesBelow(className);
+    return leaves.isNotEmpty &&
+        leaves.every((leaf) => field.subtypes.containsKey(leaf.cleanName));
+  }
 
   // ── Field classification ──────────────────────────────────────────
 
@@ -240,7 +258,9 @@ final class JsonPointerEmitter {
           field.name,
           () => _Field(
             name: field.name,
-            type: _concrete(field.isNullable ? '${field.type}?' : field.type),
+            type: concreteTypeName(
+              field.isNullable ? '${field.type}?' : field.type,
+            ),
           ),
         );
       }
@@ -301,18 +321,22 @@ final class JsonPointerEmitter {
     // Only a BARE class reference is a nested target: a `List<T>` / `Map<K, V>`
     // is a collection the pointer does not descend into.
     if (base.contains('<') || base.contains(',')) return null;
-    base = _concrete(base);
+    base = concreteTypeName(base);
     return _resolverNames.contains(base) ? base : null;
   }
 
+  /// First node in [ir] whose `cleanName` matches, or `null`.
+  ///
+  /// This assumes a single-library graph where `cleanName` is unique. A
+  /// multi-library `PolymorphicIr` with two libraries sharing a name would
+  /// silently pick the first — the same first-match caveat `nodeFor`/`rootFor`
+  /// document.
   ZorphyNodeIr? _nodeByName(String cleanName) {
     for (final node in ir.nodes.values) {
       if (node.cleanName == cleanName) return node;
     }
     return null;
   }
-
-  static String _concrete(String type) => type.replaceAll(r'$', '');
 }
 
 /// One pointer segment: its name, its declared type on the emitting node, and —

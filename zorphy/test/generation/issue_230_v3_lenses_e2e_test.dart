@@ -245,6 +245,18 @@ void main() {
       'nested unknown leaf null');
 
   // ── #193 latency guard: O(depth) resolution stays cheap under AOT ────────
+  // Baseline the same 200k reads through the direct lens getter IN THIS
+  // PROCESS, so the guard is a ratio rather than a wall clock: a busy or
+  // GC-paused shared host slows both loops together and cannot red a correct
+  // O(depth) resolver.
+  final baseline = Stopwatch()..start();
+  var baselineSink = 0;
+  for (var i = 0; i < 200000; i++) {
+    baselineSink += Product.lenses.name.get(product).length;
+  }
+  baseline.stop();
+  _check(baselineSink > 0, 'baseline loop ran');
+
   final swatch = Stopwatch()..start();
   var sink = 0;
   for (var i = 0; i < 200000; i++) {
@@ -252,12 +264,19 @@ void main() {
   }
   swatch.stop();
   _check(sink > 0, 'latency loop ran');
+
+  // resolvePath runs a switch step per segment, so it may cost somewhat more
+  // than a direct lens read — but a regex/mirror regression is orders of
+  // magnitude worse. The additive constant absorbs a near-zero baseline.
+  final baselineMs = baseline.elapsedMilliseconds;
+  final resolveMs = swatch.elapsedMilliseconds;
   _check(
-      swatch.elapsedMilliseconds < 2000,
-      'resolvePath latency budget exceeded: '
-      '${swatch.elapsedMilliseconds}ms for 200k lookups');
+      resolveMs < (baselineMs + 1) * 100 + 200,
+      'resolvePath latency regression: '
+      '${resolveMs}ms for 200k lookups vs ${baselineMs}ms baseline');
 
   stdout.writeln('ALL CHECKS PASSED '
-      '(200k resolvePath lookups in ${swatch.elapsedMilliseconds}ms)');
+      '(200k resolvePath lookups in ${resolveMs}ms, '
+      'direct-lens baseline ${baselineMs}ms)');
 }
 ''';
