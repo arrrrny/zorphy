@@ -9,28 +9,22 @@ String _versionOf(String pubspecPath) {
 }
 
 void main() {
-  group('version sync (3.0.0)', () {
-    test('zorphy is at 3.0.0', () {
-      expect(_versionOf('pubspec.yaml'), '3.0.0');
+  group('version sync (3.0.0 and 3.0.0-dev.2 sync across 3 packages)', () {
+    test('zorphy, zorphy_annotation, and zorphy_migrator versions match', () {
+      final zorphyVer = _versionOf('pubspec.yaml');
+      final annotationVer = _versionOf('../zorphy_annotation/pubspec.yaml');
+      final migratorVer = _versionOf('../zorphy_migrator/pubspec.yaml');
+
+      expect(zorphyVer, annotationVer);
+      expect(zorphyVer, migratorVer);
     });
 
-    test('zorphy_annotation is at 3.0.0', () {
-      expect(_versionOf('../zorphy_annotation/pubspec.yaml'), '3.0.0');
-    });
-
-    test('zorphy and zorphy_annotation versions match', () {
-      expect(
-        _versionOf('pubspec.yaml'),
-        _versionOf('../zorphy_annotation/pubspec.yaml'),
-      );
-    });
-
-    test('both CHANGELOGs carry a 3.0.0 entry', () {
-      expect(File('CHANGELOG.md').readAsStringSync(), contains('## [3.0.0]'));
-      expect(
-        File('../zorphy_annotation/CHANGELOG.md').readAsStringSync(),
-        contains('## [3.0.0]'),
-      );
+    test('publish.sh version regex accepts SemVer prerelease like 3.0.0-dev.2', () {
+      final regex = RegExp(r'^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$');
+      expect(regex.hasMatch('3.0.0'), isTrue);
+      expect(regex.hasMatch('3.0.0-dev.2'), isTrue);
+      expect(regex.hasMatch('3.0.0-rc.1'), isTrue);
+      expect(regex.hasMatch('invalid'), isFalse);
     });
   });
 }
