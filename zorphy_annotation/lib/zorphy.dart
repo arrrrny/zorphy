@@ -21,6 +21,7 @@ export 'src/patch_wire.dart';
 export 'src/lens.dart';
 
 export 'src/patch_base.dart';
+export 'src/zorphy_entity_descriptor.dart';
 export 'src/query/field.dart';
 export 'src/query/filter.dart';
 export 'src/query/sort.dart';
