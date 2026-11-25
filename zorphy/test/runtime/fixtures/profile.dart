@@ -92,9 +92,19 @@ class AddressPatch extends PatchBase<Address, Address$> {
   AddressPatch compose(covariant AddressPatch next) {
     if (next.isEmpty) return this;
     if (isEmpty) return next;
-    return AddressPatch()
+    final composed = AddressPatch()
       ..patchMap.addAll(patchMap)
       ..patchMap.addAll(next.patchMap);
+    return composed;
+  }
+
+  @override
+  String wireNameFor(Address$ key) {
+    return switch (key) {
+      Address$.street => 'street',
+      Address$.city => 'city',
+      Address$.postalCode => 'postalCode',
+    };
   }
 
   AddressPatch invert(Address before) {
@@ -407,9 +417,35 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
   ProfilePatch compose(covariant ProfilePatch next) {
     if (next.isEmpty) return this;
     if (isEmpty) return next;
-    return ProfilePatch()
+    final composed = ProfilePatch()
       ..patchMap.addAll(patchMap)
       ..patchMap.addAll(next.patchMap);
+    final addressCarried = patchMap[Profile$.address];
+    final addressNext = next.patchMap[Profile$.address];
+    if (addressCarried is PatchNested<Address, AddressPatch> &&
+        addressNext is PatchNested<Address, AddressPatch>)
+      composed.patchMap[Profile$.address] = addressCarried.composeNested(
+        addressNext,
+      );
+    final previousAddressCarried = patchMap[Profile$.previousAddress];
+    final previousAddressNext = next.patchMap[Profile$.previousAddress];
+    if (previousAddressCarried is PatchNested<Address, AddressPatch> &&
+        previousAddressNext is PatchNested<Address, AddressPatch>)
+      composed.patchMap[Profile$.previousAddress] = previousAddressCarried
+          .composeNested(previousAddressNext);
+    return composed;
+  }
+
+  @override
+  String wireNameFor(Profile$ key) {
+    return switch (key) {
+      Profile$.id => 'id',
+      Profile$.displayName => 'displayName',
+      Profile$.address => 'address',
+      Profile$.tags => 'tags',
+      Profile$.scores => 'scores',
+      Profile$.previousAddress => 'previousAddress',
+    };
   }
 
   ProfilePatch invert(Profile before) {
@@ -429,13 +465,7 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
     if (patchMap.containsKey(Profile$.address) &&
         addressCarried is! PatchNested)
       undo.patchMap[Profile$.address] = before.address;
-    if (patchMap[Profile$.tags] is ListPatchDelta<String>)
-      undo.patchMap[Profile$.tags] =
-          (patchMap[Profile$.tags] as ListPatchDelta<String>).invert(
-            before.tags,
-          );
-    if (patchMap.containsKey(Profile$.tags) &&
-        patchMap[Profile$.tags] is! ListPatchDelta<String>)
+    if (patchMap.containsKey(Profile$.tags))
       undo.patchMap[Profile$.tags] = before.tags;
     if (patchMap[Profile$.scores] is MapPatchDelta<String, int>)
       undo.patchMap[Profile$.scores] =
@@ -471,8 +501,8 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
       changes.patchMap[Profile$.address] = PatchNested<Address, AddressPatch>(
         addressDelta,
       );
-    final tagsDelta = ListPatchDelta.diff<String>(previous.tags, next.tags);
-    if (tagsDelta.isNotEmpty) changes.patchMap[Profile$.tags] = tagsDelta;
+    if (!const ListEquality<Object?>().equals(previous.tags, next.tags))
+      changes.patchMap[Profile$.tags] = next.tags;
     final scoresDelta = MapPatchDelta.diff<String, int>(
       previous.scores,
       next.scores,
@@ -504,9 +534,7 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
           ? (patchMap[Profile$.address] as PatchNested).toWire()
           : PatchWireReplacement(patchMap[Profile$.address]);
     if (patchMap.containsKey(Profile$.tags))
-      wire['tags'] = patchMap[Profile$.tags] is ListPatchDelta<String>
-          ? (patchMap[Profile$.tags] as ListPatchDelta<String>).toWire()
-          : patchMap[Profile$.tags];
+      wire['tags'] = patchMap[Profile$.tags];
     if (patchMap.containsKey(Profile$.scores))
       wire['scores'] = patchMap[Profile$.scores] is MapPatchDelta<String, int>
           ? (patchMap[Profile$.scores] as MapPatchDelta<String, int>)
@@ -641,7 +669,7 @@ class ProfilePatch extends PatchBase<Profile, Profile$> {
             ),
           );
         } else {
-          final decoded = ZorphyPatchWire.listDelta<String>(
+          final decoded = ZorphyPatchWire.listValue<String>(
             tagsRaw,
             '$prefix/tags',
             violations,

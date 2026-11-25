@@ -216,6 +216,17 @@ final class PatchNested<Sub, SubPatch extends ZorphyPatch<Sub>>
     next is PatchNested<Sub, ZorphyPatch<Sub>> ? next.patch : next,
   );
 
+  /// Composes another carry of the same nested field, keeping THIS wrapper's
+  /// static type parameters.
+  ///
+  /// A generated patch's `compose` narrows its result to the concrete nested
+  /// patch, so the cast is safe for generated carries; preserving the type
+  /// matters because generated `invert` narrows the carry back to
+  /// `PatchNested<Sub, SubPatch>`.
+  PatchNested<Sub, SubPatch> composeNested(
+    covariant PatchNested<Sub, SubPatch> next,
+  ) => PatchNested<Sub, SubPatch>(patch.compose(next.patch) as SubPatch);
+
   @override
   ZorphyPatch<Sub> invert(Sub before) => patch.invert(before);
 
