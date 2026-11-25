@@ -155,6 +155,92 @@ User decode(Map a, Map b) {
     });
   });
 
+  group('v3 codemod — cross-file inheritance (whole-tree archetype map)', () {
+    test('inherited id crosses the file boundary via known archetypes', () {
+      // The CLI's first pass builds a whole-tree map: `$Entity` declares `id`
+      // (entity), `$Order` inherits it across files. Both annotations must
+      // become entities — the child must NOT be misclassified as a value.
+      final baseTypes = V3Codemod.zorphyTypesIn(
+        fixture('cross_file_base.dart'),
+      );
+      final childTypes = V3Codemod.zorphyTypesIn(
+        fixture('cross_file_child.dart'),
+      );
+      final known = <String>{...baseTypes, ...childTypes};
+      final entityRoots = V3Codemod.entityRootsIn(
+        fixture('cross_file_base.dart'),
+      );
+      final codemod = V3Codemod(
+        knownTypes: known,
+        knownEntityRoots: entityRoots,
+      );
+
+      final out = codemod.transform(fixture('cross_file_child.dart'));
+      expect(out, contains('@ZorphyEntity(principalKey: #id)'));
+      // The child annotation must be an entity, not a value — check the
+      // annotation line, since the fixture's comment mentions `@ZorphyValue()`.
+      final annotationLine = out
+          .split('\n')
+          .firstWhere((line) => line.startsWith('@Zorphy'));
+      expect(annotationLine, contains('@ZorphyEntity(principalKey: #id)'));
+      expect(annotationLine, isNot(contains('@ZorphyValue()')));
+      expect(out, isNot(contains('@Zorphy(')));
+    });
+  });
+
+  group('v3 codemod — type-correct fromWire rewrites', () {
+    test('a returned fromJson call gets .getOrThrow() to keep its type', () {
+      const source = '''
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+
+Product decode(Map<String, Object?> map) => Product.fromJson(map);
+''';
+      final out = codemod.transform(source);
+      expect(out, contains('Product.fromWire(map).getOrThrow()'));
+      expect(out, isNot(contains('Product.fromJson')));
+      // The trust-boundary TODO is retained for explicit handling.
+      expect(out, contains('TODO(trust-boundary): handle BoundaryErr'));
+    });
+
+    test('an assigned fromJson call gets .getOrThrow() to keep its type', () {
+      const source = '''
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+
+Product load(Map<String, Object?> map) {
+  final product = Product.fromJson(map);
+  return product;
+}
+''';
+      final out = codemod.transform(source);
+      expect(out, contains('Product.fromWire(map).getOrThrow()'));
+      expect(out, isNot(contains('Product.fromJson')));
+    });
+
+    test('a bare-expression fromJson call is left as a BoundaryResult', () {
+      // No type context to preserve — the result is the natural value.
+      const source = '''
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+
+void log(Map<String, Object?> map) {
+  print(Product.fromJson(map));
+}
+''';
+      final out = codemod.transform(source);
+      expect(out, contains('Product.fromWire(map)'));
+      expect(out, isNot(contains('.getOrThrow()')));
+      expect(out, isNot(contains('Product.fromJson')));
+    });
+  });
+
   group('v3 codemod — whole-corpus invariants', () {
     test('no v2 preset or generate* toggle survives anywhere', () {
       for (final name in corpusNames) {

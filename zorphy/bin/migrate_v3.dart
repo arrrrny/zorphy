@@ -64,12 +64,17 @@ Future<void> main(List<String> args) async {
   // for an unrelated serializer and silently left behind.
   final sources = <String, String>{};
   final knownTypes = <String>{};
+  final knownEntityRoots = <String>{};
   for (final file in files) {
     final source = await File(file).readAsString();
     sources[file] = source;
     knownTypes.addAll(V3Codemod.zorphyTypesIn(source));
+    knownEntityRoots.addAll(V3Codemod.entityRootsIn(source));
   }
-  final codemod = V3Codemod(knownTypes: knownTypes);
+  final codemod = V3Codemod(
+    knownTypes: knownTypes,
+    knownEntityRoots: knownEntityRoots,
+  );
 
   var changed = 0;
   for (final file in files) {
