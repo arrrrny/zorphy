@@ -5,8 +5,10 @@
 ///
 /// Walks the given file or directory, rewrites every v2 `@Zorphy` /
 /// `@ZorphySealed` annotation and `.fromJson` / `.toJson` call site onto the
-/// zero-preset v3 archetypes and wire codecs, and prints a unified-style
-/// summary. Dry-run by default; pass `--apply` to rewrite files in place.
+/// zero-preset v3 archetypes and wire codecs, strips the stale v2
+/// `part '*.zorphy.dart';` / `part '*.g.dart';` directives, and prints a
+/// unified-style summary. Dry-run by default; `--apply` rewrites files in
+/// place and deletes the stale 2.x `<file>.zorphy.dart` parts from disk.
 ///
 /// Usage:
 ///   dart run zorphy:migrate_v3 <path> [--apply]
@@ -53,7 +55,8 @@ Future<void> main(List<String> args) async {
   final apply = parsed['apply'] as bool;
   final target = parsed.rest.first;
   final files = _collectDartFiles(target);
-  if (files.isEmpty) {
+  final staleParts = _collectStalePartFiles(target);
+  if (files.isEmpty && staleParts.isEmpty) {
     stderr.writeln('No Dart files found under $target');
     exit(2);
   }
@@ -84,7 +87,7 @@ Future<void> main(List<String> args) async {
   var changed = 0;
   for (final file in files) {
     final source = sources[file]!;
-    final migrated = codemod.transform(source);
+    final migrated = codemod.transform(source, fileName: p.basename(file));
     if (migrated == source) continue;
     changed++;
     if (apply) {
@@ -94,15 +97,57 @@ Future<void> main(List<String> args) async {
     }
   }
 
-  if (changed == 0) {
+  // The 2.x layout left a generated `<file>.zorphy.dart` beside every source
+  // file; v3 attaches one shared part itself, so a dry run lists the stale
+  // files and --apply deletes them from disk (#249).
+  if (staleParts.isNotEmpty) {
+    if (apply) {
+      for (final part in staleParts) {
+        await File(part).delete();
+      }
+      stdout.writeln(
+        'Deleted ${staleParts.length} stale .zorphy.dart file(s).',
+      );
+    } else {
+      for (final part in staleParts) {
+        stdout.writeln('would delete: ${p.relative(part)}');
+      }
+    }
+  }
+
+  if (changed == 0 && staleParts.isEmpty) {
     stdout.writeln('Nothing to migrate — no v2 constructs found.');
     return;
   }
-  stdout.writeln(
-    apply
-        ? 'Migrated $changed file(s). Re-run build_runner to regenerate.'
-        : 'Dry run — $changed file(s) would change. Re-run with --apply.',
-  );
+  if (changed > 0) {
+    stdout.writeln(
+      apply
+          ? 'Migrated $changed file(s). Re-run build_runner to regenerate.'
+          : 'Dry run — $changed file(s) would change. Re-run with --apply.',
+    );
+  }
+}
+
+/// Every stale 2.x generated part under [target]: exactly the generated files
+/// [_collectDartFiles] skips as unprocessable are the ones #249 deletes.
+List<String> _collectStalePartFiles(String target) {
+  final entity = FileSystemEntity.typeSync(target);
+  final files = <String>{};
+  bool stale(File file) =>
+      file.path.endsWith('.zorphy.dart') &&
+      !file.path
+          .split(Platform.pathSeparator)
+          .any((seg) => seg.startsWith('.') || seg == 'build');
+
+  if (entity == FileSystemEntityType.file) {
+    final f = File(target);
+    if (stale(f)) files.add(f.absolute.path);
+  } else if (entity == FileSystemEntityType.directory) {
+    for (final e in Directory(target).listSync(recursive: true)) {
+      if (e is File && stale(e)) files.add(e.absolute.path);
+    }
+  }
+  return files.toList()..sort();
 }
 
 List<String> _collectDartFiles(String target) {

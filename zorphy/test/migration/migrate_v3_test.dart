@@ -14,6 +14,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+import 'package:zorphy/src/migration/part_directive_cleaner.dart';
 import 'package:zorphy/src/migration/v3_codemod.dart';
 
 void main() {
@@ -391,6 +392,133 @@ abstract class \$Product {
 ''';
       final out = codemod.transform(source);
       expect(out, contains("part 'legacy.g.dart';"));
+    });
+  });
+
+  group('v3 codemod — stale part directives (#249)', () {
+    test('a stale v2 zorphy part directive is stripped on migration', () {
+      const source = '''
+import 'package:zorphy_annotation/zorphy_annotation.dart';
+
+part 'product.zorphy.dart';
+part 'product.g.dart';
+
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+''';
+      final out = codemod.transform(source, fileName: 'product.dart');
+      expect(out, isNot(contains('.zorphy.dart')));
+      expect(out, isNot(contains("part '")));
+      expect(out, contains('@ZorphyEntity(principalKey: #id)'));
+    });
+
+    test('a migrated-but-stale file loses only its zorphy part', () {
+      // The annotation is already v3 and no codec is called, so the file
+      // carries no v2 construct BESIDES the stale part — the part still goes
+      // (v3 never keeps a hand-written zorphy part), the json part stays.
+      const source = '''
+part 'product.zorphy.dart';
+part 'product.g.dart';
+
+@ZorphyEntity(principalKey: #id)
+abstract class \$Product {
+  String get id;
+}
+''';
+      final out = codemod.transform(source, fileName: 'product.dart');
+      expect(out, isNot(contains('.zorphy.dart')));
+      expect(out, contains("part 'product.g.dart';"));
+    });
+
+    test('a non-zorphy json_serializable file passes through unchanged', () {
+      const source = '''
+part 'other.g.dart';
+
+@JsonSerializable()
+class Other {
+  final int value;
+}
+''';
+      expect(codemod.transform(source), source);
+    });
+
+    test('the cleaner reports the stale zorphy parts the CLI must delete', () {
+      const source = '''
+part 'a.zorphy.dart';
+part 'b.zorphy.dart';
+part 'a.g.dart';
+
+@Zorphy()
+abstract class \$A {}
+''';
+      final result = PartDirectiveCleaner.clean(
+        PartDirectiveCleanArg(
+          source: source,
+          libraryFileName: 'a.dart',
+          stripJsonParts: true,
+        ),
+      );
+      expect(result.removedZorphyParts, ['a.zorphy.dart', 'b.zorphy.dart']);
+      expect(result.removedJsonParts, ['a.g.dart']);
+      expect(result.restoredJsonPart, isNull);
+      expect(result.changed, isTrue);
+    });
+
+    test('a file with its own @JsonSerializable classes gets exactly one clean '
+        'json part', () {
+      const source = '''
+part 'legacy.zorphy.dart';
+part 'legacy.g.dart';
+part 'legacy.g.dart';
+
+@JsonSerializable()
+class Other {
+  final int value;
+}
+
+@Zorphy(generateJson: true)
+abstract class \$Product {
+  String get id;
+}
+''';
+      final result = PartDirectiveCleaner.clean(
+        PartDirectiveCleanArg(
+          source: source,
+          libraryFileName: 'product.dart',
+          stripJsonParts: true,
+        ),
+      );
+      expect(result.restoredJsonPart, 'product.g.dart');
+      final out = result.source;
+      expect(out, isNot(contains('legacy')));
+      expect("part '".allMatches(out), hasLength(1));
+      expect(out, contains("part 'product.g.dart';"));
+    });
+
+    test('the restored json part reuses the removed URI without a name', () {
+      const source = '''
+part 'legacy.g.dart';
+
+@JsonSerializable()
+class Other {}
+''';
+      final result = PartDirectiveCleaner.clean(
+        PartDirectiveCleanArg(source: source, stripJsonParts: true),
+      );
+      expect(result.restoredJsonPart, 'legacy.g.dart');
+      expect(result.source, contains("part 'legacy.g.dart';"));
+    });
+
+    test('an unparseable file is returned unchanged', () {
+      const source = 'class {';
+      final result = PartDirectiveCleaner.clean(
+        PartDirectiveCleanArg(source: source, stripJsonParts: true),
+      );
+      expect(result.changed, isFalse);
+      expect(result.source, source);
+      expect(codemod.transform(source), source);
     });
   });
 
