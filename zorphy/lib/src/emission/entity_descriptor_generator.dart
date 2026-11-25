@@ -161,10 +161,10 @@ final class EntityDescriptorGenerator {
     final lines = <String>[
       for (final leaf in leaves)
         'if (previous is $leaf && next is $leaf) { '
-        'return ${leaf}Patch.diff(previous, next); }',
+            'return ${leaf}Patch.diff(previous, next); }',
       "throw ArgumentError.value(next, 'next', '$name.descriptor.diff cannot "
-      'represent a change from \${previous.runtimeType} to '
-      "\${next.runtimeType}: a patch cannot change the runtime subtype.');",
+          'represent a change from \${previous.runtimeType} to '
+          "\${next.runtimeType}: a patch cannot change the runtime subtype.');",
     ];
     return Code(lines.join('\n'));
   }
