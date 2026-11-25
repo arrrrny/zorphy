@@ -1,5 +1,6 @@
 import 'package:code_builder/code_builder.dart';
 import 'package:dart_style/dart_style.dart';
+import 'package:pub_semver/pub_semver.dart';
 
 /// Emits formatted Dart source from a [Library] spec.
 ///
@@ -7,6 +8,18 @@ import 'package:dart_style/dart_style.dart';
 /// Generators produce [Spec] objects; this class turns them into a
 /// single formatted Dart library string.
 class ZorphyEmitter {
+  /// The language version the emitted source is formatted under.
+  ///
+  /// The emitted file is later re-formatted by `dart format`, which applies
+  /// the CONSUMING package's language version — for this package's own
+  /// fixtures that is the pubspec's min SDK (3.11), not the formatter's
+  /// newest style. The newest style keeps an over-wide single-string
+  /// argument on one line where earlier versions wrap it, so an emission
+  /// formatted at `latestLanguageVersion` can be byte-identical to a
+  /// fixture OR the fixture can be format-clean, never both (#226). Pin the
+  /// emitter to that same floor and bump the two together.
+  static final Version formatterLanguageVersion = Version(3, 11, 0);
+
   /// Default page width used by [DartFormatter].
   ///
   /// 80 follows the Dart style guide convention.
@@ -23,7 +36,7 @@ class ZorphyEmitter {
   ZorphyEmitter()
     : pageWidth = defaultPageWidth,
       _formatter = DartFormatter(
-        languageVersion: DartFormatter.latestLanguageVersion,
+        languageVersion: formatterLanguageVersion,
         pageWidth: defaultPageWidth,
       );
 
@@ -31,7 +44,7 @@ class ZorphyEmitter {
   ZorphyEmitter.withPageWidth(int width)
     : pageWidth = width,
       _formatter = DartFormatter(
-        languageVersion: DartFormatter.latestLanguageVersion,
+        languageVersion: formatterLanguageVersion,
         pageWidth: width,
       );
 

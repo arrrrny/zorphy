@@ -53,10 +53,7 @@ void main() {
         ],
       );
       final ir = PolymorphicIr(
-        nodes: {
-          '\$Order': order,
-          '\$InspectIntent': intent,
-        },
+        nodes: {'\$Order': order, '\$InspectIntent': intent},
         roots: [order, intent],
         diagnostics: const [],
       );
@@ -156,46 +153,87 @@ void main() {
       );
     });
 
-    test('the shared apply narrows an inherited field the leaf did not redeclare', () {
-      final root = _node(
-        name: 'Node',
-        isRoot: true,
-        fields: const [ZorphyFieldIr(name: 'payload', type: 'Object')],
-      );
-      final mid = _node(
-        name: 'Mid',
-        fields: const [ZorphyFieldIr(name: 'payload', type: 'String')],
-        superTypes: [root],
-      );
-      final leaf = _node(name: 'Leaf', superTypes: [mid]);
-      final wiredMid = mid.copyWith(
-        directSubTypes: [leaf],
-        isConcreteLeaf: false,
-      );
-      final wiredRoot = root.copyWith(
-        directSubTypes: [wiredMid],
-        isConcreteLeaf: false,
-      );
-      final ir = PolymorphicIr(
-        nodes: {
-          '\$Node': wiredRoot,
-          '\$Mid': wiredMid,
-          '\$Leaf': leaf,
-        },
-        roots: [wiredRoot],
-        diagnostics: const [],
-      );
+    test(
+      'the shared apply narrows an inherited field the leaf did not redeclare',
+      () {
+        final root = _node(
+          name: 'Node',
+          isRoot: true,
+          fields: const [ZorphyFieldIr(name: 'payload', type: 'Object')],
+        );
+        final mid = _node(
+          name: 'Mid',
+          fields: const [ZorphyFieldIr(name: 'payload', type: 'String')],
+          superTypes: [root],
+        );
+        final leaf = _node(name: 'Leaf', superTypes: [mid]);
+        final wiredMid = mid.copyWith(
+          directSubTypes: [leaf],
+          isConcreteLeaf: false,
+        );
+        final wiredRoot = root.copyWith(
+          directSubTypes: [wiredMid],
+          isConcreteLeaf: false,
+        );
+        final ir = PolymorphicIr(
+          nodes: {'\$Node': wiredRoot, '\$Mid': wiredMid, '\$Leaf': leaf},
+          roots: [wiredRoot],
+          diagnostics: const [],
+        );
 
-      final emitted = const ArchetypeComposer().compose(ir);
+        final emitted = const ArchetypeComposer().compose(ir);
 
-      // `payload` is declared on the intermediate, not on the leaf. Building
-      // the subtype type map from `leaf.fields` alone drops it, and the
-      // shared apply writes an `Object?` into `copyWith(payload: String?)`.
-      expect(
-        emitted,
-        contains('payload.valueOrNull as String'),
-        reason: 'the nearest inherited declaration must win in the apply arm',
-      );
-    });
+        // `payload` is declared on the intermediate, not on the leaf. Building
+        // the subtype type map from `leaf.fields` alone drops it, and the
+        // shared apply writes an `Object?` into `copyWith(payload: String?)`.
+        expect(
+          emitted,
+          contains('payload.valueOrNull as String'),
+          reason: 'the nearest inherited declaration must win in the apply arm',
+        );
+      },
+    );
+
+    test(
+      'a generic leaf under a live root is pruned from class and dispatch',
+      () {
+        final root = _node(
+          name: 'Node',
+          isRoot: true,
+          fields: const [ZorphyFieldIr(name: 'id', type: 'String')],
+        );
+        final leaf = _node(name: 'Leaf', superTypes: [root]);
+        final generic = _node(
+          name: 'Box',
+          typeParameters: const ['T'],
+          fields: const [ZorphyFieldIr(name: 'value', type: 'T')],
+          superTypes: [root],
+        );
+        final wiredRoot = root.copyWith(
+          directSubTypes: [leaf, generic],
+          isConcreteLeaf: false,
+        );
+        final ir = PolymorphicIr(
+          nodes: {'\$Node': wiredRoot, '\$Leaf': leaf, '\$Box': generic},
+          roots: [wiredRoot],
+          diagnostics: const [],
+        );
+
+        final emitted = const ArchetypeComposer().compose(ir);
+
+        // The composer's own walks prune the generic subtree (no codec, no
+        // class spec), so neither the class-emission walk nor the codec's leaf
+        // enumeration may reach it: an emitted `$Box` would leave `T` unbound,
+        // and a `box` dispatch arm would reference a `fromWire` the library
+        // never declares.
+        expect(
+          emitted,
+          contains('Leaf'),
+          reason: 'the non-generic leaf still composes',
+        );
+        expect(emitted, isNot(contains('\$Box')));
+        expect(emitted, isNot(contains("'box'")));
+      },
+    );
   });
 }

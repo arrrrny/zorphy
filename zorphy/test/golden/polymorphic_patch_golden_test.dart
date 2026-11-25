@@ -378,12 +378,73 @@ void main() {
       );
       expect(
         emitted,
-        contains(
-          'id: this.id.isUnchanged ? target.id : this.id.valueOrNull',
-        ),
+        contains('id: this.id.isUnchanged ? target.id : this.id.valueOrNull'),
       );
 
       final result = _analyzeEmitted(emitted, _standaloneTargetFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+
+    test('a field named next does not shadow the compose parameter', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Tagged',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('next', 'String', ''),
+        ],
+      );
+
+      // `compose(ZorphyPatch<Tagged> next)` names its parameter `next`. An
+      // unqualified fallback reads that parameter (the incoming patch)
+      // instead of the existing patch field and fails to compile.
+      expect(
+        emitted,
+        contains('next: next.next.isUnchanged ? this.next : next.next'),
+      );
+
+      final result = _analyzeEmitted(emitted, _standaloneCollisionsFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+
+    test('a field named before does not shadow the invert parameter', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Tagged',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('before', 'String', ''),
+        ],
+      );
+
+      // `invert(Tagged before)` names its parameter `before`. An unqualified
+      // unchanged-test resolves to that parameter (which has no
+      // `isUnchanged`) and cannot compile; `before.before` stays the prior
+      // entity value. (The formatter wraps the ternary, so assert the two
+      // halves.)
+      expect(emitted, contains('before: this.before.isUnchanged'));
+      expect(emitted, contains(': PatchValue.set(before.before)'));
+
+      final result = _analyzeEmitted(emitted, _standaloneCollisionsFixture);
+      expect(result.exitCode, 0, reason: result.output);
+    });
+
+    test('a field named wire does not shadow the toWire output map', () {
+      final emitted = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Tagged',
+        fields: [
+          NameTypeClassComment('id', 'String', ''),
+          NameTypeClassComment('wire', 'String', ''),
+        ],
+      );
+
+      // `toWire` declares `final wire = <String, Object?>{}`. An unqualified
+      // patch-field read resolves to that local map (which has neither
+      // `isSet` nor `valueOrNull`) and cannot compile; the map write stays
+      // `wire[...]`.
+      expect(emitted, contains('if (this.wire.isSet)'));
+      expect(emitted, contains("wire['wire'] = this.wire.valueOrNull"));
+      expect(emitted, contains("wire['id'] = this.id.valueOrNull"));
+
+      final result = _analyzeEmitted(emitted, _standaloneCollisionsFixture);
       expect(result.exitCode, 0, reason: result.output);
     });
   });
@@ -429,6 +490,36 @@ final class Box {
 
   Box copyWith({String? id, String? value}) {
     return Box(id: id ?? this.id, value: value ?? this.value);
+  }
+}
+''';
+
+/// Standalone entity whose field names collide with the emitter's own
+/// parameter and local spellings — `compose`'s `next`, `invert`'s `before`
+/// and `toWire`'s output map `wire`. One fixture serves the compile probe of
+/// all three: `copyWith` takes every field optionally, so a patch carrying a
+/// subset still type-checks against it.
+const _standaloneCollisionsFixture = r'''
+final class Tagged {
+  const Tagged({
+    required this.id,
+    required this.next,
+    required this.before,
+    required this.wire,
+  });
+
+  final String id;
+  final String next;
+  final String before;
+  final String wire;
+
+  Tagged copyWith({String? id, String? next, String? before, String? wire}) {
+    return Tagged(
+      id: id ?? this.id,
+      next: next ?? this.next,
+      before: before ?? this.before,
+      wire: wire ?? this.wire,
+    );
   }
 }
 ''';

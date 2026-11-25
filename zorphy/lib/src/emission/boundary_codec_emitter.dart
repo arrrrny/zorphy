@@ -251,10 +251,16 @@ class BoundaryCodecEmitter {
     ];
   }
 
-  /// Every concrete leaf at or below [node], depth-first.
+  /// Every emittable concrete leaf at or below [node], depth-first.
+  ///
+  /// A generic node (and everything below it) is pruned: the composer emits
+  /// no codec for it, so a dispatch enumerating it would reference a
+  /// `fromWire` the generated library does not declare. The same fail-closed
+  /// rule the class-emission walk applies.
   static List<ZorphyNodeIr> leavesOf(ZorphyNodeIr node) {
     final out = <ZorphyNodeIr>[];
     void walk(ZorphyNodeIr current) {
+      if (current.typeParameters.isNotEmpty) return;
       if (current.isConcreteLeaf) {
         out.add(current);
         return;
@@ -630,8 +636,10 @@ class BoundaryCodecEmitter {
         body
           ..add(Code('final $local = this.${field.name};'))
           ..add(
-            Code('if ($local != null) { '
-                'map[${_literal(field.name)}] = $value; }'),
+            Code(
+              'if ($local != null) { '
+              'map[${_literal(field.name)}] = $value; }',
+            ),
           );
       } else {
         final value = _wireExpression(field, type);
@@ -693,6 +701,10 @@ class BoundaryCodecEmitter {
   Set<String> _known(ZorphyNodeIr node, Set<String> additional) {
     final names = <String>{...additional};
     void walk(ZorphyNodeIr current) {
+      // A generic node (and everything below it) receives no codec, so its
+      // name must not classify a field as a nested node — the codec would
+      // emit a `fromWire` the generated library does not declare.
+      if (current.typeParameters.isNotEmpty) return;
       names.add(current.cleanName);
       for (final child in current.directSubTypes) {
         walk(child);

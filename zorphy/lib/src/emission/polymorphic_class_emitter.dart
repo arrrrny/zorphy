@@ -161,6 +161,11 @@ final class PolymorphicClassEmitter {
         ),
       );
       for (final child in node.directSubTypes) {
+        // A generic child (and everything below it) is pruned: the class
+        // emitter declares no type parameters, so emitting it would leave `T`
+        // unbound in the generated library. The same fail-closed rule the
+        // codec, patch and mock surfaces apply.
+        if (child.typeParameters.isNotEmpty) continue;
         walk(child, [node, ...ancestors]);
       }
     }

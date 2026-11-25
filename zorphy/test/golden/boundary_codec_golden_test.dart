@@ -270,7 +270,10 @@ void main() {
       );
       expect(toWire, contains("<String,Object?>{'kind':'order'}"));
       expect(toWire, contains("map['orderId']=this.orderId;"));
-      expect(toWire, contains("map['createdAt']=this.createdAt.toIso8601String();"));
+      expect(
+        toWire,
+        contains("map['createdAt']=this.createdAt.toIso8601String();"),
+      );
       // A nullable field is read into a local before the null guard: Dart
       // does not promote a public field, so checking the field directly and
       // then calling a member on it stays a call on the nullable type.
@@ -401,10 +404,7 @@ void main() {
           ),
         ]),
       );
-      expect(
-        compact,
-        contains('byId.map((key,e)=>MapEntry(key,e.toWire()))'),
-      );
+      expect(compact, contains('byId.map((key,e)=>MapEntry(key,e.toWire()))'));
     });
 
     test('a nullable member-call field is promoted into a local toWire', () {
@@ -419,7 +419,9 @@ void main() {
       expect(compact, contains('final_lastSeenAt=this.lastSeenAt;'));
       expect(
         compact,
-        contains("if(_lastSeenAt!=null){map['lastSeenAt']=_lastSeenAt.toIso8601String();}"),
+        contains(
+          "if(_lastSeenAt!=null){map['lastSeenAt']=_lastSeenAt.toIso8601String();}",
+        ),
       );
     });
 

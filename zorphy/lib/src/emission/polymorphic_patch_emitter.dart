@@ -713,7 +713,10 @@ class PolymorphicPatchEmitter {
       final args = fields
           .map((f) {
             final name = _memberName(f.name);
-            return '$name: next.$name.isUnchanged ? $name : next.$name';
+            // `next` is the compose parameter: qualify the patch field with
+            // `this` so a field named `next` reads the patch, not the
+            // parameter.
+            return '$name: next.$name.isUnchanged ? this.$name : next.$name';
           })
           .join(', ');
       lines.add('return $selfName($args);');
@@ -767,7 +770,10 @@ class PolymorphicPatchEmitter {
     final args = fields
         .map((f) {
           final name = _memberName(f.name);
-          return '$name: $name.isUnchanged '
+          // `before` is the invert parameter: qualify the patch field with
+          // `this` so a field named `before` reads the patch, not the
+          // parameter. `before.$name` stays the prior entity value.
+          return '$name: this.$name.isUnchanged '
               '? const PatchValue.unchanged() '
               ': PatchValue.set(before.$name)';
         })
@@ -791,8 +797,12 @@ class PolymorphicPatchEmitter {
         final lines = <String>['final wire = <String, Object?>{};'];
         for (final field in fields) {
           final name = _memberName(field.name);
+          // `wire` is the output map: qualify the patch field with `this` so
+          // a field named `wire` reads the patch, not the map. `wire[…]`
+          // stays the map write.
           lines.add(
-            'if ($name.isSet) wire[\'${field.name}\'] = $name.valueOrNull;',
+            'if (this.$name.isSet) '
+            "wire['${field.name}'] = this.$name.valueOrNull;",
           );
         }
         lines.add('return wire;');
