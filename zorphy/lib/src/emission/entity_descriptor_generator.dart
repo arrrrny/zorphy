@@ -129,6 +129,46 @@ final class EntityDescriptorGenerator {
     return null;
   }
 
+  /// The body of the generated `diff`.
+  ///
+  /// A STANDALONE entity's `<Entity>Patch.diff` compares every field, so the
+  /// plain delegation already satisfies the contract. A HIERARCHY ROOT's
+  /// `<Root>Patch.diff` compares only the root's SHARED fields (its shared
+  /// patch applies to any subtype while leaving leaf-only fields intact), so
+  /// applying it to `previous` silently drops a leaf-only change or a runtime
+  /// subtype replacement — `applyPatch(previous, diff(previous, next))` can
+  /// then differ from `next` without any error.
+  ///
+  /// The composer emits a concrete `<Leaf>Patch` for every concrete leaf, each
+  /// extending `<Root>Patch` (hence a `ZorphyPatch<Root>`), whose `diff` covers
+  /// the leaf's WHOLE payload including leaf-only fields. Dispatch on the
+  /// runtime subtype when both values are the same leaf — that patch reproduces
+  /// `next` exactly. A patch rebuilds its target through that target's
+  /// `copyWith`, so it can never change the runtime subtype: when the two
+  /// values are different leaves (or an unhandled instance), FAIL with an
+  /// [ArgumentError] rather than return a patch that silently loses the change.
+  Code _diffBody(ZorphyNodeIr node) {
+    final name = node.cleanName;
+    final leaves = [
+      for (final leaf in node.allConcreteLeaves)
+        if (leaf.typeParameters.isEmpty) leaf.cleanName,
+    ];
+    if (leaves.isEmpty) {
+      // Standalone entity (or a root with no emittable leaf patch): the
+      // root's own patch is the only surface, and it diffs every field.
+      return Code('return ${name}Patch.diff(previous, next);');
+    }
+    final lines = <String>[
+      for (final leaf in leaves)
+        'if (previous is $leaf && next is $leaf) { '
+        'return ${leaf}Patch.diff(previous, next); }',
+      "throw ArgumentError.value(next, 'next', '$name.descriptor.diff cannot "
+      'represent a change from \${previous.runtimeType} to '
+      "\${next.runtimeType}: a patch cannot change the runtime subtype.');",
+    ];
+    return Code(lines.join('\n'));
+  }
+
   Class _buildDescriptorClass(ZorphyNodeIr node) {
     final name = node.cleanName;
     final principalKey = node.principalKey!;
@@ -202,7 +242,7 @@ final class EntityDescriptorGenerator {
                   ..type = referType(name),
               ),
             ])
-            ..body = Code('return ${name}Patch.diff(previous, next);');
+            ..body = _diffBody(node);
         }),
       );
 

@@ -179,6 +179,32 @@ void _check(bool condition, String label) {
   if (!condition) throw StateError('FAILED: $label');
 }
 
+/// Exact set equality — a subset check alone cannot tell intersection from
+/// union, which is the whole point of the conflict cases below.
+bool _sameSet(Set<String> actual, Set<String> expected) =>
+    actual.length == expected.length && actual.containsAll(expected);
+
+/// Conflict detection over DISTINCT patches: the result must be the exact
+/// intersection of the wire keys both patches change, rendered as JSON
+/// pointers. A union or a self-only implementation fails these cases.
+void conflictsGeneric<T extends ZorphyEntityBase>(
+  ZorphyEntityDescriptor<T> desc,
+  ZorphyPatch<T> a,
+  ZorphyPatch<T> b,
+  Set<String> expected,
+  String label,
+) {
+  final actual = desc.conflictingPaths(a, b);
+  _check(
+    _sameSet(actual, expected),
+    '$label conflict set: expected $expected, got $actual',
+  );
+  _check(
+    actual.every((p) => p.startsWith('/')),
+    '$label conflict paths are JSON pointers',
+  );
+}
+
 /// The issue's mandated generic helper — reflection-free, AOT-safe, names no
 /// concrete entity type. It exercises every descriptor member for any entity.
 void roundTripGeneric<T extends ZorphyEntityBase>(
@@ -224,12 +250,13 @@ void roundTripGeneric<T extends ZorphyEntityBase>(
   _check(decoded.isOk, '$label fromWire(toWire(b)) is Ok');
   _check(decoded.valueOrNull == b, '$label fromWire(toWire(b))==b');
 
-  // conflictingPaths: a patch conflicts with itself on every path it changes.
-  final conflicts = desc.conflictingPaths(patch, patch);
-  _check(conflicts.isNotEmpty, '$label conflictingPaths self non-empty');
-  _check(
-    conflicts.every((p) => p.startsWith('/')),
-    '$label conflictingPaths are JSON pointers',
+  // conflictingPaths: self-comparison yields EXACTLY the paths it changes.
+  conflictsGeneric(
+    desc,
+    patch,
+    patch,
+    patch.toWire().keys.map((k) => '/$k').toSet(),
+    '$label self',
   );
 
   // composePatches: composing with an empty (no-op) patch behaves like the
@@ -269,6 +296,101 @@ void main() {
       title: 'Hi',
       orderId: 'o1',
     ),
+  );
+
+  // Issue #266 review finding: a hierarchy ROOT descriptor's diff must not
+  // drop leaf-only changes. The root shared patch diffs only shared fields,
+  // so a change confined to `orderId` used to produce an empty patch and
+  // `applyPatch` returned the original value with no error.
+  const leafBefore = OrderNotification.fromTrusted(
+    id: 'n1',
+    title: 'Hello',
+    orderId: 'o1',
+  );
+  const leafAfter = OrderNotification.fromTrusted(
+    id: 'n1',
+    title: 'Hello',
+    orderId: 'o2',
+  );
+  final leafPatch = Notification.descriptor.diff(leafBefore, leafAfter);
+  _check(
+    Notification.descriptor.applyPatch(leafBefore, leafPatch) == leafAfter,
+    'Notification leaf-only change survives descriptor diff/apply',
+  );
+
+  // A runtime subtype replacement cannot be expressed by a patch: a patch
+  // rebuilds its target through that target's own copyWith, so it can never
+  // turn an OpenTask into a DoneTask. The descriptor must FAIL rather than
+  // return a patch that silently keeps the original subtype.
+  var subtypeChangeFailed = false;
+  try {
+    Task.descriptor.diff(
+      OpenTask.fromTrusted(
+        id: 't1',
+        createdAt: DateTime.utc(2026),
+        tags: ['a'],
+        assignee: 'x',
+      ),
+      DoneTask.fromTrusted(
+        id: 't1',
+        createdAt: DateTime.utc(2026),
+        tags: ['a'],
+        result: 'ok',
+      ),
+    );
+  } on ArgumentError {
+    subtypeChangeFailed = true;
+  }
+  _check(subtypeChangeFailed, 'subtype replacement fails loudly');
+
+  // Conflict detection on DISTINCT patches: exact intersection, not union
+  // and not a self-comparison that accepts any nonempty set.
+  const productDesc = Product.descriptor;
+  final pName = productDesc.diff(
+    const Product.fromTrusted(id: 'p1', name: 'Widget'),
+    const Product.fromTrusted(id: 'p1', name: 'Gadget'),
+  );
+  final pId = productDesc.diff(
+    const Product.fromTrusted(id: 'p1', name: 'Widget'),
+    const Product.fromTrusted(id: 'p2', name: 'Widget'),
+  );
+  conflictsGeneric(productDesc, pName, pId, const {}, 'Product disjoint');
+  final pNameOther = productDesc.diff(
+    const Product.fromTrusted(id: 'p9', name: 'Widget'),
+    const Product.fromTrusted(id: 'p9', name: 'Gadget'),
+  );
+  conflictsGeneric(
+    productDesc,
+    pName,
+    pNameOther,
+    const {'/name'},
+    'Product overlap',
+  );
+
+  // The same exact-set cases through a hierarchy root, including a LEAF-only
+  // field: a union would wrongly report both `/title` and `/orderId`.
+  const notificationDesc = Notification.descriptor;
+  final nTitle = notificationDesc.diff(
+    const OrderNotification.fromTrusted(id: 'n1', title: 'Hello', orderId: 'o1'),
+    const OrderNotification.fromTrusted(id: 'n1', title: 'Hi', orderId: 'o1'),
+  );
+  conflictsGeneric(
+    notificationDesc,
+    nTitle,
+    leafPatch,
+    const {},
+    'Notification disjoint leaf fields',
+  );
+  final nBoth = notificationDesc.diff(
+    const OrderNotification.fromTrusted(id: 'n1', title: 'Hello', orderId: 'o1'),
+    const OrderNotification.fromTrusted(id: 'n1', title: 'Hi', orderId: 'o2'),
+  );
+  conflictsGeneric(
+    notificationDesc,
+    nTitle,
+    nBoth,
+    const {'/title'},
+    'Notification partial overlap',
   );
 
   print('ALL CHECKS PASSED');
