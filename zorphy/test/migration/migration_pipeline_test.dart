@@ -63,9 +63,9 @@ void main() {
 }
 
 void _writePipelinePackage(Directory probe, Directory checkout) {
-  final annotationRoot = Directory(
-    '${checkout.parent.path}/zorphy_annotation',
-  ).absolute.path;
+  final annotationRoot = Directory('${checkout.parent.path}/zorphy_annotation')
+      .absolute
+      .path;
   final zorphyRoot = checkout.absolute.path;
 
   File('${probe.path}/pubspec.yaml').writeAsStringSync('''
