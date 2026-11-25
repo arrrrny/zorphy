@@ -1,4 +1,4 @@
-import 'package:collection/collection.dart';
+import 'equality.dart';
 
 /// Deep structural equality for lists of patch items, used by
 /// [ListReplaceAll.operator ==].

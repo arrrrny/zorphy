@@ -106,13 +106,13 @@ class CrossEntityImportDetector {
   /// Private constructor — this class is a namespace of static helpers.
   CrossEntityImportDetector._();
 
-  /// Pre-filter regex for `@Zorphy` / `@Zorphy2` class declarations.
+  /// Pre-filter regex for a zorphy class declaration.
   ///
-  /// Captures the class name (with leading `$`s) so we can skip
-  /// self-references.
-  static final _classDeclRegex = RegExp(
-    r'@(?:Zorphy2?)\b[^{]*\bclass\s+(\$+\w+)',
-  );
+  /// Matches the legacy `@Zorphy` / `@Zorphy2` and every v3 archetype
+  /// (`@ZorphyEntity` / `@ZorphyValue` / `@ZorphyUnion` / `@ZorphyState` /
+  /// `@ZorphyIntent`) followed by a `class $Name` declaration. Captures the
+  /// class name (with leading `$`s) so self-references can be skipped.
+  static final _classDeclRegex = RegExp(r'@Zorphy\w*[^{]*\bclass\s+(\$+\w+)');
 
   /// Regex for cross-entity field references.
   ///

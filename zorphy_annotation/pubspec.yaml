@@ -7,11 +7,10 @@ environment:
   sdk: ">=3.11.0 <4.0.0"
 
 dependencies:
-  collection: ^1.19.1
-  # `ZorphyIntentDigest` hashes the canonical intent payload (issue #189).
+  # `ZorphyIntentDigest` hashes the canonical intent payload with SHA-256
+  # (issue #189). This is the one external dependency the v3 surface keeps:
+  # the #176 zero-dependency gate is reconciled against the SHA-256/runtime
+  # requirement in #175 (a reviewed amendment — see CHANGELOG / #175).
   crypto: ^3.0.7
-  json_annotation: ^4.12.0
-  meta: ^1.17.0
-  quiver: ^3.2.2
 dev_dependencies:
   test: ^1.33.0

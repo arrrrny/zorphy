@@ -1,22 +1,26 @@
 import 'model.dart';
 
-/// Renders a [FreezedClassModel] as zorphy source text.
+/// Renders a [FreezedClassModel] as zorphy v3 source text.
 ///
-/// Mapping (pre-decided in the v2.0 spec):
-/// - simple class → `@Zorphy() abstract class $Foo { T get x; }`
-/// - union → sealed `$$Foo` base + `$Variant implements $$Foo` subtypes
-/// - fromJson/toJson → `generateJson: true`
-/// - `@Default(expr)` → `abstract class $Foo_` + top-level factory fn
+/// v3 has no presets and no `generate*` toggles (issue #176 / #233): a class
+/// is annotated with exactly ONE zero-toggle archetype that names what it IS,
+/// and the wire codecs (`fromWire`/`toWire`) are generated unconditionally.
+/// The mapping is therefore archetype-only:
+///
+/// - a class with a `String id` field → `@ZorphyEntity(principalKey: #id)`
+/// - any other plain class → `@ZorphyValue()`
+/// - a union → a `@ZorphyUnion()` root with redirecting factories plus one
+///   concrete `@ZorphyValue() class $Variant implements $$Root` per variant
+/// - `@Default(expr)` → `@JsonKey(defaultValue: expr)` on the getter (the
+///   field default is a constructor concern the archetype keeps)
 /// - `@JsonKey(...)` → preserved verbatim on the getter
-/// - lean-eligible classes → `preset: ZorphyPreset.lean`
 /// - field types referencing other migrated classes are rewritten to
 ///   zorphy's `$`-prefixed form (`Address` → `$Address`,
 ///   `List<CartItem>` → `List<$CartItem>`)
 ///
 /// `@ExchangeableObject` / `@ExchangeableEnum` dialect (the custom codegen
 /// annotations used by flutter_inappwebview forks):
-/// - value object → `@Zorphy(kind: ZorphyKind.valueObject, generateJson:
-///   true, generateCompareTo: true) abstract class $Foo { T get x; }`
+/// - value object → `@ZorphyValue() abstract class $Foo { T get x; }`
 /// - constructor `= expr` defaults → `@JsonKey(defaultValue: expr)` on the
 ///   getter
 /// - class/enum name `Foo_` → `$Foo` / `enum Foo`
@@ -83,22 +87,11 @@ class ZorphyRenderer {
     return result;
   }
 
-  String _annotationFor(
-    FreezedClassModel model, {
-    List<String>? explicitSubTypes,
-  }) {
-    final args = <String>[];
-    if (model.isLeanEligible && explicitSubTypes == null) {
-      args.add('preset: ZorphyPreset.lean');
-    }
-    if (model.hasFromJson || model.hasToJson) {
-      args.add('generateJson: true');
-    }
-    if (explicitSubTypes != null && explicitSubTypes.isNotEmpty) {
-      args.add('explicitSubTypes: [${explicitSubTypes.join(', ')}]');
-    }
-    return '@Zorphy(${args.join(', ')})';
-  }
+  /// The zero-preset archetype annotation for a plain (non-union) class:
+  /// `@ZorphyEntity(principalKey: #id)` when the class carries a `String id`
+  /// field, otherwise `@ZorphyValue()`.
+  String _annotationFor(FreezedClassModel model) =>
+      model.hasStringId ? '@ZorphyEntity(principalKey: #id)' : '@ZorphyValue()';
 
   String _typeParams(FreezedClassModel model) => model.typeParameters.isEmpty
       ? ''
@@ -119,9 +112,8 @@ class ZorphyRenderer {
   void _renderField(FreezedField field, StringBuffer sb) {
     if (field.docComment != null) sb.writeln('  ${field.docComment}');
     final jsonKeys = [...field.jsonKeyAnnotations];
-    // freezed @Default(expr) → zorphy's default-value mechanism:
-    // @JsonKey(defaultValue: expr) on the getter makes the generated
-    // constructor parameter optional with the expression as fallback.
+    // freezed @Default(expr) → @JsonKey(defaultValue: expr): the archetype
+    // keeps the field default as a constructor concern.
     if (field.defaultExpression != null) {
       final existing = jsonKeys.indexWhere((k) => k.startsWith('@JsonKey('));
       if (existing >= 0) {
@@ -139,9 +131,11 @@ class ZorphyRenderer {
     sb.writeln('  ${convertType(field.type)} get ${field.name};');
   }
 
-  /// Renders an `@ExchangeableObject()` value object as a Zorphy value
-  /// entity, matching the zikzak_inappwebview conversion convention
-  /// (see PROGRESS.md recipe).
+  /// Renders an `@ExchangeableObject()` value object as a `@ZorphyValue()`
+  /// archetype (the v3 zero-preset value surface; wire codecs are emitted
+  /// unconditionally, so there is no `generateJson`/`generateCompareTo`
+  /// toggle to carry).
+  ///
   /// The zorphy generator (issue #88) leaks the content of doc-comment
   /// lines written as `///- X` (or `/// X`) into the generated constructor —
   /// the `- ` / space after `///` is consumed and the remaining token is
@@ -153,11 +147,7 @@ class ZorphyRenderer {
   void _renderExchangeableObject(FreezedClassModel model, StringBuffer sb) {
     if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
     sb
-      ..writeln('@Zorphy(')
-      ..writeln('  kind: ZorphyKind.valueObject,')
-      ..writeln('  generateJson: true,')
-      ..writeln('  generateCompareTo: true,')
-      ..writeln(')')
+      ..writeln('@ZorphyValue()')
       ..writeln('abstract class \$${model.name} {');
     for (final field in model.fields) {
       _renderExchangeableField(field, sb);
@@ -223,39 +213,39 @@ class ZorphyRenderer {
   }
 
   void _renderUnion(FreezedClassModel model, StringBuffer sb) {
-    // Sealed base: $$Foo — explicitSubTypes reference the $-prefixed
-    // abstract classes (zorphy convention, see README "Sealed Abstract
-    // Classes").
-    final baseJson = model.hasFromJson || model.hasToJson;
+    // v3 union: a `@ZorphyUnion()` root carrying redirecting factories, plus
+    // one CONCRETE `@ZorphyValue() class $Variant implements $$Root` per
+    // variant. A redirecting factory cannot target an abstract class, so the
+    // variants are concrete `class` declarations with `final` fields and a
+    // `const` constructor — exactly the shape the v3 generator recovers.
+    final rootName = '\$${'\$'}${model.name}';
     if (model.docComment != null) sb.writeln(_sanitizeDoc(model.docComment!));
-    sb.writeln(
-      _annotationFor(
-        model,
-        explicitSubTypes: model.variants
-            .map((v) => '\$${v.className}')
-            .toList(),
-      ),
-    );
-    sb.writeln('abstract class \$${'\$'}${model.name}${_typeParams(model)} {');
+    sb.writeln('@ZorphyUnion()');
+    sb.writeln('abstract class $rootName${_typeParams(model)} {');
+    for (final variant in model.variants) {
+      final params = variant.fields
+          .map((f) => '${convertType(f.type)} ${f.name}')
+          .join(', ');
+      sb.writeln(
+        '  factory $rootName.${variant.factoryName}($params) = '
+        '\$${variant.className};',
+      );
+    }
     sb.writeln('}');
 
     for (final variant in model.variants) {
-      // Variants of a sealed base keep the standard preset and mirror the
-      // base's JSON flag: they participate in the polymorphic
-      // discriminator machinery via the base.
-      final variantAnnotation = baseJson
-          ? '@Zorphy(generateJson: true)'
-          : '@Zorphy()';
       sb
         ..writeln()
-        ..writeln(variantAnnotation)
+        ..writeln('@ZorphyValue()')
         ..writeln(
-          'abstract class \$${variant.className}${_typeParams(model)} '
-          'implements \$${'\$'}${model.name}${_typeParams(model)} {',
+          'class \$${variant.className} implements $rootName'
+          '${_typeParams(model)} {',
         );
       for (final field in variant.fields) {
-        _renderField(field, sb);
+        sb.writeln('  final ${convertType(field.type)} ${field.name};');
       }
+      final ctorParams = variant.fields.map((f) => 'this.${f.name}').join(', ');
+      sb.writeln('  const \$${variant.className}($ctorParams);');
       sb.writeln('}');
     }
   }

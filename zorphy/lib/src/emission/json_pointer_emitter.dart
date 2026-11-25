@@ -83,8 +83,18 @@ final class JsonPointerEmitter {
     final className = node.cleanName;
     final visible = _visibleFields(node);
     final subtypeOnly = _subtypeOnlyFields(node);
+    // A nullable nested value (`Address?`) is NOT a descent head: the composed
+    // lens would have to be `ZorphyLens<Node, Address?>` while the child
+    // resolver is `ZorphyLens<Address, …>`, and `then` requires the outer
+    // value type to equal the child's source type. It stays an addressable
+    // leaf (`/shippingAddress`) instead — the descent into
+    // `/shippingAddress/street` answers `null` through the final arm.
     final nested = visible.entries
-        .where((entry) => _nestedTarget(entry.value.type) != null)
+        .where(
+          (entry) =>
+              !entry.value.type.endsWith('?') &&
+              _nestedTarget(entry.value.type) != null,
+        )
         .toList();
 
     return Method((m) {

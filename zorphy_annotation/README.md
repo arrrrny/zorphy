@@ -1,5 +1,14 @@
 # Zorphy Annotation
 
+> **⚠️ v3.0.0 — archetypes only, zero codegen toggles.** The legacy `@Zorphy` /
+> `@Zorphy2` / `ZorphyPreset` / `ZValueObject` / `generate*` surface was removed
+> after the v3 migration gate (#233). The only class annotations are the
+> zero-preset archetypes — `@ZorphyEntity(principalKey: #id)`, `@ZorphyValue()`,
+> `@ZorphyUnion()`, `@ZorphyState`, `@ZorphyIntent` — and none carries a
+> `generate*` toggle. The package keeps a single external dependency, `crypto`
+> (the SHA-256 intent digest, #189); the #176 zero-dependency gate is reconciled
+> against that requirement in #175.
+
 [![pub package](https://img.shields.io/badge/pub-v1.0.0-blue)](https://pub.dev/packages/zorphy_annotation)
 [![Dart SDK](https://img.shields.io/badge/sdk-Dart%20%3E%3D%203.0.0-blue)](https://dart.dev)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)

@@ -108,8 +108,6 @@ class Review with _$Review {
 
 @freezed
 class Coupon with _$Coupon {
-  const factory Coupon({
-    required String code,
-    @Default(0) int percentOff,
-  }) = _Coupon;
+  const factory Coupon({required String code, @Default(0) int percentOff}) =
+      _Coupon;
 }

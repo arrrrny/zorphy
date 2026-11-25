@@ -101,7 +101,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'user.zorphy.dart';
 part 'user.g.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$User {}
 ''');
 
@@ -129,7 +129,7 @@ dependencies:
       await File('${libDir.path}/product.dart').writeAsString('''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Product {}
 ''');
 
@@ -167,7 +167,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'order.zorphy.dart';
 part 'order.g.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Order {}
 ''';
         File('$libPath/order.dart')
@@ -214,7 +214,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'item.zorphy.dart';
 part 'item.g.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Item {}
 ''';
       File('$libPath/item.dart')

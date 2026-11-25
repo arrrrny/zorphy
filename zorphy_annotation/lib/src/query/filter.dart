@@ -1,9 +1,6 @@
-import 'package:meta/meta.dart';
-
 import 'field.dart';
 
 /// Base class for all filters
-@immutable
 sealed class Filter<TEntity> {
   const Filter();
 

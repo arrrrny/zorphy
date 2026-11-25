@@ -55,7 +55,7 @@ class Plain {}
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'self_ref.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$SelfRef {
   \$SelfRef get parent;
   String get id;
@@ -78,7 +78,7 @@ abstract class \$SelfRef {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'self_ref.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$SelfRef {
   SelfRef get parent;
   String get id;
@@ -101,7 +101,7 @@ abstract class \$SelfRef {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
   bool get summarized;
@@ -123,7 +123,7 @@ abstract class \$ArtifactStore {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   \$ArtifactRef? get ref;
 }
@@ -137,7 +137,7 @@ abstract class \$Holder {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   final \$ArtifactRef ref;
   String get id;
@@ -154,7 +154,7 @@ abstract class \$Holder {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   List<\$ArtifactRef> get refs;
 }
@@ -168,7 +168,7 @@ abstract class \$Holder {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   Map<String, \$ArtifactRef> get refs;
 }
@@ -182,7 +182,7 @@ abstract class \$Holder {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'composite.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Composite {
   \$ArtifactRef get ref;
   \$Issue117Ref get issue;
@@ -210,7 +210,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../artifact_ref/artifact_ref.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
   bool get summarized;
@@ -231,7 +231,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 import 'package:my_app/src/domain/entities/artifact_ref/artifact_ref.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
 }
@@ -247,7 +247,7 @@ abstract class \$ArtifactStore {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
 }
@@ -261,48 +261,55 @@ abstract class \$ArtifactStore {
         },
       );
 
-      test('flags \$Ref even when ../other/artifact_ref.dart is imported (regression for finding #2)', () {
-        // The canonical pattern `ref/ref.dart` should NOT match
-        // `../other/artifact_ref.dart` even though it ends with `ref.dart`.
-        final result = CrossEntityImportDetector.detect('''
+      test(
+        'flags \$Ref even when ../other/artifact_ref.dart is imported (regression for finding #2)',
+        () {
+          // The canonical pattern `ref/ref.dart` should NOT match
+          // `../other/artifact_ref.dart` even though it ends with `ref.dart`.
+          final result = CrossEntityImportDetector.detect('''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../other/artifact_ref.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   \$Ref get ref;
 }
 ''');
-        expect(result.detectedTypes, {'\$Ref'});
-        expect(
-          result.hasMissing,
-          isTrue,
-          reason: 'artifact_ref.dart does not match the canonical ref/ref.dart pattern',
-        );
-        final comment = result.toGuidanceComment()!;
-        expect(comment, contains("import '../ref/ref.dart';"));
-      });
+          expect(result.detectedTypes, {'\$Ref'});
+          expect(
+            result.hasMissing,
+            isTrue,
+            reason:
+                'artifact_ref.dart does not match the canonical ref/ref.dart pattern',
+          );
+          final comment = result.toGuidanceComment()!;
+          expect(comment, contains("import '../ref/ref.dart';"));
+        },
+      );
 
-      test('does NOT flag when the canonical snake/snake.dart import is present (regression for finding #2)', () {
-        // Verify that the canonical `ref/ref.dart` pattern DOES match correctly.
-        final result = CrossEntityImportDetector.detect('''
+      test(
+        'does NOT flag when the canonical snake/snake.dart import is present (regression for finding #2)',
+        () {
+          // Verify that the canonical `ref/ref.dart` pattern DOES match correctly.
+          final result = CrossEntityImportDetector.detect('''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 import '../ref/ref.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   \$Ref get ref;
 }
 ''');
-        expect(result.detectedTypes, {'\$Ref'});
-        expect(
-          result.hasMissing,
-          isFalse,
-          reason: 'The canonical ref/ref.dart import is present',
-        );
-      });
+          expect(result.detectedTypes, {'\$Ref'});
+          expect(
+            result.hasMissing,
+            isFalse,
+            reason: 'The canonical ref/ref.dart import is present',
+          );
+        },
+      );
     });
 
     group('snake_case conversion', () {
@@ -317,26 +324,29 @@ abstract class \$Holder {
         );
       });
 
-      test('converts acronym-style names matching NamingUtils behavior (regression for finding #3)', () {
-        // The toSnakeCase implementation now matches NamingUtils.toSnakeCase
-        // from the CLI, which inserts `_` before EVERY uppercase letter
-        // (except the first). This means `HTTPServer` -> `h_t_t_p_server`,
-        // not `httpserver` or `http_server`.
-        expect(
-          CrossEntityImportDetector.toSnakeCase('HTTPServer'),
-          'h_t_t_p_server',
-          reason: 'Should match NamingUtils behavior for acronyms',
-        );
-        expect(
-          CrossEntityImportDetector.toSnakeCase('ArtifactRef'),
-          'artifact_ref',
-        );
-        expect(
-          CrossEntityImportDetector.toSnakeCase('XMLParser'),
-          'x_m_l_parser',
-          reason: 'Each uppercase letter gets its own underscore',
-        );
-      });
+      test(
+        'converts acronym-style names matching NamingUtils behavior (regression for finding #3)',
+        () {
+          // The toSnakeCase implementation now matches NamingUtils.toSnakeCase
+          // from the CLI, which inserts `_` before EVERY uppercase letter
+          // (except the first). This means `HTTPServer` -> `h_t_t_p_server`,
+          // not `httpserver` or `http_server`.
+          expect(
+            CrossEntityImportDetector.toSnakeCase('HTTPServer'),
+            'h_t_t_p_server',
+            reason: 'Should match NamingUtils behavior for acronyms',
+          );
+          expect(
+            CrossEntityImportDetector.toSnakeCase('ArtifactRef'),
+            'artifact_ref',
+          );
+          expect(
+            CrossEntityImportDetector.toSnakeCase('XMLParser'),
+            'x_m_l_parser',
+            reason: 'Each uppercase letter gets its own underscore',
+          );
+        },
+      );
 
       test('handles single-word names', () {
         expect(CrossEntityImportDetector.toSnakeCase('User'), 'user');
@@ -433,7 +443,7 @@ final doc = 'Usage: import "fake_import.dart";';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'artifact_store.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$ArtifactStore {
   \$ArtifactRef get ref;
 }
@@ -451,7 +461,7 @@ abstract class \$ArtifactStore {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'composite.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Composite {
   \$ArtifactRef get ref;
   \$Issue117Ref get issue;
@@ -474,7 +484,7 @@ abstract class \$Composite {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'holder.zorphy.dart';
 
-@Zorphy()
+@ZorphyValue()
 abstract class \$Holder {
   \$ArtifactRef get ref;
 }
@@ -492,7 +502,7 @@ abstract class \$Holder {
 
     group('issue #117 regression', () {
       // The exact fixture from the issue body:
-      //   @Zorphy()
+      //   @ZorphyValue()
       //   abstract class $ArtifactStoreResult {
       //     $ArtifactRef get ref;
       //     bool get summarized;
@@ -509,7 +519,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'artifact_store_result.zorphy.dart';
 part 'artifact_store_result.g.dart';
 
-@Zorphy(generateJson: true, generateCompareTo: true)
+@ZorphyValue()
 abstract class \$ArtifactStoreResult {
   \$ArtifactRef get ref;
   bool get summarized;
@@ -534,7 +544,7 @@ import '../artifact_ref/artifact_ref.dart';
 part 'artifact_store_result.zorphy.dart';
 part 'artifact_store_result.g.dart';
 
-@Zorphy(generateJson: true, generateCompareTo: true)
+@ZorphyValue()
 abstract class \$ArtifactStoreResult {
   \$ArtifactRef get ref;
   bool get summarized;

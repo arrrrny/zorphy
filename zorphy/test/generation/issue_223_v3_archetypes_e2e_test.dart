@@ -19,25 +19,18 @@ import 'package:test/test.dart';
 
 void main() {
   final v3Part = File('example/lib/_br_/v3_archetypes/v3_archetypes.part.dart');
-  final legacyPart = File(
-    'example/lib/_br_/v3_archetypes/legacy_control.part.dart',
-  );
 
   late String v3;
-  late String legacy;
 
   setUpAll(() {
-    for (final file in [v3Part, legacyPart]) {
-      if (!file.existsSync()) {
-        fail(
-          'Missing generated file: ${file.path}\n'
-          'Run: cd example && dart run build_runner build '
-          '--delete-conflicting-outputs',
-        );
-      }
+    if (!v3Part.existsSync()) {
+      fail(
+        'Missing generated file: ${v3Part.path}\n'
+        'Run: cd example && dart run build_runner build '
+        '--delete-conflicting-outputs',
+      );
     }
     v3 = v3Part.readAsStringSync();
-    legacy = legacyPart.readAsStringSync();
   });
 
   group('#223 v3 archetypes — e2e build_runner smoke', () {
@@ -214,10 +207,6 @@ void main() {
         reason: 'the leaf extends the nearest intermediate patch',
       );
       expect(v3, contains('static SystemEventPatch diff('));
-    });
-
-    test('legacy @Zorphy control still generates beside the v3 surface', () {
-      expect(legacy, contains('class LegacyGreeting'));
     });
 
     test('the generated v3 part compiles standalone', () {

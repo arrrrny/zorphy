@@ -5,7 +5,6 @@ import 'package:path/path.dart' as p;
 
 import 'exchangeable_detector.dart';
 import 'freezed_detector.dart';
-import 'lean_detector.dart';
 import 'mapping.dart';
 import 'model.dart';
 import 'report.dart';
@@ -56,28 +55,17 @@ class MigratorCli {
       stdout.writeln(
         'Usage:\n'
         '  zorphy_migrator migrate <path> [--dry-run] [--apply] '
-        '[--report <file>] [--fail-on-manual]\n'
-        '  zorphy_migrator lean <path> [--dry-run] [--apply] '
-        '[--report <file>]',
+        '[--report <file>] [--fail-on-manual]\n',
       );
       return exitClean;
     }
 
-    if (args.rest.length < 2 ||
-        (args.rest.first != 'migrate' && args.rest.first != 'lean')) {
+    if (args.rest.length < 2 || args.rest.first != 'migrate') {
       stderr.writeln(
-        'Usage: zorphy_migrator <migrate|lean> <path> [--dry-run] [--apply] '
-        '[--report <file>]',
+        'Usage: zorphy_migrator migrate <path> [--dry-run] [--apply] '
+        '[--report <file>] [--fail-on-manual]',
       );
       return exitAnalysisError;
-    }
-
-    if (args.rest.first == 'lean') {
-      return _runLean(
-        args.rest[1],
-        apply: args['apply'] as bool,
-        reportPath: args['report'] as String?,
-      );
     }
 
     final target = args.rest[1];
@@ -139,11 +127,6 @@ class MigratorCli {
         manual.addAll(m.informationalItems);
         if (m.isMigratable) {
           final notes = <String>[];
-          if (m.dialect == ModelDialect.freezed &&
-              m.isLeanEligible &&
-              !m.isUnion) {
-            notes.add('preset: ZorphyPreset.lean');
-          }
           if (m.dialect == ModelDialect.exchangeableObject) {
             notes.add('@ExchangeableObject');
           }
@@ -187,146 +170,6 @@ class MigratorCli {
       );
       if (failOnManual) return exitManualItems;
     }
-    return exitClean;
-  }
-
-  /// Scans [target] and proposes a leaner `@Zorphy` annotation for every
-  /// class whose generated helpers go unused.
-  ///
-  /// Dry-run by default: prints a unified diff. `--apply` rewrites in place.
-  Future<int> _runLean(
-    String target, {
-    required bool apply,
-    required String? reportPath,
-  }) async {
-    final files = _collectDartFiles(target);
-    if (files.isEmpty) {
-      stderr.writeln('No Dart files found under $target');
-      return exitAnalysisError;
-    }
-
-    // Liveness is derived from the scanned tree and nowhere else, so a target
-    // that is not a package root is scanned with its consumers invisible:
-    // `test/` and `integration_test/` are only added for a target carrying
-    // its own pubspec.yaml, and a published package's real consumers live in
-    // other packages entirely. Say so — a silent `preset: lean` rewrite of a
-    // test-only-used class breaks the suite that proved it was used.
-    if (FileSystemEntity.typeSync(target) == FileSystemEntityType.directory &&
-        !File(p.join(target, 'pubspec.yaml')).existsSync()) {
-      stderr.writeln(
-        'WARNING: `$target` has no pubspec.yaml of its own, so it is scanned '
-        'in isolation — `test/`, `integration_test/` and any consumer outside '
-        'this tree are invisible, and a class only they use may be slimmed '
-        'past what they need. Point `lean` at a package root (or at an '
-        'application) for a complete picture.',
-      );
-    }
-
-    final SymbolIndex symbols;
-    final List<LeanProposal> proposals;
-    final detector = LeanDetector();
-    try {
-      symbols = await LeanDetector.collectSymbols(files);
-      proposals = await detector.detect(files, symbols: symbols);
-    } catch (e) {
-      stderr.writeln('Analysis error: $e');
-      return exitAnalysisError;
-    }
-
-    if (detector.skippedFiles.isNotEmpty) {
-      stderr.writeln(
-        'WARNING: ${detector.skippedFiles.length} file(s) could not be parsed '
-        'and were left untouched:\n'
-        '${detector.skippedFiles.map((f) => '  $f').join('\n')}',
-      );
-    }
-
-    if (proposals.isEmpty) {
-      stderr.writeln(
-        'WARNING: no @Zorphy or @Zorphy2 classes found under $target — '
-        'nothing to slim. Is this the right directory?',
-      );
-      return exitClean;
-    }
-
-    final rewriter = Rewriter();
-    final byFile = <String, List<LeanProposal>>{};
-    for (final proposal in proposals) {
-      byFile
-          .putIfAbsent(p.normalize(proposal.filePath), () => [])
-          .add(proposal);
-    }
-
-    final diffs = StringBuffer();
-    var changed = 0;
-    for (final entry in byFile.entries) {
-      final replacements = leanReplacements(entry.value);
-      if (replacements.isEmpty) continue;
-      changed += replacements.length;
-
-      final source = await File(entry.key).readAsString();
-      final revised = rewriter.applySpans(source, replacements);
-      if (apply) {
-        await File(entry.key).writeAsString(revised);
-      } else {
-        diffs.write(
-          rewriter.unifiedDiff(source, revised, p.relative(entry.key)),
-        );
-      }
-    }
-
-    if (!apply && diffs.isNotEmpty) stdout.write(diffs);
-
-    final shrinkable = proposals.where((p) => !p.alreadyLean).toList();
-    final buffer = StringBuffer()
-      ..writeln('# Zorphy lean-flavor report')
-      ..writeln()
-      ..writeln('Target: `$target`')
-      ..writeln('Annotated classes scanned: ${proposals.length}')
-      ..writeln('Classes that can slim down: ${shrinkable.length}');
-    if (detector.skippedFiles.isNotEmpty) {
-      buffer
-        ..writeln()
-        ..writeln(
-          'Files left untouched (parse errors): ${detector.skippedFiles.length}',
-        );
-      for (final file in detector.skippedFiles) {
-        buffer.writeln('- `$file`');
-      }
-    }
-    buffer
-      ..writeln()
-      ..writeln('| Class | File | Unused features dropped |')
-      ..writeln('|---|---|---|');
-    for (final proposal in shrinkable) {
-      final names =
-          proposal.declared
-              .difference(proposal.used)
-              .map((f) => f.annotationField)
-              .toList()
-            ..sort();
-      buffer.writeln(
-        '| `${proposal.className}` | `${p.relative(proposal.filePath, from: target)}` | '
-        '${names.isEmpty ? '—' : names.join(', ')} |',
-      );
-    }
-    final report = buffer.toString();
-
-    if (reportPath != null) {
-      await File(reportPath).writeAsString(report);
-      stdout.writeln('Report written to $reportPath');
-    } else {
-      stdout.writeln();
-      stdout.write(report);
-    }
-
-    stdout.writeln(
-      apply
-          ? 'Applied $changed annotation rewrite(s). Re-run build_runner to '
-                'regenerate.'
-          : 'Dry run — $changed annotation(s) would change. Re-run with '
-                '--apply to write.',
-    );
     return exitClean;
   }
 

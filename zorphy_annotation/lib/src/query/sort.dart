@@ -1,9 +1,6 @@
-import 'package:meta/meta.dart';
-
 import 'field.dart';
 
 /// Represents a sort operation on a field
-@immutable
 class Sort<TEntity> {
   final Field<TEntity, Object?> field;
   final bool descending;

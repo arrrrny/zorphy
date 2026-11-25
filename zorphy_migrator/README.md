@@ -4,6 +4,12 @@ A codemod that migrates model classes to [zorphy](https://pub.dev/packages/zorph
 using **resolved AST analysis** — not regex — so union variants, generics,
 defaults, and `@JsonKey` renames are converted correctly.
 
+It emits the **zero-preset v3 archetypes** (issue #176 / #233): a class is
+annotated with exactly one archetype that names what it IS
+(`@ZorphyEntity` / `@ZorphyValue` / `@ZorphyUnion`), with no `preset:` and no
+`generate*` toggles — the wire codecs (`fromWire`/`toWire`) are generated
+unconditionally.
+
 Two input dialects are supported:
 
 - **[freezed](https://pub.dev/packages/freezed)** model classes (the original
@@ -15,7 +21,7 @@ Two input dialects are supported:
   [zorphy #86](https://github.com/arrrrny/zorphy/issues/86)); with it, the
   same seamless migration path applies.
 
-Part of the zorphy 2.0 release. See the
+Part of the zorphy 3.0 release. See the
 [comparison](../README.md#%EF%B8%8F-zorphy-vs-freezed) for why teams switch.
 
 ## Usage
@@ -27,80 +33,34 @@ dart pub global activate zorphy_migrator
 zorphy_migrator migrate lib/ --dry-run                    # preview unified diff (default)
 zorphy_migrator migrate lib/ --apply --report MIGRATION.md
 zorphy_migrator migrate lib/ --apply --fail-on-manual     # CI: exit 1 if a human is needed
-
-zorphy_migrator lean . --dry-run                          # slim @Zorphy annotations
-zorphy_migrator lean . --apply --report LEAN.md
 ```
 
 Exit codes: `0` = clean migration, `1` = items need manual attention (or
 nothing to migrate was found), `2` = analysis error.
 
-## `lean` — pick a flavor from real usage
-
-`lean` is the other direction: the project already runs on zorphy, and the
-annotations ask for more than the code consumes. It rewrites each `@Zorphy`
-annotation to the smallest flavor that still covers everything the package
-actually uses, so the generated code shrinks without changing behaviour.
-
-```bash
-zorphy_migrator lean . --dry-run     # unified diff + per-class report
-zorphy_migrator lean . --apply       # rewrite in place, then re-run build_runner
-```
-
-How it decides, per annotated class:
-
-- **Dropped** when the class names no consumer: `FooPatch`, `FooFields`,
-  `copyWithFooFn` and the JSON factories are all named after their class, so
-  an absent name is proof the generated helper is dead, and the flag that
-  requests it is removed.
-- **Kept** when a consumer exists: a class referenced anywhere else in the
-  scanned tree is *live*, keeps the preset its author chose, and only loses
-  opt-in flags it can prove unused. `toJson` and `copyWithFn` are instance
-  calls with no class in the name, so they are never dropped from a live class.
-- **Untouched** arguments: anything that is not one of the four feature flags
-  (`autoId`, `kind`, `hidePublicConstructor`, …) is carried over verbatim.
-
-Scan scope and safety:
-
-- Generated files (`.g.dart`, `.zorphy.dart`, and the shared parts under
-  `lib/_br_/`) are excluded — scanning them would make every class look used.
-- Pointing at a package root also scans `test/` and `integration_test/`, since
-  a feature used only by a test still has to be generated. A target without a
-  `pubspec.yaml` of its own gets no such extra scan, and says so on stderr:
-  its tests and any consumer outside the tree are invisible to the decision.
-- One file that does not parse is reported and skipped, not fatal.
-- The scan is syntactic (no resolution), so `zik_zak`-sized trees finish in
-  seconds rather than minutes.
-
-**`lean` targets applications.** Liveness is derived from the scanned tree and
-nothing else, so a class whose only consumers live outside it comes out
-"unused" and is rewritten to `preset: ZorphyPreset.lean`. For a package whose
-generated code is its public API that is a breaking change no scan of the
-package itself can see. Run `lean` on an application, or on a package with
-`--dry-run` and read the report before applying.
-
 ## Mapping
 
-| freezed construct | zorphy output |
+| freezed construct | zorphy v3 output |
 | --- | --- |
-| `@freezed class Foo with _$Foo { const factory Foo({required String a, int? b}) = _Foo; }` | `@Zorphy(preset: ZorphyPreset.lean) abstract class $Foo { String get a; int? get b; }` |
-| Union: `factory Foo.ok(T v) = Ok;` | `@Zorphy(explicitSubTypes: [$Ok]) abstract class $$Foo {}` + `abstract class $Ok implements $$Foo { T get v; }` |
-| `factory Foo.fromJson(...) => _$FooFromJson(json);` | `generateJson: true` on the annotation |
+| `@freezed class Foo with _$Foo { const factory Foo({required String id, int? b}) = _Foo; }` | `@ZorphyEntity(principalKey: #id) abstract class $Foo { String get id; int? get b; }` |
+| a plain class with no `String id` field | `@ZorphyValue() abstract class $Foo { … }` |
+| Union: `factory Foo.ok(T v) = Ok;` | `@ZorphyUnion() abstract class $$Foo { factory $$Foo.ok(T v) = $Ok; }` + `@ZorphyValue() class $Ok implements $$Foo { final T v; const $Ok(this.v); }` |
+| `factory Foo.fromJson(...) => _$FooFromJson(json);` | no annotation change — the wire codecs are generated unconditionally |
 | `@Default(expr)` | `@JsonKey(defaultValue: expr)` on the getter (never silently dropped) |
 | `@JsonKey(...)` | preserved verbatim on the getter |
 | Field types referencing other migrated classes | rewritten to `$`-prefixed form (`List<CartItem>` → `List<$CartItem>`) |
 
-| `@ExchangeableObject` construct | zorphy output |
+| `@ExchangeableObject` construct | zorphy v3 output |
 | --- | --- |
-| `@ExchangeableObject() class Foo_ { T x; Foo_({required this.x}); }` | `@Zorphy(kind: ZorphyKind.valueObject, generateJson: true, generateCompareTo: true) abstract class $Foo { T get x; }` |
+| `@ExchangeableObject() class Foo_ { T x; Foo_({required this.x}); }` | `@ZorphyValue() abstract class $Foo { T get x; }` |
 | `this.x = expr` constructor default | `@JsonKey(defaultValue: expr)` on the getter |
 | `@ExchangeableEnum() class Foo_ { static const A = Foo_._internal(0); }` | plain `enum Foo { A }` (member names + declaration order preserved) |
 | Field type `Bar_` where `Bar` is converted in the same run | `Bar` (the codegen `_` suffix is dropped; concrete sibling form, recovered by zorphy #351) |
 
-Lean-preset inference: classes that provably use only lean features (no
-union, no defaults) are emitted with `preset: ZorphyPreset.lean` and the
-choice is noted in the report; everything else uses the standard preset
-(byte-compatible with zorphy 1.x defaults).
+Archetype inference: a class carrying a `String id` field is an aggregate
+root and is emitted as `@ZorphyEntity(principalKey: #id)`; everything else is
+a `@ZorphyValue()`. A freezed union becomes a `@ZorphyUnion()` root with
+redirecting factories plus one concrete `@ZorphyValue()` variant class each.
 
 ## Not converted (always reported, never dropped)
 
@@ -124,10 +84,11 @@ the freezed dependencies is a documented manual step.
 
 1. Remove `freezed` / `freezed_annotation` from pubspec; add `zorphy`
    (dev) + `zorphy_annotation`.
-2. Delete `*.freezed.dart`; keep `.g.dart` only where `generateJson: true`
-   was emitted.
+2. Delete `*.freezed.dart` (and any stale `*.g.dart`).
 3. Update `part` directives: drop `.freezed.dart`. Add no zorphy directive —
-   as of 3.0 `build_runner` inserts the shared-part `part` line itself.
+   as of 3.0 `build_runner` inserts the shared-part `part` line itself, and no
+   `.g.dart` part is needed because the wire codecs are generated
+   unconditionally.
 4. Replace `when`/`map` calls with Dart 3 `switch` expressions on the
    sealed base.
 5. `dart run build_runner build`, then `dart analyze`. build_runner 2.17
@@ -139,20 +100,19 @@ the freezed dependencies is a documented manual step.
 1. Swap the internal-annotations import for
    `package:zorphy_annotation/zorphy_annotation.dart`. No zorphy `part` line is
    needed: `build_runner` writes the shared-part directive for you.
-2. Delete the stale codegen `.g.dart` (regenerated by json_serializable).
-   If the package's `build.yaml` scopes entity generation to a specific
-   directory (e.g. `lib/src/domain/entities/**`), move the converted files
-   there first.
+2. Delete the stale codegen `.g.dart`. If the package's `build.yaml` scopes
+   entity generation to a specific directory (e.g.
+   `lib/src/domain/entities/**`), move the converted files there first.
 3. Update barrels to re-export the entity under the `_`-stripped public
-   name, and glue platform controllers (`fromMap`→`fromJson`,
-   `toMap`→`toJson`, enum wire `_value`→`.index`/name, plus any
+   name, and glue platform controllers (`fromMap`→`fromWire`,
+   `toMap`→`toWire`, enum wire `_value`→`.index`/name, plus any
    platform-native enum translation that used `_nativeValue`).
 
 ## Requirements
 
 - The target project must resolve (`dart pub get` done) — the migrator
   uses the analyzer's resolved AST.
-- Targets zorphy 2.0 (`zorphy_annotation ^2.0.0`).
+- Targets zorphy 3.0 (`zorphy_annotation ^3.0.0`).
 - `@ExchangeableObject`/`@ExchangeableEnum` classes are matched by
   annotation name (any library), so no dependency on the fork's internal
   annotations package is needed.

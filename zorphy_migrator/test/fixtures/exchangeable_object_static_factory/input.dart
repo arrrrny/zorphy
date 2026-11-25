@@ -17,6 +17,10 @@ class AndroidResource_ {
   }
 
   static AndroidResource_ layout({required String name, String? defPackage}) {
-    return AndroidResource_(name: name, defType: "layout", defPackage: defPackage);
+    return AndroidResource_(
+      name: name,
+      defType: "layout",
+      defPackage: defPackage,
+    );
   }
 }

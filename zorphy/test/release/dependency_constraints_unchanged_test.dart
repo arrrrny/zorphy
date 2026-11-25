@@ -27,9 +27,11 @@ void main() {
       () {
         final zorphyYaml =
             loadYaml(File('pubspec.yaml').readAsStringSync()) as YamlMap;
-        final annotationYaml = loadYaml(
-          File('../zorphy_annotation/pubspec.yaml').readAsStringSync(),
-        ) as YamlMap;
+        final annotationYaml =
+            loadYaml(
+                  File('../zorphy_annotation/pubspec.yaml').readAsStringSync(),
+                )
+                as YamlMap;
 
         final zorphyDeps = _parseDependencies(zorphyYaml);
         final zorphyDevDeps = _parseDependencies(
@@ -60,13 +62,14 @@ void main() {
         };
 
         final expectedAnnotationDeps = <String, String>{
-          'collection': '^1.19.1',
-          // issue #189 added `crypto`: `ZorphyIntentDigest` needs SHA-256 over
-          // the canonical intent payload, and stdlib has no digest.
+          // issue #233 reconciled the #176 zero-dependency gate against the
+          // SHA-256/runtime requirement (#175): the v3 annotation surface
+          // keeps ONLY `crypto` (ZorphyIntentDigest needs SHA-256 over the
+          // canonical intent payload, and stdlib has no digest). The former
+          // `collection` / `json_annotation` / `meta` / `quiver` deps were
+          // removed — collection's List/Map equality is now a local shim,
+          // and the json_annotation/quiver/meta re-exports are gone.
           'crypto': '^3.0.7',
-          'json_annotation': '^4.12.0',
-          'meta': '^1.17.0',
-          'quiver': '^3.2.2',
         };
 
         final expectedZorphyDevDeps = <String, String>{

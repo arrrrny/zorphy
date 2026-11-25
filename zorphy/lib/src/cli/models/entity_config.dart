@@ -1,4 +1,9 @@
-import 'package:zorphy_annotation/zorphy_annotation.dart';
+/// The semantic kind of a scaffolded class.
+///
+/// Local to the CLI model: the v3 annotation surface has no `kind` toggle
+/// (issue #233), so the scaffolder maps this onto the archetype it emits —
+/// [entity] → `@ZorphyEntity`, [valueObject] → `@ZorphyValue`.
+enum ZorphyKind { entity, valueObject }
 
 /// Configuration for entity creation
 class EntityConfig {

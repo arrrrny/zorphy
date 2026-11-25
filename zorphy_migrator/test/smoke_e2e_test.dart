@@ -42,8 +42,6 @@ dependencies:
 dev_dependencies:
   zorphy: ^3.0.0
   build_runner: ^2.17.1
-  json_serializable: ^6.14.0
-  json_annotation: ^4.12.0
 dependency_overrides:
   zorphy_annotation:
     path: ${p.join(repoRoot, 'zorphy_annotation')}
@@ -67,22 +65,26 @@ dependency_overrides:
       expect(migrated, isNot(contains('@freezed')));
       expect(migrated, contains('abstract class \$\$PaymentMethod'));
       expect(migrated, contains('implements \$\$PaymentMethod'));
-      expect(migrated, contains('ZorphyPreset.lean'));
-      expect(migrated, contains('generateJson: true'));
+      expect(migrated, contains('@ZorphyUnion()'));
+      expect(migrated, contains('@ZorphyValue()'));
+      expect(migrated, contains('@ZorphyEntity(principalKey: #id)'));
+      expect(migrated, isNot(contains('ZorphyPreset')));
+      expect(migrated, isNot(contains('generateJson')));
 
       final report = File(p.join(root.path, 'MIGRATION.md')).readAsStringSync();
       expect(report, contains('Converted classes (11)'));
       expect(report, contains('Needs manual attention (0)'));
 
-      // 3. Post-migration steps a user would do: swap the import and point the
-      //    json_serializable part at its output. The zorphy part directive is
-      //    not hand-written: the shared-part builder inserts it.
+      // 3. Post-migration step a user would do: swap the import. The zorphy
+      //    part directive is not hand-written — the shared-part builder inserts
+      //    it — and no `.g.dart` part is needed: the v3 wire codecs are
+      //    generated unconditionally.
       final finalized = migrated
           .replaceAll(
             "import 'package:freezed_annotation/freezed_annotation.dart';",
             "import 'package:zorphy_annotation/zorphy_annotation.dart';",
           )
-          .replaceAll("part 'input.freezed.dart';", "part 'models.g.dart';");
+          .replaceAll("part 'input.freezed.dart';", '');
       File(p.join(libDir, 'models.dart')).writeAsStringSync(finalized);
 
       // 4. Generate with zorphy 3.0 and analyze. `--delete-conflicting-outputs`

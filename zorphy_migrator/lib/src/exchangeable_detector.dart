@@ -336,8 +336,9 @@ class ExchangeableDetector {
         );
 
         final initializer = variable.initializer?.toSource() ?? '';
-        final match = RegExp(r'_internal\(\s*([^)]+?)\s*\)')
-            .firstMatch(initializer);
+        final match = RegExp(
+          r'_internal\(\s*([^)]+?)\s*\)',
+        ).firstMatch(initializer);
         final arg = match?.group(1)?.trim();
         if (arg == null) continue;
         final intValue = int.tryParse(arg);

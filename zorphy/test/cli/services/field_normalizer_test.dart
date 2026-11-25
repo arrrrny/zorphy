@@ -161,7 +161,7 @@ class Money {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'country.zorphy.dart';
 
-@Zorphy(generateJson: true)
+@ZorphyValue()
 abstract class \$Country {
   String get code;
 }
@@ -187,7 +187,7 @@ abstract class \$Country {
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 part 'base_entity.zorphy.dart';
 
-@Zorphy(generateJson: true)
+@ZorphyValue()
 abstract class \$\$BaseEntity {
   String get id;
 }

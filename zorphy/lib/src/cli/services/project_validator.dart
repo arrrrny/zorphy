@@ -27,8 +27,9 @@ class ProjectValidator {
   ProjectValidator({required this.projectDir, List<String>? sourceDirs})
     : sourceDirs = sourceDirs ?? const ['lib'];
 
-  /// Check if the file content has actual @Zorphy or @zorphy annotations
-  /// (not in comments or string literals).
+  /// Check if the file content has a v3 archetype annotation
+  /// (`@ZorphyEntity` / `@ZorphyValue` / `@ZorphyUnion` / `@ZorphyState` /
+  /// `@ZorphyIntent`), not in comments or string literals.
   bool _hasZorphyAnnotation(String content) {
     try {
       final parsed = parseString(content: content);
@@ -38,7 +39,7 @@ class ProjectValidator {
         if (declaration is ClassDeclaration) {
           for (final metadata in declaration.metadata) {
             final name = metadata.name.name;
-            if (name == 'Zorphy' || name == 'zorphy') {
+            if (name.startsWith('Zorphy')) {
               return true;
             }
           }
@@ -47,7 +48,7 @@ class ProjectValidator {
       return false;
     } catch (e) {
       // If parsing fails, fall back to string search to avoid missing files
-      return content.contains('@Zorphy(') || content.contains('@zorphy(');
+      return content.contains('@Zorphy');
     }
   }
 
@@ -156,7 +157,8 @@ class ProjectValidator {
             message: "'zorphy_annotation' not found in dependencies",
             severity: ValidationSeverity.error,
             filePath: pubspecPath,
-            fixSuggestion: "Add 'zorphy_annotation: ^2.0.0' to dependencies in pubspec.yaml",
+            fixSuggestion:
+                "Add 'zorphy_annotation: ^2.0.0' to dependencies in pubspec.yaml",
           ),
         );
       }
@@ -165,7 +167,8 @@ class ProjectValidator {
       if (!_yamlKeyExists(devDepsText, 'build_runner')) {
         findings.add(
           ValidationFinding(
-            message: "'build_runner' not found in dev_dependencies (required for code generation)",
+            message:
+                "'build_runner' not found in dev_dependencies (required for code generation)",
             severity: ValidationSeverity.warning,
             filePath: pubspecPath,
             fixSuggestion: 'Add dev dependency: dart pub add dev:build_runner',

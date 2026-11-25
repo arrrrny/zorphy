@@ -1,5 +1,21 @@
 ## [Unreleased]
 
+### Changed (BREAKING — v3.0.0)
+
+- **Legacy annotation surface removed (#233).** `@Zorphy`, `@Zorphy2`,
+  `ZorphyPreset`, `ZorphyKind`, `ZValueObject`, `ZorphyNamedConstructor`,
+  `ZorphyX` and every `generate*` constructor toggle are gone, along with the
+  `getGenericToJsonFn` / `getFromJsonToGenericFn` helpers. The v3 archetypes
+  (`@ZorphyEntity` / `@ZorphyValue` / `@ZorphyUnion` / `@ZorphyState` /
+  `@ZorphyIntent`) are the only class annotations, and none carries a codegen
+  toggle.
+- **Dependency gate reconciled (#175, #176).** The #176 zero-external-dependency
+  goal is met except for `crypto`, which the SHA-256 intent-digest requirement
+  (#189) needs and the stdlib cannot provide — a reviewed amendment recorded in
+  #175. `collection` is replaced by a local `ListEquality` / `MapEquality`
+  shim (`src/equality.dart`), and the `json_annotation` / `meta` / `quiver`
+  re-exports and dependencies are removed.
+
 ### Added
 
 - Patch wire codecs (#192): `ZorphyPatchWire` is the total decode layer a
