@@ -1,346 +1,26 @@
-// Chord v2 in-memory cost guards (ISSUE-018, arrrrny/zorphy#193).
+// Reliability primitives for the Chord v2 in-memory cost guards
+// (ISSUE-018, arrrrny/zorphy#193; reliability contract arrrrny/zorphy#237;
+// real-generated-code move arrrrny/zorphy#234).
 //
-// The guard logic behind both CI entry points:
+// This file is DELIBERATELY generated-free: it holds only the pure reliability
+// harness (overload admission, robust sample statistics, the performance
+// verdict, the retry budget, the report types) plus the timing helpers. The
+// four guards themselves — and the `evaluateCostGuards()` that runs them —
+// live in `benchmark/cost_guards_impl.dart`, which imports the REAL
+// `build_runner`-generated v3 classes from
+// `benchmark/cost_guard_fixtures.dart` and measures THEM (#234).
 //
-//   * `dart run benchmark/cost_guards_benchmark.dart` — the standalone gate the
-//     issue's acceptance criterion names; exits non-zero when any guard is red.
-//   * `test/benchmark/cost_guards_test.dart` — rides the existing `dart test`
-//     CI step, so a regression fails the build even though the dedicated
-//     `cost_guards` workflow job could not be committed (the lane's GitHub
-//     credential lacks the `workflow` scope `.github/workflows/*` requires).
+// Keeping the harness here, free of any generated `part`, is what lets
+// `test/benchmark/cost_guards_reliability_test.dart` pin the reliability rules
+// as deterministic pure functions that compile and run without a generation
+// step — while the generated-aware test and the standalone benchmark exercise
+// the guards against real output.
 //
-// Each guard measures the real emitted API shape — the same shapes the
-// generator produces and the runtime fixtures under `test/runtime/fixtures/`
-// pin byte-for-byte. The fixture classes below mirror that output; they are
-// hand-shaped here only so the guards are a self-contained, runnable program.
-// The `test/golden/*` suites are what pin the emitter to these shapes.
-//
-// The four guards (Section 2 of the issue):
-//
-//   1. Zero-copy reference identity — `copyWith` / `changeTo*` reuse the
-//      untouched references (no deep clone of `tags`, `createdAt`, …).
-//   2. No-op patch identity — `Patch.diff(e, e).apply(e)` returns the SAME
-//      instance and runs in < 50 ns/call.
-//   3. Polymorphic JSON-Pointer lens lookup — `resolvePath('/…')` resolves in
-//      < 200 ns/lookup across 100_000 iterations, dispatching on the runtime
-//      subtype.
-//   4. Boundary validation throughput — `Entity.fromWire(validMap)` validates
-//      10_000 polymorphic entities in < 30 ms.
+// The release gate (the `dart test` CI step and the standalone `dart run`
+// entry) treats INCONCLUSIVE as NOT passing, so it cannot close on one.
+// ---------------------------------------------------------------------------
 
 import 'dart:io';
-
-import 'package:zorphy_annotation/zorphy.dart';
-
-// ---------------------------------------------------------------------------
-// Guard 1 fixtures — a concrete entity with a reference-typed collection field
-// (`tags`) and a `DateTime` (`createdAt`), plus a `changeTo*` morph that must
-// reuse both references.
-// ---------------------------------------------------------------------------
-
-/// Stands in for the generated `@ZorphyEntity Product`: `tags` is a
-/// `List<String>` and `createdAt` a `DateTime`, both reference-typed so a
-/// zero-copy `copyWith` / morph can be proven with `identical`.
-class Product {
-  const Product({
-    required this.id,
-    required this.price,
-    required this.tags,
-    required this.createdAt,
-  });
-
-  final String id;
-  final double price;
-  final List<String> tags;
-  final DateTime createdAt;
-
-  /// Generated `copyWith`: an omitted argument keeps the current reference.
-  Product copyWith({String? id, double? price, List<String>? tags}) {
-    return Product(
-      id: id ?? this.id,
-      price: price ?? this.price,
-      tags: tags ?? this.tags,
-      createdAt: createdAt,
-    );
-  }
-
-  /// A generated `changeTo*` morph (the polymorphic-patch shape): the fields it
-  /// does not touch are carried by reference, never cloned.
-  OrderNotification changeToPriceDropNotification({required double newPrice}) {
-    return OrderNotification(
-      id: id,
-      price: newPrice,
-      tags: tags,
-      createdAt: createdAt,
-    );
-  }
-
-  @override
-  String toString() => 'Product(id: $id, price: $price)';
-}
-
-/// The polymorphic sibling the morph produces; carries the SAME `tags` and
-/// `createdAt` references it was handed.
-class OrderNotification {
-  const OrderNotification({
-    required this.id,
-    required this.price,
-    required this.tags,
-    required this.createdAt,
-  });
-
-  final String id;
-  final double price;
-  final List<String> tags;
-  final DateTime createdAt;
-}
-
-// ---------------------------------------------------------------------------
-// Guard 2 fixtures — a concrete entity + its generated patch algebra
-// (`diff` / `apply`), byte-identical to `PatchEmitter`'s output.
-// ---------------------------------------------------------------------------
-
-enum Product$ { id, price, tags }
-
-class ProductPatch extends PatchBase<Product, Product$> {
-  const ProductPatch.empty() : super.empty();
-
-  ProductPatch() : super();
-
-  /// The canonical empty patch: no change, no allocation (the O(1) neutral
-  /// element `diff` returns for an identical pair).
-  static const ProductPatch emptyPatch = ProductPatch.empty();
-
-  bool get isEmpty => patchMap.isEmpty;
-
-  Product apply(Product target) {
-    if (isEmpty) return target;
-    return target.copyWith(
-      id: patchMap[Product$.id] as String?,
-      price: patchMap[Product$.price] as double?,
-      tags: patchMap[Product$.tags] as List<String>?,
-    );
-  }
-
-  @override
-  Product applyTo(Product entity) => apply(entity);
-
-  @override
-  ProductPatch compose(covariant ProductPatch next) {
-    if (next.isEmpty) return this;
-    if (isEmpty) return next;
-    return ProductPatch()..patchMap.addAll(next.patchMap);
-  }
-
-  @override
-  ProductPatch invert(Product before) {
-    final undo = ProductPatch();
-    if (patchMap.containsKey(Product$.id)) {
-      undo.patchMap[Product$.id] = before.id;
-    }
-    if (patchMap.containsKey(Product$.price)) {
-      undo.patchMap[Product$.price] = before.price;
-    }
-    if (patchMap.containsKey(Product$.tags)) {
-      undo.patchMap[Product$.tags] = before.tags;
-    }
-    return undo;
-  }
-
-  @override
-  Map<String, Object?> toWire() {
-    final wire = <String, Object?>{};
-    if (patchMap.containsKey(Product$.id)) wire['id'] = patchMap[Product$.id];
-    if (patchMap.containsKey(Product$.price)) {
-      wire['price'] = patchMap[Product$.price];
-    }
-    if (patchMap.containsKey(Product$.tags)) {
-      wire['tags'] = patchMap[Product$.tags];
-    }
-    return wire;
-  }
-
-  /// Generated `diff`: an identical pair yields the canonical empty patch, and
-  /// `apply` of an empty patch returns the target by reference.
-  static ProductPatch diff(Product previous, Product next) {
-    if (identical(previous, next)) return const ProductPatch.empty();
-    final changes = ProductPatch();
-    if (previous.id != next.id) changes.patchMap[Product$.id] = next.id;
-    if (previous.price != next.price) {
-      changes.patchMap[Product$.price] = next.price;
-    }
-    if (!identical(previous.tags, next.tags)) {
-      changes.patchMap[Product$.tags] = next.tags;
-    }
-    return changes;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Guard 3 fixtures — a polymorphic hierarchy with a static `resolvePath` lens
-// table (the `JsonPointerGenerator` shape). `resolvePath` is a compile-time
-// switch over the class's own JSON-Pointer segments and dispatches on the
-// runtime subtype.
-// ---------------------------------------------------------------------------
-
-sealed class UiNode {
-  const UiNode();
-
-  /// Generated static lens table: one switch step per segment, no mirrors.
-  static ZorphyLens<UiNode, Object?>? resolvePath(String pointer) {
-    switch (pointer) {
-      case '/label':
-        return ZorphyLens<UiNode, Object?>(
-          path: '/label',
-          get: (node) => node is ZfaButtonNode ? node.label : null,
-          set: (node, value) => node is ZfaButtonNode
-              ? node.copyWith(label: value as String)
-              : node,
-        );
-      case '/enabled':
-        return ZorphyLens<UiNode, Object?>(
-          path: '/enabled',
-          get: (node) => node is InteractiveUiNode ? node.enabled : null,
-          set: (node, value) => node is InteractiveUiNode
-              ? node.copyWith(enabled: value as bool)
-              : node,
-        );
-      default:
-        return null;
-    }
-  }
-}
-
-class InteractiveUiNode extends UiNode {
-  const InteractiveUiNode({required this.enabled});
-
-  final bool enabled;
-
-  InteractiveUiNode copyWith({bool? enabled}) =>
-      InteractiveUiNode(enabled: enabled ?? this.enabled);
-}
-
-class ZfaButtonNode extends InteractiveUiNode {
-  const ZfaButtonNode({required super.enabled, required this.label});
-
-  final String label;
-
-  @override
-  ZfaButtonNode copyWith({bool? enabled, String? label}) => ZfaButtonNode(
-    enabled: enabled ?? this.enabled,
-    label: label ?? this.label,
-  );
-}
-
-/// A nested-draft state with its own `resolvePath`, exercising the
-/// `/editDraft/price` composed-pointer shape from the issue.
-class ProductUiState {
-  const ProductUiState({required this.editDraft});
-
-  final EditDraft editDraft;
-
-  static ZorphyLens<ProductUiState, Object?>? resolvePath(String pointer) {
-    switch (pointer) {
-      case '/editDraft/price':
-        return ZorphyLens<ProductUiState, Object?>(
-          path: '/editDraft/price',
-          get: (state) => state.editDraft.price,
-          set: (state, value) => state.copyWith(
-            editDraft: state.editDraft.copyWith(price: value as double),
-          ),
-        );
-      default:
-        return null;
-    }
-  }
-
-  ProductUiState copyWith({EditDraft? editDraft}) =>
-      ProductUiState(editDraft: editDraft ?? this.editDraft);
-}
-
-class EditDraft {
-  const EditDraft({required this.price});
-
-  final double price;
-
-  EditDraft copyWith({double? price}) => EditDraft(price: price ?? this.price);
-}
-
-// ---------------------------------------------------------------------------
-// Guard 4 fixtures — a polymorphic entity with a generated `fromWire` boundary
-// codec that validates through a trusted constructor and accumulates
-// violations instead of throwing.
-// ---------------------------------------------------------------------------
-
-sealed class Entity {
-  const Entity();
-
-  /// Generated polymorphic `fromWire`: dispatches on the discriminator and
-  /// validates every field through total helpers (no `as`-cast).
-  static ZorphyBoundaryResult<Entity> fromWire(Map<String, Object?> raw) {
-    final kind = raw['kind'];
-    switch (kind) {
-      case 'product':
-        return _productFromWire(raw);
-      case 'order':
-        return _orderFromWire(raw);
-      default:
-        return BoundaryErr<Entity>(
-          targetType: 'Entity',
-          violations: <FieldViolation>[
-            FieldViolation(
-              path: '/kind',
-              expected: 'one of: product, order',
-              actual: ZorphyPatchWire.describe(kind),
-            ),
-          ],
-        );
-    }
-  }
-}
-
-class ProductEntity extends Entity {
-  const ProductEntity({required this.id, required this.price});
-
-  final String id;
-  final double price;
-}
-
-class OrderEntity extends Entity {
-  const OrderEntity({required this.id, required this.itemCount});
-
-  final String id;
-  final int itemCount;
-}
-
-ZorphyBoundaryResult<Entity> _productFromWire(Map<String, Object?> raw) {
-  final violations = <FieldViolation>[];
-  final id = ZorphyPatchWire.as<String>(raw['id'], '/id', violations);
-  final price = ZorphyPatchWire.asDouble(raw['price'], '/price', violations);
-  if (violations.isNotEmpty) {
-    return BoundaryErr<Entity>(
-      targetType: 'ProductEntity',
-      violations: violations,
-    );
-  }
-  return BoundaryOk<Entity>(ProductEntity(id: id!, price: price!));
-}
-
-ZorphyBoundaryResult<Entity> _orderFromWire(Map<String, Object?> raw) {
-  final violations = <FieldViolation>[];
-  final id = ZorphyPatchWire.as<String>(raw['id'], '/id', violations);
-  final itemCount = ZorphyPatchWire.as<int>(
-    raw['itemCount'],
-    '/itemCount',
-    violations,
-  );
-  if (violations.isNotEmpty) {
-    return BoundaryErr<Entity>(
-      targetType: 'OrderEntity',
-      violations: violations,
-    );
-  }
-  return BoundaryOk<Entity>(OrderEntity(id: id!, itemCount: itemCount!));
-}
 
 // ---------------------------------------------------------------------------
 // Reliability primitives (arrrrny/zorphy#237).
@@ -682,7 +362,9 @@ double readLoadAverage1m() {
   return 0;
 }
 
-double _maxLoadPerCoreFromEnv() {
+/// The per-core load budget from `COST_GUARD_MAX_LOAD_PER_CORE`, or
+/// [defaultMaxLoadPerCore] when unset/invalid.
+double maxLoadPerCoreFromEnv() {
   final raw = Platform.environment['COST_GUARD_MAX_LOAD_PER_CORE'];
   final v = double.tryParse(raw ?? '');
   if (v == null || v <= 0) return defaultMaxLoadPerCore;
@@ -707,7 +389,7 @@ const int retryBudget = 3;
 
 /// Runs [body] [iterations] times and returns the mean wall-clock cost per call
 /// in nanoseconds.
-int _meanNanos(int iterations, void Function(int) body) {
+int meanNanos(int iterations, void Function(int) body) {
   // Warm up so the JIT has tiered the hot path before we measure.
   for (var i = 0; i < 1000; i++) {
     body(i);
@@ -724,7 +406,7 @@ int _meanNanos(int iterations, void Function(int) body) {
 /// inconclusive result up to [retryBudget] times. [loadAdmitted] forces an
 /// inconclusive verdict when the host failed admission (measurements under
 /// overload are not trustworthy).
-PerformanceVerdict _timedVerdict({
+PerformanceVerdict timedVerdict({
   required int budget,
   required bool loadAdmitted,
   required List<int> Function() collect,
@@ -749,8 +431,9 @@ PerformanceVerdict _timedVerdict({
       // remaining retryBudget attempts are the actual re-samples.
       maxAttempts: retryBudget + 1,
       attempt: (i) {
-        if (i == 0)
+        if (i == 0) {
           return SampleVerdict.inconclusive; // first sample already in
+        }
         final retry = decidePerformance(
           samples: collect(),
           budget: budget,
@@ -762,176 +445,4 @@ PerformanceVerdict _timedVerdict({
     );
   }
   return verdict;
-}
-
-/// Runs all four Chord v2 cost guards and returns the suite (every guard report
-/// plus the environment metadata). Pure of network I/O; reads only the local
-/// load average and CPU count so both the `dart run` entry and the test can
-/// consume it.
-CostGuardSuite evaluateCostGuards() {
-  final cpuCount = Platform.numberOfProcessors;
-  final load1m = readLoadAverage1m();
-  final maxPerCore = _maxLoadPerCoreFromEnv();
-  final load = classifyLoad(
-    loadAverage1m: load1m,
-    cpuCount: cpuCount,
-    maxLoadPerCore: maxPerCore,
-  );
-  final environment = LoadEnvironment(
-    cpuCount: load.cpuCount,
-    loadAverage1m: load.loadAverage1m,
-    maxLoadPerCore: load.maxLoadPerCore,
-    admitted: load.admitted,
-  );
-
-  final guards = <CostGuardReport>[
-    _guard1ZeroCopy(),
-    _guard2NoOpPatch(load.admitted),
-    _guard3PolymorphicResolvePath(load.admitted),
-    _guard4BoundaryThroughput(load.admitted),
-  ];
-  return CostGuardSuite(guards: guards, environment: environment);
-}
-
-// Guard 1 — zero-copy reference identity (correctness only, no timing budget).
-CostGuardReport _guard1ZeroCopy() {
-  final tags = <String>['a', 'b', 'c'];
-  final createdAt = DateTime.utc(2026, 11, 24, 12);
-  final entity = Product(
-    id: 'p1',
-    price: 9.99,
-    tags: tags,
-    createdAt: createdAt,
-  );
-
-  final copied = entity.copyWith(price: 10.0);
-  final tagsReused = identical(entity.tags, copied.tags);
-
-  final notif = entity.changeToPriceDropNotification(newPrice: 19.99);
-  final createdAtReused = identical(entity.createdAt, notif.createdAt);
-
-  final ok = tagsReused && createdAtReused;
-  return CostGuardReport(
-    name: 'Guard 1: zero-copy reference identity',
-    correctnessOk: ok,
-    correctnessDetail:
-        'copyWith reuses tags=$tagsReused, morph reuses createdAt=$createdAtReused',
-    timing: PerformanceVerdict.greenSample,
-  );
-}
-
-// Guard 2 — no-op patch identity + latency.
-CostGuardReport _guard2NoOpPatch(bool loadAdmitted) {
-  final e = Product(
-    id: 'p1',
-    price: 9.99,
-    tags: const <String>['a'],
-    createdAt: DateTime.utc(2026, 11, 24),
-  );
-
-  final noop = ProductPatch.diff(e, e).apply(e);
-  final identityOk = identical(noop, e);
-
-  const budgetNs = 50; // nominal; CI headroom is the noise band, not a multiple
-  final timing = _timedVerdict(
-    budget: budgetNs,
-    loadAdmitted: loadAdmitted,
-    collect: () => List<int>.generate(
-      sampleCount,
-      (_) => _meanNanos(50_000, (_) {
-        ProductPatch.diff(e, e).apply(e);
-      }),
-    ),
-  );
-
-  return CostGuardReport(
-    name: 'Guard 2: no-op patch identity (<50ns, identical)',
-    correctnessOk: identityOk,
-    correctnessDetail: 'identical=$identityOk',
-    timing: timing,
-  );
-}
-
-// Guard 3 — polymorphic JSON-Pointer lens lookup latency.
-CostGuardReport _guard3PolymorphicResolvePath(bool loadAdmitted) {
-  final button = ZfaButtonNode(enabled: true, label: 'ok');
-  final state = ProductUiState(editDraft: const EditDraft(price: 1.0));
-
-  // Correctness first: the lens resolves and dispatches on the runtime subtype.
-  final enabledLens = UiNode.resolvePath('/enabled');
-  final enabledOk = enabledLens?.get(button) == true;
-  final priceLens = ProductUiState.resolvePath('/editDraft/price');
-  final priceOk = priceLens?.get(state) == 1.0;
-
-  const budgetNs = 200;
-  final timing = _timedVerdict(
-    budget: budgetNs,
-    loadAdmitted: loadAdmitted,
-    collect: () => List<int>.generate(sampleCount, (_) {
-      final nanosButton = _meanNanos(50_000, (_) {
-        UiNode.resolvePath('/enabled');
-      });
-      final nanosState = _meanNanos(50_000, (_) {
-        ProductUiState.resolvePath('/editDraft/price');
-      });
-      return nanosButton > nanosState ? nanosButton : nanosState;
-    }),
-  );
-
-  return CostGuardReport(
-    name: 'Guard 3: polymorphic resolvePath (<200ns/lookup)',
-    correctnessOk: enabledOk && priceOk,
-    correctnessDetail: 'enabled=$enabledOk price=$priceOk',
-    timing: timing,
-  );
-}
-
-// Guard 4 — boundary validation throughput.
-CostGuardReport _guard4BoundaryThroughput(bool loadAdmitted) {
-  const total = 10_000;
-  // Warm up both discriminator branches so `fromWire` is JIT-tiered before we
-  // time it.
-  for (var i = 0; i < 1000; i++) {
-    Entity.fromWire(
-      i.isEven
-          ? <String, Object?>{'kind': 'product', 'id': 'w$i', 'price': 9.99}
-          : <String, Object?>{'kind': 'order', 'id': 'w$i', 'itemCount': i},
-    );
-  }
-
-  // Correctness is MANDATORY and runs regardless of timing/load: every entity
-  // must validate. This is never skipped under overload (#237).
-  var ok = 0;
-  for (var i = 0; i < total; i++) {
-    final raw = i.isEven
-        ? <String, Object?>{'kind': 'product', 'id': 'c$i', 'price': 9.99}
-        : <String, Object?>{'kind': 'order', 'id': 'c$i', 'itemCount': i};
-    if (Entity.fromWire(raw) is BoundaryOk<Entity>) ok++;
-  }
-  final correctnessOk = ok == total;
-
-  const budgetMs = 30; // nominal; the noise band supplies the headroom
-  // Each timed sample is one full 10k validation pass, in milliseconds.
-  final timing = _timedVerdict(
-    budget: budgetMs,
-    loadAdmitted: loadAdmitted,
-    collect: () => List<int>.generate(sampleCount, (_) {
-      final sw = Stopwatch()..start();
-      for (var i = 0; i < total; i++) {
-        final raw = i.isEven
-            ? <String, Object?>{'kind': 'product', 'id': 'p$i', 'price': 9.99}
-            : <String, Object?>{'kind': 'order', 'id': 'o$i', 'itemCount': i};
-        Entity.fromWire(raw);
-      }
-      sw.stop();
-      return sw.elapsedMilliseconds;
-    }),
-  );
-
-  return CostGuardReport(
-    name: 'Guard 4: boundary validation throughput (<30ms/10k)',
-    correctnessOk: correctnessOk,
-    correctnessDetail: '$ok/$total validated',
-    timing: timing,
-  );
 }
