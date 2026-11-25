@@ -28,7 +28,6 @@ import 'package:test/test.dart';
 import 'package:zorphy/src/emission/archetype_composer.dart';
 import 'package:zorphy/src/parser/hierarchy_resolver.dart';
 import 'package:zorphy/src/parser/polymorphic_ir.dart';
-import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 const _annotationImport =
     "import 'package:zorphy_annotation/zorphy_annotation.dart';\n";
