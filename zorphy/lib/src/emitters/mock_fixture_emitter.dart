@@ -275,8 +275,14 @@ final class MockFixtureEmitter {
       }
 
       if (payload.isEmpty) {
-        // A fieldless LEAF's generated `const` constructor takes no arguments.
-        m.body = Code('return const ${node.cleanName}();');
+        // A fieldless LEAF's generated constructor takes no arguments. An
+        // intent's constructor is not const (IntentEmitter emits no const
+        // factory), so only the other archetypes may use the const form.
+        m.body = Code(
+          node.archetype == ArchetypeKind.intent
+              ? 'return ${node.cleanName}();'
+              : 'return const ${node.cleanName}();',
+        );
         return;
       }
 
@@ -305,12 +311,13 @@ final class MockFixtureEmitter {
         return;
       }
 
-      m.body = Block.of([
-        referType(node.cleanName)
-            .newInstanceNamed('fromTrusted', const [], arguments)
-            .returned
-            .statement,
-      ]);
+      // An intent constructs through its plain named-parameter constructor
+      // (#232): it carries no `fromTrusted` for the mock to call.
+      final construct = node.archetype == ArchetypeKind.intent
+          ? referType(node.cleanName).newInstance(const [], arguments)
+          : referType(node.cleanName)
+                .newInstanceNamed('fromTrusted', const [], arguments);
+      m.body = Block.of([construct.returned.statement]);
     });
   }
 

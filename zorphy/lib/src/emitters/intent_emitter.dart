@@ -1,10 +1,12 @@
 /// Emits the `@ZorphyIntent` surface of a [PolymorphicIr] (ISSUE-014, #189).
 ///
 /// An intent hierarchy is the one archetype family whose payload is replayed
-/// across a trust boundary, so its generated surface carries three things the
-/// other archetypes do not: an explicit `replaySafe` decision, a wire name
-/// (`intentName`), and a canonical `intentDigest()` that a receiver can verify
-/// a replay against. This emitter produces all of it — for a standalone intent
+/// across a trust boundary, so its generated surface carries an explicit
+/// `replaySafe` decision, a wire name (`intentName`), a canonical
+/// `intentDigest()` that a receiver can verify a replay against, and — since
+/// #232 — a validated `fromWire` decode through the shared boundary codec
+/// ([BoundaryCodecEmitter] with the intent constructor and value-exact
+/// number decode). This emitter produces all of it — for a standalone intent
 /// and for a sealed root with abstract intermediate leaves — through
 /// `package:code_builder` only: every declaration is a [Spec].
 ///
@@ -14,8 +16,13 @@
 /// may carry no directive other than `part of`. The Owning library is therefore
 /// responsible for importing the symbols the fragment names — at minimum
 /// [annotationImportUrl] — exactly the way `orchestrator.dart` folds
-/// `pluginImports` into the library it generates. Because the fragment is
-/// directive-free it composes into that library (and its `part` wrapper) as-is.
+/// `pluginImports` into the library it generates. Since #232 the fragment also
+/// NAMES the shared boundary helpers (`_boundaryAs`, `_boundaryDescribe`, …)
+/// from its `fromWire` decode bodies, so the Owning library must emit
+/// [BoundaryCodecEmitter.helperSpecs] (or the used subset) once per library —
+/// which `ArchetypeComposer` already does; a hand-rolled composition must do
+/// the same. Because the fragment is directive-free it composes into that
+/// library (and its `part` wrapper) as-is.
 ///
 /// Field types are emitted verbatim from the IR (`ZorphyFieldIr.type`), so a
 /// non-`dart:core` field type resolves against the Owning library's existing
@@ -33,6 +40,7 @@ import 'dart:collection';
 
 import 'package:code_builder/code_builder.dart';
 
+import '../emission/boundary_codec_emitter.dart';
 import '../emission/emitter.dart';
 import '../parser/polymorphic_ir.dart';
 
@@ -127,11 +135,49 @@ final class IntentEmitter {
       c.constructors.add(_constructor(payload));
 
       c.methods.addAll([
+        _fromWireMethod(node, payload),
         _intentNameGetter(node),
         _replaySafeGetter(node),
         _toWireMethod(node, payload),
         _intentDigestMethod(node, payload),
       ]);
+    });
+  }
+
+  /// The boundary codec every intent class decodes through (#232).
+  ///
+  /// Two decisions differ from the entity/value codec, both owned by the
+  /// intent's replay contract:
+  ///
+  /// - `trustedConstructor: null` — intents construct through their plain
+  ///   named-parameter constructor; they carry no `fromTrusted`.
+  /// - `widenNumbers: false` — `ZorphyIntentDigest` keeps the int `2` and the
+  ///   double `2.0` distinct, so a `num` field must decode value-exact or the
+  ///   digest would change across `fromWire(intent.toWire())`.
+  static final BoundaryCodecEmitter _codec = const BoundaryCodecEmitter(
+    trustedConstructor: null,
+    widenNumbers: false,
+  );
+
+  /// `static ZorphyBoundaryResult<InspectProductIntent> fromWire(Map<String, Object?> raw);`
+  ///
+  /// A dispatch node (a sealed root or an abstract intermediate) resolves
+  /// `raw[discriminatorKey]` against the concrete leaves below it and
+  /// re-types the leaf's result onto the root's contract; a leaf validates
+  /// every payload field with `is` tests that record a `FieldViolation`
+  /// instead of throwing, then constructs once no violation remains. A
+  /// validated decode preserves the leaf's own `intentName`/`replaySafe`/
+  /// `intentDigest` — those getters read the leaf's own annotation decisions,
+  /// which the constructor restores exactly (#232).
+  Method _fromWireMethod(ZorphyNodeIr node, List<ZorphyFieldIr> payload) {
+    return _codec.fromWire(node, {
+      node.className: [
+        for (final field in payload)
+          BoundaryField(
+            name: field.name,
+            type: field.isNullable ? '${field.type}?' : field.type,
+          ),
+      ],
     });
   }
 
