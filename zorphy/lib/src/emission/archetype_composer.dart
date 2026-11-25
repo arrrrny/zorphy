@@ -41,6 +41,15 @@
 ///   (a second class emitter would duplicate every intent class), and its
 ///   `toWire` would collide with the codec's.
 ///
+/// Every non-intent node also receives the typed-lens and JSON-Pointer surface
+/// (ISSUE-0230): [LensEmitter] contributes the `static const <Name>Lenses
+/// lenses` registry (spliced into each concrete class) plus the top-level
+/// `<Name>Lenses` accessor classes, and [JsonPointerEmitter] contributes the
+/// `static ZorphyLens<T, Object?>? resolvePath(String)` resolver on every
+/// non-generic node — sealed roots included. Both are IR-native: the legacy
+/// `LensGenerator`/`JsonPointerGenerator` consume the analyzer's
+/// `ClassMetadata`, which the v3 path never builds.
+///
 /// The output is a PART-FILE BODY: directive-free source the owning library
 /// composes into its shared part. The fragment names `ZorphyEntityBase`,
 /// `ZorphyBoundaryResult`, `ZorphyIntentDigest`, ... — all from
@@ -56,6 +65,8 @@ import '../emitters/mock_fixture_emitter.dart';
 import '../parser/polymorphic_ir.dart';
 import 'boundary_codec_emitter.dart';
 import 'emitter.dart';
+import 'json_pointer_emitter.dart';
+import 'lens_emitter.dart';
 import 'polymorphic_class_emitter.dart';
 import 'polymorphic_matcher_emitter.dart';
 import 'polymorphic_morphing_emitter.dart';
@@ -145,6 +156,11 @@ final class ArchetypeComposer {
     }
 
     const codec = BoundaryCodecEmitter();
+    // The lens + JSON-Pointer surfaces (ISSUE-0230) are IR-native: they read
+    // the whole graph, not one hierarchy, because a node's resolver dispatches
+    // into its subtypes and nested types. Compute them once per library.
+    final resolvePaths = JsonPointerEmitter(ir).resolvePathMethods();
+    final lensRegistries = const LensEmitter().registryFields(ir);
     // `_sentinel` backs the leaf `copyWith` clear-a-nullable-field path. It
     // is a library-level declaration, so it is emitted only when some
     // emitted leaf's payload actually carries a nullable field — otherwise
@@ -176,21 +192,30 @@ final class ArchetypeComposer {
     for (final root in ir.roots) {
       // Intents emit their own class surface through [IntentEmitter] below.
       if (root.archetype == ArchetypeKind.intent) continue;
-      final extraMethods = <String, List<Method>>{
-        // `_walk` yields nothing for a generic root and prunes generic
-        // children: exactly the nodes that receive a codec.
-        for (final node in _walk(root))
-          node.className: codec.emitCodec(
+      final extraMethods = <String, List<Method>>{};
+      final extraFields = <String, List<Field>>{};
+      // `_walk` yields nothing for a generic root and prunes generic children:
+      // exactly the nodes that receive a codec and the lens/resolver surface.
+      for (final node in _walk(root)) {
+        final methods = <Method>[
+          ...codec.emitCodec(
             node,
             payloads,
             additionalNodes: knownNodes,
           ),
-      };
+        ];
+        final resolvePath = resolvePaths[node.className];
+        if (resolvePath != null) methods.add(resolvePath);
+        extraMethods[node.className] = methods;
+        final registry = lensRegistries[node.className];
+        if (registry != null) extraFields[node.className] = [registry];
+      }
       fragments.add(
         const PolymorphicClassEmitter().emit(
           root: root,
           fields: ownFields,
           extraMethods: extraMethods,
+          extraFields: extraFields,
           // The `_sentinel` declarations are one-per-library: only the first
           // hierarchy carries them, or the duplicates are a compile error.
           includeSentinelDeclarations: firstRoot && needsSentinel,
@@ -201,7 +226,8 @@ final class ArchetypeComposer {
       // no patch can name its type parameter, and the mock emitter skips
       // generic nodes anyway.
       if (root.typeParameters.isEmpty) {
-        if (root.archetype == ArchetypeKind.entity) {
+        if (root.archetype == ArchetypeKind.entity ||
+            root.archetype == ArchetypeKind.state) {
           fragments.add(_emitEntityPatches(root));
         }
         fragments.add(MockFixtureEmitter().emit(root));
@@ -226,6 +252,13 @@ final class ArchetypeComposer {
           ),
         ),
       );
+      // The `<Name>Lenses` accessor classes are top-level, one per concrete
+      // node, emitted once per library after the classes that own the registry
+      // field referencing them (ISSUE-0230).
+      final lensClasses = const LensEmitter().lensClasses(ir);
+      if (lensClasses.isNotEmpty) {
+        fragments.add(ZorphyEmitter().emitSpecs(lensClasses));
+      }
     }
 
     // Intent hierarchies emit their own class surface (see the library doc).
@@ -310,33 +343,69 @@ final class ArchetypeComposer {
     ];
 
     final rootFieldNames = [for (final field in root.fields) field.name];
-    void walk(ZorphyNodeIr node) {
+
+    // Emit the patch surface depth-first. Each level carries the patch base its
+    // children extend (the root patch at the top, the nearest intermediate
+    // patch below) and the field names declared at or above it (so a child
+    // marks those `@override`). An abstract intermediate gets a REAL patch
+    // class carrying its own fields — not a typedef alias — so its fields are
+    // patchable through the intermediate surface (#229 §3).
+    void walk(
+      ZorphyNodeIr node,
+      String basePatchName,
+      List<String> inheritedFieldNames,
+    ) {
       for (final child in node.directSubTypes) {
-        // A generic subtree is pruned from the patch surface for the same
-        // reason the root is: no patch can name its type parameter, and
-        // `MockFixtureEmitter` skips it too.
         if (child.typeParameters.isNotEmpty) continue;
+        final childPatchName = '${child.cleanName}Patch';
+        final childOwnNames = [for (final field in child.fields) field.name];
+        final childInherited = [...inheritedFieldNames, ...childOwnNames];
         if (child.isConcreteLeaf) {
           fragments.add(
             emitter.emitSubtypePatch(
               subtypeName: child.cleanName,
               rootName: root.cleanName,
               fields: _patchFields(_payloadFields(child)),
-              sharedFields: rootFieldNames,
+              sharedFields: inheritedFieldNames,
+              basePatchName: basePatchName,
             ),
           );
         } else {
-          // An abstract intermediate: its mock delegates to a leaf patch, so
-          // the name only has to RESOLVE to a supertype of every leaf patch.
+          // A real intermediate patch: it extends the nearest patch base and
+          // carries the intermediate's own fields, and the leaves below extend
+          // IT. `apply` dispatches to those leaves through their `copyWith`.
+          final leaves = _concreteLeaves(child);
           fragments.add(
-            'typedef ${child.cleanName}Patch = ${root.cleanName}Patch;',
+            emitter.emitIntermediatePatch(
+              name: child.cleanName,
+              rootName: root.cleanName,
+              basePatchName: basePatchName,
+              fields: _patchFields(_payloadFields(child)),
+              sharedFields: inheritedFieldNames,
+              leafNames: [for (final leaf in leaves) leaf.cleanName],
+              leafFieldTypes: {
+                for (final leaf in leaves)
+                  leaf.cleanName: {
+                    // The leaf's OWN payload, not the intermediate's: the
+                    // intermediate `apply` dispatches through each leaf's
+                    // `copyWith`, so a leaf that covariantly narrows an
+                    // inherited field must be cast to ITS declared type —
+                    // the same rule `_sharedApplyMethod` follows for the
+                    // root's shared patch.
+                    for (final field in _payloadFields(leaf))
+                      field.name: field.isNullable
+                          ? '${field.type}?'
+                          : field.type,
+                  },
+              },
+            ),
           );
-          walk(child);
+          walk(child, childPatchName, childInherited);
         }
       }
     }
 
-    walk(root);
+    walk(root, '${root.cleanName}Patch', rootFieldNames);
     return fragments.join('\n\n');
   }
 

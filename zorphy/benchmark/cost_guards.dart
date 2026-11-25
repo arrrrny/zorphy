@@ -27,6 +27,8 @@
 //   4. Boundary validation throughput — `Entity.fromWire(validMap)` validates
 //      10_000 polymorphic entities in < 30 ms.
 
+import 'dart:io';
+
 import 'package:zorphy_annotation/zorphy.dart';
 
 // ---------------------------------------------------------------------------
@@ -341,31 +343,367 @@ ZorphyBoundaryResult<Entity> _orderFromWire(Map<String, Object?> raw) {
 }
 
 // ---------------------------------------------------------------------------
-// Harness
+// Reliability primitives (arrrrny/zorphy#237).
+//
+// The 2026-11-25 re-audit found the gate unreliable on a shared host: the
+// in-suite run was green (739/739) while two standalone runs failed at
+// loadavg ~133 on 12 cores. The cause was a single timed sample gated on a
+// fixed 2x headroom, with no overload admission and no inconclusive state — so
+// host contention produced a misleading RED and a quiet host a GREEN with no
+// evidence the host was fit to measure.
+//
+// The fix is a reproducible performance-gate design, not a threshold bump:
+//
+//   * `classifyLoad` — an overload admission check. A host past its per-core
+//     load budget is INCONCLUSIVE (not measured), never a misleading red.
+//   * `summarizeSamples` — robust multi-sample statistics (median + MAD), so a
+//     single noisy sample cannot flip the verdict.
+//   * `decidePerformance` — classifies a measurement as green / red /
+//     INCONCLUSIVE from the median and its noise band against the budget. A
+//     band that straddles the budget is inconclusive, never a guess.
+//   * `withRetries` — an explicit retry budget: an inconclusive/slow sample is
+//     re-measured before the guard settles on a documented INCONCLUSIVE.
+//   * `CostGuardReport` — keeps correctness/identity MANDATORY: a correctness
+//     failure is red regardless of timing, and an inconclusive timing is an
+//     inconclusive guard, never green.
+//
+// The release gate (the `dart test` CI step and the standalone `dart run`
+// entry) treats INCONCLUSIVE as NOT passing, so it cannot close on one.
 // ---------------------------------------------------------------------------
 
-/// The outcome of one cost guard: whether it stayed within budget, plus a
-/// human-readable detail line carrying the measured numbers.
-class CostGuardResult {
-  const CostGuardResult({
-    required this.name,
-    required this.passed,
+/// The three-valued outcome of a performance measurement. INCONCLUSIVE is a
+/// first-class result — the documented outcome under host overload — distinct
+/// from both a pass (green) and a regression (red).
+enum PerformanceOutcome { green, red, inconclusive }
+
+/// The three-valued outcome of a whole cost guard: correctness plus timing.
+enum GuardOutcome { green, red, inconclusive }
+
+/// The verdict of the overload admission check.
+class LoadVerdict {
+  const LoadVerdict({
+    required this.admitted,
+    required this.loadAverage1m,
+    required this.cpuCount,
+    required this.maxLoadPerCore,
+  });
+
+  /// Whether the host is fit to measure (load within the per-core budget).
+  final bool admitted;
+
+  /// True when the host is too loaded to measure — the inconclusive case.
+  bool get inconclusive => !admitted;
+
+  final double loadAverage1m;
+  final int cpuCount;
+  final double maxLoadPerCore;
+
+  /// The per-core load budget the host was admitted against.
+  double get budgetPerCore => maxLoadPerCore;
+
+  String get detail =>
+      'loadavg ${loadAverage1m.toStringAsFixed(2)} over '
+      '${cpuCount} cores (budget ${maxLoadPerCore.toStringAsFixed(2)}/core) '
+      '→ ${admitted ? 'admitted' : 'INCONCLUSIVE (overloaded)'}';
+
+  @override
+  String toString() => 'LoadVerdict($detail)';
+}
+
+/// Default per-core load budget for admission. The #237 misfire was ~11 load
+/// per core; a normal `dart test -j 2` never approaches 2/core, so this catches
+/// genuine overload without self-flaking the in-suite run. Override with
+/// `COST_GUARD_MAX_LOAD_PER_CORE`.
+const double defaultMaxLoadPerCore = 2.0;
+
+/// Classifies a host's 1-minute load average against a per-core budget.
+///
+/// Pure so the reliability contract is testable without provoking real load.
+LoadVerdict classifyLoad({
+  required double loadAverage1m,
+  required int cpuCount,
+  required double maxLoadPerCore,
+}) {
+  final cores = cpuCount < 1 ? 1 : cpuCount;
+  final admitted = loadAverage1m <= cores * maxLoadPerCore;
+  return LoadVerdict(
+    admitted: admitted,
+    loadAverage1m: loadAverage1m,
+    cpuCount: cores,
+    maxLoadPerCore: maxLoadPerCore,
+  );
+}
+
+/// Robust summary of a timing sample set: median and median absolute deviation.
+/// The median/MAD pair ignores a single outlier (a pre-empted sample), which a
+/// mean would let dominate the verdict.
+class SampleStats {
+  const SampleStats(this.median, this.mad);
+
+  final int median;
+  final int mad;
+
+  @override
+  String toString() => 'SampleStats(median=$median, mad=$mad)';
+}
+
+/// Median and median-absolute-deviation of [samples] (integer nanoseconds/ms).
+SampleStats summarizeSamples(List<int> samples) {
+  if (samples.isEmpty) return const SampleStats(0, 0);
+  final sorted = List<int>.of(samples)..sort();
+  final median = _intMedian(sorted);
+  final deviations = sorted.map((v) => (v - median).abs()).toList()..sort();
+  final mad = _intMedian(deviations);
+  return SampleStats(median, mad);
+}
+
+int _intMedian(List<int> sorted) {
+  final n = sorted.length;
+  final lo = sorted[(n - 1) ~/ 2];
+  final hi = sorted[n ~/ 2];
+  return (lo + hi) ~/ 2;
+}
+
+/// The performance verdict for one guard: the outcome plus the numbers behind
+/// it (median, MAD, budget) and a human-readable detail line.
+class PerformanceVerdict {
+  const PerformanceVerdict({
+    required this.outcome,
+    required this.median,
+    required this.mad,
+    required this.budget,
     required this.detail,
   });
 
-  final String name;
-  final bool passed;
+  final PerformanceOutcome outcome;
+  final int median;
+  final int mad;
+  final int budget;
   final String detail;
 
+  bool get withinBudget => median <= budget;
+
+  /// A ready-made green verdict for guards with no timing dimension (Guard 1).
+  static const PerformanceVerdict greenSample = PerformanceVerdict(
+    outcome: PerformanceOutcome.green,
+    median: 0,
+    mad: 0,
+    budget: 1,
+    detail: 'correctness-only guard (no timing budget)',
+  );
+
+  /// A ready-made inconclusive verdict (used in tests and the load gate).
+  static const PerformanceVerdict inconclusiveSample = PerformanceVerdict(
+    outcome: PerformanceOutcome.inconclusive,
+    median: 0,
+    mad: 0,
+    budget: 1,
+    detail: 'inconclusive (host overloaded or too noisy to measure)',
+  );
+
   @override
-  String toString() => '${passed ? 'PASS' : 'FAIL'} $name — $detail';
+  String toString() => '${outcome.name.toUpperCase()} timing — $detail';
 }
 
-/// Shared CI headroom factor for the wall-clock guards. A fixed budget met
-/// exactly on a developer machine flakes on a contended shared runner, so each
-/// timing guard accepts up to this multiple of its nominal budget while still
-/// reporting the nominal budget in its detail line.
+/// Decides green / red / INCONCLUSIVE from [samples] against [budget].
+///
+/// * green — the whole noise band (median ± [maxMadsOverBudget]·MAD) is within
+///   budget;
+/// * red — the whole band is above budget (a stable regression);
+/// * inconclusive — the band straddles the budget (too noisy to call), never a
+///   misleading red and never a green.
+PerformanceVerdict decidePerformance({
+  required List<int> samples,
+  required int budget,
+  required int maxMadsOverBudget,
+}) {
+  final stats = summarizeSamples(samples);
+  final upperBand = stats.median + maxMadsOverBudget * stats.mad;
+  final lowerBand = stats.median - maxMadsOverBudget * stats.mad;
+
+  final PerformanceOutcome outcome;
+  if (upperBand <= budget) {
+    outcome = PerformanceOutcome.green;
+  } else if (lowerBand > budget) {
+    outcome = PerformanceOutcome.red;
+  } else {
+    outcome = PerformanceOutcome.inconclusive;
+  }
+
+  final band =
+      'median ${stats.median} (MAD ${stats.mad}, band '
+      '${lowerBand}..${upperBand}) vs budget ${budget}';
+  final detail = outcome == PerformanceOutcome.inconclusive
+      ? 'noisy: $band — straddles budget, INCONCLUSIVE'
+      : '$band';
+  return PerformanceVerdict(
+    outcome: outcome,
+    median: stats.median,
+    mad: stats.mad,
+    budget: budget,
+    detail: detail,
+  );
+}
+
+/// The per-attempt verdict used by [withRetries].
+enum SampleVerdict { green, red, inconclusive }
+
+/// Runs [attempt] up to [maxAttempts] times, returning the first green/red, and
+/// INCONCLUSIVE if every attempt is inconclusive. A hard red short-circuits
+/// without burning the remaining budget.
+SampleVerdict withRetries({
+  required int maxAttempts,
+  required SampleVerdict Function(int attempt) attempt,
+}) {
+  var last = SampleVerdict.inconclusive;
+  final attempts = maxAttempts < 1 ? 1 : maxAttempts;
+  for (var i = 0; i < attempts; i++) {
+    last = attempt(i);
+    if (last != SampleVerdict.inconclusive) return last;
+  }
+  return last;
+}
+
+SampleVerdict _outcomeToSample(PerformanceOutcome o) => switch (o) {
+  PerformanceOutcome.green => SampleVerdict.green,
+  PerformanceOutcome.red => SampleVerdict.red,
+  PerformanceOutcome.inconclusive => SampleVerdict.inconclusive,
+};
+
+/// One guard's report: a MANDATORY correctness result plus a timing verdict.
+class CostGuardReport {
+  const CostGuardReport({
+    required this.name,
+    required this.correctnessOk,
+    required this.correctnessDetail,
+    required this.timing,
+  });
+
+  final String name;
+  final bool correctnessOk;
+  final String correctnessDetail;
+  final PerformanceVerdict timing;
+
+  /// The combined outcome. Correctness dominates: a correctness failure is red
+  /// whatever the timing says; otherwise the timing outcome carries through.
+  GuardOutcome get outcome {
+    if (!correctnessOk) return GuardOutcome.red;
+    return switch (timing.outcome) {
+      PerformanceOutcome.green => GuardOutcome.green,
+      PerformanceOutcome.red => GuardOutcome.red,
+      PerformanceOutcome.inconclusive => GuardOutcome.inconclusive,
+    };
+  }
+
+  bool get passed => outcome == GuardOutcome.green;
+  bool get inconclusive => outcome == GuardOutcome.inconclusive;
+
+  String get detail =>
+      correctnessOk ? timing.detail : 'correctness FAILED: $correctnessDetail';
+
+  @override
+  String toString() => '${outcome.name.toUpperCase()} $name — $detail';
+}
+
+/// The host environment a guard run measured against.
+class LoadEnvironment {
+  const LoadEnvironment({
+    required this.cpuCount,
+    required this.loadAverage1m,
+    required this.maxLoadPerCore,
+    required this.admitted,
+  });
+
+  final int cpuCount;
+  final double loadAverage1m;
+  final double maxLoadPerCore;
+  final bool admitted;
+
+  static const LoadEnvironment sample = LoadEnvironment(
+    cpuCount: 1,
+    loadAverage1m: 0,
+    maxLoadPerCore: defaultMaxLoadPerCore,
+    admitted: true,
+  );
+
+  @override
+  String toString() =>
+      'LoadEnvironment(cores=$cpuCount, loadavg='
+      '${loadAverage1m.toStringAsFixed(2)}, admitted=$admitted)';
+}
+
+/// The whole suite: every guard report plus the environment metadata, with an
+/// aggregate outcome that is INCONCLUSIVE if any guard is inconclusive.
+class CostGuardSuite {
+  const CostGuardSuite({required this.guards, required this.environment});
+
+  final List<CostGuardReport> guards;
+  final LoadEnvironment environment;
+
+  /// green only if every guard is green; red if any is red; else inconclusive.
+  GuardOutcome get aggregate {
+    var sawInconclusive = false;
+    for (final g in guards) {
+      if (g.outcome == GuardOutcome.red) return GuardOutcome.red;
+      if (g.outcome == GuardOutcome.inconclusive) sawInconclusive = true;
+    }
+    return sawInconclusive ? GuardOutcome.inconclusive : GuardOutcome.green;
+  }
+
+  bool get allPassed => aggregate == GuardOutcome.green;
+}
+
+/// Reads the 1-minute load average, or 0 when the platform does not expose one.
+double readLoadAverage1m() {
+  // Linux: /proc/loadavg — first field is the 1-minute average.
+  try {
+    final f = File('/proc/loadavg');
+    if (f.existsSync()) {
+      final first = f.readAsStringSync().split(RegExp(r'\s+')).first;
+      final v = double.tryParse(first);
+      if (v != null) return v;
+    }
+  } catch (_) {
+    // fall through to sysctl
+  }
+  // macOS / BSD: sysctl vm.loadavg → "{ 1.87 2.42 2.53 }".
+  try {
+    final r = Process.runSync('sysctl', <String>['-n', 'vm.loadavg']);
+    if (r.exitCode == 0) {
+      final m = RegExp(r'[0-9]+(?:\.[0-9]+)?').firstMatch(r.stdout as String);
+      if (m != null) {
+        final v = double.tryParse(m.group(0)!);
+        if (v != null) return v;
+      }
+    }
+  } catch (_) {
+    // no load reading available — caller treats 0 as "cannot prove overload"
+  }
+  return 0;
+}
+
+double _maxLoadPerCoreFromEnv() {
+  final raw = Platform.environment['COST_GUARD_MAX_LOAD_PER_CORE'];
+  final v = double.tryParse(raw ?? '');
+  if (v == null || v <= 0) return defaultMaxLoadPerCore;
+  return v;
+}
+
+// ---------------------------------------------------------------------------
+// Harness
+// ---------------------------------------------------------------------------
+
+/// Shared CI headroom factor retained for the detail lines' "CI budget"
+/// wording; the verdict itself is now decided by [decidePerformance] against
+/// the nominal budget with a noise band, not a fixed multiple.
 const int ciHeadroomFactor = 2;
+
+/// Number of timed samples per wall-clock guard (robust median/MAD input).
+const int sampleCount = 7;
+
+/// How many times an inconclusive/slow measurement is retried before the guard
+/// settles on a documented INCONCLUSIVE.
+const int retryBudget = 3;
 
 /// Runs [body] [iterations] times and returns the mean wall-clock cost per call
 /// in nanoseconds.
@@ -382,18 +720,81 @@ int _meanNanos(int iterations, void Function(int) body) {
   return sw.elapsedMicroseconds * 1000 ~/ iterations;
 }
 
-/// Runs all four Chord v2 cost guards and returns one [CostGuardResult] each,
-/// in issue order. Pure of I/O so both the `dart run` entry and the test can
-/// consume it.
-List<CostGuardResult> evaluateCostGuards() => <CostGuardResult>[
-  _guard1ZeroCopy(),
-  _guard2NoOpPatch(),
-  _guard3PolymorphicResolvePath(),
-  _guard4BoundaryThroughput(),
-];
+/// Measures [measure] [sampleCount] times and decides a verdict, retrying an
+/// inconclusive result up to [retryBudget] times. [loadAdmitted] forces an
+/// inconclusive verdict when the host failed admission (measurements under
+/// overload are not trustworthy).
+PerformanceVerdict _timedVerdict({
+  required int budget,
+  required bool loadAdmitted,
+  required List<int> Function() collect,
+}) {
+  if (!loadAdmitted) {
+    return PerformanceVerdict(
+      outcome: PerformanceOutcome.inconclusive,
+      median: 0,
+      mad: 0,
+      budget: budget,
+      detail: 'host not admitted (overloaded) — INCONCLUSIVE',
+    );
+  }
+  var verdict = decidePerformance(
+    samples: collect(),
+    budget: budget,
+    maxMadsOverBudget: 3,
+  );
+  if (verdict.outcome == PerformanceOutcome.inconclusive) {
+    withRetries(
+      // attempt(0) is the initial sample (already collected above); the
+      // remaining retryBudget attempts are the actual re-samples.
+      maxAttempts: retryBudget + 1,
+      attempt: (i) {
+        if (i == 0)
+          return SampleVerdict.inconclusive; // first sample already in
+        final retry = decidePerformance(
+          samples: collect(),
+          budget: budget,
+          maxMadsOverBudget: 3,
+        );
+        verdict = retry;
+        return _outcomeToSample(retry.outcome);
+      },
+    );
+  }
+  return verdict;
+}
 
-// Guard 1 — zero-copy reference identity.
-CostGuardResult _guard1ZeroCopy() {
+/// Runs all four Chord v2 cost guards and returns the suite (every guard report
+/// plus the environment metadata). Pure of network I/O; reads only the local
+/// load average and CPU count so both the `dart run` entry and the test can
+/// consume it.
+CostGuardSuite evaluateCostGuards() {
+  final cpuCount = Platform.numberOfProcessors;
+  final load1m = readLoadAverage1m();
+  final maxPerCore = _maxLoadPerCoreFromEnv();
+  final load = classifyLoad(
+    loadAverage1m: load1m,
+    cpuCount: cpuCount,
+    maxLoadPerCore: maxPerCore,
+  );
+  final environment = LoadEnvironment(
+    cpuCount: load.cpuCount,
+    loadAverage1m: load.loadAverage1m,
+    maxLoadPerCore: load.maxLoadPerCore,
+    admitted: load.admitted,
+  );
+
+  final guards = <CostGuardReport>[
+    _guard1ZeroCopy(),
+    _guard2NoOpPatch(load.admitted),
+    _guard3PolymorphicResolvePath(load.admitted),
+    _guard4BoundaryThroughput(load.admitted),
+  ];
+  return CostGuardSuite(guards: guards, environment: environment);
+}
+
+// Guard 1 — zero-copy reference identity (correctness only, no timing budget).
+CostGuardReport _guard1ZeroCopy() {
   final tags = <String>['a', 'b', 'c'];
   final createdAt = DateTime.utc(2026, 11, 24, 12);
   final entity = Product(
@@ -409,17 +810,18 @@ CostGuardResult _guard1ZeroCopy() {
   final notif = entity.changeToPriceDropNotification(newPrice: 19.99);
   final createdAtReused = identical(entity.createdAt, notif.createdAt);
 
-  return CostGuardResult(
+  final ok = tagsReused && createdAtReused;
+  return CostGuardReport(
     name: 'Guard 1: zero-copy reference identity',
-    passed: tagsReused && createdAtReused,
-    detail:
-        'copyWith reuses tags=$tagsReused, '
-        'morph reuses createdAt=$createdAtReused',
+    correctnessOk: ok,
+    correctnessDetail:
+        'copyWith reuses tags=$tagsReused, morph reuses createdAt=$createdAtReused',
+    timing: PerformanceVerdict.greenSample,
   );
 }
 
 // Guard 2 — no-op patch identity + latency.
-CostGuardResult _guard2NoOpPatch() {
+CostGuardReport _guard2NoOpPatch(bool loadAdmitted) {
   final e = Product(
     id: 'p1',
     price: 9.99,
@@ -430,22 +832,28 @@ CostGuardResult _guard2NoOpPatch() {
   final noop = ProductPatch.diff(e, e).apply(e);
   final identityOk = identical(noop, e);
 
-  final nanos = _meanNanos(100_000, (_) {
-    ProductPatch.diff(e, e).apply(e);
-  });
-  final ciBudgetNs = 50 * ciHeadroomFactor;
+  const budgetNs = 50; // nominal; CI headroom is the noise band, not a multiple
+  final timing = _timedVerdict(
+    budget: budgetNs,
+    loadAdmitted: loadAdmitted,
+    collect: () => List<int>.generate(
+      sampleCount,
+      (_) => _meanNanos(50_000, (_) {
+        ProductPatch.diff(e, e).apply(e);
+      }),
+    ),
+  );
 
-  return CostGuardResult(
+  return CostGuardReport(
     name: 'Guard 2: no-op patch identity (<50ns, identical)',
-    passed: identityOk && nanos < ciBudgetNs,
-    detail:
-        'identical=$identityOk, ${nanos}ns/call '
-        '(nominal budget 50ns, CI budget ${ciBudgetNs}ns)',
+    correctnessOk: identityOk,
+    correctnessDetail: 'identical=$identityOk',
+    timing: timing,
   );
 }
 
 // Guard 3 — polymorphic JSON-Pointer lens lookup latency.
-CostGuardResult _guard3PolymorphicResolvePath() {
+CostGuardReport _guard3PolymorphicResolvePath(bool loadAdmitted) {
   final button = ZfaButtonNode(enabled: true, label: 'ok');
   final state = ProductUiState(editDraft: const EditDraft(price: 1.0));
 
@@ -455,29 +863,34 @@ CostGuardResult _guard3PolymorphicResolvePath() {
   final priceLens = ProductUiState.resolvePath('/editDraft/price');
   final priceOk = priceLens?.get(state) == 1.0;
 
-  final nanosButton = _meanNanos(100_000, (_) {
-    UiNode.resolvePath('/enabled');
-  });
-  final nanosState = _meanNanos(100_000, (_) {
-    ProductUiState.resolvePath('/editDraft/price');
-  });
-  final worst = nanosButton > nanosState ? nanosButton : nanosState;
+  const budgetNs = 200;
+  final timing = _timedVerdict(
+    budget: budgetNs,
+    loadAdmitted: loadAdmitted,
+    collect: () => List<int>.generate(sampleCount, (_) {
+      final nanosButton = _meanNanos(50_000, (_) {
+        UiNode.resolvePath('/enabled');
+      });
+      final nanosState = _meanNanos(50_000, (_) {
+        ProductUiState.resolvePath('/editDraft/price');
+      });
+      return nanosButton > nanosState ? nanosButton : nanosState;
+    }),
+  );
 
-  return CostGuardResult(
+  return CostGuardReport(
     name: 'Guard 3: polymorphic resolvePath (<200ns/lookup)',
-    passed: enabledOk && priceOk && worst < 200,
-    detail:
-        'enabled=$enabledOk price=$priceOk, worst ${worst}ns '
-        '(button ${nanosButton}ns, state ${nanosState}ns; budget 200ns)',
+    correctnessOk: enabledOk && priceOk,
+    correctnessDetail: 'enabled=$enabledOk price=$priceOk',
+    timing: timing,
   );
 }
 
 // Guard 4 — boundary validation throughput.
-CostGuardResult _guard4BoundaryThroughput() {
+CostGuardReport _guard4BoundaryThroughput(bool loadAdmitted) {
   const total = 10_000;
   // Warm up both discriminator branches so `fromWire` is JIT-tiered before we
-  // time it. This guard used to run cold and hit its nominal budget exactly;
-  // the other latency guards warm up through `_meanNanos`.
+  // time it.
   for (var i = 0; i < 1000; i++) {
     Entity.fromWire(
       i.isEven
@@ -486,28 +899,39 @@ CostGuardResult _guard4BoundaryThroughput() {
     );
   }
 
-  // A relative headroom absorbs shared-runner contention instead of gating on
-  // a fixed number the warm run can land exactly on.
-  const nominalBudgetMs = 30;
-  final ciBudgetMs = nominalBudgetMs * ciHeadroomFactor;
-
-  final sw = Stopwatch()..start();
+  // Correctness is MANDATORY and runs regardless of timing/load: every entity
+  // must validate. This is never skipped under overload (#237).
   var ok = 0;
   for (var i = 0; i < total; i++) {
     final raw = i.isEven
-        ? <String, Object?>{'kind': 'product', 'id': 'p$i', 'price': 9.99}
-        : <String, Object?>{'kind': 'order', 'id': 'o$i', 'itemCount': i};
-    final result = Entity.fromWire(raw);
-    if (result is BoundaryOk<Entity>) ok++;
+        ? <String, Object?>{'kind': 'product', 'id': 'c$i', 'price': 9.99}
+        : <String, Object?>{'kind': 'order', 'id': 'c$i', 'itemCount': i};
+    if (Entity.fromWire(raw) is BoundaryOk<Entity>) ok++;
   }
-  sw.stop();
+  final correctnessOk = ok == total;
 
-  final elapsedMs = sw.elapsedMilliseconds;
-  return CostGuardResult(
+  const budgetMs = 30; // nominal; the noise band supplies the headroom
+  // Each timed sample is one full 10k validation pass, in milliseconds.
+  final timing = _timedVerdict(
+    budget: budgetMs,
+    loadAdmitted: loadAdmitted,
+    collect: () => List<int>.generate(sampleCount, (_) {
+      final sw = Stopwatch()..start();
+      for (var i = 0; i < total; i++) {
+        final raw = i.isEven
+            ? <String, Object?>{'kind': 'product', 'id': 'p$i', 'price': 9.99}
+            : <String, Object?>{'kind': 'order', 'id': 'o$i', 'itemCount': i};
+        Entity.fromWire(raw);
+      }
+      sw.stop();
+      return sw.elapsedMilliseconds;
+    }),
+  );
+
+  return CostGuardReport(
     name: 'Guard 4: boundary validation throughput (<30ms/10k)',
-    passed: ok == total && elapsedMs < ciBudgetMs,
-    detail:
-        '$ok/$total validated in ${elapsedMs}ms '
-        '(nominal budget ${nominalBudgetMs}ms, CI budget ${ciBudgetMs}ms)',
+    correctnessOk: correctnessOk,
+    correctnessDetail: '$ok/$total validated',
+    timing: timing,
   );
 }

@@ -135,3 +135,41 @@ abstract class $OpenTask implements $Task {
 abstract class $DoneTask implements $Task {
   String get result;
 }
+
+// ── @ZorphyValue — a nested value the pointer resolver descends into ─────────
+@ZorphyValue()
+abstract class $EditDraft {
+  String get title;
+  double get price;
+}
+
+// ── @ZorphyState — a state carrying a nested value (/editDraft/price) ────────
+@ZorphyState()
+abstract class $ProductUiState {
+  $EditDraft get editDraft;
+  int get selectedTab;
+}
+
+// ── @ZorphyState — a three-level hierarchy with a SIBLING leaf ───────────────
+// `mode` is subtype-only (the interactive branch), `label` belongs to the button
+// and `text` to the text node, so resolving a segment a receiver does not carry
+// answers null instead of throwing — the safe-dispatch acceptance case.
+@ZorphyState()
+abstract class $UiNode {
+  String get contractId;
+}
+
+@ZorphyState()
+abstract class $InteractiveUiNode implements $UiNode {
+  String get mode;
+}
+
+@ZorphyState()
+abstract class $ZfaButtonNode implements $InteractiveUiNode {
+  String get label;
+}
+
+@ZorphyState()
+abstract class $ZfaTextNode implements $UiNode {
+  String get text;
+}
