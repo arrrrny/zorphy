@@ -97,7 +97,8 @@ class V3Codemod {
   }
 
   /// The concrete type name a v2 declaration generates (`$User` -> `User`).
-  static String _generatedName(String declarationName) => declarationName.startsWith(r'$')
+  static String _generatedName(String declarationName) =>
+      declarationName.startsWith(r'$')
       ? declarationName.substring(1)
       : declarationName;
 
@@ -219,7 +220,11 @@ class V3Codemod {
 
       final start = methodName.offset;
       spans.add(
-        _Span(start, start + name.length, name == 'fromJson' ? 'fromWire' : 'toWire'),
+        _Span(
+          start,
+          start + name.length,
+          name == 'fromJson' ? 'fromWire' : 'toWire',
+        ),
       );
       if (name == 'fromJson') {
         final lineStart = _lineStart(source, call.offset);
