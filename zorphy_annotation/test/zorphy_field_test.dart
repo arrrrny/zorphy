@@ -264,5 +264,38 @@ void main() {
         throwsFormatException,
       );
     });
+
+    test('fromWire throws on wrong-typed values instead of coercing', () {
+      ZorphyFilter<Product> build(Map<String, dynamic> wire) =>
+          ZorphyFilter.fromWire<Product>(
+            wire,
+            (pointer) => ProductFields.all.byPointer(pointer),
+          );
+      // A non-list `in` value must not silently become an empty (match-none)
+      // list.
+      expect(
+        () => build(const {'field': '/id', 'op': 'in', 'value': 'p1'}),
+        throwsFormatException,
+      );
+      // A non-string `contains` / `startsWith` value used to coerce to '',
+      // which matches EVERY string — the silent match-ALL the doc warns of.
+      expect(
+        () => build(const {'field': '/id', 'op': 'contains', 'value': 42}),
+        throwsFormatException,
+      );
+      expect(
+        () => build(const {'field': '/id', 'op': 'startsWith', 'value': 42}),
+        throwsFormatException,
+      );
+      // Valid values still round-trip (no over-tightening).
+      expect(
+        build(const {
+          'field': '/id',
+          'op': 'contains',
+          'value': 'p1',
+        }).matches(p),
+        isTrue,
+      );
+    });
   });
 }

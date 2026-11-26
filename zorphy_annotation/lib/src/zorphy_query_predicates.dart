@@ -71,7 +71,9 @@ sealed class ZorphyFilter<T> {
       'neq' => ZorphyNotEquals<T, Object?>(field, value),
       'in' => ZorphyIn<T, Object?>(
         field,
-        value is List ? List<Object?>.unmodifiable(value) : const [],
+        value is List
+            ? List<Object?>.unmodifiable(value)
+            : throw _badWire(wire, 'value must be a list'),
       ),
       'isNull' => ZorphyIsNull<T>(field),
       'isNotNull' => ZorphyIsNotNull<T>(field),
@@ -81,10 +83,17 @@ sealed class ZorphyFilter<T> {
       'gte' => ZorphyGreaterThanOrEqual<T, Object?>(field, value),
       'contains' => ZorphyContains<T>(
         field,
-        value is String ? value : '',
+        value is String
+            ? value
+            : throw _badWire(wire, 'value must be a string'),
         caseSensitive: wire['caseSensitive'] is! bool || wire['caseSensitive'],
       ),
-      'startsWith' => ZorphyStartsWith<T>(field, value is String ? value : ''),
+      'startsWith' => ZorphyStartsWith<T>(
+        field,
+        value is String
+            ? value
+            : throw _badWire(wire, 'value must be a string'),
+      ),
       _ => throw _badWire(wire, 'unknown op'),
     };
   }
