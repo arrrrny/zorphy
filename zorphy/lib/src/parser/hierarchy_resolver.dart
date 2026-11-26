@@ -352,7 +352,7 @@ final class HierarchyResolver {
         ZorphyFieldIr(
           name: name,
           type: _typeText(type),
-          isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+          isNullable: _isNullableField(type),
           isDomainBool:
               _isDomainBool(getter) ||
               _isDomainBool(_declaringField(declaredByName, name)),
@@ -368,7 +368,7 @@ final class HierarchyResolver {
         ZorphyFieldIr(
           name: name,
           type: _typeText(type),
-          isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+          isNullable: _isNullableField(type),
           isDomainBool: _isDomainBool(field),
         ),
       );
@@ -409,6 +409,28 @@ final class HierarchyResolver {
     final text = type.getDisplayString();
     return text.endsWith('?') ? text.substring(0, text.length - 1) : text;
   }
+
+  /// Whether a `?` on [type] would be redundant because the field is typed by
+  /// a type parameter whose bound is already nullable (ISSUE-273, ZRP-010).
+  ///
+  /// `class ToggleParams<I>` (implicit bound `Object?`) declares `I? get id`;
+  /// emitting `I? id` is an `unnecessary_question_mark` in generated code. The
+  /// bound is resolved ONCE here, at the IR level, so every emitter inherits
+  /// the same answer instead of re-deriving it from strings. A non-nullable
+  /// bound (`class DeleteParams<I extends Object>`) keeps the meaningful `?`.
+  static bool _hasNullableBound(DartType type) {
+    final element = type.element;
+    if (element is! TypeParameterElement) return false;
+    final bound = element.bound;
+    return bound == null ||
+        bound.nullabilitySuffix == NullabilitySuffix.question;
+  }
+
+  /// The field's declared nullability: `?` on the source type, unless the type
+  /// is a type parameter whose bound already carries nullability (#273).
+  static bool _isNullableField(DartType type) =>
+      type.nullabilitySuffix == NullabilitySuffix.question &&
+      !_hasNullableBound(type);
 
   /// The `$Parent` an [element] implements, as a declared class, or `null`.
   ///
