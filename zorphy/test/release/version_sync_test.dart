@@ -11,9 +11,8 @@ String _versionOf(String pubspecPath) {
 /// The repository root: this test runs with the `zorphy` package as cwd (the
 /// documented `dart test` invocation) and the package sits directly under the
 /// root. Running from the repo root instead would resolve the wrong root.
-final String _repoRoot = Directory(
-  '${Directory.current.path}/..',
-).resolveSymbolicLinksSync();
+final Directory _packageDir = Directory('${Directory.current.path}/..');
+final String _repoRoot = _packageDir.resolveSymbolicLinksSync();
 
 String _read(String relative) =>
     File('$_repoRoot/$relative').readAsStringSync();
