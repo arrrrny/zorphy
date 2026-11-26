@@ -27,3 +27,26 @@ final updated = personPatch.apply(person);
 final combined = patchA.compose(patchB); // left-to-right
 final undo = patch.invert(before);        // captures prior values
 ```
+
+## Three-way sync: `changedPaths`, `conflictingPaths`, `composePatches`
+
+A generated `<Name>Patch` carries the three-way-merge surface (dev.3, #248):
+
+- `changedPaths` — the set of JSON pointers this patch touches, e.g.
+  `{'/price', '/address/city'}`. Nested patches expand to their leaf paths, so
+  two edits under one object conflict only on the leaf they share.
+- `conflictingPaths(other)` — the exact set of paths BOTH patches change — the
+  conflict set a three-way sync surfaces. Disjoint edits return an empty set.
+- `composePatches(next)` — the three-way-merge name for `compose`, with
+  identical left-to-right semantics.
+
+```dart
+final mine = ProfilePatch.diff(base, localEdit);
+final theirs = ProfilePatch.diff(base, remoteEdit);
+
+// Which JSON pointers did both sides change?
+final conflicts = mine.conflictingPaths(theirs); // e.g. {'/name'}
+
+// Merge the non-conflicting edits; composePatches == compose.
+final merged = mine.composePatches(theirs).apply(base);
+```

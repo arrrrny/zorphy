@@ -34,44 +34,51 @@ You can also find the package on **[pub.dev](https://pub.dev/packages/zorphy)**.
 
 ## ✨ Features
 
-- 📋 **Immutable Data Classes** - Clean, immutable class definitions with minimal boilerplate
-- 🔄 **CopyWith Methods** - Generate `copyWith` methods for creating modified copies
-- 🏷️ **Field-Selector CopyWith** - `copyWithField(Field<E, T> field, T value)` replaces a single field via the typed `Field` selector; passing `null` to a nullable field preserves the current value
-- 🎯 **Function-based CopyWith** - Optional function-based copyWith for computed updates
-- 🔧 **Patch System** - Advanced patching mechanism for partial updates with nested support
-- 📦 **JSON Serialization** - Full `toJson`/`fromJson` support with polymorphic type handling
-- ⚖️ **Equality** - Auto-generated `==` operator and `hashCode`
-- 📝 **toString** - Meaningful string representations for debugging
-- 🔐 **Sealed Classes** - Support for sealed classes with exhaustiveness checking
-- 🌳 **Self-Referencing Types** - Handle tree structures and hierarchical data
-- 🏭 **Factory Methods** - Support for custom factory constructors
-- 🧬 **Inheritance & Polymorphism** - Multiple inheritance, generics, and interfaces
-- 🔢 **Enum Support** - Full enum integration with JSON serialization
-- 📊 **CompareTo** - Generate comparison methods showing differences between instances
-- 🔄 **ChangeTo** - Convert between related types in inheritance hierarchies
-- 🤖 **AI-Friendly CLI** - Command-line tool optimized for AI agents and developers
-- 🔌 **MCP Server** - Model Context Protocol server for agentic integration
+Zorphy v3 is a zero-preset code generator. A class is annotated with exactly
+**one of five archetypes** that names what the class IS — there are no
+`preset:` or `generate*` toggles to keep in sync.
+
+- 🧬 **Five archetypes** — `@ZorphyEntity`, `@ZorphyValue`, `@ZorphyUnion`,
+  `@ZorphyState`, `@ZorphyIntent`
+- 🔄 **CopyWith & patches** — every archetype gets a `<Name>Patch` with
+  `diff` / `apply`, `compose` / `invert`, and `changedPaths` / `conflictingPaths`
+  for three-way sync
+- 📦 **Wire codecs** — `toWire()` / `fromWire()` replace the legacy JSON codecs;
+  `fromWire` decodes untrusted data at a trust boundary and returns a
+  `ZorphyBoundaryResult<T>` instead of leaking a raw `TypeError`
+- 🔐 **Sealed unions & open hierarchies** — declarative polymorphism via a
+  `discriminator` field and `explicitSubTypes`, with exhaustive Dart 3 `switch`
+- 🏷️ **Reflection-free descriptor** — `Entity.descriptor` is a
+  `ZorphyEntityDescriptor<T>` exposing `Field<E, T>` selectors, the principal
+  key, `diff`, and the wire codec — valid under Dart AOT (no `dart:mirrors`)
+- 🔎 **Filter/query descriptors** — `Field<E, T>` selectors plus `eq` / `gt` /
+  `lt` / `contains` / `and` / `or` / `sort` helpers
+- 🧱 **Generics & polymorphism** — generic classes carry their type arguments
+  through the wire codecs; codec-parameterized `toWire` / `fromWire` close the
+  generic boundary
+- 🤖 **AI-Friendly CLI & MCP server** — scaffold and manage entities from an
+  agent or the command line
+- ⚖️ **Equality, `toString`, enums, self-referencing types** — generated for you
 
 ## ⚖️ Zorphy vs Freezed
 
 Both generate immutable data classes. Zorphy goes further — it is a full
-**entity toolkit** with a nested patch system, filter/query descriptors,
-compareTo diffs, and an AI-agent CLI/MCP server.
+**entity toolkit** with a nested patch system, a reflection-free descriptor,
+filter/query selectors, and an AI-agent CLI/MCP server.
 
-| Capability | zorphy 2.0 | freezed 3.2.5 |
+| Capability | zorphy 3.0 | freezed 3.2.5 |
 | --- | --- | --- |
-| Immutable data classes + copyWith | ✅ | ✅ |
-| Function-based copyWith (`copyWithFn`) | ✅ opt-in (`ZorphyPreset.full`) | ❌ |
-| JSON + polymorphic discriminators + `toJsonLean` | ✅ | ✅ (no `toJsonLean`) |
-| Sealed unions | ✅ sealed `$$Base` + Dart 3 pattern matching | ✅ via `when`/`map` helpers |
-| **Nested patch system** (partial updates of deep graphs) | ✅ `UserPatch()..withAddressPatch(...)` | ❌ manual nested copyWith chains |
-| **Filter/query descriptors** (`Field<E, T>`) | ✅ | ❌ |
-| **compareTo diffs** between instances | ✅ | ❌ |
-| **changeTo conversions** between subtypes | ✅ | ❌ |
+| Immutable data classes | ✅ | ✅ |
+| CopyWith | ✅ `copyWith` + field-selector `copyWithField` | ✅ |
+| Wire codecs + polymorphic discriminators | ✅ `toWire` / `fromWire` | ✅ (JSON only) |
+| Sealed unions | ✅ `@ZorphyUnion()` + Dart 3 pattern matching | ✅ via `when`/`map` helpers |
+| **Nested patch system** (partial updates of deep graphs) | ✅ `UserPatch.diff(a, b).apply(user)` | ❌ manual nested copyWith chains |
+| **Reflection-free descriptor** (`Entity.descriptor`) | ✅ `ZorphyEntityDescriptor<T>` | ❌ |
+| **Filter/query selectors** (`Field<E, T>`) | ✅ | ❌ |
+| **Patch algebra** (`changedPaths` / `conflictingPaths` / `compose`) | ✅ | ❌ |
 | Multiple interface inheritance with generics | ✅ | ❌ |
 | Self-referencing types | ✅ | ✅ |
 | CLI + MCP server for scaffolding | ✅ | ❌ |
-| Output size control | ✅ `ZorphyPreset.lean/standard/full` + per-feature flags | ❌ |
 | analyzer 14 support | ✅ `>=13.0.0 <15.0.0` | ❌ caps `analyzer <11.0.0` (as of 2026-07-30) |
 
 **Where freezed differs (honest notes):** freezed's mixin pattern
@@ -82,7 +89,7 @@ sealed base. Freezed's ecosystem is older and larger.
 
 ### Side by side
 
-**1. Simple data class** — freezed:
+**1. Simple value class** — freezed:
 
 ```dart
 @freezed
@@ -92,10 +99,10 @@ class User with _$User {
 }
 ```
 
-zorphy (lean preset — no patch/filter/compareTo bloat):
+zorphy (a `@ZorphyValue` — an immutable value object with no identity):
 
 ```dart
-@Zorphy(preset: ZorphyPreset.lean, generateJson: true)
+@ZorphyValue()
 abstract class $User {
   String get id;
   String get name;
@@ -113,17 +120,27 @@ class Result with _$Result {
 }
 ```
 
-zorphy (real sealed hierarchy, exhaustive Dart 3 switch):
+zorphy (a real sealed `@ZorphyUnion()` with redirecting variant factories,
+exhaustive Dart 3 switch):
 
 ```dart
-@Zorphy(explicitSubTypes: [$Ok, $Err])
-abstract class $$Result {}
+@ZorphyUnion()
+abstract class $Result {
+  factory $Result.ok(String value) = $Ok;
+  factory $Result.err(String message) = $Err;
+}
 
-@Zorphy()
-abstract class $Ok implements $$Result { String get value; }
+@ZorphyValue()
+class $Ok implements $Result {
+  final String value;
+  const $Ok(this.value);
+}
 
-@Zorphy()
-abstract class $Err implements $$Result { String get message; }
+@ZorphyValue()
+class $Err implements $Result {
+  final String message;
+  const $Err(this.message);
+}
 
 String describe(Result r) => switch (r) {
   Ok(:final value) => 'ok: $value',
@@ -140,14 +157,9 @@ user.copyWith(address: user.address.copyWith(city: 'Berlin'));
 zorphy's patch system composes:
 
 ```dart
-final patch = ProfilePatch()
-  ..withName('Ada')
-  ..withAddressPatch(AddressPatch()..withCity('Berlin'));
-final updated = patch.applyTo(profile);
+final patch = ProfilePatch.diff(before, after); // carries a nested AddressPatch
+final updated = patch.apply(profile);
 ```
-
-All three zorphy examples are real, compilable code — see
-[`zorphy/example/lib/comparison/`](zorphy/example/lib/comparison/).
 
 **Migrating from freezed?** Use the
 [`zorphy_migrator`](zorphy_migrator/) codemod:
@@ -184,33 +196,8 @@ dart pub global activate zorphy
 
 ## 🚀 Quick Start
 
-### Using the CLI (Recommended for AI Agents)
-
-The Zorphy CLI is designed for optimal AI agent usage:
-
-```bash
-# Create entity
-zorphy create -n User
-
-# Create with fields
-zorphy create -n Product \
-  --field name:String \
-  --field price:double \
-  --field inStock:bool
-
-# Quick create (simple entity with defaults)
-zorphy new -n Category
-
-# Build all entities
-zorphy build
-
-# List entities
-zorphy list
-```
-
-### Manual Class Definition
-
-Or create classes manually:
+Declare a class with one archetype, run the generator, then use the generated
+class (the `$`-prefix is dropped in the output).
 
 ```dart
 import 'package:zorphy_annotation/zorphy_annotation.dart';
@@ -218,7 +205,7 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 // zorphy 3.0 emits a shared part under lib/_br_/ and build_runner writes the
 // `part` directive for you — there is nothing to declare here.
 
-@Zorphy()
+@ZorphyValue()
 abstract class $User {
   String get name;
   int get age;
@@ -241,1088 +228,49 @@ void main() {
   // Copy with changes
   final olderUser = user.copyWith(age: 31);
 
-  // Convert to JSON (if generateJson: true)
-  final json = user.toJson();
-
-  // Create from JSON
-  final fromJson = User.fromJson(json);
+  // Wire codec (replaces the legacy JSON codec)
+  final wire = user.toWire();
+  final fromWire = User.fromWire(wire); // ZorphyBoundaryResult<User>
 }
 ```
 
-## 🤖 Zorphy CLI
+### Choosing an archetype
 
-The Zorphy CLI provides an intuitive interface for creating and managing entities, optimized for both human developers and AI agents.
+| Archetype | Use it for |
+| --- | --- |
+| `@ZorphyEntity(principalKey: #id)` | an aggregate/event root with its own identity |
+| `@ZorphyValue()` | an immutable value object with no identity |
+| `@ZorphyUnion()` | a closed discriminated union of sibling variants |
+| `@ZorphyState()` | a mutable/composed state node in a sealed hierarchy |
+| `@ZorphyIntent(replaySafe: true)` | a replay-safe command/intent envelope |
 
-### Installation
+Polymorphism is declarative: name the wire `discriminator` (default `'kind'`)
+and list any subtypes the generator cannot infer with `explicitSubTypes`.
+See the [website docs](https://arrrrny.github.io/zorphy/) for the full guide to
+every archetype, the patch system, the descriptor, filters/queries, generics,
+and the CLI/MCP tooling.
 
-```bash
-# Install globally
-dart pub global activate zorphy
+## 🤖 CLI & MCP
 
-# Or run directly
-dart run zorphy:zorphy_cli
-```
-
-### CLI Commands
-
-#### `create` - Create New Entity
-
-Create a new Zorphy entity with full control over options:
-
-```bash
-zorphy create [options]
-```
-
-**Options:**
-
-- `-n, --name` - Entity name (required)
-- `-o, --output` - Output directory (default: `lib/src/domain/entities`)
-- `-p, --package` - Package name for imports
-- `--json` - Enable JSON serialization (default: true)
-- `--copywith-fn` - Enable function-based copyWith (default: false)
-- `--compare` - Enable compareTo (default: true)
-- `--filter` - Enable filter descriptors (default: false)
-- `--sealed` - Create sealed class (default: false)
-- `--non-sealed` - Create non-sealed class (default: false)
-- `--field` - Add fields directly (`name:type` or `name:type?`), repeatable
-- `--extends` - Interface to extend (e.g., `$BaseEntity`)
-- `--subtypes` - Explicit subtypes for polymorphism (repeatable)
-- `--generate-subs` - Auto-generate subtype stubs for sealed classes
-- `--dry-run` - Preview generated code without writing files
-
-**Examples:**
+The Zorphy CLI scaffolds and builds entities, and the same surface is exposed
+as a Model Context Protocol server for AI agents.
 
 ```bash
-# Create with fields
-zorphy create -n User \
-  --field name:String \
-  --field age:int \
-  --field email:String?
+# Create an entity with fields
+zorphy create -n Product --field name:String --field price:double
 
-# With all options
-zorphy create -n Product \
-  --output lib/models \
-  --json \
-  --compare \
-  --field name:String \
-  --field price:double \
-  --field category:String?
-
-# Sealed class with subtypes
-zorphy create -n Result --sealed \
-  --subtypes Ok \
-  --subtypes Err
-
-# Dry run (preview only)
-zorphy create -n User --field name:String --dry-run
-
-# With inheritance
-zorphy create -n Admin \
-  --extends '$User' \
-  --field permissions:List<String>
-```
-
-#### `new` - Quick Create
-
-Create a simple entity with default settings:
-
-```bash
-zorphy new -n EntityName
-```
-
-**Options:**
-
-- `-n, --name` - Entity name (required)
-- `-o, --output` - Output directory (default: `lib/src/domain/entities`)
-- `--json` - Enable JSON (default: true)
-
-**Example:**
-
-```bash
-zorphy new -n Product
-```
-
-#### `build` - Run Code Generation
-
-Generate code for all Zorphy entities:
-
-```bash
-zorphy build [options]
-```
-
-**Options:**
-
-- `-w, --watch` - Watch for changes (default: false)
-- `-c, --clean` - Clean before build (default: false)
-- `--dry-run` - Preview without writing (default: false)
-- `--force` - Force rebuild even if up to date (default: false)
-
-**Examples:**
-
-```bash
-# Build once
+# Build all entities (clean + watch supported)
 zorphy build
-
-# Clean and build
-zorphy build --clean
-
-# Watch mode
 zorphy build --watch
 
-# Force rebuild
-zorphy build --force
-```
-
-#### `list` - List Entities
-
-List all Zorphy entities in a directory:
-
-```bash
-zorphy list [options]
-```
-
-**Options:**
-
-- `-o, --output` - Directory to search (default: `lib/src/domain/entities`)
-
-**Example:**
-
-```bash
+# List entities
 zorphy list
-# Output:
-# 📂 Zorphy Entities in lib/src/domain/entities:
-#
-# 📄 User
-#    File: lib/src/domain/entities/user.dart
-#    ✓ JSON support
-#    ✓ Function-based copyWith
-#
-# Total: 1 entity/entities
 ```
 
-### Field Types
-
-The CLI supports various field types:
-
-- **Basic types:** `String`, `int`, `double`, `bool`, `num`, `DateTime`
-- **Nullable types:** Add `?` after type (e.g., `String?`, `int?`)
-- **Generic types:** `List<Type>`, `Set<Type>`, `Map<KeyType, ValueType>`
-- **Custom types:** Any other class name
-
-**Examples:**
-
-```bash
---field name:String
---field age:int
---field email:String?
---field tags:List<String>
---field metadata:Map<String, dynamic>
---field createdAt:DateTime
-```
-
-#### `enum` - Create Enum
-
-Create a new Zorphy-compatible enum:
-
-```bash
-zorphy enum -n Status --value active,inactive,pending
-```
-
-**Options:**
-
-- `-n, --name` - Enum name (required)
-- `--value` - Comma-separated enum values (required)
-- `-o, --output` - Output directory (default: `lib/src/domain/entities`)
-
-**Example:**
-
-```bash
-zorphy enum -n UserRole --value admin,user,guest
-```
-
-#### `add-field` - Add Field to Existing Entity
-
-Add a field to an existing Zorphy entity file:
-
-```bash
-zorphy add-field -n User -f email:String?
-```
-
-**Options:**
-
-- `-n, --name` - Entity name (required)
-- `-f, --field` - Field to add (`name:type` or `name:type?`) (required)
-
-**Example:**
-
-```bash
-zorphy add-field -n User -f avatarUrl:String?
-zorphy add-field -n Product -f tags:List<String>
-```
-
-#### `watch` - Watch and Rebuild
-
-Watch for file changes and automatically rebuild:
-
-```bash
-zorphy watch
-```
-
-#### `from-json` - Create Entity from JSON
-
-Generate a Zorphy entity from a JSON sample:
-
-```bash
-zorphy from-json -n User --json-input '{"name": "Alice", "age": 30}'
-```
-
-**Options:**
-
-- `-n, --name` - Entity name (required)
-- `--json-input` - JSON string to generate from (required)
-- `-o, --output` - Output directory (default: `lib/src/domain/entities`)
-
-## 🔌 Zorphy MCP Server
-
-The Model Context Protocol (MCP) server enables AI agents like Claude to programmatically create and manage Zorphy entities.
-
-### Setting up the MCP Server
-
-Add to your Claude/MCP client configuration:
-
-```json
-{
-  "mcpServers": {
-    "zorphy": {
-      "command": "zorphy_mcp_server"
-    }
-  }
-}
-```
-
-> The `zorphy_mcp_server` executable is registered when you run `dart pub global activate zorphy`. Alternatively, use `dart run zorphy:zorphy_mcp_server`.
-
-### Available MCP Tools
-
-#### `create_entity`
-
-Create a new Zorphy entity programmatically.
-
-**Parameters:**
-
-```json
-{
-  "name": "string (required)",
-  "outputDir": "string (default: lib/src/domain/entities)",
-  "package": "string (optional)",
-  "generateJson": "boolean (default: true)",
-  "generateCompareTo": "boolean (default: true)",
-  "sealed": "boolean (default: false)",
-  "nonSealed": "boolean (default: false)",
-  "extends": "string (optional)",
-  "explicitSubTypes": ["string"],
-  "fields": [
-    {
-      "name": "string",
-      "type": "string"
-    }
-  ]
-}
-```
-
-> **Note:** Parameters are flat (no nested `options` object). Fields use the `?` suffix in the type string for nullable fields (e.g., `"type": "String?"`).
-
-**Example:**
-
-```json
-{
-  "name": "User",
-  "fields": [
-    { "name": "id", "type": "String" },
-    { "name": "name", "type": "String" },
-    { "name": "email", "type": "String?" },
-    { "name": "age", "type": "int" }
-  ],
-  "generateJson": true,
-  "generateCompareTo": true
-}
-```
-
-#### `create_enum`
-
-Create a new Zorphy-compatible enum.
-
-**Parameters:**
-
-```json
-{
-  "name": "string (required)",
-  "values": ["string (required)"],
-  "outputDir": "string (default: lib/src/domain/entities)"
-}
-```
-
-**Example:**
-
-```json
-{
-  "name": "UserRole",
-  "values": ["admin", "user", "guest"]
-}
-```
-
-#### `add_field`
-
-Add a field to an existing Zorphy entity.
-
-**Parameters:**
-
-```json
-{
-  "name": "string (required) — entity name",
-  "fields": [
-    {
-      "name": "string (required)",
-      "type": "string (required)"
-    }
-  ]
-}
-```
-
-**Example:**
-
-```json
-{
-  "name": "User",
-  "fields": [{ "name": "avatarUrl", "type": "String?" }]
-}
-```
-
-#### `list_entities`
-
-List all Zorphy entities in a directory.
-
-**Parameters:**
-
-```json
-{
-  "directory": "string (default: lib/src/domain/entities)"
-}
-```
-
-### Agentic Usage Examples
-
-**Example 1: Agent Creating a User Entity**
-
-```python
-# Agent using MCP server
-mcp.call_tool("create_entity", {
-    "name": "User",
-    "fields": [
-        {"name": "id", "type": "String"},
-        {"name": "username", "type": "String"},
-        {"name": "email", "type": "String?"},
-        {"name": "createdAt", "type": "DateTime"}
-    ],
-    "generateJson": True,
-    "generateCompareTo": True
-})
-```
-
-**Example 2: Agent Creating a Sealed Hierarchy**
-
-```python
-# Create the sealed base
-mcp.call_tool("create_entity", {
-    "name": "PaymentMethod",
-    "sealed": True,
-    "explicitSubTypes": ["$CreditCard", "$PayPal"]
-})
-
-# Create each variant
-mcp.call_tool("create_entity", {
-    "name": "CreditCard",
-    "extends": "$$PaymentMethod",
-    "fields": [
-        {"name": "cardNumber", "type": "String"},
-        {"name": "expiryDate", "type": "String"}
-    ]
-})
-
-mcp.call_tool("create_entity", {
-    "name": "PayPal",
-    "extends": "$$PaymentMethod",
-    "fields": [
-        {"name": "email", "type": "String"}
-    ]
-})
-```
-
-**Example 3: Agent Adding a Field and Listing Entities**
-
-```python
-# List existing entities
-entities = mcp.call_tool("list_entities", {})
-
-# Add a field to an existing entity
-mcp.call_tool("add_field", {
-    "name": "User",
-    "fields": [{"name": "avatarUrl", "type": "String?"}]
-})
-
-# Create an enum
-mcp.call_tool("create_enum", {
-    "name": "UserRole",
-    "values": ["admin", "user", "guest"]
-})
-```
-
-## 📖 Complete Feature Guide
-
-### 1. Class Definition Patterns
-
-#### Concrete Classes (Single $)
-
-Use a single `$` prefix for concrete classes:
-
-```dart
-@Zorphy()
-abstract class $Person {
-  String get firstName;
-  String get lastName;
-  int? get age;
-}
-
-// Usage: Omit the $ when using
-final person = Person(firstName: 'John', lastName: 'Doe');
-```
-
-#### Sealed Abstract Classes (Double $$)
-
-Use `$$` prefix for sealed abstract classes. Sealed classes enable exhaustiveness checking:
-
-```dart
-@Zorphy()
-abstract class $$Shape {
-  double get area;
-}
-
-@Zorphy()
-abstract class $Circle implements $$Shape {
-  double get radius;
-
-  @override
-  double get area => 3.14159 * radius * radius;
-}
-
-@Zorphy()
-abstract class $Rectangle implements $$Shape {
-  double get width;
-  double get height;
-
-  @override
-  double get area => width * height;
-}
-
-// Exhaustiveness checking
-String describeShape(Shape shape) => switch (shape) {
-  Circle() => 'A circle',
-  Rectangle() => 'A rectangle',
-};
-```
-
-Dart restricts subtyping of a `sealed` class to the library that declares it.
-The generated base is `sealed` only when the closed hierarchy is **explicitly
-declared** on the base — `explicitSubTypes` — AND every declared subtype lives
-in the same file:
-
-```dart
-@Zorphy(explicitSubTypes: [Circle, Rectangle])
-abstract class $$Shape {
-  double get area;
-}
-```
-
-Same-file subtypes alone do not seal the base: the generator cannot see a
-subtype declared in another file that merely imports the base, so sealing on
-same-file evidence alone would emit a `sealed` base that remote subtype cannot
-implement. Without the explicit declaration — and whenever subtypes are
-declared in other files — the base is generated `abstract` instead; any
-library may then implement it, and the hierarchy compiles (exhaustiveness
-checking is not available across libraries). `nonSealed: true` always opts
-out of sealing.
-
-#### Non-Sealed Abstract Classes
-
-Use `nonSealed: true` to create non-sealed abstract classes:
-
-```dart
-@Zorphy(nonSealed: true)
-abstract class $$BaseEntity {
-  String get id;
-  DateTime get createdAt;
-}
-```
-
-### 2. JSON Serialization
-
-Enable JSON generation with `generateJson: true`:
-
-```dart
-@Zorphy(generateJson: true)
-abstract class $User {
-  String get id;
-  String get name;
-  String? get email;
-}
-```
-
-**Features:**
-
-- Automatic `toJson()` and `fromJson()`
-- `toJsonLean()` removes metadata for cleaner output
-- Handles nested objects and collections
-- Supports polymorphic serialization with type discriminators
-
-#### Polymorphic JSON
-
-```dart
-@Zorphy()
-abstract class $$Animal {}
-
-@Zorphy(generateJson: true)
-abstract class $Dog implements $$Animal {
-  String get breed;
-}
-
-@Zorphy(generateJson: true)
-abstract class $Cat implements $$Animal {
-  double get whiskerLength;
-}
-
-// Serialization includes type discriminator
-final dog = Dog(breed: 'Labrador');
-final json = dog.toJson();
-// {"__typename": "Dog", "breed": "Labrador"}
-
-// Deserialization automatically handles type
-final animal = Animal.fromJson(json);
-print(animal); // Instance of Dog
-```
-
-### 3. CopyWith Methods
-
-#### Basic CopyWith
-
-```dart
-@Zorphy()
-abstract class $User {
-  String get name;
-  int get age;
-}
-
-final user = User(name: 'Alice', age: 30);
-final updated = user.copyWith(name: 'Bob');
-// User(name: 'Bob', age: 30)
-```
-
-#### Function-based CopyWith
-
-Enable with `generateCopyWithFn: true`:
-
-```dart
-@Zorphy(generateCopyWithFn: true)
-abstract class $Counter {
-  int get value;
-}
-
-final counter = Counter(value: 0);
-final incremented = counter.copyWithCounterFn(
-  value: () => counter.value + 1,
-);
-// Counter(value: 1)
-```
-
-#### Type-specific CopyWith
-
-```dart
-@Zorphy()
-abstract class $Pet {
-  String get name;
-  int get age;
-}
-
-@Zorphy()
-abstract class $Dog implements $Pet {
-  String get breed;
-}
-
-final dog = Dog(name: 'Buddy', age: 5, breed: 'Labrador');
-final updated = dog.copyWithDog(breed: 'Golden Retriever');
-// Updates only Dog-specific fields
-```
-
-### 4. Patch System
-
-The patch system provides powerful partial updates with nested support:
-
-```dart
-@Zorphy()
-abstract class $User {
-  String get name;
-  int get age;
-}
-
-// Create a patch
-final patch = UserPatch.create()
-  ..withName('New Name')
-  ..withAge(25);
-
-// Apply patch
-final updated = user.patchWithUser(patchInput: patch);
-```
-
-#### Nested Patches
-
-```dart
-@Zorphy()
-abstract class $Address {
-  String get street;
-  String get city;
-}
-
-@Zorphy()
-abstract class $User {
-  String get name;
-  Address get address;
-}
-
-// Nested patching
-final patch = UserPatch.create()
-  ..withName('Updated Name')
-  ..withAddressPatch((addrPatch) => addrPatch
-    ..withStreet('123 New St')
-    ..withCity('New York'));
-
-final updated = user.patchWithUser(patchInput: patch);
-```
-
-#### Collection Patching
-
-```dart
-@Zorphy()
-abstract class $TodoList {
-  String get title;
-  List<Todo> get todos;
-}
-
-// Update specific item in list
-final patch = TodoListPatch.create()
-  ..updateTodosAt(0, (todoPatch) => todoPatch
-    ..withCompleted(true)
-    ..withTitle('Updated Title'));
-```
-
-#### Functional Patches
-
-```dart
-// Using functions for computed updates
-final patch = CounterPatch.create()
-  ..withValue((current) => current + 1);
-
-final updated = counter.patchWithCounter(patchInput: patch);
-```
-
-### 5. Inheritance & Polymorphism
-
-#### Multiple Inheritance
-
-```dart
-@Zorphy()
-abstract class $Pet {
-  String get name;
-  int get age;
-}
-
-@Zorphy()
-abstract class $Dog {
-  String get barkSound;
-}
-
-@Zorphy()
-abstract class $Cat {
-  double get whiskerLength;
-}
-
-// Implement multiple interfaces
-@Zorphy()
-abstract class $FrankensteinsDogCat implements $Dog, $Pet, $Cat {
-  // Inherits all fields from all interfaces
-}
-```
-
-#### Generic Inheritance
-
-```dart
-@Zorphy()
-abstract class $$Repository<T> {
-  T? find(String id);
-  List<T> getAll();
-}
-
-@Zorphy()
-abstract class $UserRepository implements $$Repository<User> {
-  @override
-  User? find(String id);
-
-  @override
-  List<User> getAll();
-}
-```
-
-#### Generic Classes with Type Constraints
-
-```dart
-@Zorphy()
-abstract class $$Base<T> {
-  T get value;
-}
-
-@Zorphy()
-abstract class $Derived<T extends num> implements $$Base<T> {
-  @override
-  T get value;
-
-  T get doubled => value * 2;
-}
-```
-
-### 6. Explicit Subtypes & ChangeTo
-
-Use `explicitSubTypes` to enable cross-type operations:
-
-```dart
-@Zorphy(explicitSubTypes: [$Dog, $Cat])
-abstract class $Pet {
-  String get name;
-  int get age;
-}
-
-@Zorphy()
-abstract class $Dog implements $Pet {
-  String get breed;
-}
-
-@Zorphy()
-abstract class $Cat implements $Pet {
-  double get whiskerLength;
-}
-```
-
-This generates `changeTo` methods:
-
-```dart
-final dog = Dog(name: 'Buddy', age: 5, breed: 'Labrador');
-
-// Convert Dog to Cat
-final cat = dog.changeToCat(whiskerLength: 3.5);
-// Cat(name: 'Buddy', age: 5, whiskerLength: 3.5)
-```
-
-### 7. CompareTo Feature
-
-Generate comparison methods showing differences between instances:
-
-```dart
-@Zorphy(generateCompareTo: true)
-abstract class $User {
-  String get name;
-  int get age;
-}
-
-final user1 = User(name: 'Alice', age: 30);
-final user2 = User(name: 'Alice', age: 35);
-
-final diff = user1.compareToUser(user2);
-// {'age': () => 35}
-```
-
-### 8. Enum Support
-
-Full enum integration with JSON serialization:
-
-```dart
-enum Status {
-  active,
-  inactive,
-  pending,
-}
-
-@Zorphy(generateJson: true)
-abstract class $User {
-  String get name;
-  Status get status;
-}
-
-final user = User(name: 'Alice', status: Status.active);
-final json = user.toJson();
-// {"name": "Alice", "status": "active"}
-
-final fromJson = User.fromJson(json);
-// User(name: 'Alice', status: Status.active)
-```
-
-### 9. Self-Referencing Classes
-
-Handle tree structures and hierarchical data:
-
-```dart
-@Zorphy(generateJson: true)
-abstract class $TreeNode {
-  String get value;
-  List<TreeNode>? get children;
-  TreeNode? get parent;
-}
-
-final tree = TreeNode(
-  value: 'root',
-  children: [
-    TreeNode(value: 'child1'),
-    TreeNode(value: 'child2'),
-  ],
-);
-```
-
-### 10. Factory Methods
-
-Support for custom factory constructors:
-
-```dart
-@Zorphy()
-abstract class $Person {
-  String get firstName;
-  String get lastName;
-
-  // Custom factory method
-  factory $Person.fromNames(String first, String last) = _PersonFromNames;
-
-  // Default factory
-  factory $Person.empty() => Person(firstName: '', lastName: '');
-}
-
-class _PersonFromNames extends Person {
-  _PersonFromNames({
-    required String first,
-    required String last,
-  }) : super(
-    firstName: first.toUpperCase(),
-    lastName: last.toUpperCase(),
-  );
-}
-
-// Usage
-final person = Person.fromNames('john', 'doe');
-// Person(firstName: 'JOHN', lastName: 'DOE')
-```
-
-### 11. Private Constructors
-
-Use underscore suffix to hide public constructor:
-
-```dart
-@Zorphy(hidePublicConstructor: true)
-abstract class $Config_ {
-  String get apiKey;
-  String get endpoint;
-}
-
-// Define custom factory in the same file
-Config createProductionConfig() {
-  return Config._(
-    apiKey: 'prod-key',
-    endpoint: 'https://api.prod.com',
-  );
-}
-
-Config createDevConfig() {
-  return Config._(
-    apiKey: 'dev-key',
-    endpoint: 'https://api.dev.com',
-  );
-}
-
-// Usage - Config() constructor is not available
-final config = createProductionConfig();
-```
-
-### 12. Constant Constructors
-
-Enable constant constructors for immutable values:
-
-```dart
-@Zorphy()
-abstract class $Color {
-  int get red;
-  int get green;
-  int get blue;
-
-  const $Color();
-}
-
-// Usage
-const red = Color(red: 255, green: 0, blue: 0);
-```
-
-### 13. Nullable Fields
-
-Full null safety support:
-
-```dart
-@Zorphy()
-abstract class $User {
-  String get name;
-  String? get email;
-  String? get phone;
-}
-
-final user = User(name: 'Alice');
-// email and phone are null
-
-final withEmail = user.copyWith(email: 'alice@example.com');
-```
-
-### 14. Complex Nested Structures
-
-```dart
-@Zorphy()
-abstract class $Company {
-  String get name;
-  List<Department> get departments;
-}
-
-@Zorphy()
-abstract class $Department {
-  String get name;
-  List<Employee> get employees;
-}
-
-@Zorphy()
-abstract class $Employee {
-  String get name;
-  String? get title;
-}
-
-// Deep nesting with proper JSON support
-final company = Company(
-  name: 'Tech Corp',
-  departments: [
-    Department(
-      name: 'Engineering',
-      employees: [
-        Employee(name: 'Alice', title: 'Engineer'),
-      ],
-    ),
-  ],
-);
-```
-
-### 15. Generic Fields and Methods
-
-```dart
-typedef JsonConverter<T> = T Function(dynamic);
-
-@Zorphy()
-abstract class $ApiResponse<T> {
-  bool get success;
-  T? get data;
-  String? get error;
-}
-
-@Zorphy()
-abstract class $UserListResponse implements $ApiResponse<List<User>> {
-  @override
-  bool get success;
-
-  @override
-  List<User>? get data;
-
-  @override
-  String? get error;
-}
-```
-
-### 16. Combining Multiple Features
-
-```dart
-enum UserRole {
-  admin,
-  user,
-  guest,
-}
-
-@Zorphy(
-  generateJson: true,
-  generateCopyWithFn: true,
-  generateCompareTo: true,
-)
-abstract class $User {
-  String get id;
-  String get name;
-  String? get email;
-  int get age;
-  UserRole get role;
-  DateTime get createdAt;
-  List<String>? get tags;
-}
-
-// All features available
-final user = User(
-  id: '1',
-  name: 'Alice',
-  age: 30,
-  role: UserRole.admin,
-  createdAt: DateTime.now(),
-);
-
-// CopyWith
-final updated = user.copyWith(email: 'alice@example.com');
-
-// Function-based CopyWith
-final aged = user.copyWithUserFn(age: () => user.age + 1);
-
-// Patch
-final patched = user.patchWithUser(
-  patchInput: UserPatch.create()..withTags(['developer', 'dart']),
-);
-
-// CompareTo
-final diff = user.compareToUser(updated);
-
-// JSON
-final json = user.toJson();
-final fromJson = User.fromJson(json);
-```
-
-## 🎨 Annotation Options
-
-The `@Zorphy` annotation supports these options:
-
-| Option                     | Type             | Default | Description                                              |
-| -------------------------- | ---------------- | --------- | -------------------------------------------------------- |
-| `preset`                   | `ZorphyPreset?` | `null`    | Preset that controls defaults for multiple options (`lean`, `standard`, `full`). When set, per-flag defaults inherit from the preset |
-| `generateJson`             | `bool`          | `false`    | Enable JSON serialization (`toJson`/`fromJson`) |
-| `generateCopyWith`         | `bool?`          | `null`    | Generate `copyWith` methods; inherits from preset if `null` |
-| `generateCopyWithFn`       | `bool?`          | `null`    | Generate function-based copyWith methods; inherits from preset if `null` |
-| `generatePatch`            | `bool?`          | `null`    | Generate patch classes for partial updates; inherits from preset if `null` |
-| `generateFilter`           | `bool?`          | `null`    | Generate filter/query descriptor fields; inherits from preset if `null` |
-| `generateCompareTo`        | `bool?`          | `null`    | Generate comparison methods; inherits from preset if `null` |
-| `generatePropertyHelpers`  | `bool?`          | `null`    | Generate property helper extensions; inherits from preset if `null` |
-| `generateEqualsToString`   | `bool?`          | `null`    | Generate `==`, `hashCode`, and `toString`; inherits from preset if `null` |
-| `generateChangeTo`         | `bool?`          | `null`    | Generate `changeTo` conversion methods between subtypes; inherits from preset if `null` |
-| `explicitSubTypes`         | `List<Type>`     | `null`    | Specify explicit subtypes for polymorphic operations |
-| `explicitToJson`           | `bool`           | `true`    | Control JSON serialization generation |
-| `hidePublicConstructor`    | `bool`           | `false`   | Hide the public constructor for custom factories |
-| `nonSealed`                | `bool`           | `false`   | Create non-sealed abstract classes instead of sealed |
+The MCP server (`zorphy_mcp_server`, registered by `dart pub global activate
+zorphy`) exposes `create_entity`, `create_enum`, and `add_field` tools. The full
+CLI and MCP reference lives on the
+[website](https://arrrrny.github.io/zorphy/).
 
 ## 🏗️ Build Configuration
 
@@ -1359,37 +307,20 @@ zorphy build --clean
 ### Class Prefixes
 
 - **`$ClassName`** - Concrete class definition (use `ClassName` in code)
-- **`$$ClassName`** - Sealed abstract class (exhaustiveness checking)
-- **`$ClassName_`** - Class with hidden private constructor
+- **`ClassName$`** - Enum of field names for the patch system
+- **`ClassNamePatch`** - Patch class for partial updates
 
 ### Generated Files
 
-- **`lib/_br_/**.part.dart`** - Generated code from `@Zorphy` annotations,
+- **`lib/_br_/**.part.dart`** - Generated code from the archetype annotations,
   one shared part per library. As of 3.0 the builder declares
   `adds_to_library: true`, so `build_runner` emits a single
   `<library>.part.dart` per annotated library and inserts the `part`
   directive itself. Delete any hand-written `part '*.zorphy.dart';` line and
   the 2.x `<file>.zorphy.dart` files, then rebuild — or let
-  `dart run zorphy:migrate_v3 <path> --apply` do both: it strips the stale
-  directives (and the `part '*.g.dart';` of migrated files that declare no
-  own `@JsonSerializable` classes) and deletes the stale files; the dry run
-  lists them. (2.x wrote one
-  `<file>.zorphy.dart` beside every source file; that layout is gone, and
-  build_runner 2.17 removed `--delete-conflicting-outputs` — passing it is
-  ignored with a warning, so the stale files are yours to delete.) Each
-  generated part carries `// ignore_for_file:` headers, so a consumer's own
-  `analysis_options.yaml` does not lint code it cannot edit; exclude
-  `lib/_br_/**` as well if you prefer to keep generated code out of analysis
-  altogether.
-
-### Generated Enums
-
-- **`ClassName$`** - Enum of field names for patch system
-
-### Generated Patch Classes
-
-- **`ClassNamePatch`** - Patch class for partial updates
-
+  `dart run zorphy:migrate_v3 <path> --apply` do both. Each generated part
+  carries `// ignore_for_file:` headers; exclude `lib/_br_/**` from analysis if
+  you prefer to keep generated code out of it altogether.
 <a id="v3-migration"></a>
 ## 🔄 Migrating v2 → v3
 
@@ -1485,9 +416,10 @@ abstract class $B<T2> implements $A<T1> { }
 
 ### Circular Dependencies
 
-> **Note:** `@Zorphy2` is **deprecated** in v2. The single-pass v2 generator handles ordering automatically — you no longer need to annotate build-order dependencies manually.
-
-If you are migrating from v1 code that uses `@Zorphy2`, simply replace all `@Zorphy2()` annotations with `@Zorphy()` — the v2 generator will resolve the correct build order.
+The v3 generator resolves build order automatically from the archetype
+annotations — there is no build-order annotation to declare, and no
+`@Zorphy2` to migrate. Declare each class with its archetype and run
+`dart run build_runner build`.
 
 ## License
 
