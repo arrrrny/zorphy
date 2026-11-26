@@ -802,7 +802,7 @@ final class PolymorphicClassEmitter {
   /// escapes) and comments are copied verbatim. A raw `replaceAll(r'$', '')`
   /// silently corrupted `'cost: $amount'` and `r'$raw'` (issue #281 review).
   static String _rewriteVariants(String source) {
-    final result = StringBuffer();
+    final result = <String>[];
     var i = 0;
     while (i < source.length) {
       final code = source.codeUnitAt(i);
@@ -812,13 +812,13 @@ final class PolymorphicClassEmitter {
         final next = source.codeUnitAt(i + 1);
         if (next == 0x2f) {
           final end = _endOfLineComment(source, i + 2);
-          result.write(source.substring(i, end));
+          result.add(source.substring(i, end));
           i = end;
           continue;
         }
         if (next == 0x2a) {
           final end = _endOfBlockComment(source, i + 2);
-          result.write(source.substring(i, end));
+          result.add(source.substring(i, end));
           i = end;
           continue;
         }
@@ -827,7 +827,7 @@ final class PolymorphicClassEmitter {
       // Skip the WHOLE string literal, interpolation and escapes included.
       final stringEnd = _stringLiteralEnd(source, i);
       if (stringEnd != null) {
-        result.write(source.substring(i, stringEnd));
+        result.add(source.substring(i, stringEnd));
         i = stringEnd;
         continue;
       }
@@ -840,16 +840,16 @@ final class PolymorphicClassEmitter {
         }
         if (end > i + 1) {
           // `$Name` is one Dart identifier token; drop only its leading `$`.
-          result.write(source.substring(i + 1, end));
+          result.add(source.substring(i + 1, end));
           i = end;
           continue;
         }
       }
 
-      result.write(source[i]);
+      result.add(source[i]);
       i++;
     }
-    return result.toString();
+    return result.join();
   }
 
   static int _endOfLineComment(String s, int i) {

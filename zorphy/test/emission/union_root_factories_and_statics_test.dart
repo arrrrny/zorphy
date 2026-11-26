@@ -166,12 +166,10 @@ void main() {
       expect(flat, isNot(contains('\$AppFailure')));
     });
 
-    test(
-      'a generic union root keeps its type parameter on the factory',
-      () async {
-        const generic =
-            '$_annotationImport'
-            '''
+    test('a generic union root keeps its type parameter on the factory', () async {
+      const generic =
+          '$_annotationImport'
+          '''
 part 'nodes.zorphy.dart';
 
 @ZorphyUnion()
@@ -187,15 +185,14 @@ class \$SliceReady<T> implements \$AsyncSlice<T> {
   const \$SliceReady({required this.value});
 }
 ''';
-        final (_, out) = await _compose({'nodes.dart': generic});
-        final flat = out.replaceAll(RegExp(r'\s+'), ' ');
-        expect(flat, contains('sealed class AsyncSlice<T>'));
-        // The class carries `<T>`; the redirecting factory is a member of it, so
-        // its name does NOT repeat the type parameter (the issue's own example).
-        expect(flat, contains('const factory AsyncSlice.ready('));
-        expect(flat, contains('= SliceReady.fromTrusted;'));
-      },
-    );
+      final (_, out) = await _compose({'nodes.dart': generic});
+      final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+      expect(flat, contains('sealed class AsyncSlice<T>'));
+      // The class carries `<T>`; the redirecting factory is a member of it, so
+      // its name does NOT repeat the type parameter (the issue's own example).
+      expect(flat, contains('const factory AsyncSlice.ready('));
+      expect(flat, contains('= SliceReady.fromTrusted;'));
+    });
 
     test(
       'a factory name that collides with an existing member is skipped',
