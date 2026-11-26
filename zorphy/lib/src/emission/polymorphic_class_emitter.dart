@@ -782,9 +782,8 @@ final class PolymorphicClassEmitter {
   /// the resolver pruned) — the factory is then emitted with no parameters,
   /// which is still a legal redirect to a no-arg `fromTrusted`.
   ZorphyNodeIr? _variantNode(ZorphyNodeIr node, String variantClassName) {
-    for (final leaf in node.allConcreteLeaves) {
-      if (leaf.className == variantClassName) return leaf;
-    }
+    // `allConcreteLeaves` is itself derived from `directSubTypes`, so one
+    // recursive walk visits every candidate exactly once (review nit #281).
     for (final child in node.directSubTypes) {
       if (child.className == variantClassName) return child;
       final nested = _variantNode(child, variantClassName);
@@ -797,7 +796,128 @@ final class PolymorphicClassEmitter {
   /// `$`-lowering every other generator applies, so a forwarded member body
   /// that names `$NetworkFailure` or `$AppFailure` compiles against the
   /// generated classes.
-  static String _rewriteVariants(String source) => _lowerType(source);
+  ///
+  /// The rewrite is TOKEN-AWARE: only real identifier tokens lose their `$`.
+  /// `$` characters inside string literals (interpolation, raw strings,
+  /// escapes) and comments are copied verbatim. A raw `replaceAll(r'$', '')`
+  /// silently corrupted `'cost: $amount'` and `r'$raw'` (issue #281 review).
+  static String _rewriteVariants(String source) {
+    final result = StringBuffer();
+    var i = 0;
+    while (i < source.length) {
+      final code = source.codeUnitAt(i);
+
+      // Comments are prose: a `$` in them is never an identifier.
+      if (code == 0x2f /* / */ && i + 1 < source.length) {
+        final next = source.codeUnitAt(i + 1);
+        if (next == 0x2f) {
+          final end = _endOfLineComment(source, i + 2);
+          result.write(source.substring(i, end));
+          i = end;
+          continue;
+        }
+        if (next == 0x2a) {
+          final end = _endOfBlockComment(source, i + 2);
+          result.write(source.substring(i, end));
+          i = end;
+          continue;
+        }
+      }
+
+      // Skip the WHOLE string literal, interpolation and escapes included.
+      final stringEnd = _stringLiteralEnd(source, i);
+      if (stringEnd != null) {
+        result.write(source.substring(i, stringEnd));
+        i = stringEnd;
+        continue;
+      }
+
+      if (code == 0x24 /* $ */ ) {
+        var end = i + 1;
+        while (end < source.length &&
+            _isIdentifierPart(source.codeUnitAt(end))) {
+          end++;
+        }
+        if (end > i + 1) {
+          // `$Name` is one Dart identifier token; drop only its leading `$`.
+          result.write(source.substring(i + 1, end));
+          i = end;
+          continue;
+        }
+      }
+
+      result.write(source[i]);
+      i++;
+    }
+    return result.toString();
+  }
+
+  static int _endOfLineComment(String s, int i) {
+    while (i < s.length && s.codeUnitAt(i) != 0x0a) i++;
+    return i;
+  }
+
+  static int _endOfBlockComment(String s, int i) {
+    while (i + 1 < s.length) {
+      if (s.codeUnitAt(i) == 0x2a && s.codeUnitAt(i + 1) == 0x2f) return i + 2;
+      i++;
+    }
+    return s.length;
+  }
+
+  /// Index just past the string literal beginning at [i], or `null` when [i]
+  /// does not start one. Handles raw (`r`/`R`) prefixes, single/double quotes,
+  /// triple quotes and backslash escapes. An unterminated literal is copied to
+  /// the end verbatim — fail closed, never a half-rewritten body.
+  static int? _stringLiteralEnd(String s, int i) {
+    var start = i;
+    var raw = false;
+    final first = s.codeUnitAt(i);
+    if ((first == 0x72 /* r */ || first == 0x52 /* R */ ) &&
+        i + 1 < s.length &&
+        (i == 0 || !_isIdentifierPart(s.codeUnitAt(i - 1)))) {
+      final next = s.codeUnitAt(i + 1);
+      if (next == 0x27 || next == 0x22) {
+        raw = true;
+        start = i + 1;
+      }
+    }
+    final quote = s.codeUnitAt(start);
+    if (quote != 0x27 && quote != 0x22) return null;
+    if (!raw && start > 0 && _isIdentifierPart(s.codeUnitAt(start - 1))) {
+      return null;
+    }
+
+    final triple =
+        start + 2 < s.length &&
+        s.codeUnitAt(start + 1) == quote &&
+        s.codeUnitAt(start + 2) == quote;
+    var j = start + (triple ? 3 : 1);
+    while (j < s.length) {
+      final c = s.codeUnitAt(j);
+      if (!raw && c == 0x5c /* \ */ ) {
+        j += 2;
+        continue;
+      }
+      if (c == quote) {
+        if (!triple) return j + 1;
+        if (j + 2 < s.length &&
+            s.codeUnitAt(j + 1) == quote &&
+            s.codeUnitAt(j + 2) == quote) {
+          return j + 3;
+        }
+      }
+      j++;
+    }
+    return s.length;
+  }
+
+  static bool _isIdentifierPart(int code) =>
+      (code >= 0x41 && code <= 0x5a) || // A-Z
+      (code >= 0x61 && code <= 0x7a) || // a-z
+      (code >= 0x30 && code <= 0x39) || // 0-9
+      code == 0x5f || // _
+      code == 0x24; // $
 
   /// Names a skipped forwarded member in the build log (issue #271 §3.4).
   void _logSkipped(ZorphyNodeIr node, String name) {

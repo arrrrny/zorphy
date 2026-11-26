@@ -79,6 +79,33 @@ class \$NetworkFailure implements \$AppFailure {
 }
 ''';
 
+/// Regression fixture for issue #281: a forwarded body whose string carries
+/// `$` in three forms — interpolation (`$amount`), a raw literal (`r'$literal'`)
+/// and an escaped dollar (`\$literal`) — while `$NetworkFailure` in the same
+/// body is a real identifier that must still be lowered.
+const _dollarInBody =
+    _annotationImport +
+    r'''
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class $Invoice {
+  factory $Invoice.network({required String message}) = $NetworkFailure;
+  static String describe($Invoice invoice, String amount) {
+    final kind = $NetworkFailure(message: amount).runtimeType;
+    return "charge: $amount; raw: r'\$literal'; kind: $kind";
+  }
+}
+
+@ZorphyValue()
+class $NetworkFailure implements $Invoice {
+  @override
+  final String message;
+
+  const $NetworkFailure({required this.message});
+}
+''';
+
 void main() {
   group('#271 union root — IR carries variant factories and user members', () {
     test(
@@ -200,9 +227,34 @@ class \$Ok implements \$Result {
         // The user static survives; the colliding variant factory is dropped.
         expect(flat, contains('static String describe(Result r)'));
         expect(
-          flat.indexOf('factory Result.describe('),
-          -1,
+          flat,
+          isNot(contains('factory Result.describe(')),
           reason: 'the colliding redirecting factory is skipped',
+        );
+      },
+    );
+
+    test(
+      r'a dollar sign inside a forwarded body string is preserved',
+      () async {
+        final (_, out) = await _compose({'nodes.dart': _dollarInBody});
+        final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+        // `$` inside string literals (interpolation, raw, escaped) is prose,
+        // not a `$Variant` identifier — the token-aware rewrite must leave it.
+        expect(
+          flat,
+          contains(r"charge: $amount; raw: r'\$literal'; kind: $kind"),
+          reason: 'dollar signs in the string survive verbatim',
+        );
+        expect(
+          flat,
+          isNot(contains('charge: amount')),
+          reason: 'interpolation is not stripped',
+        );
+        expect(
+          flat,
+          contains('NetworkFailure(message: amount)'),
+          reason: r'real $Variant identifiers are still rewritten',
         );
       },
     );
