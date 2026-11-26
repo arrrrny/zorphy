@@ -150,6 +150,32 @@ void main() {
       );
       expect(adult.not().matches(child), isTrue);
     });
+
+    test('fromWire round-trips a nested predicate through and / or / not', () {
+      ZorphyFilter<dynamic> resolveNested(Map<String, dynamic> w) =>
+          ZorphyFilter.fromWire<Profile>(
+            w,
+            (p) => p == '/age' ? ProfileFields.age.asObject : null,
+          );
+      final nested = UserFields.profile.nested(
+        ProfileFields.age.greaterThan(18),
+      );
+      final notNull = UserFields.profile.isNotNull();
+
+      // The composite wire must carry resolveNested into every recursion arm,
+      // otherwise fromWire throws FormatException even though the caller
+      // supplied a resolver (issue #303 review of PR #304).
+      for (final f in [nested.and(notNull), nested.or(notNull), nested.not()]) {
+        final back = ZorphyFilter.fromWire<User>(
+          f.toWire(),
+          UserFields.byPointer,
+          resolveNested: resolveNested,
+        );
+        for (final u in [adult, child, noProfile]) {
+          expect(back.matches(u), f.matches(u), reason: '${f.toWire()} on $u');
+        }
+      }
+    });
   });
 }
 

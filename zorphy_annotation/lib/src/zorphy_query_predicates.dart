@@ -71,6 +71,7 @@ sealed class ZorphyFilter<T> {
             ZorphyFilter.fromWire<T>(
               (f as Map).cast<String, dynamic>(),
               resolve,
+              resolveNested: resolveNested,
             ),
         ];
         return op == 'and' ? ZorphyAnd<T>(filters) : ZorphyOr<T>(filters);
@@ -78,7 +79,11 @@ sealed class ZorphyFilter<T> {
         final inner = wire['filter'];
         if (inner is! Map) throw _badWire(wire, 'filter must be a map');
         return ZorphyNot<T>(
-          ZorphyFilter.fromWire<T>(inner.cast<String, dynamic>(), resolve),
+          ZorphyFilter.fromWire<T>(
+            inner.cast<String, dynamic>(),
+            resolve,
+            resolveNested: resolveNested,
+          ),
         );
     }
     if (pointer == null) throw _badWire(wire, 'field is required');
