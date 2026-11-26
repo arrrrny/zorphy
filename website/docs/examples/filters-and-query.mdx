@@ -59,5 +59,6 @@ abstract class $CreateParams<T, P> {
   P? get params;
 }
 
-final dataField = CreateParamsFields.data<String, Params>();
+final dataField = CreateParams.descriptor.fields.firstWhere((f) => f.name == 'data');
+// or the typed selector: CreateParams.descriptor.data
 ```
