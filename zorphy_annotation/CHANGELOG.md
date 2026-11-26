@@ -1,4 +1,4 @@
-## [Unreleased]
+## [3.0.0-dev.3] - 2026-11-26
 
 ### Documentation (#275, ZRP-006)
 

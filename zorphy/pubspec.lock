@@ -576,6 +576,6 @@ packages:
       path: "../zorphy_annotation"
       relative: true
     source: path
-    version: "3.0.0-dev.2"
+    version: "3.0.0-dev.3"
 sdks:
   dart: ">=3.13.0 <4.0.0"
