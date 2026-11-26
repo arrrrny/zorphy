@@ -66,11 +66,14 @@ void main() {
           // intent payload) and `json_annotation` (`@JsonKey` is the v3
           // field-level wire annotation the generator reads by name and the
           // migrator emits — re-exported for the documented single import).
-          // The former `collection` / `meta` / `quiver` deps were removed —
+          // `meta` is re-exported again (#274): the v2 package re-exported
+          // `@protected` / `@immutable`, and a migrated consumer must keep
+          // compiling. The former `collection` / `quiver` deps stay removed —
           // collection's List/Map equality is now a local shim, and the
-          // quiver/meta re-exports are gone.
+          // quiver re-export is gone.
           'crypto': '^3.0.7',
           'json_annotation': '^4.12.0',
+          'meta': '^1.17.0',
         };
 
         final expectedZorphyDevDeps = <String, String>{

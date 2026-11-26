@@ -90,6 +90,49 @@ abstract class \$Child extends \$Base {
       expect(out, isNot(contains('@ZorphyValue()')));
       expect(out, isNot(contains('@Zorphy(')));
     });
+
+    test('a generic-id param becomes @ZorphyValue(), not an entity', () {
+      // Finding 2 of #274: the archetype is picked from `_hasId` alone, so a
+      // class whose `id` is a TYPE PARAMETER (not a String/int key) is wrongly
+      // classified as an entity. The v3 generator rejects a non-String/non-int
+      // principal key (`_principalKeyProblem`), so this must be a value.
+      const source = '''
+@Zorphy()
+abstract class \$DeleteParams<I> {
+  final I id;
+  final String reason;
+}
+''';
+      final out = codemod.transform(source);
+      expect(out, contains('@ZorphyValue()'));
+      expect(out, isNot(contains('@ZorphyEntity')));
+      expect(out, isNot(contains('@Zorphy(')));
+    });
+
+    test('a generic-id getter param also becomes @ZorphyValue()', () {
+      const source = '''
+@Zorphy()
+abstract class \$Lookup<K> {
+  K get id;
+  String get label;
+}
+''';
+      final out = codemod.transform(source);
+      expect(out, contains('@ZorphyValue()'));
+      expect(out, isNot(contains('@ZorphyEntity')));
+    });
+
+    test('a String-id class stays an entity (generic fix is narrow)', () {
+      const source = '''
+@Zorphy()
+abstract class \$User {
+  final String id;
+}
+''';
+      final out = codemod.transform(source);
+      expect(out, contains('@ZorphyEntity(principalKey: #id)'));
+      expect(out, isNot(contains('@ZorphyValue()')));
+    });
   });
 
   group('v3 codemod — codecs', () {

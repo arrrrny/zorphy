@@ -15,5 +15,10 @@ dependencies:
   # requirements in #175 (a reviewed amendment — see CHANGELOG / #175).
   crypto: ^3.0.7
   json_annotation: ^4.12.0
+  # Re-exported from the barrel (`zorphy.dart`) so a consumer that imported
+  # `@protected` / `@immutable` through `zorphy_annotation` keeps compiling
+  # after migration (zorphy #274). The v2 package re-exported it; v3 dropped
+  # it along with the dependency.
+  meta: ^1.17.0
 dev_dependencies:
   test: ^1.33.0
