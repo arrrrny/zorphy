@@ -41,4 +41,6 @@ export 'src/agent_annotations.dart';
 export 'src/boundary.dart';
 export 'src/patch_wire.dart';
 export 'src/lens.dart';
+export 'src/zorphy_field.dart';
+export 'src/zorphy_query_predicates.dart';
 export 'src/zorphy_entity_descriptor.dart';

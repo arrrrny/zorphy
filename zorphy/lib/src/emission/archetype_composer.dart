@@ -69,6 +69,7 @@ import '../emitters/intent_emitter.dart';
 import '../emitters/mock_fixture_emitter.dart';
 import '../parser/polymorphic_ir.dart';
 import 'boundary_codec_emitter.dart';
+import 'entity_fields_generator.dart';
 import 'emitter.dart';
 import 'entity_descriptor_generator.dart';
 import 'json_pointer_emitter.dart';
@@ -289,6 +290,14 @@ final class ArchetypeComposer {
       final lensClasses = const LensEmitter().lensClasses(ir);
       if (lensClasses.isNotEmpty) {
         fragments.add(ZorphyEmitter().emitSpecs(lensClasses));
+      }
+      // The `<Name>Fields` descriptor classes ride the same seam (issue
+      // #247): top-level, one per concrete entity/value node, emitted once
+      // per library — they name the node's `copyWith` and the
+      // `ZorphyField`/`ZorphyLens` runtime types the owning library imports.
+      final fieldsClasses = const EntityFieldsGenerator().fieldsClasses(ir);
+      if (fieldsClasses.isNotEmpty) {
+        fragments.add(ZorphyEmitter().emitSpecs(fieldsClasses));
       }
     }
 
