@@ -223,7 +223,13 @@ final class ArchetypeParser {
       final name = constructor.name;
       if (name == null || name.isEmpty) continue;
       factories.add(
-        ZorphyVariantFactoryIr(name: name, variantClassName: target.name ?? ''),
+        ZorphyVariantFactoryIr(
+          name: name,
+          variantClassName: target.name ?? '',
+          parameters: constructor.firstFragment.formalParameters
+              .map(_userParam)
+              .toList(),
+        ),
       );
     }
     return factories;

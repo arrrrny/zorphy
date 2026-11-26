@@ -770,27 +770,119 @@ final class PolymorphicClassEmitter {
               fields[variant.className] ?? const [],
               fields,
             );
+      // `fromTrusted` is const only when the variant carries no collection
+      // field — a collection is defensively copied in an initializer list,
+      // which drops `const` (#284). A const redirect to that non-const
+      // constructor is `redirect_to_non_const_constructor` (#290).
+      final fromTrustedConst = variantFields.every(
+        (field) => _collectionSnapshot(field.emittedType) == null,
+      );
+      final params = _variantFactoryParams(factory, variantFields);
+      final target = '${_lowerType(factory.variantClassName)}.fromTrusted';
       c.constructors.add(
         Constructor((ctor) {
-          ctor.constant = true;
           ctor.factory = true;
           ctor.name = factory.name;
-          for (final field in variantFields) {
-            ctor.optionalParameters.add(
-              Parameter((p) {
-                p.name = field.name;
-                p.named = true;
-                p.required = !field.isNullable;
-                p.type = referType(_lowerType(field.emittedType));
-              }),
-            );
+          // A redirecting factory is implicitly `const` and may carry NO
+          // default value (`default_value_in_redirecting_factory_constructor`)
+          // and only named parameters. Only when the source declaration is
+          // already that shape AND `fromTrusted` is const is the const
+          // redirect legal; every other declaration becomes a body factory
+          // forwarding each parameter by name (#290).
+          if (fromTrustedConst && params.allNamedNoDefaults) {
+            ctor.constant = true;
+            ctor.optionalParameters.addAll(params.named);
+            ctor.redirect = refer(target);
+            return;
           }
-          ctor.redirect = refer(
-            '${_lowerType(factory.variantClassName)}.fromTrusted',
+          ctor.requiredParameters.addAll(params.requiredPositional);
+          ctor.optionalParameters.addAll(params.named);
+          ctor.optionalParameters.addAll(params.optionalPositional);
+          ctor.lambda = true;
+          ctor.body = Code(
+            '$target(${params.names.map((n) => '$n: $n').join(', ')})',
           );
         }),
       );
     }
+  }
+
+  /// The parameters the sealed root re-emits for one variant factory (issue
+  /// #290): the factory's OWN source declaration when the IR carries it, so a
+  /// declared default (`bool isRetryable = false`) and an optional parameter
+  /// survive instead of being rebuilt as `required` from the variant's fields.
+  ///
+  /// Falls back to the variant leaf's `fromTrusted` field list (all named, no
+  /// defaults) only when the source declaration was unavailable.
+  ({
+    List<Parameter> named,
+    List<Parameter> requiredPositional,
+    List<Parameter> optionalPositional,
+    List<String> names,
+    bool allNamedNoDefaults,
+  })
+  _variantFactoryParams(
+    ZorphyVariantFactoryIr factory,
+    List<PolymorphicField> variantFields,
+  ) {
+    final named = <Parameter>[];
+    final requiredPositional = <Parameter>[];
+    final optionalPositional = <Parameter>[];
+    final names = <String>[];
+    var allNamedNoDefaults = true;
+    if (factory.parameters.isNotEmpty) {
+      for (final p in factory.parameters) {
+        names.add(p.name);
+        final spec = Parameter((parameter) {
+          parameter.name = p.name;
+          if (p.type != null) {
+            parameter.type = referType(_lowerType(p.type!));
+          }
+          if (p.isNamed) {
+            parameter.named = true;
+            parameter.required = p.isRequired;
+          }
+          if (p.defaultValue != null) {
+            parameter.defaultTo = Code(p.defaultValue!);
+          }
+        });
+        if (p.isNamed) {
+          named.add(spec);
+          if (p.defaultValue != null) allNamedNoDefaults = false;
+        } else if (p.isOptionalPositional) {
+          optionalPositional.add(spec);
+          allNamedNoDefaults = false;
+        } else {
+          requiredPositional.add(spec);
+          allNamedNoDefaults = false;
+        }
+      }
+      return (
+        named: named,
+        requiredPositional: requiredPositional,
+        optionalPositional: optionalPositional,
+        names: names,
+        allNamedNoDefaults: allNamedNoDefaults,
+      );
+    }
+    for (final field in variantFields) {
+      names.add(field.name);
+      named.add(
+        Parameter((p) {
+          p.name = field.name;
+          p.named = true;
+          p.required = !field.isNullable;
+          p.type = referType(_lowerType(field.emittedType));
+        }),
+      );
+    }
+    return (
+      named: named,
+      requiredPositional: requiredPositional,
+      optionalPositional: optionalPositional,
+      names: names,
+      allNamedNoDefaults: true,
+    );
   }
 
   /// Forwards the user-declared static methods and body factory constructors

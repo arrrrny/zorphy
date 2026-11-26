@@ -190,9 +190,21 @@ final class ZorphyVariantFactoryIr {
   /// `$`-prefixed name is lowered.
   final String variantClassName;
 
+  /// The factory's OWN declared formal parameters, in declaration order, read
+  /// from the analyzer element (issue #290).
+  ///
+  /// The sealed root re-emits the source declaration's names, requiredness and
+  /// defaults — NOT a parameter list rebuilt from the variant's fields, which
+  /// silently dropped a declared default (`bool isRetryable = false` became
+  /// `required bool isRetryable`) and turned an optional parameter required.
+  /// Empty when the source could not be read; the emitter then falls back to
+  /// the variant leaf's `fromTrusted` field list.
+  final List<ZorphyUserParamIr> parameters;
+
   const ZorphyVariantFactoryIr({
     required this.name,
     required this.variantClassName,
+    this.parameters = const [],
   });
 
   @override
