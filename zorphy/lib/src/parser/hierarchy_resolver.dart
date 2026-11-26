@@ -687,19 +687,25 @@ final class HierarchyResolver {
       _finalizeNode(childElement, stamped, parents, resolved);
       final finalizedChild = resolved[childElement]!.node;
       finalizedChildren.add(finalizedChild);
-      final leaves = finalizedChild.isConcreteLeaf
-          ? [finalizedChild]
-          : finalizedChild.allConcreteLeaves;
-      for (final leaf in leaves) {
-        final leafElement = _elementForChild(leaf, resolved);
-        if (leafElement != null &&
-            !leafElement.constructors.any((c) => c.name == 'fromTrusted')) {
-          withoutFromTrusted.add(leaf.cleanName);
+      // Only the union root carries `variantsWithoutFromTrusted`. Guarding the
+      // walk avoids a wasted `allConcreteLeaves` pass on every non-root level.
+      if (root == null) {
+        final leaves = finalizedChild.isConcreteLeaf
+            ? [finalizedChild]
+            : finalizedChild.allConcreteLeaves;
+        for (final leaf in leaves) {
+          final leafElement = _elementForChild(leaf, resolved);
+          if (leafElement != null &&
+              !leafElement.constructors.any((c) => c.name == 'fromTrusted')) {
+            withoutFromTrusted.add(leaf.cleanName);
+          }
         }
       }
     }
 
     // Rebuild once more so `directSubTypes` references the finalized children.
+    // A diamond hierarchy can yield the same leaf twice; harmless because the
+    // emitter de-duplicates with `.toSet()`.
     final finalNode = stamped.copyWith(
       directSubTypes: List.unmodifiable(finalizedChildren),
       allConcreteLeaves: List.unmodifiable(<ZorphyNodeIr>[

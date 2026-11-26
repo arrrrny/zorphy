@@ -963,19 +963,31 @@ final class PolymorphicClassEmitter {
 
   /// If [source] at [pos] starts `<...>(` with no whitespace (or `(` directly),
   /// returns the index of `(`, or `null` otherwise (issue #293).
+  ///
+  /// Type arguments may contain balanced `()`/`[]`/`{}` groups — e.g.
+  /// `$V<void Function()>` and `$V<(int, String)>` — whose `)`, `]`, `}`, `,`
+  /// and spaces are part of the type, not the end of the argument list. Track
+  /// those groups alongside the angle depth so such generic constructor calls
+  /// are still rewritten to `.fromTrusted` (review of #295).
   static int? _constructorInvocationParen(String source, int pos) {
     if (pos >= source.length) return null;
     if (source.codeUnitAt(pos) == 0x28 /* ( */ ) return pos;
     if (source.codeUnitAt(pos) != 0x3c /* < */ ) return null;
-    var depth = 0;
+    var angleDepth = 0;
+    var parenDepth = 0;
+    var bracketDepth = 0;
+    var braceDepth = 0;
     var j = pos;
     while (j < source.length) {
       final c = source.codeUnitAt(j);
       if (c == 0x3c /* < */ ) {
-        depth++;
+        angleDepth++;
       } else if (c == 0x3e /* > */ ) {
-        depth--;
-        if (depth == 0) {
+        angleDepth--;
+        if (angleDepth == 0 &&
+            parenDepth == 0 &&
+            bracketDepth == 0 &&
+            braceDepth == 0) {
           final next = j + 1;
           if (next < source.length &&
               source.codeUnitAt(next) == 0x28 /* ( */ ) {
@@ -983,17 +995,42 @@ final class PolymorphicClassEmitter {
           }
           return null;
         }
-      } else if (depth == 1 &&
-          (c == 0x20 ||
-              c == 0x09 ||
-              c == 0x0a ||
-              c == 0x0d ||
-              c == 0x3b /* ; */ ||
-              c == 0x2c /* , */ ||
-              c == 0x29 /* ) */ ||
-              c == 0x5d /* ] */ ||
-              c == 0x7d /* } */ ||
-              c == 0x3d /* = */ )) {
+      } else if (c == 0x28 /* ( */ ) {
+        parenDepth++;
+      } else if (c == 0x29 /* ) */ ) {
+        if (parenDepth > 0) {
+          parenDepth--;
+        } else if (angleDepth == 1 &&
+            bracketDepth == 0 &&
+            braceDepth == 0) {
+          return null;
+        }
+      } else if (c == 0x5b /* [ */ ) {
+        bracketDepth++;
+      } else if (c == 0x5d /* ] */ ) {
+        if (bracketDepth > 0) {
+          bracketDepth--;
+        } else if (angleDepth == 1 &&
+            parenDepth == 0 &&
+            braceDepth == 0) {
+          return null;
+        }
+      } else if (c == 0x7b /* { */ ) {
+        braceDepth++;
+      } else if (c == 0x7d /* } */ ) {
+        if (braceDepth > 0) {
+          braceDepth--;
+        } else if (angleDepth == 1 &&
+            parenDepth == 0 &&
+            bracketDepth == 0) {
+          return null;
+        }
+      } else if (angleDepth == 1 &&
+          parenDepth == 0 &&
+          bracketDepth == 0 &&
+          braceDepth == 0 &&
+          (c == 0x3b /* ; */ || c == 0x3d /* = */ )) {
+        // A `;`/`=` at the outer type-argument level is not a type argument.
         return null;
       }
       j++;
