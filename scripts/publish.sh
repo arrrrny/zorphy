@@ -26,7 +26,7 @@ VERSION=""
 DESCRIPTION=""
 for arg in "$@"; do
     case "$arg" in
-        --dry-run|-n) DRY_RUN=true ;;
+        --dry-run) DRY_RUN=true ;;
         -*) echo "❌ Unknown option: $arg"; usage; exit 1 ;;
         *)
             if [ -z "$VERSION" ]; then

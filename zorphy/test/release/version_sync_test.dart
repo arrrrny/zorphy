@@ -8,8 +8,9 @@ String _versionOf(String pubspecPath) {
   return yaml['version'] as String;
 }
 
-/// The repository root: this test runs with the `zorphy` package as cwd, and
-/// the package directory sits directly under the root.
+/// The repository root: this test runs with the `zorphy` package as cwd (the
+/// documented `dart test` invocation) and the package sits directly under the
+/// root. Running from the repo root instead would resolve the wrong root.
 final String _repoRoot = Directory(
   '${Directory.current.path}/..',
 ).resolveSymbolicLinksSync();

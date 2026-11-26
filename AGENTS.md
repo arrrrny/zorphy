@@ -1,3 +1,26 @@
+<!-- fleet-agents-pointer:begin -->
+# ⚠️ FLEET RULES — LOAD ~/.agents/AGENTS.md FIRST
+
+Before applying any rule in this file, load and follow `~/.agents/AGENTS.md`
+— the fleet-level rules file every machine carries (synced from
+`arrrrny/skills`, the single source of truth, by `sync-skills` inside
+`kimi-code-update`, 3x/day). It owns the fleet-wide HARD RULES: the
+skills-sync rule (every merge-PR task must check the repo's exposed skills —
+create or update them on exported-behavior changes — and auto-PR them to
+`arrrrny/skills`), the English-only response rule, the GitHub account
+spelling (`arrrrny` = a + exactly 4 r's + ny), and the machine bootstrap
+contract (`arrrrny/scripts` + `arrrrny/skills`). Future fleet-wide rule
+changes are made ONCE in that file — never by editing every repo. Where this
+file and the fleet file disagree, the fleet file wins unless this file is
+MORE restrictive for this repo.
+<!-- fleet-agents-pointer:end -->
+
+> **Fleet-governance rules:** The `misfire-rule`, `pool-pr`, `tmp-clone`,
+> `local-ci`, `test-concurrency` and `dependency-bump-rule` blocks that were
+> copied into this file are intentionally not duplicated in this constitution.
+> They are owned by `~/.agents/AGENTS.md` (synced from `arrrrny/skills`), which
+> every agent loads first per the pointer above — the local copy of those rules
+> is not lost by this rewrite.
 # AGENTS.md — zorphy 3.0.0-dev.3 -> 3.0.0 Closure & Emitter Improvements Constitution
 
 > **Status:** Authoritative Remediation & Improvement Constitution for `arrrrny/zorphy` (`zorphy_annotation`, `zorphy`, `zorphy_migrator`)  
@@ -13,7 +36,7 @@ Inspection of `zorphy 3.0.0-dev.2` and downstream `zuraffa#2149` revealed three 
 1. **Gap A — `@ZorphyUnion` Sealed Root Drops Variant Redirecting Factories & Root Static/Factory Members (`ZRP-008`, #271):**
    * *Evidence (`polymorphic_class_emitter.dart`):* `@ZorphyUnion()` emits `const AppFailure();`, abstract getters, final variant classes (`NetworkFailure.fromTrusted(...)`), and static `fromWire`/`toWire` on the root—but **drops** the source's redirecting factories (`factory $AppFailure.network(...) = $NetworkFailure;`) and **drops** user-declared `static` methods / body `factory` constructors (such as `AppFailure.from(error, [st])`).
    * *Impact:* Forces consumers (`AppFailure`, `CachePolicy`, `AsyncSlice`, `MockScenarioPolicy`) into verbose variant-class imports or hand-written top-level wrapper functions, breaking Dart 3 dot-shorthand (`.network(...)`, `.staleWhileRevalidate(...)`, `.ready(...)`).
-   * *Fix:* Emit `const factory AppFailure.network({...}) = NetworkFailure.fromTrusted;` redirecting factories on the generated `sealed` root for every variant, AND copy user-declared `static` methods and body `factory` constructors from `$Union` onto the generated `sealed` root (rewriting `$Variant` $ightarrow$ `Variant`).
+   * *Fix:* Emit `const factory AppFailure.network({...}) = NetworkFailure.fromTrusted;` redirecting factories on the generated `sealed` root for every variant, AND copy user-declared `static` methods and body `factory` constructors from `$Union` onto the generated `sealed` root (rewriting `$Variant` -> `Variant`).
 2. **Gap B — `BoundaryCodecEmitter` Skips Generic Nodes Instead of Emitting Codec-Parameterized `toWire`/`fromWire` (`ZRP-009`, #272):**
    * *Evidence (`boundary_codec_emitter.dart:296,774`):* `if (current.typeParameters.isNotEmpty) return; // "a generic node … receives no codec"`.
    * *Impact:* Every generic wrapper class (`QueryParams<T>`, `CreateParams<T>`, `UpdateParams<T>`, `AsyncSlice<T>`) loses `toWire` and `fromWire`, forcing downstream packages to hand-write serialization boilerplate.
@@ -46,5 +69,5 @@ zorphy/ (monorepo)
 
 1. **100% `package:code_builder` Emission — ZERO `StringBuffer`.**
 2. **Clean `dart analyze --fatal-infos` on Generated `.g.dart`:** Emitted code must never trigger `unnecessary_question_mark`, `unused_import`, or `unnecessary_cast`.
-3. **All 3 Packages Version-Locked:** Never publish `zorphy_annotation` and `zorphy` without `zorphy_migrator` at the exact same version string (`3.0.0-dev.3` $ightarrow$ `3.0.0`).
+3. **All 3 Packages Version-Locked:** Never publish `zorphy_annotation` and `zorphy` without `zorphy_migrator` at the exact same version string (`3.0.0-dev.3` -> `3.0.0`).
 4. **Deterministic CI Assertions Only:** Gate CI on structural invariants (`changedPaths`, `conflictingPaths`, `resolvePath`, zero `dart:mirrors`) rather than wall-clock latency under host load.
