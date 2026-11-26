@@ -10,27 +10,21 @@
 // compiles.
 //
 // Follows the issue_109 / decorator_preservation e2e pattern: the part files
-// are produced by `dart run build_runner build` inside example/ (CI runs it
-// before this test) and asserted here.
+// are produced by `dart run build_runner build` inside example/ and asserted
+// here. The fixture is provisioned on demand by `provisionExampleFixture`
+// (issue #287), so a fresh clone needs no manual build step.
 
 import 'dart:io';
 
 import 'package:test/test.dart';
 
-void main() {
-  final v3Part = File('example/lib/_br_/v3_archetypes/v3_archetypes.part.dart');
+import '../support/provision_example_fixture.dart';
 
+void main() {
   late String v3;
 
   setUpAll(() {
-    if (!v3Part.existsSync()) {
-      fail(
-        'Missing generated file: ${v3Part.path}\n'
-        'Run: cd example && dart run build_runner build '
-        '--delete-conflicting-outputs',
-      );
-    }
-    v3 = v3Part.readAsStringSync();
+    v3 = provisionExampleFixture();
   });
 
   group('#223 v3 archetypes — e2e build_runner smoke', () {
