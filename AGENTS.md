@@ -1,286 +1,50 @@
-<!-- fleet-agents-pointer:begin -->
-# ⚠️ FLEET RULES — LOAD ~/.agents/AGENTS.md FIRST
+# AGENTS.md — zorphy 3.0.0-dev.3 -> 3.0.0 Closure & Emitter Improvements Constitution
 
-Before applying any rule in this file, load and follow `~/.agents/AGENTS.md`
-— the fleet-level rules file every machine carries (synced from
-`arrrrny/skills`, the single source of truth, by `sync-skills` inside
-`kimi-code-update`, 3x/day). It owns the fleet-wide HARD RULES: the
-skills-sync rule (every merge-PR task must check the repo's exposed skills —
-create or update them on exported-behavior changes — and auto-PR them to
-`arrrrny/skills`), the English-only response rule, the GitHub account
-spelling (`arrrrny` = a + exactly 4 r's + ny), and the machine bootstrap
-contract (`arrrrny/scripts` + `arrrrny/skills`). Future fleet-wide rule
-changes are made ONCE in that file — never by editing every repo. Where this
-file and the fleet file disagree, the fleet file wins unless this file is
-MORE restrictive for this repo.
-<!-- fleet-agents-pointer:end -->
-<!-- SPECKIT START -->
+> **Status:** Authoritative Remediation & Improvement Constitution for `arrrrny/zorphy` (`zorphy_annotation`, `zorphy`, `zorphy_migrator`)  
+> **Baseline:** Built on empirical inspection of `zorphy` / `zorphy_annotation` `3.0.0-dev.2` (`polymorphic_class_emitter.dart`, `boundary_codec_emitter.dart:296,774`, and downstream `zuraffa#2149` analyzer output).  
+> **Release Strategy:** Cut synchronized **`3.0.0-dev.3`** across all **3** packages (`zorphy_annotation`, `zorphy`, `zorphy_migrator`), verify downstream `zuraffa` v8 green, then promote all 3 packages to **`3.0.0`** final without burning `4.0.0`.
 
-<!-- misfire-rule:begin -->
-## ZURAFFA MISFIRE RULE (HARD, NON-NEGOTIABLE — HARDCODED TOP RULE)
+---
 
-**On ANY misfire (test failure, compilation error, runtime crash, unexpected output) related to zuraffa:**
+## 1. Empirical Evidence & New Gaps Found in `3.0.0-dev.2`
 
-1. **STOP IMMEDIATELY** on the first misfire.
-2. **Report the issue** to zuraffa GitHub (`arrrrny/zuraffa`) with: the command that failed, expected vs actual output, and root cause.
-3. **Continue with a workaround** to make the task pass (e.g., skip the failing test, use an alternative approach, or mock the failing component).
-4. **Add a comment** in the code explaining the workaround applied and linking to the zuraffa GitHub issue.
+Inspection of `zorphy 3.0.0-dev.2` and downstream `zuraffa#2149` revealed three high-impact emitter gaps alongside the remaining closure items:
 
-**On ANY misfire related to the repo itself (not zuraffa):**
+1. **Gap A — `@ZorphyUnion` Sealed Root Drops Variant Redirecting Factories & Root Static/Factory Members (`ZRP-008`, #271):**
+   * *Evidence (`polymorphic_class_emitter.dart`):* `@ZorphyUnion()` emits `const AppFailure();`, abstract getters, final variant classes (`NetworkFailure.fromTrusted(...)`), and static `fromWire`/`toWire` on the root—but **drops** the source's redirecting factories (`factory $AppFailure.network(...) = $NetworkFailure;`) and **drops** user-declared `static` methods / body `factory` constructors (such as `AppFailure.from(error, [st])`).
+   * *Impact:* Forces consumers (`AppFailure`, `CachePolicy`, `AsyncSlice`, `MockScenarioPolicy`) into verbose variant-class imports or hand-written top-level wrapper functions, breaking Dart 3 dot-shorthand (`.network(...)`, `.staleWhileRevalidate(...)`, `.ready(...)`).
+   * *Fix:* Emit `const factory AppFailure.network({...}) = NetworkFailure.fromTrusted;` redirecting factories on the generated `sealed` root for every variant, AND copy user-declared `static` methods and body `factory` constructors from `$Union` onto the generated `sealed` root (rewriting `$Variant` $ightarrow$ `Variant`).
+2. **Gap B — `BoundaryCodecEmitter` Skips Generic Nodes Instead of Emitting Codec-Parameterized `toWire`/`fromWire` (`ZRP-009`, #272):**
+   * *Evidence (`boundary_codec_emitter.dart:296,774`):* `if (current.typeParameters.isNotEmpty) return; // "a generic node … receives no codec"`.
+   * *Impact:* Every generic wrapper class (`QueryParams<T>`, `CreateParams<T>`, `UpdateParams<T>`, `AsyncSlice<T>`) loses `toWire` and `fromWire`, forcing downstream packages to hand-write serialization boilerplate.
+   * *Fix:* For generic nodes `<T, ...>`, emit **codec-parameterized** `Map<String, Object?> toWire(Map<String, Object?> Function(T) encodeT)` and `static Foo<T> fromWire<T>(Map<String, Object?> raw, ZorphyBoundaryResult<T> Function(Map<String, Object?>) decodeT)` (with built-in primitive fast paths when `T` is bounded to `String`/`int`/`double`/`bool`).
+3. **Gap C — Nullable Generic Type Parameters Emit `T?` Causing `unnecessary_question_mark` (`ZRP-010`, #273):**
+   * *Evidence (`toggle_params.part.dart` in `zuraffa#2149`):* For `class ToggleParams<I>` (where `I`'s implicit bound `Object?` is already nullable), emitting `I? id` triggers Dart analyzer warning `unnecessary_question_mark`, failing `dart analyze --fatal-infos`.
+   * *Fix:* Check `typeSystem.isNullable(typeParam.bound)` in the emitter; when `true`, emit `I fieldName` instead of `I? fieldName`.
+4. **Closure Items and Their Tracking Issues (`ZRP-001` – `ZRP-011`):**
+   * *Shipped in the `3.0.0-dev.2` batch:* `ZRP-001` `<Entity>Fields` (`ZorphyField<T, V>`) + `ZorphyFilter<T>` / `ZorphySort<T>` (#247); `ZRP-002` `ZorphyPatch<T>` `changedPaths`, `conflictingPaths()`, `composePatches()`, and atomic list replacement (#248); `ZRP-003` `ZorphyEntityDescriptor<T>` (`<Entity>.descriptor`) for reflection-free generic `ZfaStore` (#251); `ZRP-004` `.zorphy.dart` directive stripping and file deletion, shipped as `dart run zorphy:migrate_v3` inside the `zorphy` package (#249); `ZRP-005` 3-package SemVer prerelease sync & publish (#250); `ZRP-006` `README.md` `#v3-migration`, website pages, `#236` notes, and deterministic structural CI guards (#252).
+   * *Open in the `3.0.0-dev.3` batch (epic #270):* `ZRP-008` (#271), `ZRP-009` (#272), `ZRP-010` (#273), `ZRP-011` codemod and `package:meta` gaps reported by the downstream `zuraffa#2149` adoption (#274), the `ZRP-006` follow-up docs pass (#275), and `ZRP-007` publishing `3.0.0-dev.3` (#276). Promotion to `3.0.0` final stays on #254.
 
-1. **STOP IMMEDIATELY** on the first misfire.
-2. **Report the issue** to the repo's GitHub with full details.
-3. **Continue with a workaround** to make the task pass.
-4. **Add a comment** in the code explaining the workaround applied.
+---
 
-This rule takes precedence over all other rules. Never skip a misfire or rationalize it away.
-<!-- misfire-rule:end -->
+## 2. Workspace Package Topology (All 3 Packages Version-Locked)
 
-<!-- pool-pr:begin -->
-## The forklift pool owns the PR — never merge a pull request yourself
-
-Every pull request in these repos is reviewed by the **forklift pool**
-(`arrrrny/forklift` — the local PR-review pipeline). It mints three tasks, in
-this order, and that chain is the only sanctioned way from "PR opened" to "PR
-merged":
-
-1. `PR review <repo>#<n>` — the automated review; it posts its actionable
-   findings on the PR.
-2. `Apply review fixes <repo>#<n>` — one fixes round, pushed onto the PR's
-   branch.
-3. `Merge PR <repo>#<n>` — the merge itself; the task refuses while reviewer
-   findings are still unaddressed.
-
-**Never merge or close a PR by hand, and never merge one because it "looks
-finished".** A hand merge lands the code while findings are still open: the
-pool's fixes task is then killed by its closed-PR guard — the dispatcher log
-says `…#<n> is closed — cancelled, no agent started` — and every finding the
-review posted is dropped with nobody to own it. That is not a review, it is a
-race the pipeline cannot win.
-
-**Wait for the pool, and read the pool for the state.** The three task rows are
-the truth; the PR page is not:
-
-```bash
-# the pool's board — loopback, IPv4-only (never `localhost`)
-curl -s http://127.0.0.1:8888/tasks \
-  | jq -r '.[] | select(.title | test("PR review|Apply review fixes|Merge PR")) \
-          | [.title, .status, .id] | @tsv'
+```text
+zorphy/ (monorepo)
+├── zorphy_annotation/    # Annotations, ZorphyField<T, V>, ZorphyFilter, ZorphySort, ZorphyEntityDescriptor<T>, ZorphyBoundaryResult<T>
+├── zorphy/               # 100% code_builder AST generator (polymorphic_class_emitter, boundary_codec_emitter, fields, patch, descriptor)
+├── zorphy_migrator/      # Codemod for legacy freezed / @Zorphy2 sources (the v2 -> v3 `migrate_v3` codemod ships in the `zorphy` package)
+├── scripts/
+│   ├── check_version_sync.sh # Enforces identical versions AND matching zorphy_annotation constraints across ALL 3 packages
+│   └── publish.sh            # Publishes zorphy_annotation -> zorphy -> zorphy_migrator (supports -dev.N prereleases; --dry-run prints the plan and changes nothing)
+└── website/                  # Documentation site (all v2 guides updated to v3)
 ```
 
-One row per stage. `status` is one of `queued`, `running`, `done`, `failed`,
-`needsInput`, `cancelled`, `paused`. The PR is done when the
-`Merge PR <repo>#<n>` row reads `done`. A fixes row that reads `failed` or
-`cancelled` means the PR was **not** reviewed-and-fixed: read the row's
-`errorMessage`, fix the cause, and let the pipeline requeue it (relabelling a
-failed task requeues it in the same call — `POST /tasks/<id>/label`).
+---
 
-**An agent can simply wait for the whole process** — poll the board above until
-the `Merge PR` row is terminal. Everything else is the pool's job: it drives
-the review, the fixes round and the merge.
-<!-- pool-pr:end -->
+## 3. Non-Negotiable Rules
 
-<!-- tmp-clone:begin -->
-## Work in a `/tmp` clone — never in `~/Developer`
-
-Every piece of work on a PR or an issue happens in its own clone under `/tmp`,
-and that clone dies with the task:
-
-```bash
-git clone https://github.com/<owner>/<repo>.git /tmp/<repo>-<pr-or-issue>
-```
-
-Never clone into `~/Developer`, and never clone into the forklift checkout —
-a bare repo slug as the clone target is how a stray checkout ends up inside the
-repo root, and a clone left behind in `~/Developer` is indistinguishable from
-the primary checkout. The pool's lanes already mint their clones this way
-(`/tmp/fix-pr-<n>`, `/tmp/review-pr-<n>`, `/tmp/issue-<n>`, …) and remove them
-when the task settles.
-<!-- tmp-clone:end -->
-
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-<!-- SPECKIT END -->
-
-## Branch Strategy
-
-- **Default base for all PRs:** `master`
-- **Feature/fix branches:** Branch off master → PR to master
-- **development branch:** Scratch/backlog only (optional); NOT a merge target
-- **Release flow:** Merge to master with version bump + CHANGELOG = release
-- **CI requirements:** All jobs green + 1 review approval before merge
-- **No bulk dev→master PRs:** Each PR is individually curated with tests
-
-# Shared terminal (Herdr)
-
-Long-running or user-visible commands (e.g. `dart run build_runner build`)
-should run in a **Herdr-managed pane** so both the human and agents see the
-same terminal. Agents drive it via the `herdr` CLI; load the `herdr` skill
-first (`/skill:herdr`) for the full workflow, pane targeting, and safety rules:
-
-```bash
-herdr pane split --current --direction right --cwd "$PWD" --no-focus  # create a visible sibling pane
-herdr pane run <pane-id> 'cmd'                                       # run a command in that pane (visible to the human)
-herdr pane wait-output <pane-id> --match 'expected output' --timeout 120000   # wait until output appears
-herdr pane read <pane-id> --source recent-unwrapped --lines 120      # capture the pane's output
-```
-
-See the `herdr` skill (`~/.agents/skills/herdr/SKILL.md`) for the full workflow
-and CLI reference.
-
-## ⚠️ ZORPHY CODE GENERATION — STRICT HANDLING
-
-### Never modify generated zorphy code files.
-
-### Migrating a v2 codebase to v3
-
-Run the bundled codemod — never hand-edit v2 annotations when upgrading:
-
-```bash
-dart run zorphy:migrate_v3 <path>          # dry-run preview
-dart run zorphy:migrate_v3 <path> --apply  # rewrite in place
-```
-
-It strips every `preset:` / `generate*` argument and emits the zero-preset v3
-archetypes (`@ZorphyEntity(principalKey: #id)` / `@ZorphyValue()` /
-`@ZorphyUnion`) plus the `fromWire` / `toWire` codecs, strips the stale
-`part '*.zorphy.dart';` / `part '*.g.dart';` directives, and deletes the
-2.x `<file>.zorphy.dart` parts from disk under `--apply` (a dry run lists
-them). See `README.md` ("Migrating v2 → v3").
-
-**Rationale:** Zorphy code generator produces code that must not be manually edited. Any modifications to generated `.zorphy.dart` files will cause:
-- Unpredictable behavior in code generation  
-- Build failures due to inconsistent state
-- Inability to reproduce results with `zorphy` CLI tools
-
-**If you spot an issue in generated code:**
-1. **DO NOT** edit the `.zorphy.dart` file directly
-2. **IMMEDIATELY** drop the current task  
-3. **Open a GitHub issue** on the `zorphy` repository
-5. **Create a new task** with proper tracking once the upstream issue is resolved
-
-This rule ensures code generation integrity and reproducible builds.
-
--- auto-added by assistant for zorphy code generation integrity
-
-<!-- local-ci:begin -->
-## Running CI locally — `scripts/local_ci.sh`
-
-GitHub Actions is billing-blocked on our private repos: every workflow run ends in
-~3s with **zero steps executed**, so a red check here means nothing. Run the same
-gate locally instead:
-
-```bash
-./scripts/local_ci.sh              # every job of the pull_request workflow
-./scripts/local_ci.sh --plan       # print every step that would run, run nothing
-./scripts/local_ci.sh --list       # workflows, triggers and jobs in this repo
-./scripts/local_ci.sh --job <id>   # one job only
-./scripts/local_ci.sh --event push # simulate the push-triggered workflow
-./scripts/local_ci.sh --keep-going # do not stop at the first failure
-./scripts/local_ci.sh -v           # echo each command before running it
-```
-
-It reads `.github/workflows/*` at run time and executes that workflow's jobs and
-steps in order, so it cannot drift from CI — it is not a second copy of the gate.
-Edit the workflow and the local run changes with it. Exit 0 means every executed
-step passed.
-
-What it cannot reproduce, and prints on startup instead of guessing:
-
-- **Linux.** CI runs `ubuntu-latest`; this runs on macOS. The step set is the
-  same, the platform is not. `sudo apt-get install` steps are mapped to a local
-  presence probe rather than silently passed.
-- **GitHub context.** A step needing `${{ secrets.* }}`, `${{ inputs.* }}`,
-  `${{ vars.* }}`, `${{ steps.* }}` or `${{ github.event.* }}` is SKIPPED with the
-  reason printed, never run with a guessed value.
-- **`uses:` actions** are not executed. Toolchain setups (`setup-dart`,
-  `setup-node`, `flutter-action`, `rust-toolchain`, …) become a version assertion
-  against the local tool; checkout/cache/artifact are noted as no-ops; anything
-  else is skipped by name. A Windows-runner job is skipped outright.
-- **Cargo cross targets.** A step that builds for a rust cross target (e.g.
-  `cargo build --target wasm32-wasip2`) is answered against this host's
-  toolchain: a rustup toolchain carrying EVERY target the step asks for is used
-  for that step — selected through the rustup proxy (`RUSTUP_TOOLCHAIN`), so
-  `cargo +<toolchain>` keeps working — and when no local toolchain carries them
-  the step is SKIPPED with the reason printed (`rustup target add <target>`) —
-  never a red step that says nothing about the repo. The toolchain the workflow
-  pins wins over another one that merely happens to carry the target. A host
-  with no rust toolchain at all is a MISSING TOOLCHAIN, not a missing target:
-  the step FAILS, as this script's convention says.
-- **`container:`** jobs run on the host toolchain, not in the declared image.
-- **`continue-on-error: true`** steps are advisory locally, exactly as in CI.
-- **Local-only checkout state.** CI checks out the committed tree; this checkout
-  also has gitignored and untracked paths, which whole-tree commands (e.g.
-  `dart analyze .`) see. A step that fails naming only such paths is reported as
-  a LOCAL-ONLY failure, not as a CI failure — pass `--strict` to count it anyway.
-  A step that would `git clone` over a sibling checkout that already exists here
-  is skipped; `--allow-outside-clone` forces it.
-
-Canonical copy: `arrrrny/forklift` → `scripts/local_ci.sh` (reference:
-`docs/forklift-scripts.md`).
-<!-- local-ci:end -->
-
-<!-- test-concurrency:begin -->
-## Test concurrency (fleet guard)
-
-Cap test concurrency at **2** — one un-capped `flutter test` fan starved the
-shared host's services once (load 260; arrrrny/forklift#176).
-
-There is **no config-file knob for `flutter test`**: it ignores
-`dart_test.yaml` entirely (its only test-config file is
-`flutter_test_config.dart`, an execution hook), so the flag is the only
-lever — and it must be passed every time:
-
-```sh
-flutter test --concurrency=2
-dart test -j 2
-```
-
-A repo whose `dart_test.yaml` carries `concurrency: 2` already defaults to it
-for `dart test`; pass the flag anyway when you override it, and never raise
-the number on a host that also runs the forklift pool. CI carries the same
-flags in `.github/workflows`.
-<!-- test-concurrency:end -->
-
-<!-- dependency-bump-rule:begin -->
-<!-- dependency-bump-rule:begin -->
-## Publishing without a dependency bump is a no-op — file the upgrade chore
-
-Before any release, resolve the lockfile and align the DECLARED constraints to
-what actually resolved. The lockfile is what ships: a `pubspec.yaml` saying
-`^7.3.8` next to a resolved `7.4.2` only guarantees the next machine resolves
-to something else, so the release you just cut is not the release anyone else
-gets.
-
-```bash
-rm -f pubspec.lock
-dart pub get                     # or `flutter pub get` for an app
-# then set every caret constraint to the version the resolver picked
-```
-
-**Then look at what is still held back.** `dart pub outdated` (or
-`flutter pub outdated`) lists every package whose declared constraint refuses
-an available upgrade — the canonical example is `google_fonts` sitting on
-`8.2.1` while `9.0.0` is out. Those are the upgrades this release did NOT take.
-
-**The rule:** when a package could be upgraded but was not bumped
-automatically, the publish **continues as normal** — do not block the release
-on it — and you MUST file a GitHub chore issue for the available upgrades.
-A publish that silently leaves upgrades on the table is not a smaller publish;
-it is a publish nobody knows is stale. File the issue with the package names,
-the current and available versions, and whether the constraint or a transitive
-pin is what holds it.
-
-Two corollaries worth remembering:
-
-- **A `dart pub upgrade` that changes nothing is a signal, not a success.**
-  If the constraint blocks the upgrade, bumping the constraint is the fix —
-  and that is exactly the chore issue above.
-- **Transitive holds are still chore material.** A package held only because
-  a dependency pins it is not this repo's constraint to widen, but it is still
-  an available upgrade a human should decide on.
-
-This applies to every Dart/Flutter repo in the fleet. A repo whose publish
-flow already runs the lockfile dance (see each repo's `PUBLISH.md`) still owes
-the chore issue for whatever `pub outdated` reports.
-<!-- dependency-bump-rule:end -->
+1. **100% `package:code_builder` Emission — ZERO `StringBuffer`.**
+2. **Clean `dart analyze --fatal-infos` on Generated `.g.dart`:** Emitted code must never trigger `unnecessary_question_mark`, `unused_import`, or `unnecessary_cast`.
+3. **All 3 Packages Version-Locked:** Never publish `zorphy_annotation` and `zorphy` without `zorphy_migrator` at the exact same version string (`3.0.0-dev.3` $ightarrow$ `3.0.0`).
+4. **Deterministic CI Assertions Only:** Gate CI on structural invariants (`changedPaths`, `conflictingPaths`, `resolvePath`, zero `dart:mirrors`) rather than wall-clock latency under host load.
