@@ -353,6 +353,7 @@ final class HierarchyResolver {
           name: name,
           type: _typeText(type),
           isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+          suppressQuestionMark: _hasNullableBound(type),
           isDomainBool:
               _isDomainBool(getter) ||
               _isDomainBool(_declaringField(declaredByName, name)),
@@ -369,6 +370,7 @@ final class HierarchyResolver {
           name: name,
           type: _typeText(type),
           isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+          suppressQuestionMark: _hasNullableBound(type),
           isDomainBool: _isDomainBool(field),
         ),
       );
@@ -408,6 +410,28 @@ final class HierarchyResolver {
   static String _typeText(DartType type) {
     final text = type.getDisplayString();
     return text.endsWith('?') ? text.substring(0, text.length - 1) : text;
+  }
+
+  /// Whether a `?` on [type] would be redundant because the field is typed by
+  /// a type parameter whose bound is already nullable (ISSUE-273, ZRP-010).
+  ///
+  /// `class ToggleParams<I>` (implicit bound `Object?`) declares `I? get id`;
+  /// emitting `I? id` is an `unnecessary_question_mark` in generated code. The
+  /// bound is resolved ONCE here, at the IR level, and stored as
+  /// [ZorphyFieldIr.suppressQuestionMark] so every type-text emitter inherits
+  /// the same answer instead of re-deriving it from strings. A non-nullable
+  /// bound (`class DeleteParams<I extends Object>`) keeps the meaningful `?`.
+  ///
+  /// This flag ONLY affects type-text emission — [ZorphyFieldIr.isNullable]
+  /// stays faithful to the source `?` so the generated API (fromTrusted
+  /// requiredness and copyWith's clear-to-null sentinel) still treats the
+  /// field as nullable. An unbounded `I` can be instantiated as `String?`.
+  static bool _hasNullableBound(DartType type) {
+    final element = type.element;
+    if (element is! TypeParameterElement) return false;
+    final bound = element.bound;
+    return bound == null ||
+        bound.nullabilitySuffix == NullabilitySuffix.question;
   }
 
   /// The `$Parent` an [element] implements, as a declared class, or `null`.

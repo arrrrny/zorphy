@@ -125,7 +125,24 @@ final class ZorphyFieldIr {
   final String type;
 
   /// Whether the declared type is nullable (`String?`).
+  ///
+  /// This stays faithful to the SOURCE `?`: emitters use it for API shape
+  /// (`fromTrusted` requiredness, `copyWith`'s clear-to-null sentinel), where a
+  /// nullable-bounded type parameter must still behave as nullable — an
+  /// unbounded `I` can be instantiated as `String?`. The redundant `?` in the
+  /// emitted TYPE TEXT is suppressed separately by [suppressQuestionMark].
   final bool isNullable;
+
+  /// Whether a `?` on [type] would be redundant because the field is typed by
+  /// a type parameter whose bound is already nullable (ISSUE-273, ZRP-010).
+  ///
+  /// `class ToggleParams<I>` (implicit bound `Object?`) declares `I? get id`;
+  /// emitting `I? id` is an `unnecessary_question_mark` in generated code. The
+  /// bound is resolved ONCE here, at the IR level, so every type-text emitter
+  /// inherits the same answer instead of re-deriving it from strings. Only
+  /// type-text emission consults this flag — [isNullable] remains faithful to
+  /// the source `?` so the generated API keeps its null-clearing behavior.
+  final bool suppressQuestionMark;
 
   /// Whether the declaration carries `@ZorphyDomainBool()` — the author's
   /// explicit claim that this boolean is part of the domain rather than a
@@ -139,14 +156,22 @@ final class ZorphyFieldIr {
     required this.name,
     required this.type,
     this.isNullable = false,
+    this.suppressQuestionMark = false,
     this.isDomainBool = false,
   });
+
+  /// Whether the emitted type text carries a `?`.
+  ///
+  /// The source `?` is suppressed only when it is redundant (a
+  /// nullable-bounded type parameter); [isNullable] itself stays faithful to
+  /// the source so API-shape logic keeps treating the field as nullable.
+  bool get emitsQuestionMark => isNullable && !suppressQuestionMark;
 
   /// Whether this field is a `bool` (and therefore a candidate flag).
   bool get isBool => type == 'bool';
 
   @override
-  String toString() => '$type${isNullable ? '?' : ''} $name';
+  String toString() => '$type${emitsQuestionMark ? '?' : ''} $name';
 }
 
 /// One node of a polymorphic hierarchy.

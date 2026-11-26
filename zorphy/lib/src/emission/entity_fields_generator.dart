@@ -204,7 +204,7 @@ final class EntityFieldsGenerator {
 
   /// The field's declared type, `$`-stripped, nullability spelled out.
   String _emittedType(ZorphyFieldIr field) =>
-      concreteTypeName(field.isNullable ? '${field.type}?' : field.type);
+      concreteTypeName(field.emitsQuestionMark ? '${field.type}?' : field.type);
 
   /// Allocates a helper name (`_get<X>` / `_set<X>`) no member already uses,
   /// registered in [used] as it is claimed.

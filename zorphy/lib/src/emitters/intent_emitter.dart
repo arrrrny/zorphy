@@ -175,7 +175,7 @@ final class IntentEmitter {
         for (final field in payload)
           BoundaryField(
             name: field.name,
-            type: field.isNullable ? '${field.type}?' : field.type,
+            type: field.emitsQuestionMark ? '${field.type}?' : field.type,
           ),
       ],
     });
@@ -287,5 +287,5 @@ final class IntentEmitter {
 
   /// [field]'s type as source text, with nullability where it belongs.
   String _dartType(ZorphyFieldIr field) =>
-      field.isNullable ? '${field.type}?' : field.type;
+      field.emitsQuestionMark ? '${field.type}?' : field.type;
 }

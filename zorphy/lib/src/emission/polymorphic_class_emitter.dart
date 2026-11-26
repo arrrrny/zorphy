@@ -69,17 +69,31 @@ final class PolymorphicField {
   final String type;
 
   /// Whether the field may be null.
+  ///
+  /// Faithful to the source `?`: drives `fromTrusted` requiredness and
+  /// `copyWith`'s clear-to-null sentinel (see [_fromTrustedConstructor] and
+  /// [_copyWith]). A nullable-bounded type parameter field stays nullable
+  /// here even though its redundant `?` is suppressed in the emitted TYPE
+  /// TEXT by [suppressQuestionMark].
   final bool isNullable;
+
+  /// Whether the source `?` is redundant and must not appear in type text.
+  ///
+  /// Set from [ZorphyFieldIr.suppressQuestionMark] for a field typed by a
+  /// nullable-bounded type parameter (#273). See [emittedType].
+  final bool suppressQuestionMark;
 
   const PolymorphicField({
     required this.name,
     required this.type,
     this.isNullable = false,
+    this.suppressQuestionMark = false,
   });
 
-  /// The type as emitted: the `?` suffix applied exactly once.
+  /// The type as emitted: the `?` suffix applied exactly once, unless the
+  /// source `?` was redundant (a nullable-bounded type parameter, #273).
   String get emittedType {
-    if (!isNullable || type.endsWith('?')) return type;
+    if (!isNullable || suppressQuestionMark || type.endsWith('?')) return type;
     return '$type?';
   }
 }
@@ -218,6 +232,7 @@ final class PolymorphicClassEmitter {
       name: field.name,
       type: substituted,
       isNullable: field.isNullable,
+      suppressQuestionMark: field.suppressQuestionMark,
     );
   }
 

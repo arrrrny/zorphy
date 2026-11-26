@@ -275,7 +275,7 @@ final class JsonPointerEmitter {
           () => _Field(
             name: field.name,
             type: concreteTypeName(
-              field.isNullable ? '${field.type}?' : field.type,
+              field.emitsQuestionMark ? '${field.type}?' : field.type,
             ),
           ),
         );
