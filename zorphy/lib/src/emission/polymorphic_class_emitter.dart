@@ -903,7 +903,10 @@ final class PolymorphicClassEmitter {
         _logSkipped(node, member.name);
         continue;
       }
-      final body = _rewriteVariants(member.bodySource);
+      final body = _rewriteVariants(
+        member.bodySource,
+        node.variantsWithoutFromTrusted,
+      );
       final (required, optional) = _splitParams(member);
       if (member.isFactory) {
         c.constructors.add(
@@ -983,7 +986,11 @@ final class PolymorphicClassEmitter {
   /// `$` characters inside string literals (interpolation, raw strings,
   /// escapes) and comments are copied verbatim. A raw `replaceAll(r'$', '')`
   /// silently corrupted `'cost: $amount'` and `r'$raw'` (issue #281 review).
-  static String _rewriteVariants(String source) {
+  static String _rewriteVariants(
+    String source, [
+    List<String> variantsWithoutFromTrusted = const [],
+  ]) {
+    final withoutSet = variantsWithoutFromTrusted.toSet();
     final result = <String>[];
     var i = 0;
     while (i < source.length) {
@@ -1021,8 +1028,20 @@ final class PolymorphicClassEmitter {
           end++;
         }
         if (end > i + 1) {
+          final cleanName = source.substring(i + 1, end);
+          // Issue #293: a `$Variant(...)` (or `$Variant<...>(...)` with no
+          // whitespace) constructor invocation of a variant whose source
+          // declares no `fromTrusted` is emitted as `Variant.fromTrusted(...)`.
+          if (withoutSet.contains(cleanName)) {
+            final afterName = _constructorInvocationParen(source, end);
+            if (afterName != null) {
+              result.add('$cleanName.fromTrusted');
+              i = end;
+              continue;
+            }
+          }
           // `$Name` is one Dart identifier token; drop only its leading `$`.
-          result.add(source.substring(i + 1, end));
+          result.add(cleanName);
           i = end;
           continue;
         }
@@ -1032,6 +1051,77 @@ final class PolymorphicClassEmitter {
       i++;
     }
     return result.join();
+  }
+
+  /// If [source] at [pos] starts `<...>(` with no whitespace (or `(` directly),
+  /// returns the index of `(`, or `null` otherwise (issue #293).
+  ///
+  /// Type arguments may contain balanced `()`/`[]`/`{}` groups — e.g.
+  /// `$V<void Function()>` and `$V<(int, String)>` — whose `)`, `]`, `}`, `,`
+  /// and spaces are part of the type, not the end of the argument list. Track
+  /// those groups alongside the angle depth so such generic constructor calls
+  /// are still rewritten to `.fromTrusted` (review of #295).
+  static int? _constructorInvocationParen(String source, int pos) {
+    if (pos >= source.length) return null;
+    if (source.codeUnitAt(pos) == 0x28 /* ( */ ) return pos;
+    if (source.codeUnitAt(pos) != 0x3c /* < */ ) return null;
+    var angleDepth = 0;
+    var parenDepth = 0;
+    var bracketDepth = 0;
+    var braceDepth = 0;
+    var j = pos;
+    while (j < source.length) {
+      final c = source.codeUnitAt(j);
+      if (c == 0x3c /* < */ ) {
+        angleDepth++;
+      } else if (c == 0x3e /* > */ ) {
+        angleDepth--;
+        if (angleDepth == 0 &&
+            parenDepth == 0 &&
+            bracketDepth == 0 &&
+            braceDepth == 0) {
+          final next = j + 1;
+          if (next < source.length &&
+              source.codeUnitAt(next) == 0x28 /* ( */ ) {
+            return next;
+          }
+          return null;
+        }
+      } else if (c == 0x28 /* ( */ ) {
+        parenDepth++;
+      } else if (c == 0x29 /* ) */ ) {
+        if (parenDepth > 0) {
+          parenDepth--;
+        } else if (angleDepth == 1 && bracketDepth == 0 && braceDepth == 0) {
+          return null;
+        }
+      } else if (c == 0x5b /* [ */ ) {
+        bracketDepth++;
+      } else if (c == 0x5d /* ] */ ) {
+        if (bracketDepth > 0) {
+          bracketDepth--;
+        } else if (angleDepth == 1 && parenDepth == 0 && braceDepth == 0) {
+          return null;
+        }
+      } else if (c == 0x7b /* { */ ) {
+        braceDepth++;
+      } else if (c == 0x7d /* } */ ) {
+        if (braceDepth > 0) {
+          braceDepth--;
+        } else if (angleDepth == 1 && parenDepth == 0 && bracketDepth == 0) {
+          return null;
+        }
+      } else if (angleDepth == 1 &&
+          parenDepth == 0 &&
+          bracketDepth == 0 &&
+          braceDepth == 0 &&
+          (c == 0x3b /* ; */ || c == 0x3d /* = */ )) {
+        // A `;`/`=` at the outer type-argument level is not a type argument.
+        return null;
+      }
+      j++;
+    }
+    return null;
   }
 
   static int _endOfLineComment(String s, int i) {

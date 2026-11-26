@@ -231,6 +231,82 @@ class \$Ok implements \$Result {
       },
     );
 
+    test(r'a user body factory invoking a variant constructor $Variant(...) is rewritten to Variant.fromTrusted(...)', () async {
+      const fixture =
+          '$_annotationImport'
+          r'''
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class $AppFailure {
+  factory $AppFailure.network({required String message}) = $NetworkFailure;
+  factory $AppFailure.fromError(Object error) {
+    return $NetworkFailure(message: error.toString());
+  }
+}
+
+@ZorphyValue()
+class $NetworkFailure implements $AppFailure {
+  @override
+  final String message;
+  const $NetworkFailure({required this.message});
+}
+''';
+      final (_, out) = await _compose({'nodes.dart': fixture});
+      final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+      expect(
+        flat,
+        contains(
+          'factory AppFailure.fromError(Object error) { return '
+          'NetworkFailure.fromTrusted(message: error.toString()); }',
+        ),
+      );
+      expect(flat, isNot(contains(r'$NetworkFailure')));
+    });
+
+    test(r'a generic $Variant<...>(...) rewrites even when the type argument is a function or record type', () async {
+      // Review of #295: `_constructorInvocationParen` used to bail on `)`/`,`
+      // at angle-depth 1, so a body factory constructing a variant with a
+      // function-typed or record-typed type argument was silently NOT
+      // rewritten and still failed `dart analyze` with #293's error.
+      const fixture =
+          '$_annotationImport'
+          r'''
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class $Envelope<T> {
+  factory $Envelope.wrap({required T value}) = $Wrapped<T>;
+  factory $Envelope.callback(void Function() cb) {
+    return $Wrapped<void Function()>(value: cb);
+  }
+  factory $Envelope.pair((int, String) pair) {
+    return $Wrapped<(int, String)>(value: pair);
+  }
+}
+
+@ZorphyValue()
+class $Wrapped<T> implements $Envelope<T> {
+  @override
+  final T value;
+  const $Wrapped({required this.value});
+}
+''';
+      final (_, out) = await _compose({'nodes.dart': fixture});
+      final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+      expect(
+        flat,
+        contains('Wrapped.fromTrusted<void Function()>(value: cb)'),
+        reason: r'function-typed generic argument is rewritten to .fromTrusted',
+      );
+      expect(
+        flat,
+        contains('Wrapped.fromTrusted<(int, String)>(value: pair)'),
+        reason: r'record-typed generic argument is rewritten to .fromTrusted',
+      );
+      expect(flat, isNot(contains(r'$Wrapped')));
+    });
+
     test(
       r'a dollar sign inside a forwarded body string is preserved',
       () async {
@@ -250,8 +326,8 @@ class \$Ok implements \$Result {
         );
         expect(
           flat,
-          contains('NetworkFailure(message: amount)'),
-          reason: r'real $Variant identifiers are still rewritten',
+          contains('NetworkFailure.fromTrusted(message: amount)'),
+          reason: r'real $Variant constructor invocations are rewritten to .fromTrusted',
         );
       },
     );
