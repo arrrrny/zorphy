@@ -873,9 +873,7 @@ final class PolymorphicClassEmitter {
             for (final field in variantFields)
               if (!field.isNullable) field.name,
           };
-          final declaredNames = {
-            for (final p in factory.parameters) p.name,
-          };
+          final declaredNames = {for (final p in factory.parameters) p.name};
           final redirectCompatible =
               targetIsConst &&
               !factory.parameters.any(

@@ -30,10 +30,9 @@ Future<String> _compose(String source) async {
   File('${fixture.path}/nodes.dart').writeAsStringSync(source);
   final path = '${fixture.path}/nodes.dart';
   final collection = AnalysisContextCollection(includedPaths: [fixture.path]);
-  final resolved = await collection
-          .contextFor(path)
-          .currentSession
-          .getResolvedLibrary(path) as ResolvedLibraryResult;
+  final resolved =
+      await collection.contextFor(path).currentSession.getResolvedLibrary(path)
+          as ResolvedLibraryResult;
   final ir = HierarchyResolver.resolveLibrary(resolved.element);
   final out = const ArchetypeComposer().compose(ir);
   await collection.dispose();
@@ -61,17 +60,16 @@ void _expectAnalyzes(String out) {
   File('${fixture.path}/lib/emitted.dart').writeAsStringSync(
     "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$out",
   );
-  final pubGet = Process.runSync(
-    'dart',
-    ['pub', 'get'],
-    workingDirectory: fixture.path,
-  );
+  final pubGet = Process.runSync('dart', [
+    'pub',
+    'get',
+  ], workingDirectory: fixture.path);
   expect(pubGet.exitCode, 0, reason: '${pubGet.stdout}${pubGet.stderr}');
-  final analyze = Process.runSync(
-    'dart',
-    ['analyze', '--fatal-infos', 'lib/emitted.dart'],
-    workingDirectory: fixture.path,
-  );
+  final analyze = Process.runSync('dart', [
+    'analyze',
+    '--fatal-infos',
+    'lib/emitted.dart',
+  ], workingDirectory: fixture.path);
   expect(analyze.exitCode, 0, reason: '${analyze.stdout}${analyze.stderr}');
 }
 
@@ -120,7 +118,9 @@ class \$Ready implements \$State2 {
       final out = await _compose(_annotationImport + src);
       expect(
         _flat(out),
-        contains('factoryState2.ready(Stringinput)=>Ready.fromTrusted(value:input);'),
+        contains(
+          'factoryState2.ready(Stringinput)=>Ready.fromTrusted(value:input);',
+        ),
       );
       _expectAnalyzes(out);
     });
@@ -194,7 +194,9 @@ class \$Ready5 implements \$State5 {
       final out = await _compose(_annotationImport + src);
       expect(
         _flat(out),
-        contains('factoryState5.ready(Stringinput)=>Ready5.fromTrusted(value:input);'),
+        contains(
+          'factoryState5.ready(Stringinput)=>Ready5.fromTrusted(value:input);',
+        ),
       );
       _expectAnalyzes(out);
     });
@@ -237,7 +239,10 @@ class \$Ready7<T> implements \$State7 {
 }
 ''';
       final out = await _compose(_annotationImport + src);
-      expect(_flat(out), contains('factoryState7.ready()=>Ready7<T>.fromTrusted();'));
+      expect(
+        _flat(out),
+        contains('factoryState7.ready()=>Ready7<T>.fromTrusted();'),
+      );
       expect(_flat(out), isNot(contains('Ready7.fromTrusted<T>')));
       // NOTE: this fixture's generated generic codec surface (`toWire` on a
       // generic leaf overriding the non-generic root) has a pre-existing
