@@ -315,8 +315,9 @@ final class MockFixtureEmitter {
       // (#232): it carries no `fromTrusted` for the mock to call.
       final construct = node.archetype == ArchetypeKind.intent
           ? referType(node.cleanName).newInstance(const [], arguments)
-          : referType(node.cleanName)
-                .newInstanceNamed('fromTrusted', const [], arguments);
+          : referType(
+              node.cleanName,
+            ).newInstanceNamed('fromTrusted', const [], arguments);
       m.body = Block.of([construct.returned.statement]);
     });
   }
@@ -616,12 +617,16 @@ final class MockFixtureEmitter {
     if (type.startsWith('List<') && type.endsWith('>')) {
       final element = type.substring('List<'.length, type.length - 1);
       final seeded = _elementSeed(element, field, seed);
-      return seeded == null ? null : literalList([seeded]);
+      // An unseedable element type seeds an EMPTY list rather than blocking
+      // the node: an empty list is a valid value, so a variant whose only
+      // unseedable field is a `List<...>` stays in the mock rotation instead
+      // of throwing UnsupportedError and dropping out of `list()` (#284).
+      return seeded == null ? literalList(const []) : literalList([seeded]);
     }
     if (type.startsWith('Set<') && type.endsWith('>')) {
       final element = type.substring('Set<'.length, type.length - 1);
       final seeded = _elementSeed(element, field, seed);
-      return seeded == null ? null : literalSet([seeded]);
+      return seeded == null ? literalSet(const []) : literalSet([seeded]);
     }
     if (type.startsWith('Map<') && type.endsWith('>')) {
       final args = type.substring('Map<'.length, type.length - 1);
@@ -630,14 +635,16 @@ final class MockFixtureEmitter {
         final keyType = args.substring(0, comma).trim();
         final valueType = args.substring(comma + 1).trim();
         final seeded = _elementSeed(valueType, field, seed);
-        if (seeded == null) return null;
+        // A map with an unseedable value type seeds EMPTY (a valid map) so the
+        // variant stays in rotation (#284).
+        if (seeded == null) return literalMap(const {});
         // The key keeps its declared type too: a `Map<int, int>` must not be
         // seeded with a `String` key.
         final key = _defaultSeedValue(
           ZorphyFieldIr(name: field.name, type: keyType),
           seed,
         );
-        if (key == null) return null;
+        if (key == null) return literalMap(const {});
         return literalMap({key: seeded});
       }
     }

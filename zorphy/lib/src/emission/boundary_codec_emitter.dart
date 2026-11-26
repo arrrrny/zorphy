@@ -656,7 +656,14 @@ class BoundaryCodecEmitter {
     // BEFORE calling any helper so a legitimate null records no violation;
     // a wrong-typed NON-null value still takes the decode path and reports
     // one. Non-nullable element types keep the current violation for null.
-    if (!elementType.trim().endsWith('?')) return body;
+    //
+    // `dynamic` is treated the same way (#284): a `Map<String, dynamic>`
+    // accepts every value INCLUDING null, so `{'clear': null}` must survive a
+    // wire round trip instead of being dropped by the `!= null` guard.
+    final bareElementType = elementType.trim();
+    final keepsNull =
+        bareElementType.endsWith('?') || bareElementType == 'dynamic';
+    if (!keepsNull) return body;
     return [
       Code(
         '    if ($element == null) { ${assign.replaceAll(variable, 'null')} } else {',

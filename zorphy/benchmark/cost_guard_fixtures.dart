@@ -16,10 +16,13 @@
 //
 // The shapes map one-to-one onto the four guards:
 //
-//   * Guard 1 (zero-copy reference identity) — `$Task` carries a reference-typed
-//     `List<String> tags` and a `DateTime createdAt`; the generated `copyWith`
-//     and the `OpenTask.changeToDoneTask` / `DoneTask.changeToOpenTask` morphs
-//     must reuse those references (proven with `identical`).
+//   * Guard 1 (defensive snapshot of collection fields) — `$Task` carries a
+//     reference-typed `List<String> tags` and a `DateTime createdAt`; the
+//     generated `fromTrusted` copies `tags` at construction (#284), so mutating
+//     the caller's list cannot change the value and `copyWith` / the
+//     `OpenTask.changeToDoneTask` / `DoneTask.changeToOpenTask` morphs carry a
+//     FRESH list (proven with `identical`), while the immutable `createdAt` is
+//     still shared.
 //   * Guard 2 (no-op patch identity + latency) — `$Product` yields a generated
 //     `ProductPatch` whose `diff(e, e)` returns the canonical empty patch and
 //     whose `apply(e)` returns the SAME instance in O(1).

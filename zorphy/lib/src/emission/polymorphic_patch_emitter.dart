@@ -1254,6 +1254,10 @@ class PolymorphicPatchEmitter {
     // would carry it unused (an `unused_local_variable` analyze warning).
     if (fields.isNotEmpty) {
       lines.add("final ops = ZorphyPatchWire.opsOf(raw, '', violations);");
+      // The per-field read paths carry the envelope prefix, so a violation on
+      // an envelope decode names `/ops/<field>` while a bare `toWire()` map
+      // keeps `/<field>` (#284) — the same split `PatchEmitter` already makes.
+      lines.add("final prefix = ZorphyPatchWire.opsPathOf(raw);");
     }
     for (final field in fields) {
       final name = _memberName(field.name);
@@ -1263,7 +1267,7 @@ class PolymorphicPatchEmitter {
         ..add("if (ops != null && ops.containsKey('$name')) {")
         ..add(
           '  final Object? rawValue = ZorphyPatchWire.fieldValue('
-          "ops['$name'], '/$name', violations);",
+          "ops['$name'], '\$prefix/$name', violations);",
         )
         ..add(
           '  ${name}Value = '
@@ -1301,7 +1305,9 @@ class PolymorphicPatchEmitter {
   }) {
     final declared = _concreteType(field.type);
     final bare = declared.replaceAll('?', '').trim();
-    final path = _literal('/$nome');
+    // The read path carries the envelope prefix (`$prefix/<field>`), so an
+    // envelope decode reports `/ops/<field>` and a bare patch `/<field>` (#284).
+    final path = _literal('\$prefix/$nome');
     final String read;
     if (field.isEnum) {
       read =

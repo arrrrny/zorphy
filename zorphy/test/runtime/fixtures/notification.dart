@@ -306,17 +306,18 @@ final class NotificationSharedPatch extends NotificationPatch {
   ) {
     final violations = <FieldViolation>[];
     final ops = ZorphyPatchWire.opsOf(raw, '', violations);
+    final prefix = ZorphyPatchWire.opsPathOf(raw);
     PatchValue<String>? idValue;
     if (ops != null && ops.containsKey('id')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['id'],
-        '/id',
+        '$prefix/id',
         violations,
       );
       idValue = (() {
         final idDecoded = ZorphyPatchWire.as<String>(
           rawValue,
-          '/id',
+          '$prefix/id',
           violations,
         );
         return idDecoded == null ? null : PatchValue<String>.set(idDecoded);
@@ -326,14 +327,14 @@ final class NotificationSharedPatch extends NotificationPatch {
     if (ops != null && ops.containsKey('readAt')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['readAt'],
-        '/readAt',
+        '$prefix/readAt',
         violations,
       );
       readAtValue = (() {
         if (rawValue == null) return PatchValue<DateTime?>.set(null);
         final readAtDecoded = ZorphyPatchWire.asDateTime(
           rawValue,
-          '/readAt',
+          '$prefix/readAt',
           violations,
         );
         return readAtDecoded == null
@@ -499,17 +500,18 @@ final class OrderNotificationPatch extends NotificationPatch {
   ) {
     final violations = <FieldViolation>[];
     final ops = ZorphyPatchWire.opsOf(raw, '', violations);
+    final prefix = ZorphyPatchWire.opsPathOf(raw);
     PatchValue<String>? idValue;
     if (ops != null && ops.containsKey('id')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['id'],
-        '/id',
+        '$prefix/id',
         violations,
       );
       idValue = (() {
         final idDecoded = ZorphyPatchWire.as<String>(
           rawValue,
-          '/id',
+          '$prefix/id',
           violations,
         );
         return idDecoded == null ? null : PatchValue<String>.set(idDecoded);
@@ -519,14 +521,14 @@ final class OrderNotificationPatch extends NotificationPatch {
     if (ops != null && ops.containsKey('readAt')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['readAt'],
-        '/readAt',
+        '$prefix/readAt',
         violations,
       );
       readAtValue = (() {
         if (rawValue == null) return PatchValue<DateTime?>.set(null);
         final readAtDecoded = ZorphyPatchWire.asDateTime(
           rawValue,
-          '/readAt',
+          '$prefix/readAt',
           violations,
         );
         return readAtDecoded == null
@@ -538,13 +540,13 @@ final class OrderNotificationPatch extends NotificationPatch {
     if (ops != null && ops.containsKey('itemCount')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['itemCount'],
-        '/itemCount',
+        '$prefix/itemCount',
         violations,
       );
       itemCountValue = (() {
         final itemCountDecoded = ZorphyPatchWire.as<int>(
           rawValue,
-          '/itemCount',
+          '$prefix/itemCount',
           violations,
         );
         return itemCountDecoded == null
@@ -710,17 +712,18 @@ final class PriceDropNotificationPatch extends NotificationPatch {
   ) {
     final violations = <FieldViolation>[];
     final ops = ZorphyPatchWire.opsOf(raw, '', violations);
+    final prefix = ZorphyPatchWire.opsPathOf(raw);
     PatchValue<String>? idValue;
     if (ops != null && ops.containsKey('id')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['id'],
-        '/id',
+        '$prefix/id',
         violations,
       );
       idValue = (() {
         final idDecoded = ZorphyPatchWire.as<String>(
           rawValue,
-          '/id',
+          '$prefix/id',
           violations,
         );
         return idDecoded == null ? null : PatchValue<String>.set(idDecoded);
@@ -730,14 +733,14 @@ final class PriceDropNotificationPatch extends NotificationPatch {
     if (ops != null && ops.containsKey('readAt')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['readAt'],
-        '/readAt',
+        '$prefix/readAt',
         violations,
       );
       readAtValue = (() {
         if (rawValue == null) return PatchValue<DateTime?>.set(null);
         final readAtDecoded = ZorphyPatchWire.asDateTime(
           rawValue,
-          '/readAt',
+          '$prefix/readAt',
           violations,
         );
         return readAtDecoded == null
@@ -749,13 +752,13 @@ final class PriceDropNotificationPatch extends NotificationPatch {
     if (ops != null && ops.containsKey('newPrice')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['newPrice'],
-        '/newPrice',
+        '$prefix/newPrice',
         violations,
       );
       newPriceValue = (() {
         final newPriceDecoded = ZorphyPatchWire.asDouble(
           rawValue,
-          '/newPrice',
+          '$prefix/newPrice',
           violations,
         );
         return newPriceDecoded == null

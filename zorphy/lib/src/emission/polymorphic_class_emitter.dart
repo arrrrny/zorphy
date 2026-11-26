@@ -110,8 +110,17 @@ final class PolymorphicClassEmitter {
   /// The marker interface for `@ZorphyIntent` hierarchies.
   static const String intentBase = 'ZorphyIntentBase';
 
-  /// The marker interface for `@ZorphyValue` (and `@ZorphyUnion`) hierarchies.
+  /// The marker interface for `@ZorphyValue` hierarchies.
   static const String valueBase = 'ZorphyValueBase';
+
+  /// The marker interface for `@ZorphyUnion` hierarchies.
+  ///
+  /// A union lowers to [ArchetypeKind.value], so the archetype alone cannot
+  /// tell a union from a plain value; [ZorphyNodeIr.isUnion] is what separates
+  /// them. A consumer bounding `T extends ZorphyUnionBase` must accept a union
+  /// variant, so the union root and its members carry this marker instead of
+  /// [valueBase] (#284).
+  static const String unionBase = 'ZorphyUnionBase';
 
   /// The `copyWith` sentinel: an object no caller can pass, so `null` means
   /// "clear the field".
@@ -554,7 +563,11 @@ final class PolymorphicClassEmitter {
       ),
       ArchetypeKind.state => referType(stateBase),
       ArchetypeKind.intent => referType(intentBase),
-      ArchetypeKind.value => referType(valueBase),
+      // A `@ZorphyUnion` lowers to the value archetype but is its own family:
+      // it carries [unionBase] so a consumer bounding `T extends
+      // ZorphyUnionBase` accepts a variant. A plain `@ZorphyValue` keeps
+      // [valueBase] (#284).
+      ArchetypeKind.value => referType(node.isUnion ? unionBase : valueBase),
     };
   }
 
@@ -601,8 +614,12 @@ final class PolymorphicClassEmitter {
 
   /// `const OrderNotification.fromTrusted({required this.id, ...});`
   ///
-  /// Zero defensive cloning: a collection is assigned by REFERENCE, so the
-  /// constructor never pays for a copy the caller already owns.
+  /// A collection field (`List`/`Set`/`Map`) is DEFENSIVELY COPIED at
+  /// construction, so a caller that keeps and later mutates the list/map it
+  /// passed cannot change an already-built value (#284). The copy is what
+  /// drops `const`: a constructor with an initializer list cannot be const, so
+  /// a class with at least one collection field emits a non-const
+  /// `fromTrusted`, while a scalar-only class keeps the const form.
   ///
   /// The parameters live in [Constructor.optionalParameters] with `named` +
   /// `required` set, because code_builder renders `{…}` only for optional
@@ -611,24 +628,66 @@ final class PolymorphicClassEmitter {
     ZorphyNodeIr node,
     List<PolymorphicField> fields,
   ) {
+    final hasCollection = fields.any(
+      (field) => _collectionSnapshot(field.emittedType) != null,
+    );
     return Constructor((ctor) {
       ctor.name = 'fromTrusted';
-      ctor.constant = true;
+      ctor.constant = !hasCollection;
       for (final field in fields) {
+        final snapshot = _collectionSnapshot(field.emittedType);
+        if (snapshot == null) {
+          // A field-formal parameter must NOT carry its own type:
+          // `required String this.id` is not Dart, `required this.id` is.
+          // A NULLABLE field is optional: `required this.note` on a
+          // `String?` field would reject the null it exists to allow.
+          ctor.optionalParameters.add(
+            Parameter((p) {
+              p.name = field.name;
+              p.named = true;
+              p.required = !field.isNullable;
+              p.toThis = true;
+            }),
+          );
+          continue;
+        }
+        // A collection is taken as a plain parameter and copied in the
+        // initializer list: `items = List<String>.of(items)` (null-guarded for
+        // a nullable field, where an explicit null stays null).
         ctor.optionalParameters.add(
           Parameter((p) {
-            // A field-formal parameter must NOT carry its own type:
-            // `required String this.id` is not Dart, `required this.id` is.
-            // A NULLABLE field is optional: `required this.note` on a
-            // `String?` field would reject the null it exists to allow.
             p.name = field.name;
             p.named = true;
             p.required = !field.isNullable;
-            p.toThis = true;
+            p.type = referType(field.emittedType);
           }),
+        );
+        final name = field.name;
+        ctor.initializers.add(
+          Code(
+            field.isNullable
+                ? '$name = $name == null ? null : $snapshot($name)'
+                : '$name = $snapshot($name)',
+          ),
         );
       }
     });
+  }
+
+  /// The `Type.of` constructor expression that snapshots a collection field
+  /// of [emittedType] (`List<String>.of`, `Set<int>.of`, `Map<String,
+  /// int>.of`), or `null` when the type is not a `List`/`Set`/`Map`.
+  ///
+  /// The element/value arguments are kept verbatim (`Map<String, int>.of`), so
+  /// the copy types against the declared field. A `$`-prefixed element type is
+  /// left as written — it is a generator declaration prefix the surrounding
+  /// library strips, the same way the field type itself is emitted.
+  static String? _collectionSnapshot(String emittedType) {
+    final bare = emittedType.replaceAll('?', '').trim();
+    if (bare.startsWith('List<') && bare.endsWith('>')) return '$bare.of';
+    if (bare.startsWith('Set<') && bare.endsWith('>')) return '$bare.of';
+    if (bare.startsWith('Map<') && bare.endsWith('>')) return '$bare.of';
+    return null;
   }
 
   // ── Value methods ─────────────────────────────────────────────────

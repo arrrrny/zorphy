@@ -20,8 +20,7 @@
 //     where the leaf implements every transitive `$Parent` interface;
 //   - a `@ZorphyValue` hierarchy (no principalKey, `ZorphyValueBase`);
 //   - `copyWith` nullable clearing through the `_sentinel` object;
-//   - zero-copy passthrough of collection references in `fromTrusted` and
-//     `copyWith`;
+//   - defensive snapshot of collection fields in `fromTrusted` (#284);
 //   - the "no `StringBuffer`, `package:code_builder` only" acceptance gate.
 
 import 'dart:io';
@@ -436,8 +435,8 @@ void main() {
     });
   });
 
-  group('zero defensive cloning', () {
-    test('fromTrusted and copyWith pass collection references directly', () {
+  group('defensive cloning of collection fields', () {
+    test('fromTrusted snapshots collection fields (#284)', () {
       final leaf = _node(
         className: r'$OrderCart',
         archetype: ArchetypeKind.entity,
@@ -462,9 +461,11 @@ void main() {
         },
       );
 
-      expect(source, isNot(contains('.toList()')));
-      expect(source, isNot(contains('List.unmodifiable')));
-      expect(source, isNot(contains('List<String>.from')));
+      // A collection field is copied at construction so a caller that mutates
+      // the list it passed cannot change an already-built value (#284). The
+      // copy is a `List.of`, and the constructor is no longer const.
+      expect(source, contains('List<String>.of(items)'));
+      expect(source, isNot(contains('const OrderCart.fromTrusted')));
     });
   });
 
