@@ -94,7 +94,9 @@ final class ZorphyField<T, V> {
   ///
   /// [inner]'s element type is unchecked: [ZorphyNested.filter] holds a
   /// `ZorphyFilter<dynamic>`, so a predicate built over the wrong type
-  /// compiles but silently never matches at runtime. Build [inner] over the
+  /// compiles but triggers a runtime type error when it is evaluated against
+  /// a value of the nested type (Dart rejects the argument at the inner
+  /// predicate's non-nullable `matches` parameter). Build [inner] over the
   /// nested value's actual type (Dart cannot express its element type here).
   ZorphyFilter<T> nested(ZorphyFilter<dynamic> inner) =>
       ZorphyNested<T, V>(this, inner);

@@ -177,7 +177,46 @@ void main() {
       }
     });
   });
+  group('ZorphyNested — nullable iterable elements (PR #304 review)', () {
+    // A field whose value is a list that may contain nulls: the inner
+    // predicate's `matches` is non-nullable, so a null element must be
+    // skipped before the call rather than thrown on.
+    const ZorphyField<Group, List<Profile?>?> members =
+        ZorphyField<Group, List<Profile?>?>(
+          name: 'members',
+          jsonKey: 'members',
+          pointer: '/members',
+          get: _getMembers,
+          set: _setMembers,
+        );
+    final over18 = ProfileFields.age.greaterThan(18);
+
+    test('skips a null element and matches a later non-null one', () {
+      final f = members.nested(over18);
+      final g = Group([null, Profile(30)]);
+      expect(f.matches(g), isTrue);
+    });
+
+    test('an all-null collection does not match', () {
+      final f = members.nested(over18);
+      expect(f.matches(Group([null, null])), isFalse);
+    });
+
+    test('a null element does not throw', () {
+      final f = members.nested(over18);
+      expect(() => f.matches(Group([null, Profile(8)])), returnsNormally);
+      expect(f.matches(Group([null, Profile(8)])), isFalse);
+    });
+  });
 }
+
+final class Group {
+  final List<Profile?> members;
+  const Group(this.members);
+}
+
+List<Profile?>? _getMembers(Group g) => g.members;
+Group _setMembers(Group g, List<Profile?>? v) => Group(v ?? const []);
 
 dynamic _self(dynamic v) => v;
 dynamic _selfSet(dynamic root, dynamic v) => v;

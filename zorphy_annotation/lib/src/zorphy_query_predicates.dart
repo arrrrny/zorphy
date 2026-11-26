@@ -368,7 +368,9 @@ final class ZorphyNot<T> extends ZorphyFilter<T> {
 ///
 /// The v3 port of v2's `Nested<TEntity, TValue>`: when the field's value is
 /// an [Iterable] the entity matches if ANY element matches [filter];
-/// otherwise the value itself must match. A `null` value never matches.
+/// otherwise the value itself must match. A `null` value never matches, and a
+/// `null` element inside an [Iterable] is skipped before [filter] is called
+/// (the inner predicate's `matches` is non-nullable).
 final class ZorphyNested<T, V> extends ZorphyFilter<T> {
   const ZorphyNested(this.field, this.filter);
 
@@ -382,7 +384,9 @@ final class ZorphyNested<T, V> extends ZorphyFilter<T> {
   bool matches(T instance) {
     final value = field.get(instance);
     if (value == null) return false;
-    if (value is Iterable) return value.any(filter.matches);
+    if (value is Iterable) {
+      return value.any((element) => element != null && filter.matches(element));
+    }
     return filter.matches(value);
   }
 
