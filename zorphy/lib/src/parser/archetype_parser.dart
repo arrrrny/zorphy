@@ -229,6 +229,11 @@ final class ArchetypeParser {
           parameters: constructor.firstFragment.formalParameters
               .map(_userParam)
               .toList(),
+          // A real analyzer element backs every parameter list built here —
+          // including the EMPTY list of `factory $State.idle() = $Idle`. That
+          // distinction is what keeps the emitter from re-deriving the list
+          // from the variant's fields (#291).
+          hasDeclaredParameters: true,
         ),
       );
     }

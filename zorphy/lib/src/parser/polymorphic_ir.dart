@@ -152,12 +152,22 @@ final class ZorphyFieldIr {
   /// the flag, so the escape hatch changes no emitted code.
   final bool isDomainBool;
 
+  /// The source constructor's default for this field, as written (`0`,
+  /// `'unknown'`), or `null` when the constructor has none.
+  ///
+  /// A generated `fromTrusted` makes every non-nullable field REQUIRED, so a
+  /// root factory whose source declaration omitted a defaulted field could not
+  /// redirect to it (#291). Carrying the default lets the emitter supply it in
+  /// the body-factory fallback instead of emitting a call that cannot compile.
+  final String? constructorDefault;
+
   const ZorphyFieldIr({
     required this.name,
     required this.type,
     this.isNullable = false,
     this.suppressQuestionMark = false,
     this.isDomainBool = false,
+    this.constructorDefault,
   });
 
   /// Whether the emitted type text carries a `?`.
@@ -198,13 +208,25 @@ final class ZorphyVariantFactoryIr {
   /// factory must stay optional on the generated one, instead of being
   /// re-derived from the variant's fields where every non-nullable field
   /// becomes `required` (#290). The emitter falls back to the field-derived
-  /// list only when this is empty.
+  /// list only when declaration metadata is UNAVAILABLE — see
+  /// [hasDeclaredParameters].
   final List<ZorphyUserParamIr> parameters;
+
+  /// Whether [parameters] came from a real source declaration.
+  ///
+  /// `[]` is ambiguous: it is both an explicitly empty declaration
+  /// (`factory $State.idle() = $Idle`) and the "no analyzer element" sentinel
+  /// used by hand-built IR. Conflating the two made the emitter generate
+  /// `idle({required int count})` for an author who wrote `idle()` (#291).
+  /// The parser sets this to `true`; hand-built IR leaves it `false` and keeps
+  /// the field-derived fallback.
+  final bool hasDeclaredParameters;
 
   const ZorphyVariantFactoryIr({
     required this.name,
     required this.variantClassName,
     this.parameters = const [],
+    this.hasDeclaredParameters = false,
   });
 
   @override
