@@ -110,8 +110,8 @@ void main() {
       );
     });
 
-    test('a generic union root emits its class surface but no codec, patch or '
-        'mock', () {
+    test('a generic union DISPATCH root emits its class surface but no codec, '
+        'patch or mock', () {
       final box = _node(
         name: 'Box',
         archetype: ArchetypeKind.value,
@@ -147,16 +147,54 @@ void main() {
       // emitter declares the type parameter, so the surface compiles.
       expect(emitted, contains('sealed class Box<T>'));
       expect(emitted, contains('final class Filled<T> extends Box<T>'));
-      // The codec is still withheld: a static member cannot reference the
-      // class type parameters, so `static Box<T> fromWire` is not emittable.
+      // ZRP-009 (#272): a generic DISPATCH hierarchy still has no wire
+      // surface — a dispatch `fromWire` would have to forward the decoders to
+      // a leaf's own re-declared static, which the IR cannot express — so the
+      // codec is withheld for the whole generic dispatch subtree. (A generic
+      // CONCRETE LEAF root, like `CreateParams<T>`, DOES get one; see
+      // `generic_boundary_codec_test.dart`.)
       expect(
         emitted,
         isNot(contains('fromWire')),
-        reason: 'a generic hierarchy still has no wire surface',
+        reason: 'a generic dispatch hierarchy still has no wire surface',
       );
       // The patch and mock surfaces stay fail-closed the same way.
       expect(emitted, isNot(contains('BoxPatch')));
       expect(emitted, isNot(contains('BoxMockData')));
+    });
+
+    test('a generic CONCRETE LEAF root emits a codec-parameterized wire '
+        'surface (ZRP-009, #272)', () {
+      final params = _node(
+        name: 'CreateParams',
+        archetype: ArchetypeKind.value,
+        isRoot: true,
+        typeParameters: const ['T'],
+        fields: const [
+          ZorphyFieldIr(name: 'data', type: 'T'),
+          ZorphyFieldIr(name: 'idempotencyKey', type: 'String?'),
+        ],
+      );
+      final ir = PolymorphicIr(
+        nodes: {'\$CreateParams': params},
+        roots: [params],
+        diagnostics: const [],
+      );
+
+      final emitted = const ArchetypeComposer().compose(ir);
+
+      expect(emitted, contains('class CreateParams<T>'));
+      // `fromWire` re-declares the type parameter and takes a decoder;
+      // `toWire` takes an encoder.
+      expect(emitted, contains('static ZorphyBoundaryResult<CreateParams<T>>'));
+      expect(emitted, contains('fromWire<T>('));
+      expect(emitted, contains('decodeT'));
+      expect(emitted, contains('encodeT'));
+      // The `T` field routes through the codec parameter, not a reified cast.
+      expect(emitted, contains('encodeT(this.data)'));
+      // The patch and mock surfaces stay fail-closed on a generic node.
+      expect(emitted, isNot(contains('CreateParamsPatch')));
+      expect(emitted, isNot(contains('CreateParamsMockData')));
     });
 
     test('helper selection covers the intent codecs', () {
@@ -238,8 +276,8 @@ void main() {
       },
     );
 
-    test('a generic leaf under a live root emits with its type parameters but '
-        'keeps no wire or rotation surface', () {
+    test('a generic leaf under a live root emits its class + its own codec, '
+        'but the dispatch keeps no arm for it (ZRP-009, #272)', () {
       final root = _node(
         name: 'Node',
         isRoot: true,
@@ -269,10 +307,19 @@ void main() {
       // compiles as-is.
       expect(emitted, contains('Leaf'));
       expect(emitted, contains('class Box<T> extends Node'));
-      // The codec walk still prunes it: no `Box.fromWire` and no `box`
-      // dispatch arm may reference a decoder the library never declares.
-      expect(emitted, isNot(contains('Box.fromWire')));
-      expect(emitted, isNot(contains("'box'")));
+      // ZRP-009 (#272): a generic CONCRETE LEAF now carries its own
+      // codec-parameterized wire surface — a re-declared static `fromWire<T>`
+      // with a decoder, and a `toWire` with an encoder.
+      expect(emitted, contains('static ZorphyBoundaryResult<Box<T>>'));
+      expect(emitted, contains('fromWire<T>('));
+      expect(emitted, contains('encodeT(this.value)'));
+      // The non-generic dispatch root still has NO arm for the generic leaf:
+      // `leavesOf` prunes a generic node, so the root cannot name a decoder
+      // for it. No `case 'box':` and no `Box.fromWire(raw)` delegation. (The
+      // string `'box'` still appears inside Box's OWN `toWire`, which stamps
+      // its discriminator tag — that is the leaf's surface, not an arm.)
+      expect(emitted, isNot(contains("case 'box':")));
+      expect(emitted, isNot(contains('Box.fromWire(raw)')));
       // And the mock rotation names only leaves it actually emits seeds
       // for — a generic leaf stays out of it.
       expect(emitted, isNot(contains('BoxMockData')));

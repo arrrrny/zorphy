@@ -93,16 +93,14 @@ final class ArchetypeComposer {
 
     final fragments = <String>[];
 
-    // The boundary codec stays fail-closed on generic hierarchies (issue
-    // #231): `fromWire` is a static member, and a static cannot reference
-    // the class type parameters, so a generic root has no wire surface to
-    // declare. The CLASS surface is different — the class emitter declares
-    // the node's type parameters, so every root composes.
+    // The boundary codec emits for generic hierarchies too (ZRP-009, #272):
+    // `fromWire` RE-DECLARES the class type parameters on the static method
+    // and takes one decoder per parameter, so a generic root now has a wire
+    // surface. The CLASS surface is different — the class emitter declares the
+    // node's type parameters, so every root composes.
     final codecRoots = <ZorphyNodeIr>[
       for (final root in ir.roots)
-        if (root.archetype != ArchetypeKind.intent &&
-            root.typeParameters.isEmpty)
-          root,
+        if (root.archetype != ArchetypeKind.intent) root,
     ];
     final intentRoots = <ZorphyNodeIr>[
       for (final root in ir.roots)
@@ -209,9 +207,12 @@ final class ArchetypeComposer {
       if (root.archetype == ArchetypeKind.intent) continue;
       final extraMethods = <String, List<Method>>{};
       final extraFields = <String, List<Field>>{};
-      // `_walk` yields nothing for a generic root and prunes generic children:
-      // exactly the nodes that receive a codec and the lens/resolver surface.
-      for (final node in _walk(root)) {
+      // `_walkCodec` yields every node that receives a codec — generic nodes
+      // included since ZRP-009 (#272). The lens / resolver / descriptor maps
+      // are keyed by className and stay null for a generic node (those
+      // surfaces are still fail-closed on generics), so only the codec methods
+      // are added for one.
+      for (final node in _walkCodec(root)) {
         final methods = <Method>[
           ...codec.emitCodec(node, payloads, additionalNodes: knownNodes),
         ];
@@ -261,7 +262,7 @@ final class ArchetypeComposer {
     // — rejected by ZORPHY_E004 before any emission — can never select
     // `_boundaryDateTime` from here).
     final codecNodes = <ZorphyNodeIr>[
-      ...codecRoots.expand(_walk),
+      ...codecRoots.expand(_walkCodec),
       ...intentRoots.expand(_walk),
     ];
     if (codecNodes.isNotEmpty) {
@@ -522,6 +523,28 @@ final class ArchetypeComposer {
     yield root;
     for (final child in root.directSubTypes) {
       yield* _walk(child);
+    }
+  }
+
+  /// Every node of [root]'s hierarchy that RECEIVES a codec, depth-first
+  /// pre-order — a generic concrete LEAF included (ZRP-009, #272).
+  ///
+  /// This is [_walk] relaxed for the codec surface only: a generic concrete
+  /// leaf now emits a codec-parameterized `fromWire`/`toWire`, so it is no
+  /// longer pruned. A generic DISPATCH node (a sealed/abstract generic root)
+  /// still has no wire surface — its `fromWire` would have to forward the
+  /// decoders to a leaf's own re-declared static, which the IR cannot express
+  /// — so it is pruned WITH its subtree, exactly as before #272. A child the
+  /// class emitter cannot declare under its parent
+  /// ([PolymorphicClassEmitter.isEmittableChild]) is pruned too. The lens /
+  /// resolver / descriptor surfaces keep using [_walk] and stay fail-closed on
+  /// every generic node.
+  Iterable<ZorphyNodeIr> _walkCodec(ZorphyNodeIr root) sync* {
+    if (root.typeParameters.isNotEmpty && !root.isConcreteLeaf) return;
+    yield root;
+    for (final child in root.directSubTypes) {
+      if (!PolymorphicClassEmitter.isEmittableChild(child, root)) continue;
+      yield* _walkCodec(child);
     }
   }
 
