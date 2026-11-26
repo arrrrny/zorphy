@@ -36,13 +36,32 @@ sealed class ZorphyFilter<T> {
   /// [byPointer]. Unknown pointers and unknown ops throw
   /// [FormatException] — a silently-mismatched remote predicate is worse
   /// than a loud one.
+  ///
+  /// A nested predicate (`op: 'nested'`, issue #303) carries a filter over the
+  /// nested TYPE, which this resolver cannot see: [resolveNested] decodes it.
+  /// Without a [resolveNested], a nested wire is a loud [FormatException] —
+  /// never a predicate that silently matches nothing.
   static ZorphyFilter<T> fromWire<T>(
     Map<String, dynamic> wire,
-    ZorphyField<T, Object?>? Function(String pointer) resolve,
-  ) {
+    ZorphyField<T, Object?>? Function(String pointer) resolve, {
+    ZorphyFilter<dynamic> Function(Map<String, dynamic> wire)? resolveNested,
+  }) {
     final op = wire['op'] as String?;
     final pointer = wire['field'] as String?;
     switch (op) {
+      case 'nested':
+        final raw = wire['filter'];
+        if (raw is! Map) throw _badWire(wire, 'filter must be a map');
+        if (resolveNested == null) {
+          throw _badWire(wire, 'a nested filter needs a resolveNested');
+        }
+        if (pointer == null) throw _badWire(wire, 'field is required');
+        final outer = resolve(pointer);
+        if (outer == null) throw _badWire(wire, 'unknown field pointer');
+        return ZorphyNested<T, Object?>(
+          outer,
+          resolveNested(raw.cast<String, dynamic>()),
+        );
       case 'and':
       case 'or':
         final raw = wire['filters'];
@@ -52,6 +71,7 @@ sealed class ZorphyFilter<T> {
             ZorphyFilter.fromWire<T>(
               (f as Map).cast<String, dynamic>(),
               resolve,
+              resolveNested: resolveNested,
             ),
         ];
         return op == 'and' ? ZorphyAnd<T>(filters) : ZorphyOr<T>(filters);
@@ -59,7 +79,11 @@ sealed class ZorphyFilter<T> {
         final inner = wire['filter'];
         if (inner is! Map) throw _badWire(wire, 'filter must be a map');
         return ZorphyNot<T>(
-          ZorphyFilter.fromWire<T>(inner.cast<String, dynamic>(), resolve),
+          ZorphyFilter.fromWire<T>(
+            inner.cast<String, dynamic>(),
+            resolve,
+            resolveNested: resolveNested,
+          ),
         );
     }
     if (pointer == null) throw _badWire(wire, 'field is required');
@@ -338,6 +362,40 @@ final class ZorphyNot<T> extends ZorphyFilter<T> {
 
   @override
   Map<String, dynamic> toWire() => {'op': 'not', 'filter': filter.toWire()};
+}
+
+/// Matches [T] through a predicate over the value of [field] (issue #303).
+///
+/// The v3 port of v2's `Nested<TEntity, TValue>`: when the field's value is
+/// an [Iterable] the entity matches if ANY element matches [filter];
+/// otherwise the value itself must match. A `null` value never matches, and a
+/// `null` element inside an [Iterable] is skipped before [filter] is called
+/// (the inner predicate's `matches` is non-nullable).
+final class ZorphyNested<T, V> extends ZorphyFilter<T> {
+  const ZorphyNested(this.field, this.filter);
+
+  /// The field whose value the inner predicate is evaluated against.
+  final ZorphyField<T, V> field;
+
+  /// The predicate over the nested value (or its elements).
+  final ZorphyFilter<dynamic> filter;
+
+  @override
+  bool matches(T instance) {
+    final value = field.get(instance);
+    if (value == null) return false;
+    if (value is Iterable) {
+      return value.any((element) => element != null && filter.matches(element));
+    }
+    return filter.matches(value);
+  }
+
+  @override
+  Map<String, dynamic> toWire() => {
+    'op': 'nested',
+    'field': field.pointer,
+    'filter': filter.toWire(),
+  };
 }
 
 /// A typed ordering over an entity [T], built from a [ZorphyField].

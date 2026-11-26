@@ -88,6 +88,19 @@ final class ZorphyField<T, V> {
   /// A descending order over this field.
   ZorphySort<T> desc() => ZorphySort<T>(field: this, descending: true);
 
+  /// Matches when this field's value — or any element of it, when the value
+  /// is an [Iterable] — matches [inner], a predicate over the nested value
+  /// (issue #303).
+  ///
+  /// [inner]'s element type is unchecked: [ZorphyNested.filter] holds a
+  /// `ZorphyFilter<dynamic>`, so a predicate built over the wrong type
+  /// compiles but triggers a runtime type error when it is evaluated against
+  /// a value of the nested type (Dart rejects the argument at the inner
+  /// predicate's non-nullable `matches` parameter). Build [inner] over the
+  /// nested value's actual type (Dart cannot express its element type here).
+  ZorphyFilter<T> nested(ZorphyFilter<dynamic> inner) =>
+      ZorphyNested<T, V>(this, inner);
+
   @override
   String toString() => '$name($pointer)';
 }
