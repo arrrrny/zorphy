@@ -10,9 +10,8 @@ String _versionOf(String pubspecPath) {
 
 /// The repository root: this test runs with the `zorphy` package as cwd, and
 /// the package directory sits directly under the root.
-final String _repoRoot = Directory(
-  '${Directory.current.path}/..',
-).resolveSymbolicLinksSync();
+final Directory _packageDir = Directory('${Directory.current.path}/..');
+final String _repoRoot = _packageDir.resolveSymbolicLinksSync();
 
 String _read(String relative) =>
     File('$_repoRoot/$relative').readAsStringSync();
