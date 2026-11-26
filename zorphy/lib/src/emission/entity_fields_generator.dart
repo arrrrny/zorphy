@@ -150,9 +150,16 @@ final class EntityFieldsGenerator {
           Field((f) {
             f.name = registryName;
             f.static = true;
-            f.modifier = FieldModifier.constant;
+            // `final`, not `const`: each entry is the typed constant with its
+            // value type erased (`asObject`), a getter-built descriptor — and
+            // only an erased entry can be written through from this
+            // `Object?`-typed slot (zorphy#301). A typed `ZorphyField<T, V>`
+            // placed here directly compiles and throws on the first `.set`.
+            f.modifier = FieldModifier.final$;
             f.type = referType('List<ZorphyField<$className, Object?>>');
-            f.assignment = Code('[${fieldNames.join(', ')}]');
+            f.assignment = Code(
+              '[${fieldNames.map((n) => '$n.asObject').join(', ')}]',
+            );
           }),
         );
       }

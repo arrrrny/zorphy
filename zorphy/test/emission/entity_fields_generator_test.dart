@@ -5,7 +5,7 @@
 // non-generic `@ZorphyEntity` / `@ZorphyValue` node, an
 // `abstract final class <Name>Fields` carrying one `ZorphyField<T, V>` per
 // payload field (own + inherited, first declaration winning), the private
-// tear-off helpers its constants reference, and the `static const all`
+// tear-off helpers its constants reference, and the `static final all`
 // registry list.
 
 import 'package:test/test.dart';
@@ -167,18 +167,21 @@ void main() {
       expect(code, contains('ZorphyField<Note, String?>('));
     });
 
-    test('emits the static const all registry list', () {
+    test('emits the static final all registry of erased entries', () {
       final code = _emit();
       expect(
         code,
-        contains('static const List<ZorphyField<Product, Object?>> all = ['),
+        contains('static final List<ZorphyField<Product, Object?>> all = ['),
       );
-      // The registry references the field constants, not fresh instances.
+      // Each entry is the field constant with its value type erased: a typed
+      // `ZorphyField<T, V>` in this `Object?` slot compiles and throws on the
+      // first `.set` (zorphy#301), so the registry never holds one directly.
       final allLine = RegExp(
-        r'static const List<ZorphyField<Product, Object\?>> all = \[[^\]]*\];',
+        r'static final List<ZorphyField<Product, Object\?>> all = \[[^\]]*\];',
       ).firstMatch(code)!.group(0)!;
-      expect(allLine, contains('id'));
-      expect(allLine, contains('price'));
+      expect(allLine, contains('id.asObject'));
+      expect(allLine, contains('price.asObject'));
+      expect(allLine, isNot(RegExp(r'\[\s*id\s*[,\]]')));
     });
 
     test('emits private tear-off get/set helpers routing through copyWith', () {
@@ -276,7 +279,7 @@ void main() {
       expect(
         code,
         isNot(
-          contains('static const List<ZorphyField<Colliding, Object?>> all ='),
+          contains('static final List<ZorphyField<Colliding, Object?>> all ='),
         ),
       );
     });

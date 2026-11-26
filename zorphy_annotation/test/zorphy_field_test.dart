@@ -55,7 +55,14 @@ final class ProductFields {
     set: _setNote,
   );
 
-  static const List<ZorphyField<Product, Object?>> all = [id, price, note];
+  // Mirrors the generator (zorphy#301): erased entries, so `.set` is
+  // callable from the `Object?`-typed slot; `final` because `asObject`
+  // is a getter.
+  static final List<ZorphyField<Product, Object?>> all = [
+    id.asObject,
+    price.asObject,
+    note.asObject,
+  ];
 
   static String _getId(Product instance) => instance.id;
   static Product _setId(Product instance, String value) =>
@@ -93,6 +100,51 @@ void main() {
       final cleared = ProductFields.note.set(expensive, null);
       expect(cleared.note, isNull);
       expect(cleared.id, 'p2');
+    });
+
+    // zorphy#301: a typed `ZorphyField<T, V>` is NOT a `ZorphyField<T,
+    // Object?>` (`set` is contravariant in V), and Dart defers that check to
+    // the first `.set` read — so the registry must hold erased entries.
+    group('asObject (value-type erasure)', () {
+      test('set is callable through the Object?-typed registry', () {
+        final ZorphyField<Product, Object?> id = ProductFields.all.byPointer(
+          '/id',
+        )!;
+        final updated = id.set(p, 'p9');
+        expect(updated.id, 'p9');
+        expect(updated.price, 9.99);
+      });
+
+      test(
+        'every registry entry writes through with a correctly typed value',
+        () {
+          for (final field in ProductFields.all) {
+            final current = field.get(p);
+            final next = field.set(p, current);
+            expect(field.get(next), current, reason: field.pointer);
+          }
+        },
+      );
+
+      test(
+        'a mistyped value fails as TypeError inside set, never silently',
+        () {
+          final price = ProductFields.all.byPointer('/price')!;
+          expect(() => price.set(p, 'not-a-double'), throwsA(isA<TypeError>()));
+        },
+      );
+
+      test('preserves name / jsonKey / pointer', () {
+        final erased = ProductFields.price.asObject;
+        expect(erased.name, 'price');
+        expect(erased.jsonKey, 'price');
+        expect(erased.pointer, '/price');
+      });
+
+      test('the erased descriptor is a lens-compatible write path', () {
+        final lens = ProductFields.all.byPointer('/note')!.lens;
+        expect(lens.set(expensive, 'wrapped').note, 'wrapped');
+      });
     });
 
     test('lens bridge reuses the lens layer', () {
@@ -177,7 +229,7 @@ void main() {
 
   group('wire round-trips', () {
     test('filter toWire / fromWire preserves matching', () {
-      const fields = ProductFields.all;
+      final fields = ProductFields.all;
       final original = ProductFields.price
           .lessThan(100)
           .and(ProductFields.id.startsWith('p'));
@@ -190,7 +242,7 @@ void main() {
     });
 
     test('every operator survives a wire round-trip', () {
-      const fields = ProductFields.all;
+      final fields = ProductFields.all;
       final filters = <ZorphyFilter<Product>>[
         ProductFields.id.equals('p1'),
         ProductFields.id.notEquals('p1'),
@@ -228,7 +280,7 @@ void main() {
     });
 
     test('sort toWire / fromWire preserves ordering', () {
-      const fields = ProductFields.all;
+      final fields = ProductFields.all;
       const items = [Product('a', 2.0), Product('b', 1.0), Product('c', 3.0)];
       for (final sort in [
         ProductFields.price.asc(),

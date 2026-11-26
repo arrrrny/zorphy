@@ -48,6 +48,24 @@ final class ZorphyField<T, V> {
   ZorphyLens<T, V> get lens =>
       ZorphyLens<T, V>(path: pointer, get: get, set: set);
 
+  /// This field with its value type erased to [Object], so it can sit in a
+  /// heterogeneous `<Entity>Fields.all` registry and still be WRITTEN through.
+  ///
+  /// [set] is a function-typed field, which makes this class invariant in
+  /// [V]: a `ZorphyField<T, String>` is not a `ZorphyField<T, Object?>`, and
+  /// Dart only reports that when `.set` is first read (zorphy#301). The
+  /// erased field is a NEW descriptor whose `set` takes any value and
+  /// performs the `as V` check itself, so a correctly typed value goes
+  /// through and a mistyped one fails as a [TypeError] — the same contract
+  /// `copyWith` has.
+  ZorphyField<T, Object?> get asObject => ZorphyField<T, Object?>(
+    name: name,
+    jsonKey: jsonKey,
+    pointer: pointer,
+    get: (instance) => this.get(instance),
+    set: (instance, value) => this.set(instance, value as V),
+  );
+
   /// Matches when the field equals [value].
   ZorphyFilter<T> equals(V value) => ZorphyEquals<T, V>(this, value);
 
