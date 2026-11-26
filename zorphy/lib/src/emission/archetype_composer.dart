@@ -88,7 +88,19 @@ final class ArchetypeComposer {
   /// Emits every hierarchy in [ir] as one formatted source fragment, or an
   /// empty string when the library carries no archetype annotations — so the
   /// generator can append the result unconditionally.
-  String compose(PolymorphicIr ir) {
+  /// Emits every hierarchy in [ir] as one formatted source fragment, or an
+  /// empty string when the library carries no archetype annotations — so the
+  /// generator can append the result unconditionally.
+  ///
+  /// [onlyNodeQualNames], when non-null, restricts the TOP-LEVEL per-node
+  /// surfaces (the `<Name>Lenses` / `<Name>Fields` / `_<Entity>Descriptor`
+  /// classes, which iterate `ir.nodes`) to the named nodes (issue #278): a
+  /// cross-library leaf is emitted from its own library with the base still in
+  /// `ir.nodes` for the field merge and the `extends` edge, but the base's
+  /// top-level surfaces belong to the base's library and must not be repeated
+  /// here. The class/codec/patch/mock surfaces already walk from [ir.roots],
+  /// so they are scoped by the roots the caller passes and need no filter.
+  String compose(PolymorphicIr ir, {Set<String>? onlyNodeQualNames}) {
     if (ir.roots.isEmpty) return '';
 
     final fragments = <String>[];
@@ -165,6 +177,20 @@ final class ArchetypeComposer {
     }
 
     const codec = BoundaryCodecEmitter();
+    // The top-level per-node surfaces iterate `ir.nodes`; scope them to the
+    // locally-emitted nodes when a filter is given (issue #278), so a
+    // cross-library base's surfaces are not repeated into the leaf's library.
+    final topLevelIr = onlyNodeQualNames == null
+        ? ir
+        : PolymorphicIr(
+            nodes: Map.unmodifiable({
+              for (final entry in ir.nodes.entries)
+                if (onlyNodeQualNames.contains(entry.key))
+                  entry.key: entry.value,
+            }),
+            roots: ir.roots,
+            diagnostics: ir.diagnostics,
+          );
     // The lens + JSON-Pointer surfaces (ISSUE-0230) are IR-native: they read
     // the whole graph, not one hierarchy, because a node's resolver dispatches
     // into its subtypes and nested types. Compute them once per library.
@@ -174,7 +200,7 @@ final class ArchetypeComposer {
     // field spliced into each emittable entity, plus the top-level
     // `_<Entity>Descriptor` classes appended after the entities that own the
     // field. IR-native like the lens pair above.
-    final descriptorGenerator = EntityDescriptorGenerator(ir);
+    final descriptorGenerator = EntityDescriptorGenerator(topLevelIr);
     final descriptorFields = descriptorGenerator.descriptorFields();
     // `_sentinel` backs the leaf `copyWith` clear-a-nullable-field path. It
     // is a library-level declaration, so it is emitted only when some
@@ -287,7 +313,7 @@ final class ArchetypeComposer {
       // The `<Name>Lenses` accessor classes are top-level, one per concrete
       // node, emitted once per library after the classes that own the registry
       // field referencing them (ISSUE-0230).
-      final lensClasses = const LensEmitter().lensClasses(ir);
+      final lensClasses = const LensEmitter().lensClasses(topLevelIr);
       if (lensClasses.isNotEmpty) {
         fragments.add(ZorphyEmitter().emitSpecs(lensClasses));
       }
@@ -295,7 +321,9 @@ final class ArchetypeComposer {
       // #247): top-level, one per concrete entity/value node, emitted once
       // per library — they name the node's `copyWith` and the
       // `ZorphyField`/`ZorphyLens` runtime types the owning library imports.
-      final fieldsClasses = const EntityFieldsGenerator().fieldsClasses(ir);
+      final fieldsClasses = const EntityFieldsGenerator().fieldsClasses(
+        topLevelIr,
+      );
       if (fieldsClasses.isNotEmpty) {
         fragments.add(ZorphyEmitter().emitSpecs(fieldsClasses));
       }

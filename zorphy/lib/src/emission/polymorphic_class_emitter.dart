@@ -287,6 +287,12 @@ final class PolymorphicClassEmitter {
     // The parent comes from the TRAVERSAL, not from `node.superTypes`: the
     // hierarchy the emitter is walking is the authority on "nearest sealed
     // ancestor", and a caller's superTypes list may be a subset of it.
+    //
+    // The ROOT's walk is seeded with its own resolved `superTypes` (issue
+    // #278): a cross-library leaf emitted as its own library's root still
+    // `extends` the base generated in the other library. A normal hierarchy
+    // root has empty `superTypes`, so this seed is empty there and the
+    // traversal stays the sole authority for every descendant.
     void walk(ZorphyNodeIr node, List<ZorphyNodeIr> ancestors) {
       specs.add(
         _classSpec(
@@ -310,7 +316,7 @@ final class PolymorphicClassEmitter {
       }
     }
 
-    walk(root, const []);
+    walk(root, root.superTypes);
     return _emitter.emitSpecs([
       if (includeSentinelDeclarations) ..._sentinelDeclarations(),
       ...specs,
