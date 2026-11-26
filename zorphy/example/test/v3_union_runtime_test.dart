@@ -113,13 +113,19 @@ void main() {
       // preserved with `identical` — the morph constructs the target from
       // `this`'s fields, never cloning.
       expect(done.id, open.id);
+      // The immutable scalar `createdAt` is carried by reference, but a
+      // collection field is defensively snapshotted at construction (#284):
+      // the morph carries a FRESH list with equal contents, never the
+      // caller's reference.
       expect(identical(done.createdAt, open.createdAt), isTrue);
-      expect(identical(done.tags, open.tags), isTrue);
+      expect(identical(done.tags, open.tags), isFalse);
+      expect(done.tags, orderedEquals(open.tags));
 
       // And back: only the target-owned field is asked for.
       final reopened = done.changeToOpenTask(assignee: 'grace');
       expect(reopened.assignee, 'grace');
-      expect(identical(reopened.tags, done.tags), isTrue);
+      expect(identical(reopened.tags, done.tags), isFalse);
+      expect(reopened.tags, orderedEquals(done.tags));
     });
   });
 }

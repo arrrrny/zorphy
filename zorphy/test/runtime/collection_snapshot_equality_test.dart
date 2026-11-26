@@ -39,10 +39,7 @@ PolymorphicField _field(String name, String type) =>
 
 void main() {
   test('snapshotted collections compare and hash by content', () {
-    final leaf = _node(
-      className: r'$OrderCart',
-      principalKey: 'id',
-    );
+    final leaf = _node(className: r'$OrderCart', principalKey: 'id');
     final root = _node(
       className: r'$Cart',
       isSealedRoot: true,
@@ -62,7 +59,8 @@ void main() {
       },
     );
 
-    final program = '''
+    final program =
+        '''
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 $emitted
@@ -126,7 +124,8 @@ void main() {
     expect(
       result.exitCode,
       0,
-      reason: 'generated collection-equality program failed:\n$output\n'
+      reason:
+          'generated collection-equality program failed:\n$output\n'
           '---program---\n$program',
     );
     expect(output, contains('ALL COLLECTION EQUALITY CHECKS PASSED'));

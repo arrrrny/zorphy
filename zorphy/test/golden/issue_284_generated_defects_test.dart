@@ -287,38 +287,44 @@ void main() {
       expect(compact, isNot(contains(r'List<$Address>')));
     });
 
-    test('the snapshot strips only the outer ? and keeps element nullability', () {
-      final leaf = _node(
-        className: r'$OrderCart',
-        archetype: ArchetypeKind.entity,
-        principalKey: 'id',
-      );
-      final root = _node(
-        className: r'$Cart',
-        archetype: ArchetypeKind.entity,
-        isSealedRoot: true,
-        principalKey: 'id',
-        children: [leaf],
-      );
-      final source = const PolymorphicClassEmitter().emit(
-        root: root,
-        fields: {
-          r'$Cart': [_field('id', 'String')],
-          r'$OrderCart': [
-            _field('id', 'String'),
-            _field('items', 'List<String?>'),
-            _field('scores', 'Map<String, int?>'),
-            _field('maybe', 'List<String>', nullable: true),
-          ],
-        },
-      );
-      final compact = _compact(source);
+    test(
+      'the snapshot strips only the outer ? and keeps element nullability',
+      () {
+        final leaf = _node(
+          className: r'$OrderCart',
+          archetype: ArchetypeKind.entity,
+          principalKey: 'id',
+        );
+        final root = _node(
+          className: r'$Cart',
+          archetype: ArchetypeKind.entity,
+          isSealedRoot: true,
+          principalKey: 'id',
+          children: [leaf],
+        );
+        final source = const PolymorphicClassEmitter().emit(
+          root: root,
+          fields: {
+            r'$Cart': [_field('id', 'String')],
+            r'$OrderCart': [
+              _field('id', 'String'),
+              _field('items', 'List<String?>'),
+              _field('scores', 'Map<String, int?>'),
+              _field('maybe', 'List<String>', nullable: true),
+            ],
+          },
+        );
+        final compact = _compact(source);
 
-      expect(compact, contains('List<String?>.of(items)'));
-      expect(compact, contains('Map<String,int?>.of(scores)'));
-      expect(compact, contains('maybe=maybe==null?null:List<String>.of(maybe)'));
-      expect(compact, isNot(contains('List<String>.of(items)')));
-    });
+        expect(compact, contains('List<String?>.of(items)'));
+        expect(compact, contains('Map<String,int?>.of(scores)'));
+        expect(
+          compact,
+          contains('maybe=maybe==null?null:List<String>.of(maybe)'),
+        );
+        expect(compact, isNot(contains('List<String>.of(items)')));
+      },
+    );
 
     test('collection fields use content-based == and hashCode', () {
       final leaf = _node(
@@ -415,9 +421,7 @@ void main() {
         className: r'$Fixture',
         archetype: ArchetypeKind.entity,
         principalKey: 'id',
-        fields: const [
-          ZorphyFieldIr(name: 'setField', type: 'Set<String>'),
-        ],
+        fields: const [ZorphyFieldIr(name: 'setField', type: 'Set<String>')],
       );
       final emitted = MockFixtureEmitter().emitForNode(
         leaf,

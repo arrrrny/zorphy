@@ -1102,7 +1102,7 @@ final class PolymorphicClassEmitter {
         for (final field in fields)
           _collectionSnapshot(field.emittedType) != null
               ? '${node.cleanName}._zorphyCollectionEquals('
-                  'this.${field.name}, other.${field.name})'
+                    'this.${field.name}, other.${field.name})'
               : 'this.${field.name} == other.${field.name}',
       ];
       // `operator ==` is the method NAME (the repo's own convention in
@@ -1133,12 +1133,7 @@ final class PolymorphicClassEmitter {
         // `Object.hashAll` accepts any nonempty iterable, covering both ends.
         fields.isEmpty
             ? 'runtimeType.hashCode'
-            : 'Object.hashAll([${[
-                for (final f in fields)
-                  _collectionSnapshot(f.emittedType) != null
-                      ? '${node.cleanName}._zorphyCollectionHash(${f.name})'
-                      : f.name,
-              ].join(', ')}])',
+            : 'Object.hashAll([${[for (final f in fields) _collectionSnapshot(f.emittedType) != null ? '${node.cleanName}._zorphyCollectionHash(${f.name})' : f.name].join(', ')}])',
       );
     });
   }
@@ -1150,23 +1145,23 @@ final class PolymorphicClassEmitter {
   /// Elements use their own `==`: value equality for generated nested values,
   /// identity for nested collections (the snapshot copies only the outer one).
   static Method _collectionEqualsMethod() => Method((m) {
-        m
-          ..name = '_zorphyCollectionEquals'
-          ..static = true
-          ..returns = referType('bool');
-        m.requiredParameters.addAll([
-          Parameter((p) {
-            p
-              ..name = 'a'
-              ..type = referType('Object?');
-          }),
-          Parameter((p) {
-            p
-              ..name = 'b'
-              ..type = referType('Object?');
-          }),
-        ]);
-        m.body = Code('''
+    m
+      ..name = '_zorphyCollectionEquals'
+      ..static = true
+      ..returns = referType('bool');
+    m.requiredParameters.addAll([
+      Parameter((p) {
+        p
+          ..name = 'a'
+          ..type = referType('Object?');
+      }),
+      Parameter((p) {
+        p
+          ..name = 'b'
+          ..type = referType('Object?');
+      }),
+    ]);
+    m.body = Code('''
     if (identical(a, b)) return true;
     if (a is List && b is List) {
       if (a.length != b.length) return false;
@@ -1190,24 +1185,24 @@ final class PolymorphicClassEmitter {
     }
     return false;
     ''');
-      });
+  });
 
   /// A hash compatible with [_collectionEqualsMethod]: order matters for a
   /// `List`, but a `Set`/`Map` combines element hashes commutatively so two
   /// equal collections always hash equal regardless of iteration order.
   static Method _collectionHashMethod() => Method((m) {
-        m
-          ..name = '_zorphyCollectionHash'
-          ..static = true
-          ..returns = referType('int');
-        m.requiredParameters.add(
-          Parameter((p) {
-            p
-              ..name = 'value'
-              ..type = referType('Object?');
-          }),
-        );
-        m.body = Code('''
+    m
+      ..name = '_zorphyCollectionHash'
+      ..static = true
+      ..returns = referType('int');
+    m.requiredParameters.add(
+      Parameter((p) {
+        p
+          ..name = 'value'
+          ..type = referType('Object?');
+      }),
+    );
+    m.body = Code('''
     if (value is List) return Object.hashAll(value);
     if (value is Set) {
       return value.fold<int>(0, (hash, element) => hash + element.hashCode);
@@ -1220,7 +1215,7 @@ final class PolymorphicClassEmitter {
     }
     return value.hashCode;
     ''');
-      });
+  });
 
   /// `toString` — the class name and every field, in declaration order.
   Method _toString(ZorphyNodeIr node, List<PolymorphicField> fields) {
