@@ -16,3 +16,12 @@ analyzer:
     # stay analyzed.
     - "benchmark/cost_guard_fixtures.dart"
     - "benchmark/cost_guards_impl.dart"
+    # The #252 structural probe imports the same build_runner-generated v3
+    # fixtures (`benchmark/cost_guard_fixtures.dart` →
+    # `_br_/benchmark/cost_guard_fixtures.part.dart`) that do not exist on a
+    # fresh checkout, so `dart analyze` without a benchmark codegen step sees
+    # the generated classes (`Product`, `ProductPatch`, `UiNode`, …) as
+    # undefined. Like the cost-guard fixtures it is compiled at runtime by its
+    # launcher (`deterministic_structural_guards_test.dart`, which runs
+    # generation first and stays analyzed), not by static analysis.
+    - "test/audit/_structural_probe.dart"
