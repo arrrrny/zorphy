@@ -202,9 +202,8 @@ void main() {
       try {
         final packageRoot = p.join(root.path, 'lib', 'app');
         Directory(packageRoot).createSync(recursive: true);
-        File(
-          p.join(packageRoot, 'pubspec.yaml'),
-        ).writeAsStringSync('name: x\n');
+        final pubspec = File(p.join(packageRoot, 'pubspec.yaml'));
+        pubspec.writeAsStringSync('name: x\n');
         final inside = p.join(packageRoot, 'domain', 'entities');
         expect(
           partDirective(EntityConfig(name: 'Sample', outputDir: inside)),
