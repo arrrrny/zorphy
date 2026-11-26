@@ -10,6 +10,12 @@
 // surface.
 export 'package:json_annotation/json_annotation.dart';
 
+// `package:meta` is re-exported because the v2 annotation package did, and a
+// consumer that imported `@protected` / `@immutable` / `@visibleForTesting`
+// through `zorphy_annotation` must keep compiling after `migrate_v3` (zorphy
+// #274). The single documented import resolves these annotations again.
+export 'package:meta/meta.dart';
+
 export 'src/archetypes.dart';
 export 'src/archetype_bases.dart';
 export 'src/equality.dart';
