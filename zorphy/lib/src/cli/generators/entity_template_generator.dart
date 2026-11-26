@@ -76,9 +76,7 @@ class EntityTemplateGenerator {
   }
 
   static void _writePartDirective(StringBuffer buffer, EntityConfig config) {
-    buffer.writeln(
-      "part '${escapeDartStringLiteral(sharedPartUri(config))}';",
-    );
+    buffer.writeln("part '${escapeDartStringLiteral(sharedPartUri(config))}';");
     buffer.writeln();
   }
 
@@ -105,9 +103,7 @@ class EntityTemplateGenerator {
     if (p.posix.isAbsolute(output) || RegExp(r'^[A-Za-z]:').hasMatch(output)) {
       final segments = p.posix.split(p.posix.normalize(output));
       final libIndex = segments.lastIndexOf('lib');
-      output = libIndex >= 0
-          ? p.posix.joinAll(segments.sublist(libIndex))
-          : '';
+      output = libIndex >= 0 ? p.posix.joinAll(segments.sublist(libIndex)) : '';
     }
     final library = p.posix.normalize(
       p.posix.join(output, config.snakeName, '${config.snakeName}.dart'),

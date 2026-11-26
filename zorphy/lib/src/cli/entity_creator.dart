@@ -43,10 +43,7 @@ class EntityCreator {
   /// `/tmp/lib/app/pubspec.yaml` with output `/tmp/lib/app/domain/entities`)
   /// from being mistaken for the package's own `lib`.
   static String packageRelativeOutputDir(String? outputDir) {
-    final path = (outputDir ?? 'lib/src/domain/entities').replaceAll(
-      r'\',
-      '/',
-    );
+    final path = (outputDir ?? 'lib/src/domain/entities').replaceAll(r'\', '/');
     if (!p.posix.isAbsolute(path) && !RegExp(r'^[A-Za-z]:').hasMatch(path)) {
       return path;
     }
