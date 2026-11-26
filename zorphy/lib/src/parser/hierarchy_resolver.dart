@@ -357,6 +357,22 @@ final class HierarchyResolver {
       for (final field in element.fields)
         if (!field.isStatic && field.name != null) field.name!: field,
     };
+    // Field-formal defaults (`const $Idle({this.count = 0})`, `const
+    // $NetworkFailure(this.message, [this.code = 'unknown'])`) are the values a
+    // generated `fromTrusted` call must supply when a root/body factory omits
+    // that field (#291). Read them once per class from the source constructors.
+    final constructorDefaults = <String, String>{};
+    for (final constructor in element.constructors) {
+      for (final fragment in constructor.firstFragment.formalParameters) {
+        final parameter = fragment.element;
+        final code = parameter.defaultValueCode;
+        if (code == null) continue;
+        var name = parameter.name ?? '';
+        if (name.startsWith('this.')) name = name.substring(5);
+        if (name.isEmpty) continue;
+        constructorDefaults.putIfAbsent(name, () => code);
+      }
+    }
     for (final getter in element.getters) {
       if (getter.isStatic) continue;
       final name = getter.name ?? '';
@@ -371,6 +387,7 @@ final class HierarchyResolver {
           isDomainBool:
               _isDomainBool(getter) ||
               _isDomainBool(_declaringField(declaredByName, name)),
+          constructorDefault: constructorDefaults[name],
         ),
       );
     }
@@ -386,6 +403,7 @@ final class HierarchyResolver {
           isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
           suppressQuestionMark: _hasNullableBound(type),
           isDomainBool: _isDomainBool(field),
+          constructorDefault: constructorDefaults[name],
         ),
       );
     }
@@ -677,7 +695,6 @@ final class HierarchyResolver {
 
     // Recurse into children, passing this node as their `root`.
     final finalizedChildren = <ZorphyNodeIr>[];
-    final withoutFromTrusted = <String>[];
     for (final child in node.directSubTypes) {
       final childElement = _elementForChild(child, resolved);
       if (childElement == null) {
@@ -685,36 +702,30 @@ final class HierarchyResolver {
         continue;
       }
       _finalizeNode(childElement, stamped, parents, resolved);
-      final finalizedChild = resolved[childElement]!.node;
-      finalizedChildren.add(finalizedChild);
-      // Only the union root carries `variantsWithoutFromTrusted`. Guarding the
-      // walk avoids a wasted `allConcreteLeaves` pass on every non-root level.
-      if (root == null) {
-        final leaves = finalizedChild.isConcreteLeaf
-            ? [finalizedChild]
-            : finalizedChild.allConcreteLeaves;
-        for (final leaf in leaves) {
-          final leafElement = _elementForChild(leaf, resolved);
-          if (leafElement != null &&
-              !leafElement.constructors.any((c) => c.name == 'fromTrusted')) {
-            withoutFromTrusted.add(leaf.cleanName);
-          }
-        }
-      }
+      finalizedChildren.add(resolved[childElement]!.node);
     }
 
+    // Issue #293: a union root's forwarded bodies construct its variants. The
+    // set of variants whose SOURCE lacks `fromTrusted` is read off the root's
+    // own hierarchy children once they are final — the `implements $Union`
+    // edge, which exists whether the variant was declared through a redirecting
+    // factory or a body one.
+    final variantsWithoutFromTrusted = node.isUnion
+        ? ArchetypeParser.unionVariantsWithoutFromTrusted([
+            for (final child in node.directSubTypes)
+              if (_elementForChild(child, resolved) case final element?)
+                element,
+          ])
+        : const <String>{};
+
     // Rebuild once more so `directSubTypes` references the finalized children.
-    // A diamond hierarchy can yield the same leaf twice; harmless because the
-    // emitter de-duplicates with `.toSet()`.
     final finalNode = stamped.copyWith(
       directSubTypes: List.unmodifiable(finalizedChildren),
       allConcreteLeaves: List.unmodifiable(<ZorphyNodeIr>[
         for (final child in finalizedChildren)
           if (child.isConcreteLeaf) child else ...child.allConcreteLeaves,
       ]),
-      variantsWithoutFromTrusted: root == null
-          ? List.unmodifiable(withoutFromTrusted)
-          : const [],
+      variantsWithoutFromTrusted: variantsWithoutFromTrusted,
     );
     resolved[element] = _Declaration(element, finalNode);
   }

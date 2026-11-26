@@ -229,6 +229,11 @@ final class ArchetypeParser {
           parameters: constructor.firstFragment.formalParameters
               .map(_userParam)
               .toList(),
+          // A real analyzer element backs every parameter list built here —
+          // including the EMPTY list of `factory $State.idle() = $Idle`. That
+          // distinction is what keeps the emitter from re-deriving the list
+          // from the variant's fields (#291).
+          hasDeclaredParameters: true,
         ),
       );
     }
@@ -243,6 +248,31 @@ final class ArchetypeParser {
   /// the emitter. A body factory (`factory $AppFailure.from(...) { ... }`) has
   /// no `redirectedConstructor`; a redirecting factory is a variant, not a user
   /// member.
+  /// The clean names of [variants] whose SOURCE class declares no `fromTrusted`
+  /// constructor (issue #293).
+  ///
+  /// The variants arrive as the union's hierarchy children — the `implements
+  /// $Union` edges — not as redirecting-factory targets, because a union may
+  /// declare every variant as a BODY factory (zuraffa's `AppFailure` does) and
+  /// then has no redirect to read. Constructors are inspected by name, never by
+  /// source text. A variant that already declares `fromTrusted` is left out so
+  /// its forwarded constructor calls keep the plain `$Variant` → `Variant`
+  /// lowering.
+  static Set<String> unionVariantsWithoutFromTrusted(
+    Iterable<ClassElement> variants,
+  ) {
+    final names = <String>{};
+    for (final variant in variants) {
+      final hasFromTrusted = variant.constructors.any(
+        (constructor) => constructor.name == 'fromTrusted',
+      );
+      if (!hasFromTrusted) {
+        names.add((variant.name ?? '').replaceAll(r'$', ''));
+      }
+    }
+    return names;
+  }
+
   static List<ZorphyUserMemberIr> unionUserMembers(
     ClassElement element,
     Map<String, ZorphyMemberBody> bodyByName,

@@ -194,6 +194,328 @@ class \$SliceReady<T> implements \$AsyncSlice<T> {
       expect(flat, contains('= SliceReady.fromTrusted;'));
     });
 
+    // Issue #290 (zuraffa 8.0 adoption): two defects the real AppFailure
+    // union exposed — a non-const `fromTrusted` target, and declared defaults
+    // being re-derived away from the variant's fields.
+    group('#290 — variant factory follows the source declaration', () {
+      const declared =
+          '$_annotationImport'
+          r"""
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class $AppFailure {
+  factory $AppFailure.network({
+    required String message,
+    bool isRetryable = false,
+    int? statusCode,
+  }) = $NetworkFailure;
+  factory $AppFailure.violation({
+    required String message,
+    List<String> violations = const [],
+  }) = $Violation;
+}
+
+@ZorphyValue()
+class $NetworkFailure implements $AppFailure {
+  @override
+  final String message;
+  @override
+  final bool isRetryable;
+  final int? statusCode;
+
+  const $NetworkFailure({
+    required this.message,
+    this.isRetryable = false,
+    this.statusCode,
+  });
+}
+
+@ZorphyValue()
+class $Violation implements $AppFailure {
+  @override
+  final String message;
+  final List<String> violations;
+
+  const $Violation({
+    required this.message,
+    this.violations = const [],
+  });
+}
+""";
+
+      test('a declared default is honoured via a body factory', () async {
+        final (_, out) = await _compose({'nodes.dart': declared});
+        final flat = out.replaceAll(RegExp(r'[\s,]+'), '');
+        // `isRetryable` is non-nullable on the variant; the field-derived list
+        // would have emitted `required bool isRetryable`. The source factory
+        // declared a default, so the generated one keeps it — as a BODY
+        // factory, since Dart forbids defaults on a redirecting one.
+        expect(
+          flat,
+          contains(
+            'factoryAppFailure.network({requiredStringmessage'
+            'boolisRetryable=falseint?statusCode})'
+            '=>NetworkFailure.fromTrusted(message:message'
+            'isRetryable:isRetryablestatusCode:statusCode);',
+          ),
+        );
+        // Only the ROOT factory is under test: the variant's own fromTrusted
+        // (and copyWithField) legitimately carry `required bool isRetryable`.
+        final rootFactory = flat.substring(
+          flat.indexOf('factoryAppFailure.network('),
+          flat.indexOf('factoryAppFailure.violation('),
+        );
+        expect(rootFactory, isNot(contains('requiredboolisRetryable')));
+      });
+
+      test('a collection-bearing variant never takes a const redirect', () async {
+        final (_, out) = await _compose({'nodes.dart': declared});
+        final flat = out.replaceAll(RegExp(r'[\s,]+'), '');
+        // `violations` is a List, so `Violation.fromTrusted` snapshots it in an
+        // initializer list and is NOT const; a const redirect to it would be
+        // `redirect_to_non_const_constructor`.
+        expect(flat, isNot(contains('constfactoryAppFailure.violation(')));
+        expect(
+          flat,
+          contains(
+            'factoryAppFailure.violation({requiredStringmessage'
+            'List<String>violations=const[]})'
+            '=>Violation.fromTrusted(message:messageviolations:violations);',
+          ),
+        );
+      });
+
+      test('the emitted root compiles (the analyze acceptance gate)', () async {
+        final (_, out) = await _compose({'nodes.dart': declared});
+        final probe = Directory('test/.union290_tmp').absolute.path;
+        Directory(probe).createSync(recursive: true);
+        final fixture = Directory(probe).createTempSync('fixture_');
+        addTearDown(() => fixture.deleteSync(recursive: true));
+        File('${fixture.path}/pubspec.yaml').writeAsStringSync(
+          'name: probe_290\n'
+          'environment:\n'
+          '  sdk: ">=3.11.0 <4.0.0"\n'
+          'dependencies:\n'
+          '  zorphy_annotation:\n'
+          '    path: ${Directory.current.parent.uri.resolve('zorphy_annotation/').toFilePath()}\n',
+        );
+        Directory('${fixture.path}/lib').createSync();
+        File('${fixture.path}/lib/emitted.dart').writeAsStringSync(
+          "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$out",
+        );
+        final pubGet = Process.runSync('dart', [
+          'pub',
+          'get',
+        ], workingDirectory: fixture.path);
+        expect(pubGet.exitCode, 0, reason: '${pubGet.stdout}${pubGet.stderr}');
+        final analyze = Process.runSync('dart', [
+          'analyze',
+          '--fatal-infos',
+          'lib/emitted.dart',
+        ], workingDirectory: fixture.path);
+        expect(
+          analyze.exitCode,
+          0,
+          reason: '${analyze.stdout}${analyze.stderr}',
+        );
+      });
+    });
+
+    // Issue #293: a user body factory constructs a variant the way the SOURCE
+    // declares it; the generated leaf only has `fromTrusted`.
+    group('#293 — body factories construct variants through fromTrusted', () {
+      const bodyFactory =
+          '$_annotationImport'
+          r"""
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class $AppFailure {
+  factory $AppFailure.network({required String message, bool isRetryable = false}) {
+    return $NetworkFailure(message: message, isRetryable: isRetryable);
+  }
+  static Type networkType() => $NetworkFailure;
+  static String describe($AppFailure failure, String amount) {
+    // `$NetworkFailure(` inside a string must not be touched.
+    final literal = 'cost: $amount for $NetworkFailure(...) in prose';
+    return '$literal ${failure.runtimeType}';
+  }
+}
+
+@ZorphyValue()
+class $NetworkFailure implements $AppFailure {
+  @override
+  final String message;
+  @override
+  final bool isRetryable;
+
+  const $NetworkFailure({required this.message, this.isRetryable = false});
+}
+""";
+
+      test(r'a $Variant(...) call becomes Variant.fromTrusted(...)', () async {
+        final (_, out) = await _compose({'nodes.dart': bodyFactory});
+        final flat = out.replaceAll(RegExp(r'[\s,]+'), '');
+        expect(
+          flat,
+          contains(
+            'returnNetworkFailure.fromTrusted(message:message'
+            'isRetryable:isRetryable);',
+          ),
+        );
+      });
+
+      test('type positions, member accesses, comments and strings are left alone', () async {
+        final (_, out) = await _compose({'nodes.dart': bodyFactory});
+        final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+        expect(flat, contains('static Type networkType() => NetworkFailure;'));
+        // The string literal and the comment survive byte-for-byte (modulo the
+        // `$AppFailure` parameter type lowering, which is the plain rule).
+        expect(
+          flat,
+          contains(r"'cost: $amount for $NetworkFailure(...) in prose'"),
+        );
+        expect(flat, isNot(contains('AppFailure.fromTrusted(')));
+      });
+
+      test('the emitted root compiles (the analyze acceptance gate)', () async {
+        final (_, out) = await _compose({'nodes.dart': bodyFactory});
+        final probe = Directory('test/.union293_tmp').absolute.path;
+        Directory(probe).createSync(recursive: true);
+        final fixture = Directory(probe).createTempSync('fixture_');
+        addTearDown(() => fixture.deleteSync(recursive: true));
+        File('${fixture.path}/pubspec.yaml').writeAsStringSync(
+          'name: probe_293\n'
+          'environment:\n'
+          '  sdk: ">=3.11.0 <4.0.0"\n'
+          'dependencies:\n'
+          '  zorphy_annotation:\n'
+          '    path: ${Directory.current.parent.uri.resolve('zorphy_annotation/').toFilePath()}\n',
+        );
+        Directory('${fixture.path}/lib').createSync();
+        File('${fixture.path}/lib/emitted.dart').writeAsStringSync(
+          "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$out",
+        );
+        final pubGet = Process.runSync('dart', [
+          'pub',
+          'get',
+        ], workingDirectory: fixture.path);
+        expect(pubGet.exitCode, 0, reason: '${pubGet.stdout}${pubGet.stderr}');
+        final analyze = Process.runSync('dart', [
+          'analyze',
+          '--fatal-infos',
+          'lib/emitted.dart',
+        ], workingDirectory: fixture.path);
+        expect(
+          analyze.exitCode,
+          0,
+          reason: '${analyze.stdout}${analyze.stderr}',
+        );
+      });
+    });
+
+    // Issue #294: a field typed as one of the node's own type parameters can
+    // hold a collection at runtime; `==` compared those by identity.
+    group('#294 — a type-parameter field compares by content', () {
+      const genericLeaf =
+          '$_annotationImport'
+          r"""
+part 'nodes.zorphy.dart';
+
+@ZorphyValue()
+class $Box<T> {
+  final T payload;
+  final String id;
+
+  const $Box({required this.payload, required this.id});
+}
+""";
+
+      test('== and hashCode route a type-parameter field through the dynamic '
+          'collection helpers', () async {
+        final (_, out) = await _compose({'nodes.dart': genericLeaf});
+        final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+        expect(
+          flat,
+          contains(
+            'return other is Box && Box._zorphyCollectionEquals('
+            'this.payload, other.payload) && this.id == other.id;',
+          ),
+        );
+        expect(
+          flat,
+          contains('Object.hashAll([Box._zorphyCollectionHash(payload), id])'),
+        );
+        expect(flat, contains('static bool _zorphyCollectionEquals('));
+        expect(flat, contains('this.id == other.id'));
+      });
+
+      test('the emitted class compiles and two Map payloads compare equal', () async {
+        final (_, out) = await _compose({'nodes.dart': genericLeaf});
+        final probe = Directory('test/.box294_tmp').absolute.path;
+        Directory(probe).createSync(recursive: true);
+        final fixture = Directory(probe).createTempSync('fixture_');
+        addTearDown(() => fixture.deleteSync(recursive: true));
+        File('${fixture.path}/pubspec.yaml').writeAsStringSync(
+          'name: probe_294\n'
+          'environment:\n'
+          '  sdk: ">=3.11.0 <4.0.0"\n'
+          'dependencies:\n'
+          '  zorphy_annotation:\n'
+          '    path: ${Directory.current.parent.uri.resolve('zorphy_annotation/').toFilePath()}\n'
+          'dev_dependencies:\n'
+          '  test: any\n',
+        );
+        Directory('${fixture.path}/lib').createSync();
+        Directory('${fixture.path}/test').createSync();
+        File('${fixture.path}/lib/emitted.dart').writeAsStringSync(
+          "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$out",
+        );
+        File('${fixture.path}/test/box_test.dart').writeAsStringSync(r'''
+import 'package:test/test.dart';
+import 'package:probe_294/emitted.dart';
+void main() {
+  test('two Boxes with equal Map payloads are == and hash equal', () {
+    final a = Box<Map<String, dynamic>>.fromTrusted(
+      payload: <String, dynamic>{'name': 'x'},
+      id: '1',
+    );
+    final b = Box<Map<String, dynamic>>.fromTrusted(
+      payload: <String, dynamic>{'name': 'x'},
+      id: '1',
+    );
+    expect(a, equals(b));
+    expect(a.hashCode, equals(b.hashCode));
+    final c = Box<int>.fromTrusted(payload: 3, id: '1');
+    final d = Box<int>.fromTrusted(payload: 3, id: '1');
+    expect(c, equals(d));
+  });
+}
+''');
+        final pubGet = Process.runSync('dart', [
+          'pub',
+          'get',
+        ], workingDirectory: fixture.path);
+        expect(pubGet.exitCode, 0, reason: '${pubGet.stdout}${pubGet.stderr}');
+        final analyze = Process.runSync('dart', [
+          'analyze',
+          '--fatal-infos',
+          'lib',
+          'test',
+        ], workingDirectory: fixture.path);
+        expect(
+          analyze.exitCode,
+          0,
+          reason: '${analyze.stdout}${analyze.stderr}',
+        );
+        final run = Process.runSync('dart', [
+          'test',
+        ], workingDirectory: fixture.path);
+        expect(run.exitCode, 0, reason: '${run.stdout}${run.stderr}');
+      });
+    });
+
     test(
       'a factory name that collides with an existing member is skipped',
       () async {
@@ -296,12 +618,12 @@ class $Wrapped<T> implements $Envelope<T> {
       final flat = out.replaceAll(RegExp(r'\s+'), ' ');
       expect(
         flat,
-        contains('Wrapped.fromTrusted<void Function()>(value: cb)'),
+        contains('Wrapped<void Function()>.fromTrusted(value: cb)'),
         reason: r'function-typed generic argument is rewritten to .fromTrusted',
       );
       expect(
         flat,
-        contains('Wrapped.fromTrusted<(int, String)>(value: pair)'),
+        contains('Wrapped<(int, String)>.fromTrusted(value: pair)'),
         reason: r'record-typed generic argument is rewritten to .fromTrusted',
       );
       expect(flat, isNot(contains(r'$Wrapped')));
@@ -327,7 +649,13 @@ class $Wrapped<T> implements $Envelope<T> {
         expect(
           flat,
           contains('NetworkFailure.fromTrusted(message: amount)'),
-          reason: r'real $Variant constructor invocations are rewritten to .fromTrusted',
+          reason:
+              // #293: a `$Variant(...)` constructor invocation in a forwarded
+              // body targets the generated leaf's `fromTrusted` — the only
+              // constructor it has. Everything else in the body (the raw
+              // `r'\$literal'`, the interpolation, the `$kind` reference) is
+              // preserved verbatim.
+              r'real $Variant identifiers are still rewritten',
         );
       },
     );

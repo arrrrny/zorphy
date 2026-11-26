@@ -83,11 +83,18 @@ final class PolymorphicField {
   /// nullable-bounded type parameter (#273). See [emittedType].
   final bool suppressQuestionMark;
 
+  /// The source field-formal default (`0`, `'unknown'`), or `null`.
+  ///
+  /// Carried from [ZorphyFieldIr.constructorDefault] so an emitted call that
+  /// omits this field can supply the author's own default (#291).
+  final String? constructorDefault;
+
   const PolymorphicField({
     required this.name,
     required this.type,
     this.isNullable = false,
     this.suppressQuestionMark = false,
+    this.constructorDefault,
   });
 
   /// The type as emitted: the `?` suffix applied exactly once, unless the
@@ -242,6 +249,7 @@ final class PolymorphicClassEmitter {
       type: substituted,
       isNullable: field.isNullable,
       suppressQuestionMark: field.suppressQuestionMark,
+      constructorDefault: field.constructorDefault,
     );
   }
 
@@ -704,6 +712,36 @@ final class PolymorphicClassEmitter {
   /// * only the OUTER nullable suffix is removed. Inner `?` markers belong to
   ///   the element type (`List<String?>`, `Map<String, int?>`) and must survive,
   ///   or the `.of` copy cannot accept its own declared parameter (#285 review).
+  /// Whether [field]'s declared type is one of [node]'s own type parameters
+  /// (`P data`, `T value`), optionally nullable.
+  ///
+  /// A type parameter is opaque to the emitter, so such a field MAY hold a
+  /// `List`/`Set`/`Map` at runtime — and a snapshotted or caller-built
+  /// collection is a different instance on every value. Comparing it with
+  /// `==` then compares identities and `value == value.copyWith()` fails for
+  /// a `Map` payload (#294) — the same defect #285 fixed for DECLARED
+  /// collections, resurfacing through a generic. Those fields route through
+  /// the dynamic [_collectionEqualsMethod], which already falls back to `==`
+  /// for a non-collection.
+  static bool _isTypeParameterField(ZorphyNodeIr node, PolymorphicField field) {
+    var bare = _lowerType(field.emittedType).trim();
+    if (bare.endsWith('?')) bare = bare.substring(0, bare.length - 1).trim();
+    if (bare.isEmpty) return false;
+    return node.typeParameters.any((parameter) {
+      final name = parameter
+          .split(RegExp(r'\s+(extends|super|in)\b'))
+          .first
+          .trim();
+      return name == bare;
+    });
+  }
+
+  /// Whether [field]'s `==`/`hashCode` must go through the dynamic collection
+  /// helpers: a declared collection, or a type-parameter-typed field.
+  static bool _comparesByContent(ZorphyNodeIr node, PolymorphicField field) =>
+      _collectionSnapshot(field.emittedType) != null ||
+      _isTypeParameterField(node, field);
+
   static String? _collectionSnapshot(String emittedType) {
     var bare = _lowerType(emittedType).trim();
     if (bare.endsWith('?')) {
@@ -737,12 +775,32 @@ final class PolymorphicClassEmitter {
     };
   }
 
-  /// Emits one redirecting const factory per variant onto the sealed root
+  /// Emits one variant factory per variant onto the sealed root
   /// (issue #271 §3.1):
   /// `const factory AppFailure.network({...}) = NetworkFailure.fromTrusted;`.
   ///
-  /// The parameter list is the variant's `fromTrusted` list — the variant
-  /// leaf's full payload — so the redirect is legal (`fromTrusted` is const).
+  /// The parameter list is the SOURCE factory's own declaration (#290) —
+  /// names, requiredness and defaults exactly as written — so the author's
+  /// `bool isRetryable = false` stays optional instead of being re-derived
+  /// from the variant's fields, where every non-nullable field would turn
+  /// `required`. Only an IR built without the analyzer element (empty
+  /// [ZorphyVariantFactoryIr.parameters]) falls back to the field-derived list.
+  ///
+  /// Dart constrains a REDIRECTING factory to the target's exact signature and
+  /// forbids defaults on it (`default_value_in_redirecting_factory_constructor`,
+  /// `redirect_to_invalid_function_type`), and a `const` redirect must target
+  /// a `const` constructor. So the emitted shape is decided per variant:
+  ///
+  /// - **redirect** when the declaration is already the target's signature —
+  ///   every parameter named, no defaults — AND the target's `fromTrusted` is
+  ///   const; this keeps `const AppFailure.timeout(...)` and Dart 3
+  ///   dot-shorthand (`.timeout(...)`) working;
+  /// - **body factory** otherwise — `factory AppFailure.network({...}) =>
+  ///   NetworkFailure.fromTrusted(...)` forwarding every declared parameter to
+  ///   the field of the same name. A declared default, a positional
+  ///   declaration, or a collection field (which makes `fromTrusted`
+  ///   non-const, #284) each take this path.
+  ///
   /// A factory whose name collides with a member the root already has (an
   /// abstract getter, a codec/lens/descriptor member, or a user member) is
   /// skipped and named in the log.
@@ -770,119 +828,101 @@ final class PolymorphicClassEmitter {
               fields[variant.className] ?? const [],
               fields,
             );
-      // `fromTrusted` is const only when the variant carries no collection
-      // field — a collection is defensively copied in an initializer list,
-      // which drops `const` (#284). A const redirect to that non-const
-      // constructor is `redirect_to_non_const_constructor` (#290).
-      final fromTrustedConst = variantFields.every(
-        (field) => _collectionSnapshot(field.emittedType) == null,
+      // `fromTrusted` is const unless a collection field is snapshotted in
+      // its initializer list — the same predicate _fromTrustedConstructor uses.
+      final targetIsConst = !variantFields.any(
+        (field) => _collectionSnapshot(field.emittedType) != null,
       );
-      final params = _variantFactoryParams(factory, variantFields);
-      final target = '${_lowerType(factory.variantClassName)}.fromTrusted';
+      final targetSymbol =
+          '${_lowerType(factory.variantClassName)}.fromTrusted';
       c.constructors.add(
         Constructor((ctor) {
           ctor.factory = true;
           ctor.name = factory.name;
-          // A redirecting factory is implicitly `const` and may carry NO
-          // default value (`default_value_in_redirecting_factory_constructor`)
-          // and only named parameters. Only when the source declaration is
-          // already that shape AND `fromTrusted` is const is the const
-          // redirect legal; every other declaration becomes a body factory
-          // forwarding each parameter by name (#290).
-          if (fromTrustedConst && params.allNamedNoDefaults) {
-            ctor.constant = true;
-            ctor.optionalParameters.addAll(params.named);
-            ctor.redirect = refer(target);
+          if (!factory.hasDeclaredParameters) {
+            // No analyzer element behind the IR: the field-derived list is the
+            // only shape available, and it is redirect-compatible by design.
+            ctor.constant = targetIsConst;
+            for (final field in variantFields) {
+              ctor.optionalParameters.add(
+                Parameter((p) {
+                  p.name = field.name;
+                  p.named = true;
+                  p.required = !field.isNullable;
+                  p.type = referType(_lowerType(field.emittedType));
+                }),
+              );
+            }
+            ctor.redirect = refer(targetSymbol);
             return;
           }
-          ctor.requiredParameters.addAll(params.requiredPositional);
-          ctor.optionalParameters.addAll(params.named);
-          ctor.optionalParameters.addAll(params.optionalPositional);
-          ctor.lambda = true;
-          ctor.body = Code(
-            '$target(${params.names.map((n) => '$n: $n').join(', ')})',
-          );
-        }),
-      );
-    }
-  }
+          final (required, optional) = _splitParams(factory.parameters);
+          ctor.requiredParameters.addAll(required);
+          ctor.optionalParameters.addAll(optional);
+          // A redirecting factory must ACCEPT EVERY required parameter of its
+          // target. `fromTrusted` declares one named parameter per leaf field,
+          // so a declaration that omits a (defaulted) field — e.g.
+          // `network({required String message}) = $NetworkFailure` where the
+          // variant also has `this.code = 'unknown'` — would emit
+          // `redirect_to_invalid_function_type`. Compare the declaration with
+          // the COMPLETE target signature, not just its own shape (#291).
+          final targetFieldNames = {
+            for (final field in variantFields) field.name,
+          };
+          final targetRequiredNames = {
+            for (final field in variantFields)
+              if (!field.isNullable) field.name,
+          };
+          final declaredNames = {for (final p in factory.parameters) p.name};
+          final redirectCompatible =
+              targetIsConst &&
+              !factory.parameters.any(
+                (p) => p.defaultValue != null || !p.isNamed,
+              ) &&
+              targetRequiredNames.every(declaredNames.contains) &&
+              declaredNames.every(targetFieldNames.contains);
+          if (redirectCompatible) {
+            ctor.constant = true;
+            ctor.redirect = refer(targetSymbol);
+            return;
+          }
 
-  /// The parameters the sealed root re-emits for one variant factory (issue
-  /// #290): the factory's OWN source declaration when the IR carries it, so a
-  /// declared default (`bool isRetryable = false`) and an optional parameter
-  /// survive instead of being rebuilt as `required` from the variant's fields.
-  ///
-  /// Falls back to the variant leaf's `fromTrusted` field list (all named, no
-  /// defaults) only when the source declaration was unavailable.
-  ({
-    List<Parameter> named,
-    List<Parameter> requiredPositional,
-    List<Parameter> optionalPositional,
-    List<String> names,
-    bool allNamedNoDefaults,
-  })
-  _variantFactoryParams(
-    ZorphyVariantFactoryIr factory,
-    List<PolymorphicField> variantFields,
-  ) {
-    final named = <Parameter>[];
-    final requiredPositional = <Parameter>[];
-    final optionalPositional = <Parameter>[];
-    final names = <String>[];
-    var allNamedNoDefaults = true;
-    if (factory.parameters.isNotEmpty) {
-      for (final p in factory.parameters) {
-        names.add(p.name);
-        final spec = Parameter((parameter) {
-          parameter.name = p.name;
-          if (p.type != null) {
-            parameter.type = referType(_lowerType(p.type!));
+          // Body factory: forward each declared parameter to the TARGET FIELD
+          // it binds, not to a same-named parameter. A positional declaration
+          // binds by position (`ready(String input) = $Ready` against
+          // `const $Ready(this.value)` becomes `value: input`), while a named
+          // declaration binds by its own name (#291).
+          final forwarded = <String>[];
+          final supplied = <String>{};
+          var positionalIndex = 0;
+          for (final p in factory.parameters) {
+            final targetName = p.isNamed
+                ? p.name
+                : positionalIndex < variantFields.length
+                ? variantFields[positionalIndex].name
+                : p.name;
+            if (!p.isNamed) positionalIndex++;
+            forwarded.add('$targetName: ${p.name}');
+            supplied.add(targetName);
           }
-          if (p.isNamed) {
-            parameter.named = true;
-            parameter.required = p.isRequired;
+          // Required target fields the source declaration omitted still need a
+          // value — the author's own field-formal default is the right one.
+          // `idle()` against `const $Idle({this.count = 0})` becomes
+          // `Idle.fromTrusted(count: 0)` instead of a field-derived
+          // `idle({required int count})` (#291).
+          for (final field in variantFields) {
+            if (field.isNullable ||
+                field.constructorDefault == null ||
+                supplied.contains(field.name)) {
+              continue;
+            }
+            forwarded.add('${field.name}: ${field.constructorDefault}');
           }
-          if (p.defaultValue != null) {
-            parameter.defaultTo = Code(p.defaultValue!);
-          }
-        });
-        if (p.isNamed) {
-          named.add(spec);
-          if (p.defaultValue != null) allNamedNoDefaults = false;
-        } else if (p.isOptionalPositional) {
-          optionalPositional.add(spec);
-          allNamedNoDefaults = false;
-        } else {
-          requiredPositional.add(spec);
-          allNamedNoDefaults = false;
-        }
-      }
-      return (
-        named: named,
-        requiredPositional: requiredPositional,
-        optionalPositional: optionalPositional,
-        names: names,
-        allNamedNoDefaults: allNamedNoDefaults,
-      );
-    }
-    for (final field in variantFields) {
-      names.add(field.name);
-      named.add(
-        Parameter((p) {
-          p.name = field.name;
-          p.named = true;
-          p.required = !field.isNullable;
-          p.type = referType(_lowerType(field.emittedType));
+          ctor.lambda = true;
+          ctor.body = Code('$targetSymbol(${forwarded.join(', ')})');
         }),
       );
     }
-    return (
-      named: named,
-      requiredPositional: requiredPositional,
-      optionalPositional: optionalPositional,
-      names: names,
-      allNamedNoDefaults: true,
-    );
   }
 
   /// Forwards the user-declared static methods and body factory constructors
@@ -895,6 +935,14 @@ final class PolymorphicClassEmitter {
     Map<String, List<PolymorphicField>> fields,
   ) {
     final taken = _rootBaseNames(node, fields[node.className] ?? const []);
+    // The generated leaf's `fromTrusted` is the retargeting destination for
+    // `$Variant(...)` calls in forwarded bodies (#293). Keep its field order
+    // and source defaults so positional args and omitted fields can be bound
+    // correctly (#291).
+    final variantShapes = <String, List<PolymorphicField>>{
+      for (final name in node.variantsWithoutFromTrusted)
+        name: _variantFieldsFor(node, name, fields),
+    };
     // A user member is the author's OWN declaration and always survives (issue
     // #271 §3.4 makes the GENERATED factory yield to it, never the reverse); it
     // only yields to a member the root already carries from another emitter.
@@ -905,9 +953,9 @@ final class PolymorphicClassEmitter {
       }
       final body = _rewriteVariants(
         member.bodySource,
-        node.variantsWithoutFromTrusted,
+        variantShapes: variantShapes,
       );
-      final (required, optional) = _splitParams(member);
+      final (required, optional) = _splitParams(member.parameters);
       if (member.isFactory) {
         c.constructors.add(
           Constructor((ctor) {
@@ -940,12 +988,16 @@ final class PolymorphicClassEmitter {
     }
   }
 
-  /// Splits [member]'s parameters into the positional [required] and the
-  /// [optional] lists code_builder renders as `(a, b)` and `{...}` / `[...]`.
-  (List<Parameter>, List<Parameter>) _splitParams(ZorphyUserMemberIr member) {
+  /// Splits [parameters] into the positional [required] and the [optional]
+  /// lists code_builder renders as `(a, b)` and `{...}` / `[...]`. Shared by
+  /// the forwarded user members and the variant factories, so a declared
+  /// default value (`bool isRetryable = false`) survives both paths.
+  (List<Parameter>, List<Parameter>) _splitParams(
+    List<ZorphyUserParamIr> parameters,
+  ) {
     final required = <Parameter>[];
     final optional = <Parameter>[];
-    for (final p in member.parameters) {
+    for (final p in parameters) {
       final parameter = Parameter((spec) {
         spec.name = p.name;
         if (p.type != null) spec.type = referType(_lowerType(p.type!));
@@ -977,6 +1029,39 @@ final class PolymorphicClassEmitter {
     return null;
   }
 
+  /// The fields a variant's generated `fromTrusted` accepts, in declaration
+  /// order with inherited fields included — the shape a `$Variant(...)` call
+  /// in a forwarded body is retargeted to (#291).
+  List<PolymorphicField> _variantFieldsFor(
+    ZorphyNodeIr node,
+    String cleanName,
+    Map<String, List<PolymorphicField>> fields,
+  ) {
+    ZorphyNodeIr? find(ZorphyNodeIr current) {
+      if (current.cleanName == cleanName) return current;
+      for (final child in current.directSubTypes) {
+        final hit = find(child);
+        if (hit != null) return hit;
+      }
+      return null;
+    }
+
+    final variant = find(node);
+    if (variant != null) {
+      return _withInheritedFields(
+        variant,
+        fields[variant.className] ?? const [],
+        fields,
+      );
+    }
+    // A cross-library variant may be absent from this hierarchy's walk; fall
+    // back to the fields map keyed by its declared (prefixed) name.
+    for (final entry in fields.entries) {
+      if (entry.key.replaceAll(r'$', '') == cleanName) return entry.value;
+    }
+    return const <PolymorphicField>[];
+  }
+
   /// Rewrites every `$Variant` identifier in [source] to `Variant` — the same
   /// `$`-lowering every other generator applies, so a forwarded member body
   /// that names `$NetworkFailure` or `$AppFailure` compiles against the
@@ -986,11 +1071,20 @@ final class PolymorphicClassEmitter {
   /// `$` characters inside string literals (interpolation, raw strings,
   /// escapes) and comments are copied verbatim. A raw `replaceAll(r'$', '')`
   /// silently corrupted `'cost: $amount'` and `r'$raw'` (issue #281 review).
+  ///
+  /// [variantShapes] holds the fields (in declaration order, with the source
+  /// field-formal defaults) of the union's variants whose SOURCE has no
+  /// `fromTrusted` (issue #293). A `$Variant(...)` CONSTRUCTOR invocation of
+  /// one of those is retargeted to the generated leaf's trusted constructor:
+  /// positional arguments are bound to the target field names, omitted fields
+  /// that had a source default are supplied, and type arguments are placed
+  /// before `.fromTrusted` (#291). A `$Variant.x` member access, a `$Variant`
+  /// type position, a switch OBJECT PATTERN, or a variant that declares
+  /// `fromTrusted` keeps the plain lowering — only the call shape is rewritten.
   static String _rewriteVariants(
-    String source, [
-    List<String> variantsWithoutFromTrusted = const [],
-  ]) {
-    final withoutSet = variantsWithoutFromTrusted.toSet();
+    String source, {
+    Map<String, List<PolymorphicField>> variantShapes = const {},
+  }) {
     final result = <String>[];
     var i = 0;
     while (i < source.length) {
@@ -1028,20 +1122,46 @@ final class PolymorphicClassEmitter {
           end++;
         }
         if (end > i + 1) {
-          final cleanName = source.substring(i + 1, end);
-          // Issue #293: a `$Variant(...)` (or `$Variant<...>(...)` with no
-          // whitespace) constructor invocation of a variant whose source
-          // declares no `fromTrusted` is emitted as `Variant.fromTrusted(...)`.
-          if (withoutSet.contains(cleanName)) {
-            final afterName = _constructorInvocationParen(source, end);
-            if (afterName != null) {
-              result.add('$cleanName.fromTrusted');
-              i = end;
-              continue;
+          final name = source.substring(i + 1, end);
+          // `<...>` type arguments may sit between the name and the call's
+          // `(`; whitespace may not. They are captured so a retargeted call
+          // emits `Ready<T>.fromTrusted()` instead of `Ready.fromTrusted<T>()`.
+          var cursor = end;
+          var typeArgs = '';
+          if (cursor < source.length && source.codeUnitAt(cursor) == 0x3c) {
+            final typeArgsStart = cursor;
+            var depth = 0;
+            while (cursor < source.length) {
+              final c = source.codeUnitAt(cursor);
+              if (c == 0x3c) depth++;
+              if (c == 0x3e && --depth == 0) {
+                cursor++;
+                break;
+              }
+              cursor++;
+            }
+            typeArgs = source.substring(typeArgsStart, cursor);
+          }
+          final isCall =
+              cursor < source.length && source.codeUnitAt(cursor) == 0x28;
+          final fields = variantShapes[name];
+          if (isCall && fields != null) {
+            final close = _matchingParen(source, cursor);
+            if (close != null) {
+              // [close] is one past the closing paren, so the argument text
+              // excludes it.
+              final args = source.substring(cursor + 1, close - 1);
+              // An object pattern (`case $Variant(message: final message)`)
+              // is a TYPE match, not a construction — retargeting it to
+              // `Variant.fromTrusted(...)` produces unanalyzable code (#291).
+              if (!_isObjectPattern(args)) {
+                result.add(_retargetVariantCall(name, typeArgs, args, fields));
+                i = close;
+                continue;
+              }
             }
           }
-          // `$Name` is one Dart identifier token; drop only its leading `$`.
-          result.add(cleanName);
+          result.add(name);
           i = end;
           continue;
         }
@@ -1053,75 +1173,125 @@ final class PolymorphicClassEmitter {
     return result.join();
   }
 
-  /// If [source] at [pos] starts `<...>(` with no whitespace (or `(` directly),
-  /// returns the index of `(`, or `null` otherwise (issue #293).
-  ///
-  /// Type arguments may contain balanced `()`/`[]`/`{}` groups — e.g.
-  /// `$V<void Function()>` and `$V<(int, String)>` — whose `)`, `]`, `}`, `,`
-  /// and spaces are part of the type, not the end of the argument list. Track
-  /// those groups alongside the angle depth so such generic constructor calls
-  /// are still rewritten to `.fromTrusted` (review of #295).
-  static int? _constructorInvocationParen(String source, int pos) {
-    if (pos >= source.length) return null;
-    if (source.codeUnitAt(pos) == 0x28 /* ( */ ) return pos;
-    if (source.codeUnitAt(pos) != 0x3c /* < */ ) return null;
-    var angleDepth = 0;
-    var parenDepth = 0;
-    var bracketDepth = 0;
-    var braceDepth = 0;
-    var j = pos;
-    while (j < source.length) {
-      final c = source.codeUnitAt(j);
-      if (c == 0x3c /* < */ ) {
-        angleDepth++;
-      } else if (c == 0x3e /* > */ ) {
-        angleDepth--;
-        if (angleDepth == 0 &&
-            parenDepth == 0 &&
-            bracketDepth == 0 &&
-            braceDepth == 0) {
-          final next = j + 1;
-          if (next < source.length &&
-              source.codeUnitAt(next) == 0x28 /* ( */ ) {
-            return next;
-          }
-          return null;
-        }
-      } else if (c == 0x28 /* ( */ ) {
-        parenDepth++;
-      } else if (c == 0x29 /* ) */ ) {
-        if (parenDepth > 0) {
-          parenDepth--;
-        } else if (angleDepth == 1 && bracketDepth == 0 && braceDepth == 0) {
-          return null;
-        }
-      } else if (c == 0x5b /* [ */ ) {
-        bracketDepth++;
-      } else if (c == 0x5d /* ] */ ) {
-        if (bracketDepth > 0) {
-          bracketDepth--;
-        } else if (angleDepth == 1 && parenDepth == 0 && braceDepth == 0) {
-          return null;
-        }
-      } else if (c == 0x7b /* { */ ) {
-        braceDepth++;
-      } else if (c == 0x7d /* } */ ) {
-        if (braceDepth > 0) {
-          braceDepth--;
-        } else if (angleDepth == 1 && parenDepth == 0 && bracketDepth == 0) {
-          return null;
-        }
-      } else if (angleDepth == 1 &&
-          parenDepth == 0 &&
-          bracketDepth == 0 &&
-          braceDepth == 0 &&
-          (c == 0x3b /* ; */ || c == 0x3d /* = */ )) {
-        // A `;`/`=` at the outer type-argument level is not a type argument.
-        return null;
+  /// Index just past the `)` matching the `(` at [open], or `null` when the
+  /// call is unterminated. Strings and comments are skipped so their parens
+  /// never change the nesting depth.
+  static int? _matchingParen(String s, int open) {
+    var depth = 0;
+    var i = open;
+    while (i < s.length) {
+      final stringEnd = _stringLiteralEnd(s, i);
+      if (stringEnd != null) {
+        i = stringEnd;
+        continue;
       }
-      j++;
+      if (s.codeUnitAt(i) == 0x2f /* / */ && i + 1 < s.length) {
+        final next = s.codeUnitAt(i + 1);
+        if (next == 0x2f) {
+          i = _endOfLineComment(s, i + 2);
+          continue;
+        }
+        if (next == 0x2a) {
+          i = _endOfBlockComment(s, i + 2);
+          continue;
+        }
+      }
+      final c = s.codeUnitAt(i);
+      if (c == 0x28 /* ( */ ) depth++;
+      if (c == 0x29 /* ) */ && --depth == 0) return i + 1;
+      i++;
     }
     return null;
+  }
+
+  /// Whether an argument list is an object PATTERN rather than a constructor
+  /// invocation. Object patterns bind with `final`/`var` (or `_`) inside their
+  /// fields; a real expression argument never contains those tokens. Keeping
+  /// the check to this narrow, positive signal avoids rewriting ordinary calls
+  /// while leaving the plain `$Variant` -> `Variant` type lowering intact.
+  static bool _isObjectPattern(String args) =>
+      RegExp(r'(^|[,{(\s])(final|var)\s').hasMatch(args);
+
+  /// Builds a `Variant.fromTrusted(...)` call from a source `$Variant(...)`.
+  /// Named arguments are kept verbatim; positional ones bind to the target
+  /// field of the same position; required fields the source omitted are
+  /// supplied from their own field-formal defaults (#291).
+  static String _retargetVariantCall(
+    String name,
+    String typeArgs,
+    String args,
+    List<PolymorphicField> fields,
+  ) {
+    final pieces = _splitArgs(args);
+    final forwarded = <String>[];
+    final supplied = <String>{};
+    var positionalIndex = 0;
+    for (final piece in pieces) {
+      final named = _namedArgTarget(piece);
+      if (named != null) {
+        forwarded.add(piece);
+        supplied.add(named);
+        continue;
+      }
+      final targetName = positionalIndex < fields.length
+          ? fields[positionalIndex].name
+          : piece.trim();
+      if (positionalIndex < fields.length) positionalIndex++;
+      forwarded.add('$targetName: ${piece.trim()}');
+      supplied.add(targetName);
+    }
+    for (final field in fields) {
+      if (field.isNullable ||
+          field.constructorDefault == null ||
+          supplied.contains(field.name)) {
+        continue;
+      }
+      forwarded.add('${field.name}: ${field.constructorDefault}');
+    }
+    return '$name$typeArgs.fromTrusted(${forwarded.join(', ')})';
+  }
+
+  /// Splits an argument list at top-level commas. Nested `(`, `[` and `{`
+  /// groups (and string literals/comments) are copied without splitting.
+  static List<String> _splitArgs(String args) {
+    final pieces = <String>[];
+    var start = 0;
+    var depth = 0;
+    var i = 0;
+    while (i < args.length) {
+      final stringEnd = _stringLiteralEnd(args, i);
+      if (stringEnd != null) {
+        i = stringEnd;
+        continue;
+      }
+      final c = args.codeUnitAt(i);
+      if (c == 0x28 /* ( */ || c == 0x5b /* [ */ || c == 0x7b /* { */ ) {
+        depth++;
+      } else if (c == 0x29 /* ) */ || c == 0x5d /* ] */ || c == 0x7d /* } */ ) {
+        depth--;
+      } else if (c == 0x2c /* , */ && depth == 0) {
+        pieces.add(args.substring(start, i));
+        start = i + 1;
+      }
+      i++;
+    }
+    final tail = args.substring(start);
+    if (tail.trim().isNotEmpty || pieces.isNotEmpty) pieces.add(tail);
+    return pieces;
+  }
+
+  /// The field name of a named argument (`message: expr` -> `message`), or
+  /// `null` for a positional expression. A ternary's `:` is not a named
+  /// argument because the text before it is not a bare identifier.
+  static String? _namedArgTarget(String piece) {
+    final colon = piece.indexOf(':');
+    if (colon < 1) return null;
+    final lhs = piece.substring(0, colon).trim();
+    if (lhs.isEmpty) return null;
+    for (final unit in lhs.codeUnits) {
+      if (!_isIdentifierPart(unit)) return null;
+    }
+    return lhs;
   }
 
   static int _endOfLineComment(String s, int i) {
@@ -1216,7 +1386,7 @@ final class PolymorphicClassEmitter {
     // Only a class that actually snapshots a collection needs the helpers the
     // generated `==`/`hashCode` call. They are private STATIC members of the
     // class, so two hierarchies in one library part can never collide.
-    if (fields.any((field) => _collectionSnapshot(field.emittedType) != null)) {
+    if (fields.any((field) => _comparesByContent(node, field))) {
       methods.addAll([_collectionEqualsMethod(), _collectionHashMethod()]);
     }
     return methods;
@@ -1288,7 +1458,7 @@ final class PolymorphicClassEmitter {
         // a plain `==` compares identities and breaks `value == value.copyWith()`;
         // those fields compare their contents instead (#285 review).
         for (final field in fields)
-          _collectionSnapshot(field.emittedType) != null
+          _comparesByContent(node, field)
               ? '${node.cleanName}._zorphyCollectionEquals('
                     'this.${field.name}, other.${field.name})'
               : 'this.${field.name} == other.${field.name}',
@@ -1321,7 +1491,7 @@ final class PolymorphicClassEmitter {
         // `Object.hashAll` accepts any nonempty iterable, covering both ends.
         fields.isEmpty
             ? 'runtimeType.hashCode'
-            : 'Object.hashAll([${[for (final f in fields) _collectionSnapshot(f.emittedType) != null ? '${node.cleanName}._zorphyCollectionHash(${f.name})' : f.name].join(', ')}])',
+            : 'Object.hashAll([${[for (final f in fields) _comparesByContent(node, f) ? '${node.cleanName}._zorphyCollectionHash(${f.name})' : f.name].join(', ')}])',
       );
     });
   }
