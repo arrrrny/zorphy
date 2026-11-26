@@ -160,7 +160,7 @@ git tag -a "migrator-v$VERSION" -m "Release zorphy_migrator $VERSION" || echo " 
 
 echo "📤 Pushing changes and tags to origin..."
 git push origin "$(git rev-parse --abbrev-ref HEAD)"
-git push origin --tags
+git push origin --tags || true
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
