@@ -1383,10 +1383,9 @@ final class PolymorphicClassEmitter {
       _hashCode(node, fields),
       _toString(node, fields),
     ];
-    // Only a class that actually snapshots a collection OR compares a
-    // type-parameter field by content needs the helpers the generated
-    // `==`/`hashCode` call. They are private STATIC members of the class, so
-    // two hierarchies in one library part can never collide.
+    // Only a class that actually snapshots a collection needs the helpers the
+    // generated `==`/`hashCode` call. They are private STATIC members of the
+    // class, so two hierarchies in one library part can never collide.
     if (fields.any((field) => _comparesByContent(node, field))) {
       methods.addAll([_collectionEqualsMethod(), _collectionHashMethod()]);
     }
