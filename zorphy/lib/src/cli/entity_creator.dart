@@ -34,10 +34,14 @@ class EntityCreator {
   ///
   /// Filesystem probing lives here at the call site, where the real output
   /// path is known, so `EntityTemplateGenerator` stays a pure function of
-  /// its inputs. Relative dirs pass through; an absolute dir is rebased on
-  /// its last `lib` segment, else on the nearest ancestor holding a
-  /// `pubspec.yaml` (the package root). A directory no package claims is
-  /// its own root.
+  /// its inputs. Relative dirs pass through; an absolute dir is resolved
+  /// against the NEAREST ancestor (or itself) holding a `pubspec.yaml` —
+  /// that is the package root, and the package-relative dir is what the
+  /// shared-part URI needs. The last-`lib`-segment rebase is only a
+  /// fallback for a directory no package claims: searching for the package
+  /// root first keeps a `lib` directory ABOVE the package root (e.g.
+  /// `/tmp/lib/app/pubspec.yaml` with output `/tmp/lib/app/domain/entities`)
+  /// from being mistaken for the package's own `lib`.
   static String packageRelativeOutputDir(String? outputDir) {
     final path = (outputDir ?? 'lib/src/domain/entities').replaceAll(
       r'\',
@@ -47,18 +51,21 @@ class EntityCreator {
       return path;
     }
     final normalized = p.posix.normalize(path);
-    final segments = p.posix.split(normalized);
-    final libIndex = segments.lastIndexOf('lib');
-    if (libIndex >= 0) return p.posix.joinAll(segments.sublist(libIndex));
     final below = <String>[];
     var dir = Directory(normalized);
-    while (!File(p.join(dir.path, 'pubspec.yaml')).existsSync()) {
+    while (true) {
+      if (File(p.join(dir.path, 'pubspec.yaml')).existsSync()) {
+        return p.posix.joinAll(below);
+      }
       final parent = dir.parent;
-      if (parent.path == dir.path) return '';
+      if (parent.path == dir.path) break; // no package claims this path
       below.insert(0, p.posix.basename(dir.path));
       dir = parent;
     }
-    return p.posix.joinAll(below);
+    final segments = p.posix.split(normalized);
+    final libIndex = segments.lastIndexOf('lib');
+    if (libIndex >= 0) return p.posix.joinAll(segments.sublist(libIndex));
+    return '';
   }
 
   /// Create an entity and return the result

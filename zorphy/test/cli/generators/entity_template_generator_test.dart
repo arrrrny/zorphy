@@ -194,6 +194,38 @@ void main() {
       }
     });
 
+    test('a lib directory above the package root is not mistaken for it', () {
+      // The package root is `<tmp>/lib/app` (it holds the pubspec); the
+      // `lib` segment sits ABOVE it, so the package-relative dir is
+      // `domain/entities`, never `lib/app/domain/entities`.
+      final root = Directory.systemTemp.createTempSync('zorphy_297_libroot_');
+      try {
+        final packageRoot = p.join(root.path, 'lib', 'app');
+        Directory(packageRoot).createSync(recursive: true);
+        File(
+          p.join(packageRoot, 'pubspec.yaml'),
+        ).writeAsStringSync('name: x\n');
+        final inside = p.join(packageRoot, 'domain', 'entities');
+        expect(
+          partDirective(EntityConfig(name: 'Sample', outputDir: inside)),
+          '../../../_br_/domain/entities/sample/sample.part.dart',
+        );
+      } finally {
+        root.deleteSync(recursive: true);
+      }
+    });
+
+    test('an apostrophe in the output dir is escaped in the part literal', () {
+      final source = EntityTemplateGenerator.generate(
+        const EntityConfig(name: 'Sample', outputDir: "lib/owner's_models"),
+        const [],
+      );
+      // The raw apostrophe must never reach the single-quoted literal
+      // unescaped; the escaped form must be present instead.
+      expect(source, contains(r"owner\'s_models"));
+      expect(source, isNot(contains("part '../../_br_/owner's_models")));
+    });
+
     test('a subtype library points at its own shared part', () {
       expect(
         partDirective(const EntityConfig(name: 'Circle'), subtype: true),

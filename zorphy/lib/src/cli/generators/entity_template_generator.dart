@@ -76,7 +76,9 @@ class EntityTemplateGenerator {
   }
 
   static void _writePartDirective(StringBuffer buffer, EntityConfig config) {
-    buffer.writeln("part '${sharedPartUri(config)}';");
+    buffer.writeln(
+      "part '${escapeDartStringLiteral(sharedPartUri(config))}';",
+    );
     buffer.writeln();
   }
 
