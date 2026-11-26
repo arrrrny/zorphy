@@ -82,6 +82,11 @@ final class ZorphyField<T, V> {
   /// Matches when the field is present (non-`null` at runtime).
   ZorphyFilter<T> isNotNull() => ZorphyIsNotNull<T>(this);
 
+  /// Lifts [inner] over this field's nested value — or any element of it,
+  /// when the value is an [Iterable] (issue #303).
+  ZorphyFilter<T> nested(ZorphyFilter<dynamic> inner) =>
+      ZorphyNested<T, V>(this, inner);
+
   /// An ascending order over this field.
   ZorphySort<T> asc() => ZorphySort<T>(field: this, descending: false);
 

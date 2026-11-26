@@ -28,6 +28,70 @@ final class Product {
 
 const _unset = Object();
 
+// zorphy#303: a nested entity (`Profile`) reached through a `User` field, and
+// a collection field (`history`) of the same nested type — the shapes the v2
+// `Nested<TEntity, TValue>` projected over.
+final class Profile {
+  final int age;
+
+  const Profile(this.age);
+}
+
+final class User {
+  final String name;
+  final Profile profile;
+  final List<Profile> history;
+
+  const User(this.name, this.profile, this.history);
+}
+
+final class ProfileFields {
+  const ProfileFields();
+
+  static const age = ZorphyField<Profile, int>(
+    name: 'age',
+    jsonKey: 'age',
+    pointer: '/age',
+    get: _getAge,
+    set: _setAge,
+  );
+
+  static final List<ZorphyField<Profile, Object?>> all = List.unmodifiable([
+    age.asObject,
+  ]);
+
+  static int _getAge(Profile instance) => instance.age;
+  static Profile _setAge(Profile instance, int value) => Profile(value);
+}
+
+final class UserFields {
+  const UserFields();
+
+  static const profile = ZorphyField<User, Profile>(
+    name: 'profile',
+    jsonKey: 'profile',
+    pointer: '/profile',
+    get: _getProfile,
+    set: _setProfile,
+  );
+
+  static const history = ZorphyField<User, List<Profile>>(
+    name: 'history',
+    jsonKey: 'history',
+    pointer: '/history',
+    get: _getHistory,
+    set: _setHistory,
+  );
+
+  static Profile _getProfile(User instance) => instance.profile;
+  static User _setProfile(User instance, Profile value) =>
+      User(instance.name, value, instance.history);
+
+  static List<Profile> _getHistory(User instance) => instance.history;
+  static User _setHistory(User instance, List<Profile> value) =>
+      User(instance.name, instance.profile, value);
+}
+
 final class ProductFields {
   const ProductFields();
 
@@ -360,6 +424,85 @@ void main() {
         }).matches(p),
         isTrue,
       );
+    });
+  });
+
+  // zorphy#303: the v2 `Nested<TEntity, TValue>` projection, ported as a
+  // sealed `ZorphyNested` member — lift a filter through a `ZorphyField`,
+  // matching when the nested value (or ANY element of an Iterable field)
+  // matches the inner predicate.
+  group('ZorphyNested (nested projection)', () {
+    test('matches a single nested object value', () {
+      final nested = UserFields.profile.nested(
+        ProfileFields.age.greaterThan(18),
+      );
+      expect(nested.matches(const User('a', Profile(30), [])), isTrue);
+      expect(nested.matches(const User('b', Profile(12), [])), isFalse);
+    });
+
+    test('matches when ANY element of an Iterable field matches', () {
+      final nested = UserFields.history.nested(
+        ProfileFields.age.greaterThan(18),
+      );
+      expect(
+        nested.matches(const User('c', Profile(1), [Profile(5), Profile(40)])),
+        isTrue,
+      );
+      expect(
+        nested.matches(const User('d', Profile(1), [Profile(5), Profile(9)])),
+        isFalse,
+      );
+    });
+
+    test('a null nested value never matches', () {
+      final nested = UserFields.profile.nested(
+        ProfileFields.age.greaterThan(18),
+      );
+      expect(nested.matches(const User('e', Profile(1), [])), isFalse);
+    });
+
+    test('toWire / fromWire round-trips through a combined resolver', () {
+      final original = UserFields.profile.nested(
+        ProfileFields.age.greaterThan(18),
+      );
+      final wire = original.toWire();
+      expect(wire['op'], 'nested');
+      expect(wire['field'], '/profile');
+      // A combined resolver answers both the outer entity's pointers and the
+      // nested type's own — "the nested type's own resolver" (issue #303).
+      // The fields are built at `dynamic` so one resolver can hand back
+      // descriptors of different entity types (ZorphyField is invariant in
+      // its entity type); the get closures take `dynamic` so the inner
+      // decode never inserts a concrete-to-dynamic cast.
+      ZorphyField<dynamic, Object?> dyn(
+        String name,
+        String pointer,
+        Object? Function(dynamic) get,
+      ) => ZorphyField<dynamic, Object?>(
+        name: name,
+        jsonKey: name,
+        pointer: pointer,
+        get: get,
+        set: (instance, value) => instance,
+      );
+
+      ZorphyField<dynamic, Object?>? resolve(String pointer) {
+        switch (pointer) {
+          case '/profile':
+            return dyn('profile', '/profile', (i) => (i as User).profile);
+          case '/history':
+            return dyn('history', '/history', (i) => (i as User).history);
+          case '/age':
+            return dyn('age', '/age', (i) => (i as Profile).age);
+        }
+        return null;
+      }
+
+      // Decode at `dynamic` so the single combined resolver's type
+      // (`ZorphyField<dynamic, Object?>?`) matches the parameter exactly.
+      final restored = ZorphyFilter.fromWire<dynamic>(wire, resolve);
+      expect(restored.matches(const User('a', Profile(30), [])), isTrue);
+      expect(restored.matches(const User('b', Profile(12), [])), isFalse);
     });
   });
 }

@@ -65,6 +65,18 @@ sealed class ZorphyFilter<T> {
     if (pointer == null) throw _badWire(wire, 'field is required');
     final field = resolve(pointer);
     if (field == null) throw _badWire(wire, 'unknown field pointer');
+    if (op == 'nested') {
+      final inner = wire['filter'];
+      if (inner is! Map) throw _badWire(wire, 'filter must be a map');
+      // The inner predicate is decoded against the SAME resolver, relaxed to
+      // a dynamic target — the nested type's own fields resolve through it
+      // (issue #303). `resolve` is assignable to the dynamic resolver by
+      // dynamic's bidirectional assignability.
+      return ZorphyNested<T, Object?>(
+        field,
+        ZorphyFilter.fromWire<dynamic>(inner.cast<String, dynamic>(), resolve),
+      );
+    }
     final value = wire['value'];
     return switch (op) {
       'eq' => ZorphyEquals<T, Object?>(field, value),
@@ -338,6 +350,35 @@ final class ZorphyNot<T> extends ZorphyFilter<T> {
 
   @override
   Map<String, dynamic> toWire() => {'op': 'not', 'filter': filter.toWire()};
+}
+
+/// Lifts a [filter] over a nested value reached through [field] (issue #303).
+///
+/// Matches [T] when the value of [field] — or any element of it, when the
+/// value is an [Iterable] — matches [filter]. A `null` nested value never
+/// matches. This is the v3 port of the v2 `Nested<TEntity, TValue>`: a sealed
+/// member beside [ZorphyNot], so consumers get a nested projection without
+/// the sealed class forbidding them from adding one.
+final class ZorphyNested<T, V> extends ZorphyFilter<T> {
+  final ZorphyField<T, V> field;
+  final ZorphyFilter<dynamic> filter;
+
+  const ZorphyNested(this.field, this.filter);
+
+  @override
+  bool matches(T instance) {
+    final value = field.get(instance);
+    if (value == null) return false;
+    if (value is Iterable) return value.any(filter.matches);
+    return filter.matches(value);
+  }
+
+  @override
+  Map<String, dynamic> toWire() => {
+    'op': 'nested',
+    'field': field.pointer,
+    'filter': filter.toWire(),
+  };
 }
 
 /// A typed ordering over an entity [T], built from a [ZorphyField].
