@@ -1,3 +1,12 @@
+## [Unreleased]
+
+### Documentation (#275, ZRP-006)
+
+- No migrator code change in this release. The `migrate` subcommand already
+  emits the zero-preset v3 archetypes and strips every `preset:` / `generate*`
+  argument (3.0.0-dev.2); the README and website documentation pass (#275)
+  describes the same v3 target surface the codemod produces.
+
 ## [3.0.0-dev.2] - 2026-11-26
 
 ### Changed (BREAKING — v3.0.0)

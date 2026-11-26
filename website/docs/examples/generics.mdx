@@ -2,11 +2,13 @@
 title: Generics
 ---
 
-From `generic_example.dart`, Zorphy supports generic entities. The wire codecs
-carry the type arguments, and converters for generic fields are expressed with
-the wire boundary.
+From `generic_example.dart`, Zorphy supports generic archetypes. A generic class
+carries its type arguments through the wire codecs: because the generator cannot
+know how to serialize an open type parameter `T`, the codec is
+**codec-parameterized** — `toWire` takes one encoder per type parameter and
+`fromWire` takes one decoder per type parameter (dev.3, #272).
 
-## Generic entities
+## Generic value
 
 ```dart
 @ZorphyValue()
@@ -17,11 +19,61 @@ abstract class $Result<T> {
 }
 ```
 
+## Codec-parameterized `toWire` / `fromWire`
+
+A generic class gets one codec parameter per type parameter, in declaration
+order. `toWire` routes every field that mentions `T` through the encoder you
+supply; a nullable `T?` passes `null` through and never calls the encoder.
+`fromWire` is static, re-declares the type parameter on the method, and merges
+the decoder's field violations with the wrapper's own into one
+`ZorphyBoundaryResult`.
+
+```dart
+final result = Result<String>(success: true, data: 'ok');
+
+// toWire takes an encoder for T.
+final wire = result.toWire((value) => value); // encode T -> Object?
+
+// fromWire is static, re-declares <T>, and takes a decoder for T.
+final decoded = Result.fromWire<String>(
+  wire,
+  (raw) => BoundaryOk<String>(raw['data'] as String), // decode Object? -> T
+);
+
+// decoded is a ZorphyBoundaryResult<Result<String>>.
+final value = decoded.getOrThrow();
+```
+
+## Multiple type parameters
+
+Each type parameter gets its own codec parameter, in declaration order.
+
+```dart
+@ZorphyValue()
+abstract class $CreateParams<T, P> {
+  T get data;
+  P? get params;
+}
+
+final params = CreateParams<int, String>(data: 1, params: 'k');
+
+final wire = params.toWire(
+  (data) => data,       // encoder for T (int)
+  (p) => p,             // encoder for P (String)
+);
+
+final decoded = CreateParams.fromWire<int, String>(
+  wire,
+  (raw) => BoundaryOk<int>(raw['data'] as int),
+  (raw) => BoundaryOk<String>(raw['params'] as String),
+);
+```
+
 ## Generic converters
 
-A generic field is decoded at the trust boundary; supply the type argument when
-you call `fromWire`, and convert the payload yourself if it needs a custom
-shape.
+A generic field whose type needs a custom shape is converted by the codec
+parameter you pass — supply the type argument when you call `fromWire`, and the
+matching encoder/decoder when you cross the wire boundary.
 
 ```dart
 @ZorphyValue()
@@ -31,9 +83,5 @@ abstract class $ResultWithConverter<T> {
 }
 ```
 
-## Usage
-
-```dart
-final result = Result<String>(success: true, data: 'ok');
-final wire = result.toWire();
-```
+The decoder you pass to `fromWire` owns the conversion from the raw field map to
+`T`; the encoder you pass to `toWire` owns the reverse.

@@ -1,3 +1,15 @@
+## [Unreleased]
+
+### Documentation (#275, ZRP-006)
+
+- No change to the exported annotation surface in this release: the dev.3
+  additions (#271 redirecting union factories, #272 codec-parameterized generic
+  `toWire` / `fromWire`, #273 nullable generic parameters) are emitted by the
+  `zorphy` generator, not declared here. The v3 archetype annotations these
+  forms build on (`@ZorphyEntity` / `@ZorphyValue` / `@ZorphyUnion` /
+  `@ZorphyState` / `@ZorphyIntent`) are unchanged. The README and website
+  documentation pass (#275) records the dev.3 forms.
+
 ## [3.0.0-dev.2] - 2026-11-26
 
 ### Changed (BREAKING — v3.0.0)

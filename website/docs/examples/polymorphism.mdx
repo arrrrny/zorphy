@@ -27,6 +27,44 @@ abstract class $CreditCard implements $PaymentMethod {
 }
 ```
 
+## Redirecting variant factories & dot-shorthand
+
+A union root re-emits a redirecting `const factory` per variant, so you
+construct a variant through the root — and, with Dart 3 dot-shorthand, the
+static type does not have to name the union at all (dev.3, #271):
+
+```dart
+@ZorphyUnion()
+abstract class $AsyncStatus {
+  // Redirecting factories target a CONCRETE variant (never an abstract class).
+  factory $AsyncStatus.loading() = $Loading;
+  factory $AsyncStatus.ready(String value) = $Ready;
+}
+
+@ZorphyValue()
+class $Loading implements $AsyncStatus {
+  const $Loading();
+}
+
+@ZorphyValue()
+class $Ready implements $AsyncStatus {
+  final String value;
+  const $Ready(this.value);
+}
+```
+
+```dart
+// Construct through the root ...
+final a = AsyncStatus.loading();
+final b = AsyncStatus.ready('done');
+
+// ... or through dot-shorthand, where the context is the union type.
+AsyncStatus status = .loading();
+AsyncStatus other = .ready('done');
+
+// The root also forwards the user-declared static / factory members.
+```
+
 ## Open hierarchy with explicit subtypes
 
 A `@ZorphyState()` root keeps the base open while still enabling polymorphic
@@ -53,3 +91,5 @@ abstract class $ChatMessage {
 - Safe polymorphic wire dispatch keyed on the `kind` discriminator.
 - Strong typing when switching on subtype.
 - Clear separation between base contracts and concrete classes.
+- Variants constructible through the root (and via dot-shorthand) — no
+  variant-class import needed at the call site.

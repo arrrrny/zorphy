@@ -1,3 +1,41 @@
+## [Unreleased]
+
+### Added
+
+- **Union roots re-emit redirecting variant factories and forward user
+  static/factory members (#271, ZRP-008).** A `@ZorphyUnion()` root now emits a
+  `const factory Root.variant(...) = Variant.fromTrusted;` per variant, so a
+  variant is constructible through the root (and via Dart 3 dot-shorthand,
+  `.variant(...)`), and the user-declared `static` methods / body `factory`
+  constructors on the source `$Union` are copied onto the generated `sealed`
+  root (rewriting `$Variant` → `Variant`). A forwarded member never shadows a
+  name the root already declares.
+- **Codec-parameterized `toWire` / `fromWire` on generic classes (#272,
+  ZRP-009).** A generic `@ZorphyValue` / `@ZorphyEntity` / `@ZorphyUnion` leaf
+  `<T, …>` now gets one codec parameter per type parameter, in declaration
+  order: `Map<String, Object?> toWire(Map<String, Object?> Function(T) encodeT)`
+  routes every field that mentions `T` through the encoder (a nullable `T?`
+  passes `null` through), and `static ZorphyBoundaryResult<Foo<T>> fromWire<T>(
+  Map<String, Object?> raw, ZorphyBoundaryResult<T> Function(Map<String,
+  Object?>) decodeT)` merges the decoder's field violations with the wrapper's
+  own. A generic abstract intermediate still emits no codec (its `fromWire`
+  would have to forward to a leaf).
+
+### Fixed
+
+- **Nullable generic type parameters no longer emit `T?` (#273, ZRP-010).** A
+  type parameter whose bound is already nullable (`Object?`, the implicit
+  bound) is emitted as `I fieldName` rather than `I? fieldName`, so generated
+  code no longer trips `unnecessary_question_mark` under `dart analyze
+  --fatal-infos`.
+
+### Documentation (#275, ZRP-006)
+
+- Finished the v2 → v3 documentation pass: the README body now teaches the five
+  v3 archetypes (the legacy `@Zorphy` / `ZorphyPreset` / `generate*` surface is
+  gone outside the migration table), and the website's generics and polymorphism
+  pages document the dev.3 forms above.
+
 ## [3.0.0-dev.2] - 2026-11-26
 
 ### Migration guide (#236)
