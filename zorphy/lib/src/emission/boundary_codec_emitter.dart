@@ -106,6 +106,11 @@ enum _Shape {
   /// `fromWire`/`toWire` and re-path its violations.
   node,
 
+  /// A type parameter of the enclosing generic class (`T`, `List<T>`,
+  /// `Map<String, T>`): routed through the codec parameter the emitter
+  /// declares for it (`encodeT` / `decodeT`) instead of a reified `is` test.
+  typeParam,
+
   /// Anything else (`String`, `int`, `bool`, enums, `Duration`, …): one
   /// reified `is` test against the declared type, which is total for every
   /// type and throws for none.
@@ -156,43 +161,115 @@ class BoundaryCodecEmitter {
     ZorphyNodeIr node,
     Map<String, List<BoundaryField>> fields, {
     Set<String> additionalNodes = const {},
-  }) => Method((m) {
-    m
-      ..name = 'fromWire'
-      ..static = true
-      ..returns = referType('ZorphyBoundaryResult<${node.cleanName}>')
-      ..requiredParameters.add(
+  }) {
+    // A generic node emits a codec-parameterized `fromWire` ONLY when it is a
+    // concrete leaf (ZRP-009, #272). A generic DISPATCH node still has no wire
+    // surface: its `fromWire` would have to forward the decoders to a leaf's
+    // own re-declared static, which the IR cannot express — so it stays
+    // fail-closed, exactly as before #272.
+    final generic = node.typeParameters.isNotEmpty && node.isConcreteLeaf;
+    final typeParams = generic ? _bareNames(node.typeParameters) : <String>[];
+    return Method((m) {
+      m
+        ..name = 'fromWire'
+        ..static = true
+        ..returns = referType(
+          'ZorphyBoundaryResult<${_resultType(node, typeParams)}>',
+        );
+      // A static member cannot reference the class type parameters, so a
+      // generic `fromWire` RE-DECLARES them on the method itself — WITH their
+      // bounds (`T extends num`), or the re-declared `T` would not satisfy the
+      // class's own bound and the return type would not type-check.
+      for (final parameter in node.typeParameters) {
+        if (generic) m.types.add(_genericParameterSpec(parameter));
+      }
+      m.requiredParameters.add(
         Parameter((p) {
           p
             ..name = 'raw'
             ..type = referType('Map<String, Object?>');
         }),
-      )
-      ..body = Block.of(
+      );
+      // One decoder per type parameter, in declaration order. Each consumes
+      // the field's raw map (so `Product.fromWire` can be passed directly) and
+      // its violations merge with the wrapper field violations.
+      for (final parameter in typeParams) {
+        m.requiredParameters.add(
+          Parameter((p) {
+            p
+              ..name = _decoderName(parameter)
+              // A function type is stored verbatim in the symbol (the same
+              // escape-free trick `referType` uses for nullable types):
+              // code_builder's `FunctionType` carries no parameter names, and
+              // the issue's signature spells the raw-map parameter `raw`.
+              ..type = TypeReference(
+                (t) => t
+                  ..symbol =
+                      'ZorphyBoundaryResult<$parameter> '
+                      'Function(Map<String, Object?> raw)',
+              );
+          }),
+        );
+      }
+      m.body = Block.of(
         node.isConcreteLeaf
-            ? _leafFromWireBody(node, fields, _known(node, additionalNodes))
+            ? _leafFromWireBody(
+                node,
+                fields,
+                _known(node, additionalNodes),
+                typeParams,
+              )
             : _dispatchFromWireBody(node),
       );
-  });
+    });
+  }
 
   /// The wire-encoding member for [node].
   ///
   /// A dispatch node delegates to the matching leaf; a leaf writes its own
-  /// fields and its discriminator.
+  /// fields and its discriminator. A generic node takes one encoder per type
+  /// parameter, in declaration order; a field that mentions a parameter routes
+  /// through that parameter's encoder.
   Method toWire(
     ZorphyNodeIr node,
     Map<String, List<BoundaryField>> fields, {
     Set<String> additionalNodes = const {},
-  }) => Method((m) {
-    m
-      ..name = 'toWire'
-      ..returns = referType('Map<String, Object?>')
-      ..body = Block.of(
+  }) {
+    // Mirror `fromWire`: only a generic concrete LEAF gets the codec-
+    // parameterized surface; a generic dispatch node stays fail-closed.
+    final generic = node.typeParameters.isNotEmpty && node.isConcreteLeaf;
+    final typeParams = generic ? _bareNames(node.typeParameters) : <String>[];
+    return Method((m) {
+      m
+        ..name = 'toWire'
+        ..returns = referType('Map<String, Object?>');
+      // One encoder per type parameter, in declaration order.
+      for (final parameter in typeParams) {
+        m.requiredParameters.add(
+          Parameter((p) {
+            p
+              ..name = _encoderName(parameter)
+              // Stored verbatim in the symbol for the same reason as the
+              // decoder: a function type carries its parameter name `value`.
+              ..type = TypeReference(
+                (t) => t
+                  ..symbol = 'Map<String, Object?> Function($parameter value)',
+              );
+          }),
+        );
+      }
+      m.body = Block.of(
         node.isConcreteLeaf
-            ? _leafToWireBody(node, fields, _known(node, additionalNodes))
+            ? _leafToWireBody(
+                node,
+                fields,
+                _known(node, additionalNodes),
+                typeParams,
+              )
             : _dispatchToWireBody(node),
       );
-  });
+    });
+  }
 
   /// Both members for [node], in injection order (`fromWire`, `toWire`).
   List<Method> emitCodec(
@@ -252,8 +329,9 @@ class BoundaryCodecEmitter {
           : emitter;
       if (!node.isConcreteLeaf) hasDispatch = true;
       final known = activeEmitter._known(node, additionalNodes);
+      final typeParams = _bareNames(node.typeParameters).toSet();
       for (final field in fields[node.className] ?? const <BoundaryField>[]) {
-        final type = activeEmitter._classify(field, known);
+        final type = activeEmitter._classify(field, known, typeParams);
         shapes.add(type.shape);
         // `elementShape` defaults to scalar for a non-collection field, so it
         // only names a real decode path for a list/map.
@@ -266,18 +344,24 @@ class BoundaryCodecEmitter {
     bool uses(_Shape shape) =>
         shapes.contains(shape) || elementShapes.contains(shape);
 
+    // A type-parameter field decodes through `_boundaryObject` + the
+    // parameter's decoder, re-pathing with `_boundaryPrefix` — the same helper
+    // set a nested node field selects.
+    final usesTypeParam = uses(_Shape.typeParam);
+
     return [
       // Every typed helper reports a mismatch through `_boundaryDescribe`,
       // and a dispatch node's unknown-tag error does too.
       if (shapes.isNotEmpty || hasDispatch) _describeHelper(),
-      if (uses(_Shape.node)) _prefixHelper(),
+      if (uses(_Shape.node) || usesTypeParam) _prefixHelper(),
       // A nested collection element decodes through the reified `is` test,
       // exactly like a scalar field.
       if (uses(_Shape.scalar) ||
           elementShapes.contains(_Shape.list) ||
           elementShapes.contains(_Shape.map))
         _asHelper(),
-      if (shapes.contains(_Shape.map) || uses(_Shape.node)) _objectHelper(),
+      if (shapes.contains(_Shape.map) || uses(_Shape.node) || usesTypeParam)
+        _objectHelper(),
       if (shapes.contains(_Shape.list)) _listHelper(),
       if (uses(_Shape.number)) _doubleHelper(),
       if (uses(_Shape.dateTime)) _dateTimeHelper(),
@@ -286,10 +370,12 @@ class BoundaryCodecEmitter {
 
   /// Every emittable concrete leaf at or below [node], depth-first.
   ///
-  /// A generic node (and everything below it) is pruned: the composer emits
-  /// no codec for it, so a dispatch enumerating it would reference a
-  /// `fromWire` the generated library does not declare. The same fail-closed
-  /// rule the class-emission walk applies.
+  /// A generic node (and everything below it) is pruned from the DISPATCH
+  /// enumeration: a dispatch `fromWire` would have to forward the type
+  /// parameters' decoders to the leaf's own re-declared static, which the IR
+  /// cannot express. A generic CONCRETE LEAF still carries its own codec
+  /// (ZRP-009, #272) — it is only the dispatch arm that is withheld. The same
+  /// fail-closed rule the class-emission walk applies.
   static List<ZorphyNodeIr> leavesOf(ZorphyNodeIr node) {
     final out = <ZorphyNodeIr>[];
     void walk(ZorphyNodeIr current) {
@@ -394,13 +480,19 @@ class BoundaryCodecEmitter {
     ZorphyNodeIr node,
     Map<String, List<BoundaryField>> fields,
     Set<String> known,
+    List<String> typeParams,
   ) {
     final own = fields[node.className] ?? const <BoundaryField>[];
     final clean = node.cleanName;
+    // A generic class's boundary result is parameterized by its type
+    // parameters (`BoundaryOk<CreateParams<T>>`), so the success/error types
+    // and the `fromWire` return type agree.
+    final resultType = _resultType(node, typeParams);
+    final paramSet = typeParams.toSet();
     final body = <Code>[const Code('final violations = <FieldViolation>[];')];
 
     for (final field in own) {
-      body.addAll(_readField(field, known));
+      body.addAll(_readField(field, known, paramSet));
     }
 
     // Bail BEFORE construction: every local below is nullable, and the `!`
@@ -409,7 +501,7 @@ class BoundaryCodecEmitter {
     body.add(
       Code(
         'if (violations.isNotEmpty) {'
-        ' return BoundaryErr<$clean>('
+        ' return BoundaryErr<$resultType>('
         'targetType: ${_literal(clean)}, violations: violations); }',
       ),
     );
@@ -421,7 +513,7 @@ class BoundaryCodecEmitter {
         .join(', ');
     body.add(
       Code(
-        'return BoundaryOk<$clean>('
+        'return BoundaryOk<$resultType>('
         '${_constructorCall(clean, arguments)});',
       ),
     );
@@ -438,7 +530,11 @@ class BoundaryCodecEmitter {
 
   /// The statements that read one field off `raw`, bind it to a local, and
   /// record a violation instead of throwing when the shape is wrong.
-  List<Code> _readField(BoundaryField field, Set<String> known) {
+  List<Code> _readField(
+    BoundaryField field,
+    Set<String> known,
+    Set<String> typeParams,
+  ) {
     final rawVar = 'raw_${field.name}';
     final local = _local(field);
     final path = _literal('/${field.name}');
@@ -446,7 +542,7 @@ class BoundaryCodecEmitter {
       Code('final Object? $rawVar = raw[${_literal(field.name)}];'),
       Code('${field.baseType}? $local;'),
     ];
-    final decode = _decode(field, known, rawVar, local, path);
+    final decode = _decode(field, known, typeParams, rawVar, local, path);
     if (field.isNullable) {
       // An ABSENT nullable field is legal: decode only when the key is there,
       // so a null never manufactures a violation.
@@ -464,12 +560,13 @@ class BoundaryCodecEmitter {
   List<Code> _decode(
     BoundaryField field,
     Set<String> known,
+    Set<String> typeParams,
     String rawVar,
     String local,
     String path,
   ) {
     final base = field.baseType;
-    final type = _classify(field, known);
+    final type = _classify(field, known, typeParams);
 
     switch (type.shape) {
       case _Shape.dateTime:
@@ -481,6 +578,26 @@ class BoundaryCodecEmitter {
       case _Shape.scalar:
         return [
           Code('$local = _boundaryAs<$base>($rawVar, $path, violations);'),
+        ];
+
+      case _Shape.typeParam:
+        // A field that mentions a type parameter decodes through that
+        // parameter's decoder, which consumes the field's raw map and whose
+        // violations merge under the field pointer.
+        final decoder = _decoderName(type.inner);
+        return [
+          Code(
+            'final map_${field.name} = '
+            '_boundaryObject($rawVar, $path, violations);',
+          ),
+          Code('if (map_${field.name} != null) {'),
+          Code(
+            '  $decoder(map_${field.name}).fold('
+            '(value) { $local = value; }, '
+            '(error) => violations.addAll('
+            '_boundaryPrefix(error.violations, $path)));',
+          ),
+          const Code('}'),
         ];
 
       case _Shape.node:
@@ -500,10 +617,10 @@ class BoundaryCodecEmitter {
         ];
 
       case _Shape.list:
-        return _decodeList(field, type, rawVar, local, path, known);
+        return _decodeList(field, type, rawVar, local, path, known, typeParams);
 
       case _Shape.map:
-        return _decodeMap(field, type, rawVar, local, path, known);
+        return _decodeMap(field, type, rawVar, local, path, known, typeParams);
     }
   }
 
@@ -514,6 +631,7 @@ class BoundaryCodecEmitter {
     String local,
     String path,
     Set<String> known,
+    Set<String> typeParams,
   ) {
     final elementType = type.inner;
     final suffix = field.name;
@@ -534,6 +652,7 @@ class BoundaryCodecEmitter {
         suffix: suffix,
         pathVar: 'path_$suffix',
         assign: 'decoded_$suffix.add(element_$suffix);',
+        typeParams: typeParams,
       ),
     );
     body
@@ -550,6 +669,7 @@ class BoundaryCodecEmitter {
     String local,
     String path,
     Set<String> known,
+    Set<String> typeParams,
   ) {
     final valueType = type.inner;
     final suffix = field.name;
@@ -569,6 +689,7 @@ class BoundaryCodecEmitter {
         suffix: suffix,
         pathVar: 'path_$suffix',
         assign: 'decoded_$suffix[entry.key] = element_$suffix;',
+        typeParams: typeParams,
       ),
     );
     body
@@ -591,10 +712,34 @@ class BoundaryCodecEmitter {
     required String suffix,
     required String pathVar,
     required String assign,
+    required Set<String> typeParams,
   }) {
     final variable = 'element_$suffix';
     final List<Code> body;
     switch (elementShape) {
+      case _Shape.typeParam:
+        // A collection element that is a type parameter decodes through that
+        // parameter's decoder, re-pathing its violations under the element
+        // pointer — the same shape as a nested node element, but through the
+        // codec parameter rather than a static `fromWire`.
+        final paramAssign = assign
+            .replaceAll(variable, 'value')
+            .replaceFirst(RegExp(r';\s*$'), '');
+        final decoder = _decoderName(elementType.trim());
+        body = [
+          Code(
+            '    final $variable = '
+            '_boundaryObject($element, $pathVar, violations);',
+          ),
+          Code('    if ($variable != null) {'),
+          Code(
+            '      $decoder($variable).fold'
+            '((value) => $paramAssign, '
+            '(error) => violations.addAll('
+            '_boundaryPrefix(error.violations, $pathVar)));',
+          ),
+          const Code('    }'),
+        ];
       case _Shape.node:
         // The decoded node is the fold's success value, NOT the raw
         // `element_$suffix` map: substitute it into the assignment and drop
@@ -677,8 +822,10 @@ class BoundaryCodecEmitter {
     ZorphyNodeIr node,
     Map<String, List<BoundaryField>> fields,
     Set<String> known,
+    List<String> typeParams,
   ) {
     final own = fields[node.className] ?? const <BoundaryField>[];
+    final paramSet = typeParams.toSet();
     final body = <Code>[];
 
     // A leaf that sits in a hierarchy ALWAYS stamps its own tag, so a
@@ -696,7 +843,7 @@ class BoundaryCodecEmitter {
     }
 
     for (final field in own) {
-      final type = _classify(field, known);
+      final type = _classify(field, known, paramSet);
       if (field.isNullable) {
         // Dart does not promote a public field after a null check, so an
         // encoding that calls a member on it (`toWire`, `toIso8601String`,
@@ -737,6 +884,8 @@ class BoundaryCodecEmitter {
     // with an explicit [source] local, so only the direct read is qualified.
     final name = source ?? 'this.${field.name}';
     switch (type.shape) {
+      case _Shape.typeParam:
+        return '${_encoderName(type.inner)}($name)';
       case _Shape.node:
         return '$name.toWire()';
       case _Shape.list:
@@ -745,12 +894,15 @@ class BoundaryCodecEmitter {
         // context and turn a `List<Child>` into a scalar list whose elements
         // are never converted through `toWire()`.
         return switch (type.elementShape) {
+          _Shape.typeParam => '$name.map(${_encoderName(type.inner)}).toList()',
           _Shape.node => '$name.map((e) => e.toWire()).toList()',
           _Shape.dateTime => '$name.map((e) => e.toIso8601String()).toList()',
           _ => name,
         };
       case _Shape.map:
         return switch (type.elementShape) {
+          _Shape.typeParam =>
+            '$name.map((key, e) => MapEntry(key, ${_encoderName(type.inner)}(e)))',
           _Shape.node => '$name.map((key, e) => MapEntry(key, e.toWire()))',
           _Shape.dateTime =>
             '$name.map((key, e) => MapEntry(key, e.toIso8601String()))',
@@ -775,9 +927,12 @@ class BoundaryCodecEmitter {
   Set<String> _known(ZorphyNodeIr node, Set<String> additional) {
     final names = <String>{...additional};
     void walk(ZorphyNodeIr current) {
-      // A generic node (and everything below it) receives no codec, so its
-      // name must not classify a field as a nested node — the codec would
-      // emit a `fromWire` the generated library does not declare.
+      // A generic node's name must not classify a field as a nested node: a
+      // dispatch cannot reach a generic leaf's codec (it cannot forward the
+      // decoders), so a field naming one would emit a `fromWire` call the
+      // dispatch never declares. A generic CONCRETE LEAF still carries its own
+      // codec (ZRP-009, #272); it is only the nested-node classification that
+      // stays fail-closed here.
       if (current.typeParameters.isNotEmpty) return;
       names.add(current.cleanName);
       for (final child in current.directSubTypes) {
@@ -796,14 +951,22 @@ class BoundaryCodecEmitter {
     return names;
   }
 
-  _FieldType _classify(BoundaryField field, Set<String> known) {
+  _FieldType _classify(
+    BoundaryField field,
+    Set<String> known,
+    Set<String> typeParams,
+  ) {
     final base = field.baseType;
     if (base.startsWith('List<') && base.endsWith('>')) {
       final element = _strip(base.substring(5, base.length - 1));
       return _FieldType(
         _Shape.list,
         inner: element,
-        elementShape: _shapeOfType(element, known: known),
+        elementShape: _shapeOfType(
+          element,
+          known: known,
+          typeParams: typeParams,
+        ),
       );
     }
     if (base.startsWith('Map<') && base.endsWith('>')) {
@@ -812,14 +975,31 @@ class BoundaryCodecEmitter {
       return _FieldType(
         _Shape.map,
         inner: value,
-        elementShape: _shapeOfType(value, known: known),
+        elementShape: _shapeOfType(value, known: known, typeParams: typeParams),
       );
     }
-    return _FieldType(_shapeOfType(base, known: known), inner: base);
+    return _FieldType(
+      _shapeOfType(base, known: known, typeParams: typeParams),
+      inner: base,
+    );
   }
 
-  _Shape _shapeOfType(String type, {Set<String>? known}) {
+  _Shape _shapeOfType(
+    String type, {
+    Set<String>? known,
+    Set<String> typeParams = const {},
+  }) {
     final base = _strip(type);
+    // A type parameter is checked FIRST: a bare `T`, a nullable `T?` FIELD
+    // (`baseType` has already lifted its trailing `?`), and a `T` element of a
+    // `List<T>` / `Map<String, T>` all route through the parameter's codec,
+    // never a reified `is` test (which could not name the parameter's bound).
+    // Nullable ELEMENTS (`List<T?>`, `Map<String, T?>`) are deliberately
+    // outside ZRP-009's listed shapes: `_strip` keeps their trailing `?`, so
+    // they fall through to `scalar` and decode via `_boundaryAs` instead of
+    // the parameter's decoder. A bare `T?` field is unaffected — its `?` is
+    // stripped by `baseType` before classification.
+    if (typeParams.contains(base)) return _Shape.typeParam;
     if (base == 'DateTime') return _Shape.dateTime;
     if (base == 'double' || (widenNumbers && base == 'num')) {
       return _Shape.number;
@@ -837,6 +1017,41 @@ class BoundaryCodecEmitter {
       "'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'";
 
   static String _local(BoundaryField field) => '_${field.name}';
+
+  /// The bare names of [typeParameters] (`T extends num` -> `T`), in order.
+  static List<String> _bareNames(List<String> typeParameters) => [
+    for (final parameter in typeParameters)
+      parameter.split(' extends ').first.trim(),
+  ];
+
+  /// The [TypeReference] re-declaring one type parameter on a static method,
+  /// carrying its bound (`T extends num`) so the re-declaration satisfies the
+  /// class's own bound.
+  static TypeReference _genericParameterSpec(String parameter) {
+    final separator = parameter.indexOf(' extends ');
+    if (separator == -1) {
+      return TypeReference((t) => t..symbol = parameter.trim());
+    }
+    final name = parameter.substring(0, separator).trim();
+    final bound = parameter.substring(separator + ' extends '.length).trim();
+    return TypeReference((t) {
+      t.symbol = name;
+      t.bound = referType(bound);
+    });
+  }
+
+  /// The parameterized type a generic node's boundary result carries
+  /// (`CreateParams<T, U>`), or the bare [node] name for a non-generic one.
+  static String _resultType(ZorphyNodeIr node, Iterable<String> typeParams) =>
+      typeParams.isEmpty
+      ? node.cleanName
+      : '${node.cleanName}<${typeParams.join(', ')}>';
+
+  /// The `toWire` encoder parameter name for type parameter [parameter].
+  static String _encoderName(String parameter) => 'encode$parameter';
+
+  /// The `fromWire` decoder parameter name for type parameter [parameter].
+  static String _decoderName(String parameter) => 'decode$parameter';
 
   /// `$`/`$$` are generator declaration prefixes, never Dart identifiers.
   static String _strip(String type) => type.trim().replaceAll(r'$', '');
