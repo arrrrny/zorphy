@@ -2,6 +2,16 @@
 
 ### Fixed
 
+- **A type-parameter field compares by content (#294).** A field whose declared
+  type is one of the node's own type parameters (`P data`, `T payload`) can hold
+  a `List`/`Set`/`Map` at runtime, and `==` compared it by identity — so two
+  values with equal `Map` payloads were never equal and `value ==
+  value.copyWith()` failed. The same defect #285 fixed for DECLARED
+  collections, resurfacing through a generic. Such fields now route through the
+  dynamic `_zorphyCollectionEquals` / `_zorphyCollectionHash` helpers (which
+  fall back to `==` / `hashCode` for a non-collection), and the helpers are
+  emitted for them.
+
 - **A union root's body factories can construct their variants (#293).** A
   user body factory on a `@ZorphyUnion()` root is written against the SOURCE
   variant (`return $NetworkFailure(message: message)` — the only constructor

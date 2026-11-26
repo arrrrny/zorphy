@@ -704,6 +704,36 @@ final class PolymorphicClassEmitter {
   /// * only the OUTER nullable suffix is removed. Inner `?` markers belong to
   ///   the element type (`List<String?>`, `Map<String, int?>`) and must survive,
   ///   or the `.of` copy cannot accept its own declared parameter (#285 review).
+  /// Whether [field]'s declared type is one of [node]'s own type parameters
+  /// (`P data`, `T value`), optionally nullable.
+  ///
+  /// A type parameter is opaque to the emitter, so such a field MAY hold a
+  /// `List`/`Set`/`Map` at runtime — and a snapshotted or caller-built
+  /// collection is a different instance on every value. Comparing it with
+  /// `==` then compares identities and `value == value.copyWith()` fails for
+  /// a `Map` payload (#294) — the same defect #285 fixed for DECLARED
+  /// collections, resurfacing through a generic. Those fields route through
+  /// the dynamic [_collectionEqualsMethod], which already falls back to `==`
+  /// for a non-collection.
+  static bool _isTypeParameterField(ZorphyNodeIr node, PolymorphicField field) {
+    var bare = _lowerType(field.emittedType).trim();
+    if (bare.endsWith('?')) bare = bare.substring(0, bare.length - 1).trim();
+    if (bare.isEmpty) return false;
+    return node.typeParameters.any((parameter) {
+      final name = parameter
+          .split(RegExp(r'\s+(extends|super|in)\b'))
+          .first
+          .trim();
+      return name == bare;
+    });
+  }
+
+  /// Whether [field]'s `==`/`hashCode` must go through the dynamic collection
+  /// helpers: a declared collection, or a type-parameter-typed field.
+  static bool _comparesByContent(ZorphyNodeIr node, PolymorphicField field) =>
+      _collectionSnapshot(field.emittedType) != null ||
+      _isTypeParameterField(node, field);
+
   static String? _collectionSnapshot(String emittedType) {
     var bare = _lowerType(emittedType).trim();
     if (bare.endsWith('?')) {
@@ -1131,7 +1161,7 @@ final class PolymorphicClassEmitter {
     // Only a class that actually snapshots a collection needs the helpers the
     // generated `==`/`hashCode` call. They are private STATIC members of the
     // class, so two hierarchies in one library part can never collide.
-    if (fields.any((field) => _collectionSnapshot(field.emittedType) != null)) {
+    if (fields.any((field) => _comparesByContent(node, field))) {
       methods.addAll([_collectionEqualsMethod(), _collectionHashMethod()]);
     }
     return methods;
@@ -1203,7 +1233,7 @@ final class PolymorphicClassEmitter {
         // a plain `==` compares identities and breaks `value == value.copyWith()`;
         // those fields compare their contents instead (#285 review).
         for (final field in fields)
-          _collectionSnapshot(field.emittedType) != null
+          _comparesByContent(node, field)
               ? '${node.cleanName}._zorphyCollectionEquals('
                     'this.${field.name}, other.${field.name})'
               : 'this.${field.name} == other.${field.name}',
@@ -1236,7 +1266,7 @@ final class PolymorphicClassEmitter {
         // `Object.hashAll` accepts any nonempty iterable, covering both ends.
         fields.isEmpty
             ? 'runtimeType.hashCode'
-            : 'Object.hashAll([${[for (final f in fields) _collectionSnapshot(f.emittedType) != null ? '${node.cleanName}._zorphyCollectionHash(${f.name})' : f.name].join(', ')}])',
+            : 'Object.hashAll([${[for (final f in fields) _comparesByContent(node, f) ? '${node.cleanName}._zorphyCollectionHash(${f.name})' : f.name].join(', ')}])',
       );
     });
   }

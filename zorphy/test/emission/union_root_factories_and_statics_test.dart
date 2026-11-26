@@ -424,6 +424,114 @@ class $NetworkFailure implements $AppFailure {
       });
     });
 
+    // Issue #294: a field typed as one of the node's own type parameters can
+    // hold a collection at runtime; `==` compared those by identity.
+    group('#294 — a type-parameter field compares by content', () {
+      const genericLeaf =
+          '$_annotationImport'
+          r"""
+part 'nodes.zorphy.dart';
+
+@ZorphyValue()
+class $Box<T> {
+  final T payload;
+  final String id;
+
+  const $Box({required this.payload, required this.id});
+}
+""";
+
+      test('== and hashCode route a type-parameter field through the dynamic '
+          'collection helpers', () async {
+        final (_, out) = await _compose({'nodes.dart': genericLeaf});
+        final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+        expect(
+          flat,
+          contains(
+            'return other is Box && Box._zorphyCollectionEquals('
+            'this.payload, other.payload) && this.id == other.id;',
+          ),
+        );
+        expect(
+          flat,
+          contains('Object.hashAll([Box._zorphyCollectionHash(payload), id])'),
+        );
+        expect(flat, contains('static bool _zorphyCollectionEquals('));
+        expect(flat, contains('this.id == other.id'));
+      });
+
+      test(
+        'the emitted class compiles and two Map payloads compare equal',
+        () async {
+          final (_, out) = await _compose({'nodes.dart': genericLeaf});
+          final probe = Directory('test/.box294_tmp').absolute.path;
+          Directory(probe).createSync(recursive: true);
+          final fixture = Directory(probe).createTempSync('fixture_');
+          addTearDown(() => fixture.deleteSync(recursive: true));
+          File('${fixture.path}/pubspec.yaml').writeAsStringSync(
+            'name: probe_294\n'
+            'environment:\n'
+            '  sdk: ">=3.11.0 <4.0.0"\n'
+            'dependencies:\n'
+            '  zorphy_annotation:\n'
+            '    path: ${Directory.current.parent.uri.resolve('zorphy_annotation/').toFilePath()}\n'
+            'dev_dependencies:\n'
+            '  test: any\n',
+          );
+          Directory('${fixture.path}/lib').createSync();
+          Directory('${fixture.path}/test').createSync();
+          File('${fixture.path}/lib/emitted.dart').writeAsStringSync(
+            "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$out",
+          );
+          File('${fixture.path}/test/box_test.dart').writeAsStringSync(r'''
+import 'package:test/test.dart';
+import 'package:probe_294/emitted.dart';
+void main() {
+  test('two Boxes with equal Map payloads are == and hash equal', () {
+    final a = Box<Map<String, dynamic>>.fromTrusted(
+      payload: <String, dynamic>{'name': 'x'},
+      id: '1',
+    );
+    final b = Box<Map<String, dynamic>>.fromTrusted(
+      payload: <String, dynamic>{'name': 'x'},
+      id: '1',
+    );
+    expect(a, equals(b));
+    expect(a.hashCode, equals(b.hashCode));
+    final c = Box<int>.fromTrusted(payload: 3, id: '1');
+    final d = Box<int>.fromTrusted(payload: 3, id: '1');
+    expect(c, equals(d));
+  });
+}
+''');
+          final pubGet = Process.runSync('dart', [
+            'pub',
+            'get',
+          ], workingDirectory: fixture.path);
+          expect(
+            pubGet.exitCode,
+            0,
+            reason: '${pubGet.stdout}${pubGet.stderr}',
+          );
+          final analyze = Process.runSync('dart', [
+            'analyze',
+            '--fatal-infos',
+            'lib',
+            'test',
+          ], workingDirectory: fixture.path);
+          expect(
+            analyze.exitCode,
+            0,
+            reason: '${analyze.stdout}${analyze.stderr}',
+          );
+          final run = Process.runSync('dart', [
+            'test',
+          ], workingDirectory: fixture.path);
+          expect(run.exitCode, 0, reason: '${run.stdout}${run.stderr}');
+        },
+      );
+    });
+
     test(
       'a factory name that collides with an existing member is skipped',
       () async {
