@@ -6,10 +6,10 @@ This directory contains utility scripts for the Zorphy monorepo.
 
 ### `publish.sh`
 
-**Publish both zorphy_annotation and zorphy packages to pub.dev**
+**Publish `zorphy_annotation`, `zorphy` and `zorphy_migrator` to pub.dev**
 
 ```bash
-./scripts/publish.sh <version> [description] [--type]
+./scripts/publish.sh <version> [description] [--dry-run]
 ```
 
 **Examples:**
@@ -18,18 +18,18 @@ This directory contains utility scripts for the Zorphy monorepo.
 # Standard release
 ./scripts/publish.sh 1.0.0 "Initial release"
 
-# With category
-./scripts/publish.sh 1.1.0 "Added feature" --feat
-./scripts/publish.sh 1.1.1 "Fixed bug" --fix
+# Prerelease
+./scripts/publish.sh 3.0.0-dev.3
 
-# Promote [Unreleased] section from CHANGELOG
-./scripts/publish.sh 1.0.1
+# Preview every step without changing anything
+./scripts/publish.sh 3.0.0-dev.3 "Closure" --dry-run
 ```
 
 **What it does:**
 
 1. Publishes `zorphy_annotation` (tag: `annotation-vX.Y.Z`)
 2. Publishes `zorphy` (tag: `vX.Y.Z`)
+3. Publishes `zorphy_migrator` (tag: `migrator-vX.Y.Z`)
 
 For detailed information, see:
 - [PUBLISH_GUIDE.md](../PUBLISH_GUIDE.md) - Complete documentation
@@ -43,12 +43,13 @@ For detailed information, see:
 - ✅ Creates pull requests (if `gh` CLI is installed)
 - ✅ Creates git tags
 - ✅ Updates dependencies automatically
-- ✅ Runs tests before publishing
 - ✅ Publishes to pub.dev
 
 **Safety:**
 
-- Validates version format (X.Y.Z)
+- `--dry-run` prints the whole release and changes nothing
+- Validates version format (X.Y.Z, with an optional prerelease such as `-dev.3`)
+- Rejects unknown options
 - Stops on errors (`set -e`)
 - Commits before publishing
 - Separate git tags for each package

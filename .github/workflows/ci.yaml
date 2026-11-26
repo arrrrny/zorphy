@@ -9,8 +9,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
       - name: Check version sync
         run: bash scripts/check_version_sync.sh
+      - name: Enforce lockfiles (each committed pubspec.lock must match its pubspec.yaml)
+        run: |
+          for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
+            echo "== $pkg"
+            (cd "$pkg" && dart pub get --enforce-lockfile)
+          done
 
   format:
     runs-on: ubuntu-latest
