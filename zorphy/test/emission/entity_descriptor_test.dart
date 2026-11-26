@@ -230,6 +230,37 @@ void roundTripGeneric<T extends ZorphyEntityBase>(
   );
   _check(desc.fieldByPath('/__nope__') == null, '$label fieldByPath miss');
 
+  // zorphy#301: descriptor field accessors must write through too — every
+  // path the issue names (fields / principalKeyField / fieldByPath) carries
+  // a setValue bridge, a correctly typed value writes through, and a mistyped
+  // one fails as TypeError rather than silently coercing.
+  _check(
+    desc.fields.every((f) => f.setValue != null),
+    '$label every descriptor field has a write bridge',
+  );
+  _check(
+    desc.principalKeyField.setValue != null,
+    '$label principalKeyField has a write bridge',
+  );
+  final pkWrite = desc.fieldByPath('/${pkField.name}')!;
+  final written = pkWrite.setValue!(a, 'written');
+  _check(
+    pkWrite.getValue!(written) == 'written',
+    '$label descriptor fieldByPath writes through',
+  );
+  final pkWritten = desc.principalKeyField.setValue!(a, 'pk-written');
+  _check(
+    desc.principalKeyOf(pkWritten) == 'pk-written',
+    '$label principalKeyField writes through',
+  );
+  var descriptorWriteRejected = false;
+  try {
+    pkWrite.setValue!(a, 42); // int into a String principal key
+  } on TypeError {
+    descriptorWriteRejected = true;
+  }
+  _check(descriptorWriteRejected, '$label mistyped descriptor write is TypeError');
+
   // diff + applyPatch: applying diff(a, b) to a reproduces b.
   final patch = desc.diff(a, b);
   _check(desc.applyPatch(a, patch) == b, '$label applyPatch(diff(a,b), a)==b');

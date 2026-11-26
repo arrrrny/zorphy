@@ -57,12 +57,13 @@ final class ProductFields {
 
   // Mirrors the generator (zorphy#301): erased entries, so `.set` is
   // callable from the `Object?`-typed slot; `final` because `asObject`
-  // is a getter.
-  static final List<ZorphyField<Product, Object?>> all = [
+  // is a getter; unmodifiable so no caller can drop an entry and break
+  // a later `byPointer` lookup (review finding).
+  static final List<ZorphyField<Product, Object?>> all = List.unmodifiable([
     id.asObject,
     price.asObject,
     note.asObject,
-  ];
+  ]);
 
   static String _getId(Product instance) => instance.id;
   static Product _setId(Product instance, String value) =>
@@ -133,6 +134,17 @@ void main() {
           expect(() => price.set(p, 'not-a-double'), throwsA(isA<TypeError>()));
         },
       );
+
+      test('the registry contents cannot be mutated in place', () {
+        // `final` alone only prevents reassigning the list; an unmodifiable
+        // list also stops a caller from removing an entry and breaking every
+        // later `byPointer` lookup (review finding).
+        expect(
+          () => ProductFields.all.removeWhere((f) => f.name == 'price'),
+          throwsUnsupportedError,
+        );
+        expect(ProductFields.all.byPointer('/price'), isNotNull);
+      });
 
       test('preserves name / jsonKey / pointer', () {
         final erased = ProductFields.price.asObject;

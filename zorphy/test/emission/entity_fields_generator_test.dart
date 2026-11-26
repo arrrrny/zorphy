@@ -171,13 +171,19 @@ void main() {
       final code = _emit();
       expect(
         code,
-        contains('static final List<ZorphyField<Product, Object?>> all = ['),
+        contains(
+          'static final List<ZorphyField<Product, Object?>> all = '
+          'List.unmodifiable([',
+        ),
       );
       // Each entry is the field constant with its value type erased: a typed
       // `ZorphyField<T, V>` in this `Object?` slot compiles and throws on the
       // first `.set` (zorphy#301), so the registry never holds one directly.
+      // The list is unmodifiable so no caller can drop an entry and break
+      // later `byPointer` lookups (review finding).
       final allLine = RegExp(
-        r'static final List<ZorphyField<Product, Object\?>> all = \[[^\]]*\];',
+        r'static final List<ZorphyField<Product, Object\?>> all = '
+        r'List\.unmodifiable\(\[[^\]]*\]\);',
       ).firstMatch(code)!.group(0)!;
       expect(allLine, contains('id.asObject'));
       expect(allLine, contains('price.asObject'));

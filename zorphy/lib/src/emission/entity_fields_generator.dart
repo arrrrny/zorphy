@@ -155,10 +155,14 @@ final class EntityFieldsGenerator {
             // only an erased entry can be written through from this
             // `Object?`-typed slot (zorphy#301). A typed `ZorphyField<T, V>`
             // placed here directly compiles and throws on the first `.set`.
+            // The LIST is unmodifiable so a caller cannot remove an entry and
+            // break later `byPointer` lookups; writes THROUGH the erased
+            // descriptors remain supported.
             f.modifier = FieldModifier.final$;
             f.type = referType('List<ZorphyField<$className, Object?>>');
             f.assignment = Code(
-              '[${fieldNames.map((n) => '$n.asObject').join(', ')}]',
+              'List.unmodifiable(['
+              '${fieldNames.map((n) => '$n.asObject').join(', ')}])',
             );
           }),
         );
