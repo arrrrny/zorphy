@@ -1,5 +1,18 @@
 ## [Unreleased]
 
+### Changed (BREAKING — v3.0.0)
+
+- **`EntityConfig.autoId` removed (#300).** The v2 identity toggle on the CLI's
+  `EntityConfig` (`zorphy/lib/src/cli/models/entity_config.dart`) is gone — the
+  field, its constructor parameter and its `copyWith` parameter. v3 identity is
+  never a toggle: `_buildAnnotation` derives the archetype purely from
+  `kind` / `isSealed` / `extendsInterface`, and `_ownsIdentity` decides whether
+  the scaffold declares `String get id;`, so nothing ever read `autoId`. A field
+  that looked like it controlled identity but was silently ignored was a trap for
+  the next caller. Anyone constructing `EntityConfig` by hand must drop the
+  `autoId:` argument; downstream `zuraffa` already stopped passing it
+  (arrrrny/zuraffa#2179).
+
 ### Fixed
 
 - **A type-parameter field compares by content (#294).** A field whose declared
