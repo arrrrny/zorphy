@@ -63,9 +63,9 @@ class ZorphyRenderer {
     // idiomatic and matches `dart format` (the golden fixtures compare the
     // migrator's output byte-for-byte and CI runs `dart format --set-exit-if-
     // changed .`).
-    return DartFormatter(languageVersion: DartFormatter.latestLanguageVersion)
-        .format(sb.toString())
-        .trimRight();
+    return DartFormatter(
+      languageVersion: DartFormatter.latestLanguageVersion,
+    ).format(sb.toString()).trimRight();
   }
 
   /// Rewrites a field type for the exchangeable dialect: references to

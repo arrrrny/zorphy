@@ -232,8 +232,9 @@ void _writePart(
   String partName,
   String composed,
 ) {
-  File('${fixtureDir.path}/$partName')
-      .writeAsStringSync("part of '$libraryName';\n\n$composed");
+  File(
+    '${fixtureDir.path}/$partName',
+  ).writeAsStringSync("part of '$libraryName';\n\n$composed");
 }
 
 /// Every diagnostic the analyzer reports for the fixture directory — each
@@ -252,9 +253,9 @@ Future<List<String>> _diagnostics(Directory fixtureDir) async {
             .where((file) => file.path.endsWith('.dart'))
             .where((file) => !file.path.endsWith('.zorphy.dart'))) {
       final context = collection.contextFor(file.path);
-      final library = await context.currentSession.getResolvedLibrary(
-        file.path,
-      ) as ResolvedLibraryResult;
+      final library =
+          await context.currentSession.getResolvedLibrary(file.path)
+              as ResolvedLibraryResult;
       for (final unit in library.units) {
         for (final diagnostic in unit.diagnostics) {
           diagnostics.add(
@@ -309,8 +310,9 @@ void main() {
         // test's output: selecting any single test still finds the full
         // fixture set on disk (the order-dependence the #243 review flagged).
         for (final entry in fixtureSources.entries) {
-          File('${fixtureDir.path}/${entry.key}')
-              .writeAsStringSync(entry.value);
+          File(
+            '${fixtureDir.path}/${entry.key}',
+          ).writeAsStringSync(entry.value);
         }
         collection = AnalysisContextCollection(
           includedPaths: [fixtureDir.path],

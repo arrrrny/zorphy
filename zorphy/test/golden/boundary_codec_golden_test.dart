@@ -121,11 +121,10 @@ String _compact(String source) => source.replaceAll(RegExp(r'\s+'), '');
 
 /// The emitter's source with comment lines removed, so the acceptance gate
 /// reads CODE and not the prose that names the forbidden construct.
-String _emitterCode() =>
-    File('lib/src/emission/boundary_codec_emitter.dart')
-        .readAsLinesSync()
-        .where((line) => !line.trimLeft().startsWith('//'))
-        .join('\n');
+String _emitterCode() => File('lib/src/emission/boundary_codec_emitter.dart')
+    .readAsLinesSync()
+    .where((line) => !line.trimLeft().startsWith('//'))
+    .join('\n');
 
 void main() {
   group('golden: dispatch node', () {

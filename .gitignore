@@ -100,3 +100,7 @@ app.*.map.json
 !.kimi-code/skills/
 .kimi-code/skills/*
 !.kimi-code/skills/speckit-*/
+
+README_ISSUES.md
+ZORPHY_V3_REMAINING_ROADMAP.xlsx
+issues/
