@@ -473,24 +473,36 @@ final class MockFixtureEmitter {
   /// [type].
   ///
   /// The check is on the literal's runtime KIND against the declared type, and
-  /// it recurses one level for a collection so a `List<String>` example is not
-  /// emitted into a `Set<int>` field.
+  /// it recurses into a collection so a `List<String>` example is not emitted
+  /// into a `Set<int>` field. Three rules added with the empty-collection
+  /// fallback (#285 review):
+  /// * a `null` example fits only a NULLABLE declared type — the old early
+  ///   `return true` let `{'first': null}` into a `Map<String, Status>`;
+  /// * the collection KIND is checked before the elements — an empty `List`
+  ///   cannot seed a `Set` field;
+  /// * only the OUTER `?` is stripped, so inner element nullability survives
+  ///   the recursion and `Map<String, Status?>` still accepts a null value.
   static bool _exampleFitsType(Object? example, String type) {
-    final bare = _bareType(type);
-    if (example == null) return true;
+    final trimmed = type.trim();
+    final acceptsNull = trimmed.endsWith('?');
+    if (example == null) return acceptsNull;
+    final structural = acceptsNull
+        ? trimmed.substring(0, trimmed.length - 1).trim()
+        : trimmed;
+    final bare = _bareType(structural);
     if (bare.startsWith('List<') || bare.startsWith('Set<')) {
-      final items = example is Set
-          ? example
-          : example is List
-          ? example
-          : null;
-      if (items == null) return false;
-      final element = bare.substring(bare.indexOf('<') + 1, bare.length - 1);
+      final isList = bare.startsWith('List<');
+      if (isList ? example is! List : example is! Set) return false;
+      final element = structural.substring(
+        structural.indexOf('<') + 1,
+        structural.length - 1,
+      );
+      final items = isList ? example as List : example as Set;
       return items.every((item) => _exampleFitsType(item, element));
     }
     if (bare.startsWith('Map<')) {
       if (example is! Map) return false;
-      final args = bare.substring('Map<'.length, bare.length - 1);
+      final args = structural.substring('Map<'.length, structural.length - 1);
       final comma = _topLevelComma(args);
       if (comma <= 0) return false;
       final keyType = args.substring(0, comma).trim();
@@ -517,20 +529,24 @@ final class MockFixtureEmitter {
   /// The literal for a `@ZorphyMock(example: …)` hint, element-wise for a
   /// collection so it types against the field it seeds.
   ///
-  /// A map key keeps its own Dart type ([_scalarLiteral]) rather than being
-  /// stringified: `Map<int, int>` with an example `{1: 10}` must render
-  /// `{1: 10}`, not the `Map<String, int>`-shaped `{'1': 10}`.
+  /// Collection literals recurse: once a nullable collection field reaches the
+  /// hint path through the empty-collection fallback, an `example: [[]]` on a
+  /// `List<List<Status>>` must stay a nested list instead of having its inner
+  /// list passed to [_scalarLiteral] and rendered as `'[]'` (#285 review).
+  /// A map key keeps its own Dart type rather than being stringified:
+  /// `Map<int, int>` with an example `{1: 10}` must render `{1: 10}`, not the
+  /// `Map<String, int>`-shaped `{'1': 10}`.
   Expression _exampleLiteral(Object? example) {
     if (example is List) {
-      return literalList(example.map(_scalarLiteral));
+      return literalList(example.map(_exampleLiteral));
     }
     if (example is Set) {
-      return literalSet(example.map(_scalarLiteral));
+      return literalSet(example.map(_exampleLiteral));
     }
     if (example is Map) {
       return literalMap({
         for (final entry in example.entries)
-          _scalarLiteral(entry.key): _scalarLiteral(entry.value),
+          _exampleLiteral(entry.key): _exampleLiteral(entry.value),
       });
     }
     return _scalarLiteral(example);
@@ -616,12 +632,16 @@ final class MockFixtureEmitter {
     if (type.startsWith('List<') && type.endsWith('>')) {
       final element = type.substring('List<'.length, type.length - 1);
       final seeded = _elementSeed(element, field, seed);
-      return seeded == null ? null : literalList([seeded]);
+      // An unseedable element type seeds an EMPTY list rather than blocking
+      // the node: an empty list is a valid value, so a variant whose only
+      // unseedable field is a `List<...>` stays in the mock rotation instead
+      // of throwing UnsupportedError and dropping out of `list()` (#284).
+      return seeded == null ? literalList(const []) : literalList([seeded]);
     }
     if (type.startsWith('Set<') && type.endsWith('>')) {
       final element = type.substring('Set<'.length, type.length - 1);
       final seeded = _elementSeed(element, field, seed);
-      return seeded == null ? null : literalSet([seeded]);
+      return seeded == null ? literalSet(const []) : literalSet([seeded]);
     }
     if (type.startsWith('Map<') && type.endsWith('>')) {
       final args = type.substring('Map<'.length, type.length - 1);
@@ -630,14 +650,16 @@ final class MockFixtureEmitter {
         final keyType = args.substring(0, comma).trim();
         final valueType = args.substring(comma + 1).trim();
         final seeded = _elementSeed(valueType, field, seed);
-        if (seeded == null) return null;
+        // A map with an unseedable value type seeds EMPTY (a valid map) so the
+        // variant stays in rotation (#284).
+        if (seeded == null) return literalMap(const {});
         // The key keeps its declared type too: a `Map<int, int>` must not be
         // seeded with a `String` key.
         final key = _defaultSeedValue(
           ZorphyFieldIr(name: field.name, type: keyType),
           seed,
         );
-        if (key == null) return null;
+        if (key == null) return literalMap(const {});
         return literalMap({key: seeded});
       }
     }

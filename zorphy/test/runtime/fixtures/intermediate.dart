@@ -235,17 +235,18 @@ class SystemEventPatch extends EventPatch {
   ) {
     final violations = <FieldViolation>[];
     final ops = ZorphyPatchWire.opsOf(raw, '', violations);
+    final prefix = ZorphyPatchWire.opsPathOf(raw);
     PatchValue<String>? idValue;
     if (ops != null && ops.containsKey('id')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['id'],
-        '/id',
+        '$prefix/id',
         violations,
       );
       idValue = (() {
         final idDecoded = ZorphyPatchWire.as<String>(
           rawValue,
-          '/id',
+          '$prefix/id',
           violations,
         );
         return idDecoded == null ? null : PatchValue<String>.set(idDecoded);
@@ -255,13 +256,13 @@ class SystemEventPatch extends EventPatch {
     if (ops != null && ops.containsKey('source')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['source'],
-        '/source',
+        '$prefix/source',
         violations,
       );
       sourceValue = (() {
         final sourceDecoded = ZorphyPatchWire.as<String>(
           rawValue,
-          '/source',
+          '$prefix/source',
           violations,
         );
         return sourceDecoded == null
@@ -273,13 +274,13 @@ class SystemEventPatch extends EventPatch {
     if (ops != null && ops.containsKey('payload')) {
       final Object? rawValue = ZorphyPatchWire.fieldValue(
         ops['payload'],
-        '/payload',
+        '$prefix/payload',
         violations,
       );
       payloadValue = (() {
         final payloadDecoded = ZorphyPatchWire.as<Object>(
           rawValue,
-          '/payload',
+          '$prefix/payload',
           violations,
         );
         return payloadDecoded == null

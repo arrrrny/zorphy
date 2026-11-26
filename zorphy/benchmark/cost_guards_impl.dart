@@ -57,7 +57,7 @@ CostGuardSuite evaluateCostGuards() {
   );
 
   final guards = <CostGuardReport>[
-    guard1ZeroCopy(),
+    guard1CollectionSnapshot(),
     guard2NoOpPatch(load.admitted),
     guard3PolymorphicResolvePath(load.admitted),
     guard4BoundaryThroughput(load.admitted),
@@ -65,12 +65,15 @@ CostGuardSuite evaluateCostGuards() {
   return CostGuardSuite(guards: guards, environment: environment);
 }
 
-// Guard 1 — zero-copy reference identity (correctness only, no timing budget).
+// Guard 1 — defensive snapshot of collection fields (correctness only, no
+// timing budget).
 //
-// Measures the GENERATED `OpenTask`: `copyWith` and the `changeToDoneTask`
-// morph must carry the reference-typed `tags` list and `createdAt` DateTime by
-// reference, never a deep clone.
-CostGuardReport guard1ZeroCopy() {
+// A collection field is copied at construction (#284): mutating the caller's
+// list after `fromTrusted` must NOT change the built value, and `copyWith` /
+// the morph carry a FRESH list rather than the caller's reference. A scalar
+// reference (`createdAt`, a DateTime) is immutable and not a collection, so it
+// is still shared.
+CostGuardReport guard1CollectionSnapshot() {
   final tags = <String>['a', 'b', 'c'];
   final createdAt = DateTime.utc(2026, 11, 24, 12);
   final task = OpenTask.fromTrusted(
@@ -80,20 +83,24 @@ CostGuardReport guard1ZeroCopy() {
     assignee: 'me',
   );
 
+  // Mutating the caller's list after construction must not leak into the value.
+  tags.add('leak');
+  final snapshotOk = task.tags.length == 3 && !task.tags.contains('leak');
+
   final copied = task.copyWith(assignee: 'you');
-  final tagsReused = identical(task.tags, copied.tags);
+  final copyIsFresh = !identical(task.tags, copied.tags);
 
   final done = task.changeToDoneTask(result: 'shipped');
+  final morphIsFresh = !identical(task.tags, done.tags);
   final createdAtReused = identical(task.createdAt, done.createdAt);
-  final morphTagsReused = identical(task.tags, done.tags);
 
-  final ok = tagsReused && createdAtReused && morphTagsReused;
+  final ok = snapshotOk && copyIsFresh && morphIsFresh && createdAtReused;
   return CostGuardReport(
-    name: 'Guard 1: zero-copy reference identity',
+    name: 'Guard 1: defensive snapshot of collection fields',
     correctnessOk: ok,
     correctnessDetail:
-        'copyWith reuses tags=$tagsReused, morph reuses '
-        'createdAt=$createdAtReused tags=$morphTagsReused',
+        'snapshot=$snapshotOk copyFresh=$copyIsFresh morphFresh=$morphIsFresh '
+        'createdAtReused=$createdAtReused',
     timing: PerformanceVerdict.greenSample,
   );
 }

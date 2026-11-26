@@ -60,7 +60,7 @@ void main() {
     test('@ZorphyUnion: union root + synthetic variant leaves', () {
       expect(
         v3,
-        contains('sealed class AsyncStatus implements ZorphyValueBase'),
+        contains('sealed class AsyncStatus implements ZorphyUnionBase'),
       );
       expect(v3, contains('final class Loading extends AsyncStatus'));
       expect(v3, contains('final class Ready extends AsyncStatus'));
