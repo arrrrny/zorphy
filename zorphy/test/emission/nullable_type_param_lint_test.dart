@@ -7,6 +7,11 @@
 // the EMITTED source text — both SDK-independent. The `unnecessary_question_mark`
 // diagnostic itself is SDK-gated, so the structural emitted-source assertion is
 // what proves the fix on every SDK.
+//
+// The redundant `?` is suppressed ONLY in the emitted type text. `isNullable`
+// stays faithful to the source `?` so the generated API keeps its shape: an
+// unbounded `I` can be instantiated as `String?`, so `fromTrusted` must not
+// require the field and `copyWith(id: null)` must clear it.
 
 import 'dart:io';
 
@@ -22,6 +27,10 @@ const _annotationImport =
 
 /// Writes [sources] into a fresh temp directory, resolves the library at
 /// [libraryName] and hands its classes to [HierarchyResolver.resolveLibrary].
+///
+/// The fixture lives in-package so `package:zorphy_annotation` resolves, but
+/// it is removed on every path — including a failed analysis — so a run never
+/// leaves `fixture_*` litter under `test/`.
 Future<PolymorphicIr> _resolve(
   Map<String, String> sources, {
   String libraryName = 'nodes.dart',
@@ -29,20 +38,26 @@ Future<PolymorphicIr> _resolve(
   final root = Directory('test/.nullable_type_param_tmp').absolute.path;
   Directory(root).createSync(recursive: true);
   final fixture = Directory(root).createTempSync('fixture_');
-  for (final entry in sources.entries) {
-    File('${fixture.path}/${entry.key}').writeAsStringSync(entry.value);
+  try {
+    for (final entry in sources.entries) {
+      File('${fixture.path}/${entry.key}').writeAsStringSync(entry.value);
+    }
+    final libraryPath = '${fixture.path}/$libraryName';
+    final collection = AnalysisContextCollection(includedPaths: [fixture.path]);
+    try {
+      final resolved =
+          await collection
+                  .contextFor(libraryPath)
+                  .currentSession
+                  .getResolvedLibrary(libraryPath)
+              as ResolvedLibraryResult;
+      return HierarchyResolver.resolveLibrary(resolved.element);
+    } finally {
+      await collection.dispose();
+    }
+  } finally {
+    if (fixture.existsSync()) fixture.deleteSync(recursive: true);
   }
-  final libraryPath = '${fixture.path}/$libraryName';
-  final collection = AnalysisContextCollection(includedPaths: [fixture.path]);
-  final resolved =
-      await collection
-              .contextFor(libraryPath)
-              .currentSession
-              .getResolvedLibrary(libraryPath)
-          as ResolvedLibraryResult;
-  final ir = HierarchyResolver.resolveLibrary(resolved.element);
-  await collection.dispose();
-  return ir;
 }
 
 /// A generic entity whose type parameter has an IMPLICIT nullable bound
@@ -72,23 +87,34 @@ abstract class \$DeleteParams<I extends Object> {
 ''';
 
 void main() {
+  tearDownAll(() {
+    final root = Directory('test/.nullable_type_param_tmp');
+    if (root.existsSync()) root.deleteSync(recursive: true);
+  });
+
   group('nullable-bounded type parameter (#273)', () {
-    test('a field typed by a type param with a nullable bound is NOT nullable '
-        'in the IR (no redundant `?`)', () async {
+    test('isNullable stays faithful to the source `?`; only type text '
+        'suppresses the redundant suffix', () async {
       final ir = await _resolve({'nodes.dart': _nullableBound});
       final node = ir.rootFor('ToggleParams');
       expect(node, isNotNull);
       final id = node!.fields.firstWhere((f) => f.name == 'id');
       expect(
         id.isNullable,
-        isFalse,
-        reason: 'bound is Object? — appending `?` would be redundant',
+        isTrue,
+        reason: 'the source declares `I?` — API shape must stay nullable',
       );
+      expect(
+        id.suppressQuestionMark,
+        isTrue,
+        reason: 'bound is Object? — appending `?` in type text is redundant',
+      );
+      expect(id.emitsQuestionMark, isFalse);
     });
 
     test(
       'a field typed by a type param with a non-nullable bound stays nullable '
-      'in the IR',
+      'and keeps its `?`',
       () async {
         final ir = await _resolve({'nodes.dart': _nonNullableBound});
         final node = ir.rootFor('DeleteParams');
@@ -99,6 +125,8 @@ void main() {
           isTrue,
           reason: 'bound is Object — `I?` is a meaningful nullable',
         );
+        expect(id.suppressQuestionMark, isFalse);
+        expect(id.emitsQuestionMark, isTrue);
       },
     );
 
@@ -125,6 +153,34 @@ void main() {
         nonNullableEmitted,
         contains('final I? id;'),
         reason: 'a non-nullable bound keeps the meaningful `?` field',
+      );
+    });
+
+    test('the API shape stays null-safe for a nullable-bounded generic '
+        'entity', () async {
+      final ir = await _resolve({'nodes.dart': _nullableBound});
+      final emitted = const ArchetypeComposer().compose(ir);
+
+      // `I` is unbounded: it can be instantiated as `String?`, so the field
+      // must remain optional in fromTrusted rather than becoming required.
+      expect(
+        emitted,
+        isNot(contains('fromTrusted({required this.id})')),
+        reason: 'a nullable-bounded field must not be forced required',
+      );
+      expect(emitted, contains('fromTrusted({this.id})'));
+
+      // The clear-to-null sentinel must survive: copyWith(id: null) has to
+      // clear a field instantiated as `String?` (arrrrny/zorphy#277 finding).
+      expect(
+        emitted,
+        contains('Object? id = _sentinel'),
+        reason: 'the sentinel parameter is what makes explicit null clear',
+      );
+      expect(
+        emitted,
+        contains('identical(id, _sentinel) ? this.id : id as I'),
+        reason: 'copyWith must take the clear-to-null sentinel path',
       );
     });
   });

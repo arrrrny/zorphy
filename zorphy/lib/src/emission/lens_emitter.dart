@@ -101,7 +101,7 @@ final class LensEmitter {
           _LensField(
             name: field.name,
             type: concreteTypeName(
-              field.isNullable ? '${field.type}?' : field.type,
+              field.emitsQuestionMark ? '${field.type}?' : field.type,
             ),
           ),
         );

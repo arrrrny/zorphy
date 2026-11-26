@@ -391,7 +391,9 @@ final class ArchetypeComposer {
               // inherited type wins and `apply` type-checks against the
               // leaf's `copyWith`.
               for (final field in _payloadFields(leaf))
-                field.name: field.isNullable ? '${field.type}?' : field.type,
+                field.name: field.emitsQuestionMark
+                    ? '${field.type}?'
+                    : field.type,
             },
         },
       ),
@@ -448,7 +450,7 @@ final class ArchetypeComposer {
                     // the same rule `_sharedApplyMethod` follows for the
                     // root's shared patch.
                     for (final field in _payloadFields(leaf))
-                      field.name: field.isNullable
+                      field.name: field.emitsQuestionMark
                           ? '${field.type}?'
                           : field.type,
                   },
@@ -506,7 +508,7 @@ final class ArchetypeComposer {
     for (final field in fields)
       NameTypeClassComment(
         field.name,
-        field.isNullable ? '${field.type}?' : field.type,
+        field.emitsQuestionMark ? '${field.type}?' : field.type,
         '',
       ),
   ];
@@ -552,6 +554,7 @@ final class ArchetypeComposer {
             name: field.name,
             type: field.type,
             isNullable: field.isNullable,
+            suppressQuestionMark: field.suppressQuestionMark,
           ),
       ],
   };
@@ -571,7 +574,7 @@ final class ArchetypeComposer {
             payload.add(
               BoundaryField(
                 name: field.name,
-                type: field.isNullable ? '${field.type}?' : field.type,
+                type: field.emitsQuestionMark ? '${field.type}?' : field.type,
               ),
             );
           }

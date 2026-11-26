@@ -352,7 +352,8 @@ final class HierarchyResolver {
         ZorphyFieldIr(
           name: name,
           type: _typeText(type),
-          isNullable: _isNullableField(type),
+          isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+          suppressQuestionMark: _hasNullableBound(type),
           isDomainBool:
               _isDomainBool(getter) ||
               _isDomainBool(_declaringField(declaredByName, name)),
@@ -368,7 +369,8 @@ final class HierarchyResolver {
         ZorphyFieldIr(
           name: name,
           type: _typeText(type),
-          isNullable: _isNullableField(type),
+          isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+          suppressQuestionMark: _hasNullableBound(type),
           isDomainBool: _isDomainBool(field),
         ),
       );
@@ -415,9 +417,15 @@ final class HierarchyResolver {
   ///
   /// `class ToggleParams<I>` (implicit bound `Object?`) declares `I? get id`;
   /// emitting `I? id` is an `unnecessary_question_mark` in generated code. The
-  /// bound is resolved ONCE here, at the IR level, so every emitter inherits
+  /// bound is resolved ONCE here, at the IR level, and stored as
+  /// [ZorphyFieldIr.suppressQuestionMark] so every type-text emitter inherits
   /// the same answer instead of re-deriving it from strings. A non-nullable
   /// bound (`class DeleteParams<I extends Object>`) keeps the meaningful `?`.
+  ///
+  /// This flag ONLY affects type-text emission — [ZorphyFieldIr.isNullable]
+  /// stays faithful to the source `?` so the generated API (fromTrusted
+  /// requiredness and copyWith's clear-to-null sentinel) still treats the
+  /// field as nullable. An unbounded `I` can be instantiated as `String?`.
   static bool _hasNullableBound(DartType type) {
     final element = type.element;
     if (element is! TypeParameterElement) return false;
@@ -425,12 +433,6 @@ final class HierarchyResolver {
     return bound == null ||
         bound.nullabilitySuffix == NullabilitySuffix.question;
   }
-
-  /// The field's declared nullability: `?` on the source type, unless the type
-  /// is a type parameter whose bound already carries nullability (#273).
-  static bool _isNullableField(DartType type) =>
-      type.nullabilitySuffix == NullabilitySuffix.question &&
-      !_hasNullableBound(type);
 
   /// The `$Parent` an [element] implements, as a declared class, or `null`.
   ///
