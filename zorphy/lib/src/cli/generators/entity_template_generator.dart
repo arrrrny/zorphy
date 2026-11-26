@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:path/path.dart' as p;
 
 import '../models/entity_config.dart';
@@ -91,16 +89,23 @@ class EntityTemplateGenerator {
   /// root). No standalone `<name>.zorphy.dart` is ever written, so a
   /// scaffold pointing at the v2 filename never compiles.
   ///
-  /// [EntityConfig.outputDir] is read package-relative. An absolute path
-  /// is rebased on its last `lib` segment or, failing that, on the
-  /// package root ([_packageRelative]).
+  /// [EntityConfig.outputDir] is read package-relative. The caller
+  /// (`EntityCreator`) resolves an on-disk output path to a package-relative
+  /// dir before generating, so this method stays a pure function of its
+  /// inputs — it never touches the filesystem. An absolute path handed to
+  /// this method directly is rebased on its last `lib` segment (the only
+  /// rebase that can be done without filesystem knowledge).
   static String sharedPartUri(EntityConfig config) {
     var output = (config.outputDir ?? config.defaultOutputDir).replaceAll(
       r'\',
       '/',
     );
     if (p.posix.isAbsolute(output) || RegExp(r'^[A-Za-z]:').hasMatch(output)) {
-      output = _packageRelative(p.posix.normalize(output));
+      final segments = p.posix.split(p.posix.normalize(output));
+      final libIndex = segments.lastIndexOf('lib');
+      output = libIndex >= 0
+          ? p.posix.joinAll(segments.sublist(libIndex))
+          : '';
     }
     final library = p.posix.normalize(
       p.posix.join(output, config.snakeName, '${config.snakeName}.dart'),
@@ -226,26 +231,6 @@ class EntityTemplateGenerator {
       !config.isSealed &&
       config.kind == ZorphyKind.entity &&
       config.extendsInterface == null;
-
-  /// The package-relative form of an absolute output directory that
-  /// carries no `lib` segment: from its last `lib` segment when it has
-  /// one, else from the package root, which is the nearest ancestor
-  /// holding a `pubspec.yaml`. A directory no package claims is its own
-  /// root.
-  static String _packageRelative(String absolute) {
-    final segments = p.posix.split(absolute);
-    final libIndex = segments.lastIndexOf('lib');
-    if (libIndex >= 0) return p.posix.joinAll(segments.sublist(libIndex));
-    final below = <String>[];
-    var dir = Directory(absolute);
-    while (!File(p.join(dir.path, 'pubspec.yaml')).existsSync()) {
-      final parent = dir.parent;
-      if (parent.path == dir.path) return '';
-      below.insert(0, p.posix.basename(dir.path));
-      dir = parent;
-    }
-    return p.posix.joinAll(below);
-  }
 
   /// Generate inline subtype (for sealed classes)
   static String generateInlineSubtype(

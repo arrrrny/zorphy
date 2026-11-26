@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+import 'package:zorphy/src/cli/entity_creator.dart';
 import 'package:zorphy/src/cli/generators/entity_template_generator.dart';
 import 'package:zorphy/src/cli/models/entity_config.dart';
 
@@ -111,15 +112,22 @@ void main() {
 
   group('the part directive names the v3 shared part', () {
     String partDirective(EntityConfig config, {bool subtype = false}) {
+      // EntityCreator resolves the on-disk output dir to a package-relative
+      // one before generating; the generator itself stays filesystem-free.
+      final generatorConfig = config.copyWith(
+        outputDir: EntityCreator.packageRelativeOutputDir(
+          config.outputDir ?? config.defaultOutputDir,
+        ),
+      );
       final source = subtype
           ? EntityTemplateGenerator.generateSubtype(
               const EntityConfig(name: 'Shape', isSealed: true),
-              config,
+              generatorConfig,
               'Shape',
               true,
               const [],
             )
-          : EntityTemplateGenerator.generate(config, const []);
+          : EntityTemplateGenerator.generate(generatorConfig, const []);
       return RegExp(
         r"^part '(.+)';",
         multiLine: true,
