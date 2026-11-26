@@ -27,11 +27,9 @@ void main() {
       () {
         final zorphyYaml =
             loadYaml(File('pubspec.yaml').readAsStringSync()) as YamlMap;
-        final annotationYaml =
-            loadYaml(
-                  File('../zorphy_annotation/pubspec.yaml').readAsStringSync(),
-                )
-                as YamlMap;
+        final annotationYaml = loadYaml(
+          File('../zorphy_annotation/pubspec.yaml').readAsStringSync(),
+        ) as YamlMap;
 
         final zorphyDeps = _parseDependencies(zorphyYaml);
         final zorphyDevDeps = _parseDependencies(
