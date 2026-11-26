@@ -11,9 +11,9 @@
 // `dart:mirrors`.
 //
 // The source under test is the REAL build_runner output: `dart run build_runner
-// build` inside example/ (CI runs it before this test, exactly as the #230 e2e
-// does) writes the shared part this file reads. The part is a `part of`
-// fragment, so the `part of` directive is stripped and the annotation import
+// build` inside example/, provisioned on demand by `provisionExampleFixture`
+// (issue #287) so a fresh clone needs no manual build step. The part is a `part
+// of` fragment, so the `part of` directive is stripped and the annotation import
 // prepended to make a standalone library.
 //
 // Execution runs under `dart compile exe` (AOT), so the descriptor is exercised
@@ -26,23 +26,13 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-void main() {
-  final v3Part = File('example/lib/_br_/v3_archetypes/v3_archetypes.part.dart');
+import '../support/provision_example_fixture.dart';
 
+void main() {
   late String body;
 
   setUpAll(() {
-    if (!v3Part.existsSync()) {
-      fail(
-        'Missing generated file: ${v3Part.path}\n'
-        'Run: cd example && dart run build_runner build',
-      );
-    }
-    body = v3Part
-        .readAsStringSync()
-        .split('\n')
-        .where((line) => !line.startsWith('part of'))
-        .join('\n');
+    body = provisionExampleFixture();
   });
 
   test('every emittable entity root carries a descriptor registry field', () {

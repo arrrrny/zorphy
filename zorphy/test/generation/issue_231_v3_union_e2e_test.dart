@@ -4,28 +4,20 @@
 // shapes a clean consumer probe generated 0 outputs for before this change.
 //
 // Follows the issue_223 e2e pattern: the part file is produced by
-// `dart run build_runner build` inside example/ (CI runs it before this test)
-// and asserted here. The runtime behavior on top of this surface is pinned by
-// example/test/v3_union_runtime_test.dart.
-
-import 'dart:io';
+// `dart run build_runner build` inside example/, provisioned on demand by
+// `provisionExampleFixture` (issue #287) so a fresh clone needs no manual build
+// step, and asserted here. The runtime behavior on top of this surface is
+// pinned by example/test/v3_union_runtime_test.dart.
 
 import 'package:test/test.dart';
 
-void main() {
-  final v3Part = File('example/lib/_br_/v3_archetypes/v3_archetypes.part.dart');
+import '../support/provision_example_fixture.dart';
 
+void main() {
   late String v3;
 
   setUpAll(() {
-    if (!v3Part.existsSync()) {
-      fail(
-        'Missing generated file: ${v3Part.path}\n'
-        'Run: cd example && dart run build_runner build '
-        '--delete-conflicting-outputs',
-      );
-    }
-    v3 = v3Part.readAsStringSync();
+    v3 = provisionExampleFixture();
   });
 
   group('#231 v3 union matchers — e2e build_runner smoke', () {
