@@ -4,29 +4,26 @@ title: Patch Updates
 
 Patch helpers generate small, composable updates. This references `basic_example.dart`, `nested_example.dart`, and `no_patch_example.dart`.
 
+In v3 every entity/value archetype gets a `<Name>Patch` — there is no toggle to
+turn it off. A patch is produced by `diff` and applied with `apply`.
+
 ## Patch a single entity
 
 ```dart
-final patch = UserPatch.create()
-  ..withAge(32)
-  ..withEmail('alice@example.com');
-
-final patched = user.patchWithUser(patchInput: patch);
+final patch = UserPatch.diff(user, user.copyWith(age: 32, email: 'alice@example.com'));
+final patched = patch.apply(user);
 ```
 
 ## Nested patching
 
 ```dart
-final personPatch = PersonPatch.create()
-  ..withAddressPatch(AddressPatch.create()..withCity('Los Angeles'));
+final personPatch = PersonPatch.diff(before, after); // carries a nested AddressPatch
+final updated = personPatch.apply(person);
 ```
 
-## Turn off patch generation
+## Compose and invert
 
 ```dart
-@Zorphy(generatePatch: false, generateJson: true)
-abstract class $NoPatchUser {
-  String get name;
-  int get age;
-}
+final combined = patchA.compose(patchB); // left-to-right
+final undo = patch.invert(before);        // captures prior values
 ```

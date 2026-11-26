@@ -143,8 +143,10 @@ dart run zorphy:migrate_v3 <path> --apply  # rewrite in place
 
 It strips every `preset:` / `generate*` argument and emits the zero-preset v3
 archetypes (`@ZorphyEntity(principalKey: #id)` / `@ZorphyValue()` /
-`@ZorphyUnion`) plus the `fromWire` / `toWire` codecs. See `README.md`
-("Migrating v2 → v3").
+`@ZorphyUnion`) plus the `fromWire` / `toWire` codecs, strips the stale
+`part '*.zorphy.dart';` / `part '*.g.dart';` directives, and deletes the
+2.x `<file>.zorphy.dart` parts from disk under `--apply` (a dry run lists
+them). See `README.md` ("Migrating v2 → v3").
 
 **Rationale:** Zorphy code generator produces code that must not be manually edited. Any modifications to generated `.zorphy.dart` files will cause:
 - Unpredictable behavior in code generation  

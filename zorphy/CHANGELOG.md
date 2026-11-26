@@ -1,7 +1,38 @@
-## [Unreleased]
+## [3.0.0-dev.2] - 2026-11-26
+
+### Migration guide (#236)
+
+This release closes the #175 re-audit release gate (#236): 3.0.0 is the agreed
+v3 artifact, and the codemod plus the notes below are the supported path from
+2.x. The full side-by-side table (`@Zorphy` → the archetypes, `copyWith` →
+`ZorphyPatch`, `toJson`/`fromJson` → `toWire`/`fromWire`, `ProductFields` /
+`Product.descriptor`, and the `migrate_v3` codemod) lives in the README's
+[Migrating v2 → v3](#v3-migration) section. The short version:
+
+1. Bump `zorphy` and `zorphy_annotation` to `^3.0.0` (they move in lockstep),
+   then `dart pub get`. The `migrate_v3` executable ships with 3.0, not 2.x.
+2. Preview with `dart run zorphy:migrate_v3 <path>`, then rewrite in place with
+   `dart run zorphy:migrate_v3 <path> --apply`. The codemod strips every
+   `preset:` / `generate*` argument, emits the zero-preset archetypes
+   (`@ZorphyEntity(principalKey: #id)` / `@ZorphyValue()` / `@ZorphyUnion()` /
+   `@ZorphyState()` / `@ZorphyIntent(replaySafe: …)`), and moves codec call
+   sites to `.fromWire(...)` / `.toWire()`.
+3. Delete the 2.x `<file>.zorphy.dart` files and any hand-written
+   `part '*.zorphy.dart';` line — 3.0 emits one shared `<library>.part.dart`
+   under `lib/_br_/` and `build_runner` inserts the `part` directive itself.
+4. Run `dart run build_runner build` (no `--delete-conflicting-outputs` — the
+   flag was removed in build_runner 2.17), then `dart analyze`.
 
 ### Changed (BREAKING — v3.0.0)
 
+- **List patch fields are replaced atomically (#248).** A generated `<Name>Patch`
+  now carries a changed `List<E>` field as the whole new list value (a bare JSON
+  array on the wire), never as positional index ops (`ListPatchOp` /
+  `ListPatchDelta`). Concurrent edits to the same list are therefore an exact
+  `/tags` conflict instead of silent index corruption. The `ListPatchDelta` /
+  `ListPatchOp` types remain in `zorphy_annotation` for direct use but are no
+  longer emitted for entity list fields; the list wire form changes from
+  `{'ops': [...]}` to a bare array. Map fields keep their `MapPatchDelta`.
 - **Legacy `@Zorphy` / `@Zorphy2` generation path removed (#233).** After the
   v3 migration gate the generator runs only the zero-preset archetype pass
   (`@ZorphyEntity` / `@ZorphyValue` / `@ZorphyUnion` / `@ZorphyState` /
@@ -23,6 +54,15 @@
 
 ### Added
 
+- **Three-way merge primitives on every generated patch (#248).**
+  `<Name>Patch` now exposes `Set<String> get changedPaths` (the JSON pointers it
+  touches, e.g. `{'/price', '/title'}`, with nested edits expanded to the leaf),
+  `Set<String> conflictingPaths(other)` (the exact intersection — disjoint edits
+  return `{}`, an overlapping scalar or concurrent list replacement returns the
+  shared pointer), and `composePatches(next)` (an alias of `compose` with the
+  same left-to-right semantics, so three-way sync has one composition behaviour
+  under its own name). They live on `PatchBase` in `zorphy_annotation`, so every
+  generated patch inherits one implementation.
 - `dart run zorphy:migrate_v3 <path>` — a v2 → v3 AST migration codemod
   (#194). It strips every v2 `preset:` and `generate*` boolean argument and
   rewrites the zero-preset archetypes: `@Zorphy` / `@Zorphy2` on an
@@ -93,8 +133,6 @@
   patch can expose `const <Name>Patch.empty()` alongside its mutable default
   constructor (#182).
 
-## [3.0.0] - 2026-11-17
-
 ### Change
 
 - **BREAKING: generated output is now a shared part.** The builder declares
@@ -111,10 +149,10 @@
 - Removed the deprecated `zorphy2Builder` (`lib/builder2.dart`). `builder2`
   had been a no-op alias since 2.0; `zorphy2Builder` now fails loudly instead
   of resolving to nothing.
-- `zorphy_annotation` moves to 3.0.0 in lockstep (`check_version_sync.sh`); its
-  API is unchanged.
-- `zorphy_migrator` moves to 3.0.0 and gains `zorphy_migrator lean <path>`
-  (see its CHANGELOG).
+- `zorphy_annotation` moves to 3.0.0 in lockstep (`check_version_sync.sh`);
+  its legacy annotation surface is removed in this major (see Changed above).
+- `zorphy_migrator` moves to 3.0.0; its `lean` subcommand is removed and
+  `migrate` now emits the v3 archetypes (see its CHANGELOG).
 
 ### Fix
 

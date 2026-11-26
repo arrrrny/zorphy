@@ -5,14 +5,14 @@
 ## Package Manager
 
 - **Type**: `pub.dev`
-- **Packages**: `zorphy_annotation` → `zorphy` (dependency order)
-- **Public packages**: Both packages published to pub.dev
+- **Packages**: `zorphy_annotation` → `zorphy` → `zorphy_migrator` (dependency order)
+- **Public packages**: All 3 packages published to pub.dev
 - **Private packages**: None
-- **Version sync**: Both packages always share the same version number
+- **Version sync**: All 3 packages always share the same version number (supporting SemVer prereleases like `-dev.N`)
 
 ## Scripts
 
-- **Publish**: `./scripts/publish.sh <version> [description]` — updates versions, dependencies, changelogs, publishes both packages to pub.dev directly, commits, tags, and pushes
+- **Publish**: `./scripts/publish.sh <version> [description]` — updates versions, dependencies, changelogs, publishes all 3 packages to pub.dev directly, commits, tags, and pushes
 - **Build binaries**: `./scripts/build-binaries.sh [output-dir]` — compiles CLI and MCP server binaries
 - **Dev setup**: `./scripts/to_path.sh` — switches dependencies back to local path references for development
 
@@ -24,7 +24,7 @@
 
 ## Notes
 
-- Version numbers are synced between `zorphy` and `zorphy_annotation` — always bump together
+- Version numbers are synced between `zorphy`, `zorphy_annotation`, and `zorphy_migrator` — always bump together
 - The publish script publishes locally via `dart pub publish --force`, then pushes tags to git
 - After publishing, run `./scripts/to_path.sh` to restore path dependencies for development
 - GitHub Actions CI is no longer used for pub.dev publishing

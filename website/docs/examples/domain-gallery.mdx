@@ -10,32 +10,28 @@ A complex polymorphic hierarchy for a messaging system.
 
 ### Chat Message (Base)
 ```dart
-@Zorphy(
-  generateJson: true,
-  explicitSubTypes: [$UserMessage, $AssistantMessage],
-  nonSealed: true,
-)
-abstract class $$ChatMessage {
+@ZorphyState(explicitSubTypes: [$UserMessage, $AssistantMessage])
+abstract class $ChatMessage {
   String? get id;
   String get text;
   ChatMessageRole get role;
   DateTime get createdAt;
-  List<$$Attachment>? get attachments;
+  List<$Attachment>? get attachments;
 }
 ```
 
 ### User Message
 ```dart
-@Zorphy(generateJson: true)
-abstract class $UserMessage implements $$ChatMessage {
+@ZorphyEntity()
+abstract class $UserMessage implements $ChatMessage {
   @override ChatMessageRole get role => ChatMessageRole.user;
 }
 ```
 
 ### Assistant Message
 ```dart
-@Zorphy(generateJson: true)
-abstract class $AssistantMessage implements $$ChatMessage {
+@ZorphyEntity()
+abstract class $AssistantMessage implements $ChatMessage {
   @override ChatMessageRole get role => ChatMessageRole.assistant;
 
   // Custom factory for easier creation
@@ -52,24 +48,20 @@ abstract class $AssistantMessage implements $$ChatMessage {
 Demonstrating nested polymorphism.
 
 ```dart
-@Zorphy(
-  generateJson: true,
-  explicitSubTypes: [$FileAttachment, $LinkAttachment],
-  nonSealed: true,
-)
-abstract class $$Attachment {
+@ZorphyState(explicitSubTypes: [$FileAttachment, $LinkAttachment])
+abstract class $Attachment {
   String get name;
   String get mimeType;
 }
 
-@Zorphy(generateJson: true)
-abstract class $FileAttachment implements $$Attachment {
+@ZorphyEntity()
+abstract class $FileAttachment implements $Attachment {
   int get size;
   String get path;
 }
 
-@Zorphy(generateJson: true)
-abstract class $LinkAttachment implements $$Attachment {
+@ZorphyEntity()
+abstract class $LinkAttachment implements $Attachment {
   String get url;
 }
 ```
@@ -79,14 +71,15 @@ abstract class $LinkAttachment implements $$Attachment {
 Nesting and comparison support.
 
 ```dart
-@Zorphy(generateJson: true, generateCompareTo: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $UserWithAddress {
+  String get id;
   String get name;
   $Address get address;
   String? get phone;
 }
 
-@Zorphy(generateJson: true)
+@ZorphyValue()
 abstract class $Address {
   String get street;
   String get city;
@@ -98,7 +91,7 @@ abstract class $Address {
 Using domain-specific enumerations.
 
 ```dart
-@Zorphy(generateJson: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $Account {
   String get id;
   String get email;

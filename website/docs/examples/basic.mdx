@@ -2,11 +2,12 @@
 title: Basic Entity
 ---
 
-This mirrors `basic_example.dart` and focuses on the essentials: fields, constructors, copyWith, equality, and patching.
+This mirrors `basic_example.dart` and focuses on the essentials: fields, constructors, equality, and patching.
 
 ```dart
-@zorphy
+@ZorphyEntity(principalKey: #id)
 abstract class $User {
+  String get id;
   String get name;
   int get age;
   String? get email;
@@ -15,17 +16,17 @@ abstract class $User {
 
 ## Highlights
 
-- Instantiate with named parameters.
+- Instantiate the generated `User` with named parameters.
 - `copyWith` produces a modified copy without mutating.
 - Equality is structural, not identity-based.
-- Patch objects allow partial updates.
+- `UserPatch` captures a partial update as data.
 
 ```dart
-final user = User(name: 'Alice', age: 30);
+final user = User(id: 'u1', name: 'Alice', age: 30);
 final updated = user.copyWith(age: 31);
 
-final patch = UserPatch.create()
-  ..withAge(32)
-  ..withEmail('alice@example.com');
-final patched = user.patchWithUser(patchInput: patch);
+// A patch is the v3 way to express a partial update: diff two instances,
+// then apply the patch to a target.
+final patch = UserPatch.diff(user, user.copyWith(age: 32, email: 'alice@example.com'));
+final patched = patch.apply(user);
 ```

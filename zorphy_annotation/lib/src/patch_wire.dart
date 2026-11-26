@@ -450,6 +450,40 @@ abstract final class ZorphyPatchWire {
     return ListPatchDelta<E>(ops);
   }
 
+  /// The atomic list [raw] carries for a list field, or `null` when it could
+  /// not be decoded in full (zorphy#248).
+  ///
+  /// A list field is patched by whole-value replacement, so its wire form is a
+  /// bare JSON array rather than a `{'ops': [...]}` delta. [decodeElement]
+  /// decodes one element of the list's `E`; the emitted call site knows that
+  /// type. All-or-nothing, like [listDelta]: a single bad element nullifies the
+  /// whole read instead of shipping a silently short list.
+  static List<E>? listValue<E>(
+    Object? raw,
+    String path,
+    List<FieldViolation> violations,
+    E? Function(Object? value, String path, List<FieldViolation> violations)
+    decodeElement,
+  ) {
+    if (raw is! List) {
+      violations.add(
+        FieldViolation(path: path, expected: 'List<$E>', actual: describe(raw)),
+      );
+      return null;
+    }
+    final before = violations.length;
+    final items = <E>[];
+    for (var i = 0; i < raw.length; i++) {
+      final elementBefore = violations.length;
+      final decoded = decodeElement(raw[i], '$path/$i', violations);
+      // A clean read of a nullable element answers null too. Track SUCCESS
+      // with the violation count, never the decoded value (#215).
+      if (violations.length == elementBefore) items.add(decoded as E);
+    }
+    if (violations.length != before) return null;
+    return items;
+  }
+
   /// Reads an `index` member for a positional list step, refusing a negative
   /// index and an index that the tracked length proves out of range (#215).
   static int? _listIndex(

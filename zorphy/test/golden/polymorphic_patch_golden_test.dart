@@ -50,6 +50,131 @@ String _fixtureRegion(String start, String end) {
   return source.substring(from + start.length, to).trim();
 }
 
+/// Collapses *formatting* whitespace but preserves whitespace that belongs to
+/// a string literal's content, so a golden comparison is insensitive to the
+/// line-wrapping the locally resolved `dart_style` (`^3.1.1`) chooses without
+/// going blind to a changed literal token (zorphy#260).
+///
+/// The emitted code is formatted by whatever `dart_style` patch release
+/// resolves; a release that wraps a long string literal onto a continuation
+/// line (or back) changes only the whitespace *between* tokens — the literal's
+/// content is identical — yet used to fail the byte-for-byte golden whose
+/// fixture came from an earlier style. Collapsing outside-string whitespace
+/// removes that drift. Whitespace *inside* a literal is semantic: `'shared,
+/// OrderNotification'` and `'shared,  OrderNotification'` are different
+/// diagnostics, so it is copied verbatim. A blanket `\s+` collapse erased that
+/// distinction and let a changed diagnostic pass as equal.
+String _normalize(String source) {
+  final buffer = StringBuffer();
+
+  // A frame is a region being scanned: a 'code' frame collapses whitespace,
+  // a 'string' frame preserves it. `${...}` inside a string pushes a nested
+  // code frame so quotes within interpolation are recognized as their own
+  // literals (e.g. `'one of: ${hierarchy.join(', ')}'`).
+  final frames = <_NormalizeFrame>[_NormalizeFrame.code()];
+  var pendingSpace = false;
+
+  void flushSpace() {
+    if (pendingSpace && buffer.isNotEmpty) buffer.write(' ');
+    pendingSpace = false;
+  }
+
+  for (var i = 0; i < source.length; i++) {
+    final frame = frames.last;
+    final c = source[i];
+
+    if (frame.isString) {
+      // Inside a literal: copy every character verbatim.
+      buffer.write(c);
+      if (frame.escaped) {
+        frame.escaped = false;
+      } else if (c == r'\' && !frame.raw) {
+        frame.escaped = true;
+      } else if (frame.triple &&
+          c == frame.quote &&
+          i + 2 < source.length &&
+          source[i + 1] == frame.quote &&
+          source[i + 2] == frame.quote) {
+        buffer.write(source[i + 1]);
+        buffer.write(source[i + 2]);
+        i += 2;
+        frames.removeLast();
+      } else if (!frame.triple && c == frame.quote) {
+        frames.removeLast();
+      } else if (c == r'$' && i + 1 < source.length && source[i + 1] == '{') {
+        buffer.write('{');
+        i++;
+        frames.add(_NormalizeFrame.interpolation());
+      }
+      continue;
+    }
+
+    // Code (including interpolation expressions): collapse whitespace runs.
+    if (c == ' ' || c == '\n' || c == '\r' || c == '\t') {
+      pendingSpace = true;
+      continue;
+    }
+
+    final isQuote = c == r"'" || c == r'"';
+    if (isQuote) {
+      flushSpace();
+      final raw = i > 0 && source[i - 1] == 'r';
+      final triple =
+          i + 2 < source.length && source[i + 1] == c && source[i + 2] == c;
+      buffer.write(c);
+      if (triple) {
+        buffer.write(c);
+        buffer.write(c);
+        i += 2;
+      }
+      frames.add(_NormalizeFrame.string(c, triple, raw));
+      continue;
+    }
+
+    flushSpace();
+    buffer.write(c);
+    // Track interpolation brace depth so a `}` closes the string only when
+    // the nested `${...}` it opened is complete.
+    if (c == '{' && frame.braceDepth > 0) {
+      frame.braceDepth++;
+    } else if (c == '}' && frame.braceDepth > 0) {
+      frame.braceDepth--;
+      if (frame.braceDepth == 0) frames.removeLast();
+    }
+  }
+  // A trailing whitespace run is dropped — emitted source starts and ends with
+  // code, so the ends are trimmed without touching any string content.
+  return buffer.toString();
+}
+
+class _NormalizeFrame {
+  _NormalizeFrame.code()
+    : quote = '',
+      triple = false,
+      raw = false,
+      escaped = false,
+      braceDepth = 0;
+
+  _NormalizeFrame.interpolation()
+    : quote = '',
+      triple = false,
+      raw = false,
+      escaped = false,
+      braceDepth = 1;
+
+  _NormalizeFrame.string(this.quote, this.triple, this.raw)
+    : escaped = false,
+      braceDepth = 0;
+
+  final String quote;
+  final bool triple;
+  final bool raw;
+  bool escaped;
+  int braceDepth;
+
+  bool get isString => quote.isNotEmpty;
+}
+
 /// A three-level hierarchy whose concrete leaves narrow an inherited field:
 /// `SystemEvent.payload` is `Object`, `DeployEvent.payload` is `String` and
 /// `AlertEvent.payload` is `int`. The intermediate `apply` must dispatch to
@@ -224,20 +349,28 @@ void main() {
       );
     });
 
-    test('the root emission matches the runtime fixture byte for byte', () {
-      final emitted = PolymorphicPatchEmitter().emitRoot(
-        rootName: 'Notification',
-        fields: rootFields(),
-        subtypeNames: subtypes(),
-      );
-      expect(
-        emitted.trim(),
-        _fixtureRegion('// GOLDEN-POLY-ROOT-START', '// GOLDEN-POLY-ROOT-END'),
-        reason:
-            'the runtime suite must exercise the real emitted root patch — '
-            'regenerate $_fixturePath if the emission changed on purpose',
-      );
-    });
+    test(
+      'the root emission matches the runtime fixture (whitespace-insensitive)',
+      () {
+        final emitted = PolymorphicPatchEmitter().emitRoot(
+          rootName: 'Notification',
+          fields: rootFields(),
+          subtypeNames: subtypes(),
+        );
+        expect(
+          _normalize(emitted),
+          _normalize(
+            _fixtureRegion(
+              '// GOLDEN-POLY-ROOT-START',
+              '// GOLDEN-POLY-ROOT-END',
+            ),
+          ),
+          reason:
+              'the runtime suite must exercise the real emitted root patch — '
+              'regenerate $_fixturePath if the emission changed on purpose',
+        );
+      },
+    );
   });
 
   group('ISSUE-009 PolymorphicPatchEmitter — subtype narrowing', () {
@@ -319,10 +452,12 @@ void main() {
         sharedFields: const ['id', 'readAt'],
       );
       expect(
-        emitted.trim(),
-        _fixtureRegion(
-          '// GOLDEN-POLY-ORDER-START',
-          '// GOLDEN-POLY-ORDER-END',
+        _normalize(emitted),
+        _normalize(
+          _fixtureRegion(
+            '// GOLDEN-POLY-ORDER-START',
+            '// GOLDEN-POLY-ORDER-END',
+          ),
         ),
         reason: 'regenerate $_fixturePath if the emission changed on purpose',
       );
@@ -336,10 +471,12 @@ void main() {
         sharedFields: const ['id', 'readAt'],
       );
       expect(
-        emitted.trim(),
-        _fixtureRegion(
-          '// GOLDEN-POLY-PRICE-START',
-          '// GOLDEN-POLY-PRICE-END',
+        _normalize(emitted),
+        _normalize(
+          _fixtureRegion(
+            '// GOLDEN-POLY-PRICE-START',
+            '// GOLDEN-POLY-PRICE-END',
+          ),
         ),
         reason: 'regenerate $_fixturePath if the emission changed on purpose',
       );
@@ -595,8 +732,8 @@ void main() {
             .substring(from + '// GOLDEN-POLY-INTERMEDIATE-START'.length, to)
             .trim();
         expect(
-          region,
-          _emitIntermediateHierarchy().trim(),
+          _normalize(region),
+          _normalize(_emitIntermediateHierarchy()),
           reason:
               'the runtime suite must exercise the real emitted intermediate '
               'patch — regenerate test/runtime/fixtures/intermediate.dart if '
@@ -654,6 +791,51 @@ void main() {
       // The subtype's own field is diffed; the identical fast path is present.
       expect(emitted, contains('if (previous.itemCount != next.itemCount)'));
       expect(emitted, contains('if (identical(previous, next)) return'));
+    });
+  });
+
+  // Regression for zorphy#260: the byte-for-byte golden broke whenever a
+  // `dart_style` patch release changed how it wraps a long string literal. The
+  // normalizer collapses whitespace so only token content is compared, making
+  // the golden independent of the resolved `dart_style` version.
+  group('ISSUE-260 golden whitespace normalization', () {
+    // The exact shape of the drift from the issue: a long `expected:` string
+    // literal wrapped onto a continuation line by one dart_style version and
+    // kept on one line by another — semantically identical, byte-different.
+    const wrapped =
+        "expected:\n"
+        "            'String (one of: shared, OrderNotification, "
+        "PriceDropNotification)',";
+    const unwrapped =
+        "expected: 'String (one of: shared, OrderNotification, "
+        "PriceDropNotification)',";
+
+    test(
+      'a line-wrap-only difference is byte-unequal but normalized-equal',
+      () {
+        // RED condition (the bug): a byte-for-byte compare rejects the drift.
+        expect(wrapped, isNot(unwrapped));
+        // GREEN condition (the fix): normalization treats them as identical.
+        expect(_normalize(wrapped), _normalize(unwrapped));
+      },
+    );
+
+    test('a real token change stays unequal after normalization', () {
+      final changed = unwrapped.replaceFirst('shared', 'sharedX');
+      expect(_normalize(unwrapped), isNot(_normalize(changed)));
+    });
+
+    test('whitespace inside a string literal is preserved', () {
+      // Review finding on #263: a blanket \s+ collapse would normalize both
+      // of these to the same text, letting a changed diagnostic (a doubled
+      // space inside the literal) pass the golden. Formatting whitespace is
+      // normalized; string-literal content is compared exactly.
+      const oneSpace =
+          "expected: 'String (one of: shared, OrderNotification)',";
+      const twoSpaces =
+          "expected: 'String (one of: shared,  OrderNotification)',";
+      expect(oneSpace, isNot(twoSpaces));
+      expect(_normalize(oneSpace), isNot(_normalize(twoSpaces)));
     });
   });
 }

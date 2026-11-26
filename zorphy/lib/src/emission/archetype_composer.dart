@@ -71,6 +71,7 @@ import '../parser/polymorphic_ir.dart';
 import 'boundary_codec_emitter.dart';
 import 'entity_fields_generator.dart';
 import 'emitter.dart';
+import 'entity_descriptor_generator.dart';
 import 'json_pointer_emitter.dart';
 import 'lens_emitter.dart';
 import 'polymorphic_class_emitter.dart';
@@ -169,6 +170,12 @@ final class ArchetypeComposer {
     // into its subtypes and nested types. Compute them once per library.
     final resolvePaths = JsonPointerEmitter(ir).resolvePathMethods();
     final lensRegistries = const LensEmitter().registryFields(ir);
+    // The `ZorphyEntityDescriptor` surface (issue #251): one static registry
+    // field spliced into each emittable entity, plus the top-level
+    // `_<Entity>Descriptor` classes appended after the entities that own the
+    // field. IR-native like the lens pair above.
+    final descriptorGenerator = EntityDescriptorGenerator(ir);
+    final descriptorFields = descriptorGenerator.descriptorFields();
     // `_sentinel` backs the leaf `copyWith` clear-a-nullable-field path. It
     // is a library-level declaration, so it is emitted only when some
     // emitted leaf's payload actually carries a nullable field — otherwise
@@ -213,6 +220,13 @@ final class ArchetypeComposer {
         extraMethods[node.className] = methods;
         final registry = lensRegistries[node.className];
         if (registry != null) extraFields[node.className] = [registry];
+        final descriptor = descriptorFields[node.className];
+        if (descriptor != null) {
+          extraFields[node.className] = [
+            ...extraFields[node.className] ?? const [],
+            descriptor,
+          ];
+        }
       }
       fragments.add(
         const PolymorphicClassEmitter().emit(
@@ -285,6 +299,14 @@ final class ArchetypeComposer {
       if (fieldsClasses.isNotEmpty) {
         fragments.add(ZorphyEmitter().emitSpecs(fieldsClasses));
       }
+    }
+
+    // The `_<Entity>Descriptor` classes (issue #251) are top-level, one per
+    // emittable entity, emitted once per library after the entity classes that
+    // own the `descriptor` registry field referencing them.
+    final descriptorClasses = descriptorGenerator.descriptorClasses();
+    if (descriptorClasses.isNotEmpty) {
+      fragments.add(ZorphyEmitter().emitSpecs(descriptorClasses));
     }
 
     // Intent hierarchies emit their own class surface (see the library doc) —

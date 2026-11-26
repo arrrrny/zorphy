@@ -19,9 +19,26 @@ class ProgressBoxPatch<T> extends PatchBase<ProgressBox<T>, ProgressBox$> {
   ProgressBoxPatch<T> compose(covariant ProgressBoxPatch<T> next) {
     if (next.isEmpty) return this;
     if (isEmpty) return next;
-    return ProgressBoxPatch<T>()
+    final composed = ProgressBoxPatch<T>()
       ..patchMap.addAll(patchMap)
       ..patchMap.addAll(next.patchMap);
+    final tokenCarried = patchMap[ProgressBox$.token];
+    final tokenNext = next.patchMap[ProgressBox$.token];
+    if (tokenCarried is PatchNested<Token, TokenPatch> &&
+        tokenNext is PatchNested<Token, TokenPatch>)
+      composed.patchMap[ProgressBox$.token] = tokenCarried.composeNested(
+        tokenNext,
+      );
+    return composed;
+  }
+
+  @override
+  String wireNameFor(ProgressBox$ key) {
+    return switch (key) {
+      ProgressBox$.value => 'value',
+      ProgressBox$.label => 'label',
+      ProgressBox$.token => 'token',
+    };
   }
 
   ProgressBoxPatch<T> invert(ProgressBox<T> before) {

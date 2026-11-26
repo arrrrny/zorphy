@@ -30,7 +30,13 @@
 #   * `${{ secrets.* }}`, `${{ inputs.* }}`, `${{ vars.* }}`, `${{ steps.* }}`,
 #     `${{ needs.* }}`, `${{ github.event.* }}` — there is no GitHub context
 #     locally. A step that needs one is SKIPPED with the reason printed, never
-#     run with a guessed value.
+#     run with a guessed value. Secrets are the one context an operator can
+#     supply FOR REAL (#708): LOCAL_CI_SECRET_<NAME>=… ./scripts/local_ci.sh
+#     resolves ${{ secrets.<NAME> }} to that value, and
+#     LOCAL_CI_SECRETS="<NAME>,…" reads each name from the ambient environment.
+#     The report says which secrets were real and which were blanked; names
+#     are printed, values are never echoed — a value a step prints is masked
+#     to *** in the echoed and captured output, as GitHub masks it in a log.
 #   * `uses:` actions are not executed. Toolchain setups (setup-dart, setup-node,
 #     flutter-action, rust-toolchain, …) become a version ASSERTION against the
 #     local tool; known no-op actions (checkout/cache/artifacts) are noted; any
@@ -39,7 +45,8 @@
 #   * `strategy.matrix` is expanded as a cross product; `include` merges into
 #     every matching combination (or appends a new one when none match) and
 #     `exclude` drops matching combinations, as GitHub does.
-#   * `continue-on-error: true` steps are advisory locally, exactly as in CI.
+#   * `continue-on-error: true` (step- or job-level) failures are advisory
+#     locally, exactly as in CI.
 #   * A `cargo … --target <triple>` step needs a toolchain that carries that
 #     target's standard library. A rustup toolchain carrying EVERY target of the
 #     step is used for it — through the rustup proxy, so `cargo +<toolchain>`
@@ -47,7 +54,27 @@
 #     with the reason printed — a host fact, not a repo failure. A host with no
 #     rust toolchain at all is a missing TOOLCHAIN: the step FAILS.
 #
-# Exit status: 0 when every executed step passed, 1 otherwise.
+# HOST FACTS (forklift#941) are decided before any step runs, because a false red
+# on a green PR is worse than a slow one — this is the MERGE GATE for our private
+# repos (#659):
+#   * every step gets a PRIVATE per-run TMPDIR (`$LOCAL_CI_TMPDIR`, else the
+#     first candidate with headroom). The caller's TMPDIR is not inherited: two
+#     concurrent gates share it and delete each other's `dart_test.kernel.*`
+#     cache mid-suite.
+#   * a host carrying a sqlite3 RUNTIME object but no `libsqlite3.so` dev symlink
+#     gets that symlink in a private dir prepended to `LD_LIBRARY_PATH`, so
+#     package:sqlite3's FFI loader resolves instead of failing 96 store-backed
+#     tests. A gap with nothing to point at is named in the banner.
+#   * a filesystem under `LOCAL_CI_MIN_FREE_MB` (default 256) free aborts the run
+#     with one named `disk full:` verdict and exit 3 — no step runs.
+#   * a red whose output carries one of those fingerprints (FFI loader,
+#     `dart_test.kernel.*` collision) is reported as LOCAL ONLY, like the
+#     checkout-state guard's; `--strict` counts it anyway. `disk-full` stays a
+#     failure and only gets named, because a suite can eat a disk.
+#
+# Exit status: 0 when every executed step passed, 1 when a step failed, 2 on a
+# usage error, 3 when the host cannot run the gate at all (no headroom) — 3 is
+# deliberately not 1: it is "no verdict about this repo", not "this repo is red".
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -68,6 +95,8 @@ This is deliberately NOT a second copy of the workflow: it reads
 simulated event, and executes its jobs and steps in order.
 """
 import atexit
+import ctypes
+import glob
 import itertools
 import json
 import os
@@ -75,6 +104,7 @@ import platform
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -364,6 +394,91 @@ def parse_workflow(path):
 NO_LOCAL_CONTEXT = ("secrets.", "inputs.", "vars.", "steps.", "needs.",
                     "github.event.", "github.token", "github.actor")
 
+# Secrets the operator can hand the local run for real (issue #708). CI resolves
+# `${{ secrets.* }}` on GitHub's side; locally there is no GitHub, and #701
+# correctly blanks what cannot be resolved — but blanking also means a repo
+# whose registry credential is env-var-backed can never pass `Get dependencies`
+# here: the gate blanks the variable, pub demands it, and the run is red behind
+# an infrastructure error. The operator running this gate HAS the value — the
+# whole difference between local and CI — so it can be passed through:
+#
+#   LOCAL_CI_SECRET_PUB_ZUZU_TOKEN=… ./scripts/local_ci.sh    # direct value
+#   LOCAL_CI_SECRETS="PUB_ZUZU_TOKEN" ./scripts/local_ci.sh   # ambient env
+#
+# A listed name with no ambient value is a misconfiguration: it is named at
+# startup and the secret stays blanked, never guessed. Only NAMES are ever
+# printed — a value reaches the step's environment and nothing else.
+LOCAL_SECRETS = {}
+SECRETS_MISSING = []   # LOCAL_CI_SECRETS names the ambient env cannot back
+SECRETS_MULTILINE = []  # rejected at intake — cannot be masked across streamed lines
+SECRETS_REAL = []      # secrets resolved from a supplied value, in use order
+SECRETS_BLANKED = []   # secrets that resolved to "" for lack of a local value
+
+
+def _accept_local_secret(name, value):
+    """Store a single-line value; reject a multiline one before it can leak.
+
+    stream_command() masks each line as it is emitted (#256 review): a value
+    containing a newline never appears whole in any one line, so both halves of
+    a printed credential would reach the console and the captured log. Until
+    cross-line masking exists, a multiline value is refused at intake — it
+    resolves empty like a missing secret, never unmasked.
+    """
+    if "\n" in value or "\r" in value:
+        SECRETS_MULTILINE.append(name)
+        return
+    LOCAL_SECRETS[name] = value
+
+
+def _collect_local_secrets():
+    direct_prefix = "LOCAL_CI_SECRET_"
+    for key, value in sorted(os.environ.items()):
+        if key.startswith(direct_prefix):
+            name = key[len(direct_prefix):]
+            if name and value:
+                _accept_local_secret(name, value)
+    listed = os.environ.get("LOCAL_CI_SECRETS", "")
+    for name in (p.strip() for p in re.split(r"[,\s]+", listed)):
+        if not name or name in LOCAL_SECRETS:
+            continue
+        value = os.environ.get(name, "")
+        if value:
+            _accept_local_secret(name, value)
+        else:
+            SECRETS_MISSING.append(name)
+
+
+_collect_local_secrets()
+
+
+def local_secret(name):
+    """The supplied value for secret `name`, or None.
+
+    GitHub reads secret names case-insensitively (`${{ secrets.foo }}` resolves
+    the secret stored as FOO), so a case-insensitive match is honoured after
+    the exact one. The matched name travels with the value — the accounting
+    records the name the operator supplied, not the reference's spelling.
+    """
+    if name in LOCAL_SECRETS:
+        return name, LOCAL_SECRETS[name]
+    upper = {k.upper(): (k, v) for k, v in LOCAL_SECRETS.items()}
+    return upper.get(name.upper())
+
+
+def record_real_secrets(hits):
+    """Count (expression, supplied name) pairs whose value actually survives.
+
+    Called where a resolved secret's value is really used — a run: body about
+    to execute, an `env:` entry that survived into the child env of a step
+    past every skip guard — so a secret resolved into a value that is then
+    discarded (a sibling ref in the same entry left it unresolvable, a later
+    env layer overrode the key, the step was skipped) is never reported as
+    real (#708 review, dart_curl#76 review). First-use order.
+    """
+    for _e, supplied in hits:
+        if supplied not in SECRETS_REAL:
+            SECRETS_REAL.append(supplied)
+
 
 def build_github(slug, branch, event, workflow_name, sha):
     return {
@@ -449,6 +564,26 @@ def resolve_ref(expr, ctx, unresolved):
                 return str(src[name])
         unresolved.append(e)
         return None
+    if e.startswith("secrets."):
+        # An operator-supplied secret resolves FOR REAL (#708) — the probe
+        # stays empty, so a step that would otherwise be skipped for GitHub
+        # context runs, and an env: entry carries the value instead of "".
+        name = e[len("secrets."):]
+        resolved = local_secret(name)
+        if resolved is not None:
+            supplied, value = resolved
+            # Being counted as real does NOT happen here (forklift#708 review):
+            # a ref can resolve into a value whose entry is then blanked via
+            # another ref, and the value is discarded. The promotion lives
+            # where the resolved value survives — record_real_secrets().
+            hits = ctx.get("secret_hits")
+            if isinstance(hits, list):
+                hits.append((e, supplied))
+            return value
+        if name not in SECRETS_BLANKED:
+            SECRETS_BLANKED.append(name)
+        unresolved.append(e)
+        return None
     if any(e.startswith(p) for p in NO_LOCAL_CONTEXT):
         unresolved.append(e)
         return None
@@ -496,10 +631,15 @@ def eval_condition(text, ctx, unresolved):
         return True
     if t in ("false",):
         return False
+    # Explicit success()/failure() must match the implicit gate (#256 review):
+    # a step-level continue-on-error failure is recorded as SUCCESS in CI and
+    # later default steps still run, but it still leaves job_ok False. Keying
+    # these conditions on job_ok inverted them; job_unsoftened is the flag the
+    # implicit gate uses. Unsoftened and job-level failures keep their result.
     if t == "success()":
-        return ctx.get("job_ok", True)
+        return not ctx.get("job_unsoftened", False)
     if t == "failure()":
-        return not ctx.get("job_ok", True)
+        return ctx.get("job_unsoftened", False)
     for op, fn in (("||", any), ("&&", all)):
         parts = _split_top(t, op)
         if len(parts) > 1:
@@ -557,6 +697,557 @@ APT_EQUIVALENTS = {
     "sqlite3": ("sqlite3", "sqlite3"),
     "zlib1g-dev": ("zlib development library", None),
 }
+
+
+# ------------------------------------------------------- host environment facts
+
+# The gate runs on the operator's own machine, beside up to three other agents
+# (forklift#176), and three facts about THAT machine redden an otherwise green
+# suite. None of them is a repository defect, so each is decided BEFORE the
+# suite runs — and a fingerprint that still surfaces is reported under its class
+# instead of being read as a code failure (arrrrny/forklift#941):
+#
+#   1. package:sqlite3's FFI loader opens `libsqlite3.so`, the DEV symlink. A
+#      host carrying only the runtime package (`libsqlite3.so.0`) fails every
+#      store-backed test with "Failed to load dynamic library 'libsqlite3.so'".
+#   2. The ambient TMPDIR is shared: two concurrent gates delete each other's
+#      `dart_test.kernel.*` cache mid-suite, and the suite reports 12 failures.
+#   3. A full filesystem surfaces as `No space left on device` inside dozens of
+#      tests instead of as the disk problem it is. And when it IS full, the
+#      verdict names the stale `dart_test.kernel.*` parents that filled it
+#      (arrrrny/forklift#990): on the Linux worker a 13 GB cache two days old
+#      took `/` to 100% mid-publish and the verdict named only the watermark,
+#      so the operator had to go hunting with `du` while the release was down.
+
+# Headroom a run needs on the filesystems it writes to. Under it the gate
+# refuses to start rather than turning a full disk into 42 "test failures".
+DEFAULT_MIN_FREE_MB = 256
+
+# How old a `dart_test.kernel.*` parent must be before the disk-full verdict
+# names it as the culprit (arrrrny/forklift#990 ask 2). The gate is the
+# sweeper's own — `sweep-dart-test-cache.sh` MAX_AGE_HOURS — so the report
+# names exactly what that job would reclaim, never a cache belonging to a gate
+# that is running right now. The report only NAMES: nothing here deletes, so
+# the age can afford to be the conservative one.
+DEFAULT_STALE_CACHE_HOURS = 24
+KERNEL_CACHE_GLOB = "dart_test.kernel.*"
+
+# Where a per-run TMPDIR may live, after the operator's own override and the
+# ambient temp dir: a host whose /tmp is a small tmpfs can still run the gate.
+TMPDIR_FALLBACKS = ("/tmp", "/var/tmp")
+
+SQLITE_FFI_NAME = "libsqlite3.so"
+
+# The failure fingerprints, asked in this order. Each names a fact about the
+# machine the gate ran on, so each is reported under its own class.
+#
+# The FFI prefix is deliberately the BARE name: package:sqlite3's loader opens
+# `libsqlite3.so` with no directory, so a path-qualified form (`/usr/lib/…`) is
+# a different failure this class does not own — and a class that matched the
+# path form would claim a message the loader never emits.
+SQLITE_FFI_RE = re.compile(r"Failed to load dynamic library\s+'?"
+                           + re.escape(SQLITE_FFI_NAME))
+# Anchored to the collision signature, not to "any kernel path": the runner
+# failing to OPEN a cache it expected to own is the shared-TMPDIR fact, while a
+# path merely printed in a failure (the cache-sweep suite's own fixture names)
+# is not. An unanchored match downgraded a real red in exactly the file that
+# owns this vocabulary.
+KERNEL_CACHE_RE = re.compile(
+    r"(?:Cannot open file|Failed to load|PathNotFoundException)[^\n]*"
+    r"dart_test\.kernel\.[A-Za-z0-9]{6,}")
+DISK_FULL_RE = re.compile(r"No space left on device|errno\s*=\s*28\b")
+
+# The classes a preflight cannot prevent yet that are never a repo defect: the
+# suite died because of how the host is provisioned, not because of what the
+# commit contains. `disk-full` is deliberately NOT here — a suite CAN eat a
+# disk, so that red stays a red and only gets named.
+LOCAL_ONLY_HOST_CLASSES = ("sqlite3-ffi", "shared-kernel-cache")
+
+
+def host_fingerprint(output):
+    """`(class, sentence)` for the host fact a failure output carries, or None.
+
+    disk-full is checked FIRST (#256 review): a suite that filled the disk can
+    also print a sqlite3 FFI loader error (a truncated download, a half-written
+    library), and classifying that as sqlite3-ffi would take the LOCAL ONLY path
+    and hide a real disk-full red. A step that reports only the sqlite3
+    fingerprint still takes the LOCAL ONLY path as before.
+    """
+    text = output or ""
+    if DISK_FULL_RE.search(text):
+        return ("disk-full",
+                "the filesystem filled up while the step ran")
+    if SQLITE_FFI_RE.search(text):
+        return ("sqlite3-ffi",
+                "the host has no libsqlite3.so for package:sqlite3's FFI loader "
+                "(install the sqlite3 runtime package, or let the preflight "
+                "symlink it)")
+    if KERNEL_CACHE_RE.search(text):
+        return ("shared-kernel-cache",
+                "a concurrent run deleted this gate's dart_test.kernel.* cache — "
+                "the ambient TMPDIR was shared")
+    return None
+
+
+def disk_free_kib(path):
+    """`(free KiB, mount point)` on the filesystem holding `path`, or None.
+
+    `df -P` is POSIX and never wraps a long device name onto a second line, so
+    the LAST row is the filesystem asked for: blocks, used, available, capacity,
+    mountpoint.
+    """
+    try:
+        out = subprocess.run(["df", "-Pk", str(path)], capture_output=True,
+                             text=True, timeout=30).stdout
+    except Exception:
+        return None
+    rows = [ln for ln in out.split("\n") if ln.strip()]
+    if len(rows) < 2:
+        return None
+    fields = rows[-1].split()
+    if len(fields) < 4:
+        return None
+    try:
+        return int(fields[3]), fields[-1]
+    except ValueError:
+        return None
+
+
+def tree_kib(path):
+    """KiB a directory tree occupies, or None when it cannot be measured.
+
+    `du -sk` is the same measurement the sweeper's log line uses, and it is
+    only paid on the ABORT path (a handful of cache dirs, never the disk). A
+    timeout is an unknown, not a zero: a 13 GB cache on a loaded host can
+    outlast 60s, and reporting it as 0 would rank it last instead of first.
+    """
+    try:
+        # No `--` separator: BSD `du` (macOS) does not accept one, and every
+        # path here comes from an absolute glob, so it cannot read as an option.
+        out = subprocess.run(["du", "-sk", str(path)],
+                             capture_output=True, text=True,
+                             timeout=60).stdout
+    except Exception:
+        return None
+    fields = out.split()
+    if not fields:
+        return None
+    try:
+        return int(fields[0])
+    except ValueError:
+        return None
+
+
+def stale_kernel_caches(max_age_hours=DEFAULT_STALE_CACHE_HOURS, limit=3):
+    """`[(path, KiB, age_hours)]` for the biggest STALE kernel caches, biggest first.
+
+    arrrrny/forklift#990 ask 2: the 13 GB that filled `/` on the Linux worker
+    was a `dart_test.kernel.*` two days old, and the #941 verdict said only
+    "disk full: / has 7M free, the gate needs 256M" — the operator still had
+    to hunt the culprit by hand while a publish was down.
+
+    Bounded twice over, because this runs on the abort path of a host that is
+    already out of disk: the glob is anchored at the temp candidates (a
+    handful of dirs, never a filesystem walk — the #395 rule) and `du` only
+    descends the matched cache dirs. The age gate reads the cache dir's OWN
+    mtime, exactly what the sweeper's kernel-cache pass reads, so "stale"
+    means one thing fleet-wide.
+    """
+    cutoff = time.time() - max_age_hours * 3600
+    found = []
+    # Measure at most 4x the report size, biggest-uncertainties first: the
+    # abort path runs on a host that is already out of disk, so the `du` that
+    # feeds a `limit`-line report must not be paid once per stale cache
+    # (#991 review — the 13 GB entry is exactly the one a `du` is slow on).
+    max_probe = limit * 4
+    for base in tmpdir_candidates():
+        for path in sorted(glob.glob(os.path.join(base, KERNEL_CACHE_GLOB))):
+            if len(found) >= max_probe:
+                break
+            try:
+                stat = os.stat(path)
+            except OSError:
+                continue
+            if not os.path.isdir(path) or stat.st_mtime > cutoff:
+                continue
+            kib = tree_kib(path)
+            # A timeout/unknown is kept, not dropped: "too large to measure in
+            # 60s" is itself the strongest signal an entry can carry, and the
+            # sort below ranks it FIRST so the biggest culprit is never the
+            # one that vanishes (#991 review).
+            found.append((path, kib, (time.time() - stat.st_mtime) / 3600))
+        if len(found) >= max_probe:
+            break
+    # Unknown sizes FIRST (#256 review): the earlier key put numeric sizes
+    # before None, so a cache whose `du` timed out — the strongest signal —
+    # was dropped from a top-three report whenever three others were measured.
+    found.sort(key=lambda item: (item[1] is not None, -(item[1] or 0)))
+    return found[:limit]
+
+
+def watermark_kib():
+    """`LOCAL_CI_MIN_FREE_MB` in KiB. A typo is a named error, never a default.
+
+    The fleet's convention: an invalid value is reported, not silently replaced
+    — a watermark that quietly fell back would let a full disk through as a red.
+    """
+    raw = (os.environ.get("LOCAL_CI_MIN_FREE_MB") or "").strip()
+    if not raw:
+        return DEFAULT_MIN_FREE_MB * 1024
+    try:
+        mb = int(raw)
+    except ValueError:
+        raise ValueError(f"LOCAL_CI_MIN_FREE_MB={raw!r} is not a whole number "
+                         "of megabytes")
+    if mb < 0:
+        raise ValueError(f"LOCAL_CI_MIN_FREE_MB={mb} is negative")
+    return mb * 1024
+
+
+def tmpdir_candidates():
+    """Temp dirs to choose a per-run TMPDIR from, best claim first."""
+    out = []
+    for name in ("LOCAL_CI_TMPDIR", "TMPDIR", "TEMP", "TMP"):
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            out.append(value)
+    out.extend(TMPDIR_FALLBACKS)
+    out.append(str(Path.home() / ".cache"))
+    seen, paths = set(), []
+    for path in out:
+        absolute = os.path.abspath(path)
+        if absolute not in seen and os.path.isdir(absolute):
+            seen.add(absolute)
+            paths.append(absolute)
+    return paths
+
+
+def sqlite3_search_dirs():
+    """Where a sqlite3 runtime object may live, the operator's claim first.
+
+    `LOCAL_CI_SQLITE_LIB_DIRS` is the documented override (a Nix store, a
+    relocated sysroot); `LD_LIBRARY_PATH` is what the loader would already use.
+    The multiarch directories are globbed rather than hardcoded: Debian and
+    Ubuntu name them after the machine (`x86_64-linux-gnu`, `aarch64-linux-gnu`)
+    and that list grows with every architecture.
+    """
+    dirs = []
+
+    def add(path):
+        if path and os.path.isdir(path) and path not in dirs:
+            dirs.append(path)
+
+    for name in ("LOCAL_CI_SQLITE_LIB_DIRS", "LD_LIBRARY_PATH"):
+        for path in (os.environ.get(name) or "").split(os.pathsep):
+            add(path.strip())
+    for pattern in ("/usr/lib/*-linux-gnu*", "/lib/*-linux-gnu*",
+                    "/usr/lib64", "/usr/lib", "/lib64", "/lib", "/usr/local/lib"):
+        for path in sorted(glob.glob(pattern)):
+            add(path)
+    return dirs
+
+
+def sqlite3_candidates(dirs):
+    """`libsqlite3.so*` files in `dirs` — the un-suffixed one first, if any."""
+    exact, versioned = [], []
+    for directory in dirs:
+        try:
+            names = sorted(os.listdir(directory))
+        except OSError:
+            continue
+        for name in names:
+            path = os.path.join(directory, name)
+            if name == SQLITE_FFI_NAME:
+                exact.append(path)
+            elif name.startswith(SQLITE_FFI_NAME + "."):
+                versioned.append(path)
+    return exact + versioned
+
+
+def sqlite3_ffi_plan(search_dirs):
+    """`("ok"|"remedy"|"gap"|"n-a", payload)` for package:sqlite3's FFI loader.
+
+    The loader opens `libsqlite3.so` — the DEV symlink — so a host with the
+    runtime package only has a versioned object no loader will find. When one IS
+    there, a private symlink dir repairs it for every child step; when nothing
+    is, there is nothing to point at and the gap is reported instead. The probe
+    is the loader's own: `ctypes.CDLL` resolves exactly what Dart's
+    `DynamicLibrary.open` would, so this is never a guess about a path.
+    """
+    try:
+        ctypes.CDLL(SQLITE_FFI_NAME)
+        return "ok", None
+    except OSError:
+        pass
+    except Exception:
+        return "n-a", None
+    found = sqlite3_candidates(search_dirs)
+    if found:
+        return "remedy", found[0]
+    if sys.platform.startswith("linux"):
+        return "gap", None
+    return "n-a", None   # macOS/Windows open a .dylib/.dll, not a .so
+
+
+class HostPreflight:
+    """What this host can do for the run — decided before any step runs (#941).
+
+    Three decisions, one place: the per-run TMPDIR (never the caller's), the
+    sqlite3 FFI remedy, and the disk verdict. The rules themselves are the pure
+    functions above; this class carries their outcome into the banner, the child
+    environment and the failure classification, so a red can be named instead of
+    guessed at.
+    """
+
+    def __init__(self, create=True):
+        """`create=False` is the `--plan` mode: measure, never touch the disk.
+
+        A dry run must not mkdtemp a per-run TMPDIR (the wrapper TERMs a plan
+        and the atexit handler never runs) and must not gain the exit-3 failure
+        mode on a full disk, so the preflight reports what it WOULD do and
+        creates nothing.
+        """
+        self.watermark = watermark_kib()
+        self.tmp_base, self.tmp_free, self.tmp_mount, self.verdict = (
+            self._plan_disk())
+        # The disk-full verdict names the watermark and the filesystem; on its
+        # own that still left the operator hunting the 13 GB culprit by hand
+        # (#990 ask 2). Measured only when the run is ALREADY aborting, so a
+        # normal run never pays for a `du`.
+        self.culprits = stale_kernel_caches() if self.verdict else []
+        # A per-run dir INSIDE the chosen base, so the run owns one tree and one
+        # cleanup: the base is shared (and may be the ambient TMPDIR itself, which
+        # the run must never remove), while `tmpdir` dies with the run.
+        self.tmpdir = None
+        # `create=False` is --plan: measure and report, never touch the disk
+        # (#256 review). Without this guard a plan on a roomy host still made a
+        # real per-run directory here, which the wrapper TERMs before the
+        # atexit cleanup can run.
+        if create and self.tmp_base and not self.verdict:
+            self.tmpdir = tempfile.mkdtemp(prefix="local_ci_", dir=self.tmp_base)
+        self.sqlite_state, self.sqlite_payload = sqlite3_ffi_plan(
+            sqlite3_search_dirs())
+        self.remedy_dir = None
+        if self.sqlite_state == "remedy" and self.tmpdir:
+            self.remedy_dir = self._make_remedy()
+            if self.remedy_dir is None:
+                self.sqlite_state, self.sqlite_payload = "gap", None
+        if not self.tmpdir and not self.verdict and create:
+            # No filesystem could be measured (no `df`, no readable mount). The
+            # old behaviour — the ambient temp dir — is the only one left, and it
+            # is not worth a verdict of its own.
+            self.tmpdir = tempfile.mkdtemp(prefix="local_ci_")
+
+    # ------------------------------------------------------------------ disk
+
+    def _plan_disk(self):
+        """`(tmp_base, free, mount, verdict)` — checkout and temp judged apart.
+
+        EVERY filesystem this run writes to is measured: the temp candidates and
+        the checkout root. `.dart_tool` and every build artifact land in the
+        checkout, so a full checkout root is a full run even when /tmp has room
+        (FR-007). But they are TWO separate verdicts (#256 review): an UNUSED
+        /tmp with 64M free must not block a run whose LOCAL_CI_TMPDIR and
+        checkout each have 1 GiB — the suggested override cannot clear a verdict
+        that /tmp keeps supplying. The checkout is measured for its own verdict
+        and is never a candidate for the temp base: its empty path would make
+        `max()` choose it, and the constructor would then fall back to the
+        ambient (unmeasured) temp location.
+
+        A filesystem too small to be measured (no `df`, no readable mount) is not
+        an opinion; an unreadable root is likewise skipped, never treated as full.
+        """
+        watermark = self.watermark
+        temp_measured = []
+        for path in tmpdir_candidates():
+            m = disk_free_kib(path)
+            if m is not None:
+                temp_measured.append((path, m[0], m[1]))
+        root = disk_free_kib(str(ROOT))
+        if root is not None and root[0] < watermark:
+            free, mount = root
+            verdict = (f"disk full: {mount} has {free // 1024}M free, the gate "
+                       f"needs {watermark // 1024}M (the checkout root) — free "
+                       "space, or move the checkout to a filesystem with headroom")
+            return None, None, None, verdict
+
+        # The temp base is the roomiest MEASURED candidate WITH room. A tight
+        # candidate names the verdict only when NO eligible candidate has room.
+        with_room = [item for item in temp_measured if item[1] >= watermark]
+        if with_room:
+            chosen = max(with_room, key=lambda item: item[1])
+            return chosen[0], chosen[1], chosen[2], None
+        if temp_measured:
+            tightest = min(temp_measured, key=lambda item: item[1])
+            _, free, mount = tightest
+            verdict = (f"disk full: {mount} has {free // 1024}M free, the gate "
+                       f"needs {watermark // 1024}M ({tightest[0]}) — free space, "
+                       "or point LOCAL_CI_TMPDIR at a filesystem with headroom")
+            return None, None, None, verdict
+        # No temp filesystem could be measured — no opinion, use the fallback.
+        return None, None, None, None
+
+    # --------------------------------------------------------------- sqlite3
+
+    def _make_remedy(self):
+        """A private dir holding `libsqlite3.so` -> the versioned runtime object."""
+        directory = os.path.join(self.tmpdir, "sqlite-ffi")
+        try:
+            os.makedirs(directory, exist_ok=True)
+            # Absolute target (#256 review): LOCAL_CI_SQLITE_LIB_DIRS may carry
+            # a relative dir; the symlink lives in the private sqlite-ffi dir,
+            # where a relative payload would resolve to nothing.
+            target = os.path.abspath(self.sqlite_payload)
+            os.symlink(target, os.path.join(directory, SQLITE_FFI_NAME))
+        except OSError:
+            return None
+        return directory
+
+    # ------------------------------------------------------------------ edges
+
+    @property
+    def blocked(self):
+        return self.verdict
+
+    def culprit_lines(self):
+        """The stale kernel-cache parents behind a disk-full verdict (#990)."""
+        lines = []
+        for path, kib, hours in self.culprits:
+            size = "size unknown" if kib is None else f"{kib // 1024}M"
+            lines.append(f"  {YELLOW}culprit  : {path} {size}, last "
+                         f"written {hours:.0f}h ago — a stale "
+                         "dart_test.kernel.* parent "
+                         f"(sweep-dart-test-cache.sh reclaims it){RESET}")
+        return lines
+
+    def plan_lines(self):
+        """The host facts a real run WOULD apply, with no directory created.
+
+        `--plan` is a dry run (forklift#941 review): it measures the host and
+        says what a real run would do, but a full disk is not a plan failure —
+        a plan that reports the plan is more useful than one that exits 3 on a
+        machine that happens to be tight right now.
+        """
+        if self.verdict:
+            return [f"  {YELLOW}disk     : {self.verdict} "
+                    f"(a real run would abort){RESET}"] + self.culprit_lines()
+        lines = []
+        if self.tmp_base:
+            # `df` can be unavailable: the free reading is then unknown, and
+            # arithmetic on it used to raise TypeError here (#256 review).
+            free = (f"{self.tmp_free // 1024}M free" if self.tmp_free is not None
+                    else "free space unknown")
+            lines.append(f"  tmpdir   : {self.tmp_base} would hold a private "
+                         f"per-run TMPDIR ({free}) — "
+                         "created for a real run, not for a plan")
+        if self.sqlite_state == "remedy":
+            lines.append(f"  sqlite3  : {SQLITE_FFI_NAME} does not resolve; a "
+                         f"real run would symlink {self.sqlite_payload}")
+        elif self.sqlite_state == "ok":
+            lines.append(f"  sqlite3  : {SQLITE_FFI_NAME} resolves for the FFI "
+                         "loader")
+        elif self.sqlite_state == "gap":
+            lines.append(f"  {YELLOW}sqlite3  : {SQLITE_FFI_NAME} does not "
+                         "resolve and no libsqlite3.so.* exists — install the "
+                         f"sqlite3 runtime package{RESET}")
+        return lines
+
+    def banner_lines(self):
+        """The host facts this run applied, one line each (printed at startup)."""
+        if self.verdict:
+            return [f"  {YELLOW}disk     : {self.verdict}{RESET}"] + \
+                self.culprit_lines()
+        lines = []
+        if self.tmpdir:
+            ambient = os.path.abspath(os.environ.get("TMPDIR") or "")
+            note = ("" if self.tmp_base == ambient
+                    else f"; the ambient TMPDIR ({os.environ.get('TMPDIR') or 'unset'}) "
+                         "is not inherited")
+            # An unmeasurable `df` leaves tmp_free None: report unknown, never
+            # crash in the startup banner before atexit is registered (#256).
+            free = (f"{self.tmp_free // 1024}M free" if self.tmp_free is not None
+                    else "free space unknown")
+            lines.append(f"  tmpdir   : {self.tmpdir} "
+                         f"({free}) — private per-run "
+                         f"TMPDIR{note}")
+        if self.sqlite_state == "remedy":
+            lines.append(
+                f"  sqlite3  : {SQLITE_FFI_NAME} does not resolve; symlinked "
+                f"{self.sqlite_payload} into {self.remedy_dir} and prepended to "
+                "LD_LIBRARY_PATH for every step")
+        elif self.sqlite_state == "ok":
+            lines.append(f"  sqlite3  : {SQLITE_FFI_NAME} resolves for the FFI "
+                         "loader")
+        elif self.sqlite_state == "gap":
+            lines.append(
+                f"  {YELLOW}sqlite3  : {SQLITE_FFI_NAME} does not resolve and no "
+                "libsqlite3.so.* exists — install the sqlite3 runtime package, or "
+                "store-backed suites will die in the FFI loader"
+                f"{RESET}")
+        return lines
+
+    def child_env(self, env):
+        """`env` with this run's host decisions applied to every step.
+
+        TMPDIR is FORCED, not defaulted: the caller's value is exactly what #941
+        is about, and an operator's shell TMPDIR is a shared /tmp. TMP/TEMP are
+        moved with it only when they were the same directory, so a workflow that
+        deliberately pins them somewhere else is not overridden.
+        """
+        if self.tmpdir:
+            ambient = os.environ.get("TMPDIR") or ""
+            env["TMPDIR"] = self.tmpdir
+            for alias in ("TMP", "TEMP"):
+                if env.get(alias) and env.get(alias) == ambient:
+                    env[alias] = self.tmpdir
+        if self.remedy_dir:
+            existing = (env.get("LD_LIBRARY_PATH") or "").strip()
+            env["LD_LIBRARY_PATH"] = (
+                self.remedy_dir + os.pathsep + existing if existing
+                else self.remedy_dir)
+        return env
+
+
+# ------------------------------------------------- forbidden cache-clean steps
+
+# A cache-destroying step has NO honest local equivalent: `flutter clean`
+# wipes the flutter tool cache and an app repo's SPM-managed iOS dependencies,
+# `flutter/dart pub cache clean` wipes the whole pub cache — 20–30 minutes of
+# rebuild on the shared Intel Mac, and on app repos a nuked SPM plugin graph.
+# These are HARD FORBIDDEN on the fleet (AGENTS.md), so the step is SKIPPED
+# with the reason printed, never executed locally. CI keeps it: on a runner
+# the checkout is disposable and the next step re-resolves everything a
+# pure-Dart package needs (`pub get`).
+# Ported from arrrrrny/zuraffa_ui#71 (PR #74, commit fc559cc) into the
+# canonical copy — arrrrrny/forklift#1011 — so the fleet rollout cannot
+# silently revert the guard in the repo that first ran into the incident.
+FORBIDDEN_CLEAN_RE = re.compile(
+    r"^\s*(?:sudo\s+)?(?:(?:flutter|dart)\s+pub\s+cache\s+clean|flutter\s+clean)"
+    r"(?:\s+\S.*)?\s*$",
+    re.I,
+)
+
+
+def forbidden_clean_commands(body):
+    """The forbidden cache-clean commands a step body asks for, verbatim.
+
+    Only a command with the destructive HEAD counts: `flutter clean` as its
+    own step (or its own pipeline line) is the destructive act, trailing
+    flags included — `flutter clean --verbose` wipes the same caches; a word
+    like `clean` inside another command (`flutter test --plain-name clean`,
+    `git clean -fdx`) is not.
+    """
+    out = []
+    for argv in _shell_commands(body):
+        if not argv:
+            continue
+        i = 0
+        while i < len(argv) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", argv[i]):
+            i += 1
+        candidate = " ".join(argv[i:])
+        if FORBIDDEN_CLEAN_RE.match(candidate):
+            out.append(candidate)
+    return out
 
 
 # ------------------------------------------------------- cargo cross targets
@@ -913,10 +1604,24 @@ class Runner:
         self.args = args
         self.out = Outcome()
         self.job_ok = True
+        # job-level continue-on-error (#775): in GitHub Actions it tolerates
+        # the failure of every step in the job — the job reports red, only the
+        # run stays green. fail() inherits it as the default for each step's
+        # advisory decision.
+        self.job_continue = False
+        # an unsoftened step failed in this job (#780 review): a failure CI
+        # does not record as a successful step — a job-level soft-gate's step
+        # or a hard one — fails the job, so its later implicit-success steps
+        # are skipped. A step-level continue-on-error failure is recorded as
+        # success in CI and does NOT count here.
+        self.job_unsoftened = False
         self.stopped = False
         self.current_ctx = None
         self.absent_prefixes = ci_absent_prefixes()
         self.pinned_toolchain = None
+        # The host preflight of this run (forklift#941), attached by run() once
+        # the disk verdict is known. None on a --list run, which never steps.
+        self.host = None
 
     # ------------------------------------------------------------ job plumbing
 
@@ -995,6 +1700,8 @@ class Runner:
             self.skip_job(label, "steps is not a list")
             return
         self.job_ok = True
+        self.job_continue = bool(job.get("continue-on-error"))
+        self.job_unsoftened = False
         self.pinned_toolchain = None
         for n, step in enumerate(steps, 1):
             if self.stopped:
@@ -1006,16 +1713,62 @@ class Runner:
     def ctx_for(self, wf_env, job_env, step_env, combo):
         final = {}
         chain = []
+        # An `env:` value that resolves to an unresolvable expression must NOT
+        # reach the child environment as its literal text. A `run:` body gets
+        # that treatment already (the step is skipped on `probe`), but `env:`
+        # is expanded here with the probe discarded — so
+        # `PUB_ZUZU_TOKEN: ${{ secrets.X }}` used to be exported verbatim, and
+        # `dart pub` then read the literal as the credential and rejected it
+        # ("not a valid Bearer token") on a tree that is green in CI.
+        #
+        # The variable is kept and set to the EMPTY string, not dropped
+        # (forklift#701 review): GitHub resolves an undefined secret to `""`,
+        # so in CI the variable is present-but-empty. Dropping it makes a step
+        # under `set -u` / `${VAR:?}` fail locally while passing in CI — the
+        # same inversion, one layer down. A value mixing literal text with the
+        # expression (`Bearer ${{ secrets.X }}`) becomes `Bearer ` in CI, which
+        # is what stripping the expression yields here.
+        unresolved = {}
+        secret_env_hits = {}
         for layer in (wf_env, job_env, step_env):
             for k, v in (layer or {}).items():
                 ctx = self.base_ctx(combo)
                 ctx["env_chain"] = [final] + chain
+                hits = []
+                ctx["secret_hits"] = hits
                 probe = []
-                final[k] = expand(v, ctx, probe) if isinstance(v, str) else v
+                value = expand(v, ctx, probe) if isinstance(v, str) else v
+                if probe:
+                    unresolved[k] = probe[0]
+                    final[k] = EXPR_RE.sub("", v) if isinstance(v, str) else ""
+                    # the winner is blanked — a secret it resolved can never
+                    # reach the child through this key
+                    secret_env_hits.pop(k, None)
+                else:
+                    final[k] = value
+                    unresolved.pop(k, None)
+                    # the entry holds real, locally supplied secret(s) (#708).
+                    # Claimed here and not in resolve_ref: a ref resolved into
+                    # an entry that is blanked via a sibling ref never reaches
+                    # the environment. Every expression in the value is named,
+                    # not just the first. NOT promoted here (dart_curl#76
+                    # review): a later layer may still override the key with a
+                    # literal, and the step's `if:` may skip it before any
+                    # child materializes the env — the hits are kept per key,
+                    # last layer wins, and run_step promotes them where the
+                    # child env is final.
+                    secret_env_hits[k] = hits
             chain.append(dict(final))
         all_env = dict(os.environ)
         all_env.update({k: str(v) for k, v in final.items() if v is not None})
-        return self.base_ctx(combo, env_chain=[final, dict(os.environ)], environ=all_env)
+        ctx = self.base_ctx(combo, env_chain=[final, dict(os.environ)],
+                            environ=all_env)
+        ctx["unresolved_env"] = unresolved
+        secret_env_hits = {k: h for k, h in secret_env_hits.items() if h}
+        ctx["secret_env"] = {k: ", ".join(e for e, _ in h)
+                             for k, h in secret_env_hits.items()}
+        ctx["secret_env_hits"] = secret_env_hits
+        return ctx
 
     def base_ctx(self, combo, env_chain=None, environ=None):
         # GitHub's own name for this platform, so `if: runner.os == 'macOS'`
@@ -1029,6 +1782,7 @@ class Runner:
             "env_chain": env_chain or [dict(os.environ)],
             "environ": environ or dict(os.environ),
             "job_ok": self.job_ok,
+            "job_unsoftened": self.job_unsoftened,
         }
 
     # ------------------------------------------------------------- step runner
@@ -1045,6 +1799,24 @@ class Runner:
                 why = f"if: {step['if']}" + ("" if verdict is None else " (false)")
                 self.skip(head, why)
                 return
+        elif self.job_unsoftened:
+            # CI-fidelity (forklift#780 review): after an unsoftened failed
+            # step the job has failed, and a step WITHOUT an `if:` carries an
+            # implicit `if: success()` — CI skips it; only `failure()` /
+            # `always()` steps run. That holds inside a job-level
+            # continue-on-error job too, which softens only the run verdict:
+            # the advisory branch of fail() keeps the run green but still
+            # marks the job, so this keeps the remaining steps of a
+            # soft-gated job in lockstep with CI instead of running side
+            # effects CI never performs. A step-level continue-on-error
+            # failure does NOT gate this — CI records that step as success
+            # and runs the later default steps.
+            self.skip(
+                head,
+                "implicit if: success() — the job already has a failed step, "
+                "so CI would skip this step",
+            )
+            return
 
         if step.get("uses"):
             self.current_ctx = ctx0
@@ -1058,6 +1830,8 @@ class Runner:
 
         probe = []
         ctx = self.ctx_for(wf_env, job_env, step.get("env") or {}, combo)
+        body_hits = []  # secrets the run: body resolves (#708)
+        ctx["secret_hits"] = body_hits
         body_expanded = expand(body, ctx, probe)
         wd = step.get("working-directory") or job_wd
         wd_probe = []
@@ -1067,9 +1841,48 @@ class Runner:
             self.skip(head, "needs GitHub context: "
                             + ", ".join(sorted(set(probe))[:3]))
             return
+        # The body's real-secret claim is recorded only AFTER every skip guard
+        # below has passed (#256 review): an apt_step or forbidden-clean skip
+        # must not report a secret as used when the body never executes. The
+        # claim now sits next to the env-hit promotion, at the run boundary.
+
+        # An `env:` entry that needed GitHub context is exported EMPTY, never as
+        # its literal `${{ … }}` text (forklift#701). Say so on the step, so a
+        # variable the step reads as empty is explained rather than mysterious.
+        blanked_env = ctx.get("unresolved_env") or {}
+        if blanked_env:
+            names = ", ".join(f"{k} ({v})" for k, v in sorted(blanked_env.items()))
+            print(f"  {YELLOW}note{RESET} env set empty locally: {names}")
+        # The honest counterpart (#708): an entry that got a REAL value from a
+        # locally supplied secret says so, in the same shape as the blanking
+        # note. Names only — the value itself is never echoed.
+        real_env = ctx.get("secret_env") or {}
+        if real_env:
+            names = ", ".join(f"{k} ({v})" for k, v in sorted(real_env.items()))
+            print(f"  {CYAN}note{RESET} env set from local secrets: {names}")
 
         apt = self.apt_step(body_expanded, head)
         if apt is not None:
+            return
+
+        # A cache-destroying step is forbidden on the fleet (AGENTS.md): its
+        # caches take 20–30 minutes to rebuild on the shared Intel Mac, and on
+        # an app repo `flutter clean` also nukes SPM-managed iOS dependencies.
+        # CI can have it (disposable runner); locally it is skipped loudly.
+        # The check sits BEFORE every other guard, so the step never even
+        # reaches a run path (zuraffa_ui#71 — a live run got as far as
+        # `dart pub cache clean`'s interactive `Are you sure? (y/N)?` prompt;
+        # ported to the canonical copy by forklift#1011).
+        banned = forbidden_clean_commands(body_expanded)
+        if banned:
+            # The body already had secrets substituted before this check, so a
+            # `flutter clean ${{ secrets.TOKEN }}` would put the raw value in
+            # the skip message (and the skipped list) without this mask (#256).
+            self.skip(head, mask_secrets(", ".join(banned))
+                      + " is forbidden locally (fleet hard rule) — CI-only step; "
+                      "the caches it destroys take 20–30 min to rebuild on this "
+                      "shared host, and the follow-up pub get step re-resolves "
+                      "what a pure-Dart package needs")
             return
 
         cwd = ROOT / wd if wd else ROOT
@@ -1158,12 +1971,36 @@ class Runner:
                                    f"not carry {names} here")
 
         env = dict(ctx["environ"])
+        # The host decisions of THIS run (forklift#941): a private TMPDIR no
+        # concurrent gate can delete the kernel cache out of, and the sqlite3 FFI
+        # remedy when the host has the runtime object but no dev symlink. Both
+        # are forced, not defaulted — the caller's TMPDIR is exactly the defect.
+        if self.host is not None:
+            env = self.host.child_env(env)
         if path_prefix:
             env["PATH"] = path_prefix + os.pathsep + env.get("PATH", "")
         if toolchain_env:
             env["RUSTUP_TOOLCHAIN"] = toolchain_env
         env.setdefault("CI", "true")
         env.setdefault("GITHUB_ACTIONS", "true")
+        # GitHub exports RUNNER_TEMP to every step pointing at the same
+        # directory the runner.temp expression resolves to, and workflows
+        # hand paths from one spelling to the other (dart_curl#55,
+        # forklift#752). Force, not setdefault: an ambient RUNNER_TEMP from
+        # the operator's shell is not a runner-provided value, and honoring
+        # it would fork the two spellings again.
+        #
+        # The other `runner.*` values have shell spellings too, and a workflow
+        # may read either one — the same fork, three more variables (#757).
+        # GitHub exports all of them to every step and none is overridable
+        # from a workflow's `env:`, so these are forced the same way. Read
+        # from the step's own ctx: it already carries this combo's runner
+        # values, so nothing is rebuilt.
+        runner_ctx = ctx["runner"]
+        env["RUNNER_TEMP"] = str(self.runner_temp)
+        env["RUNNER_OS"] = runner_ctx["os"]
+        env["RUNNER_ARCH"] = runner_ctx["arch"]
+        env["RUNNER_TOOL_CACHE"] = str(runner_ctx["tool_cache"])
         env["GITHUB_WORKSPACE"] = str(ROOT)
         if self.github.get("repository"):
             env["GITHUB_REPOSITORY"] = self.github["repository"]
@@ -1176,11 +2013,32 @@ class Runner:
             return
         flags = ["-e", "-o", "pipefail", "-c"] if shell == "bash" else ["-e", "-c"]
         cmd = [shell, *flags, body_expanded]
+        # Every skip guard has passed — the child env below is final and a
+        # process is about to run with it (or --plan is about to show it). The
+        # body's AND the env entries' real-secret claims are promoted HERE, not
+        # at expansion time (dart_curl#76 review, #256 review): a step skipped
+        # by `if:`, an apt step, a forbidden clean, or an unresolvable context
+        # never materializes its secret, and an entry a later layer overrode
+        # with a literal no longer carries it — none may report it real.
+        record_real_secrets(body_hits)
+        # Runner-provided values below overwrite `env:` entries of the same
+        # name (#256 review): a secret referenced by RUNNER_TEMP (or a sibling
+        # runner/GITHUB var) never survives into the child, so its hit must not
+        # be promoted as used.
+        runner_overwritten = {
+            "RUNNER_TEMP", "RUNNER_OS", "RUNNER_ARCH", "RUNNER_TOOL_CACHE",
+            "GITHUB_WORKSPACE", "GITHUB_REF_NAME", "GITHUB_EVENT_NAME",
+        }
+        if self.github.get("repository"):
+            runner_overwritten.add("GITHUB_REPOSITORY")
+        for key, hits in (ctx.get("secret_env_hits") or {}).items():
+            if key not in runner_overwritten:
+                record_real_secrets(hits)
 
         if self.args.get("verbose") or self.args.get("plan"):
             where = f" (in {wd})" if wd else ""
             print(f"\n{BRIGHT}{CYAN}▶ {head}{RESET}{DIM}{where}{RESET}")
-            print(f"{DIM}$ {body_expanded}{RESET}")
+            print(f"{DIM}$ {mask_secrets(body_expanded)}{RESET}")
         else:
             print(f"\n{BRIGHT}▶ {head}{RESET}")
         if toolchain_note:
@@ -1195,6 +2053,10 @@ class Runner:
             self.out.ran += 1
             print(f"{GREEN}✓ {took} {head}{RESET}")
             return
+        # A failure the HOST explains is named, not counted as a repo defect
+        # (forklift#941). The class is read off the output, the same way the
+        # checkout-state guard below reads its paths off it.
+        host = host_fingerprint(output)
         # CI checks out the COMMITTED tree only. A failure whose every mentioned
         # path lives in a gitignored/untracked path cannot happen in CI, so it is
         # reported as local-only rather than as a red gate — loudly, never silently.
@@ -1206,11 +2068,34 @@ class Runner:
                       f"the output is under {absent}, which CI's clean checkout does not "
                       f"have. Not a CI failure. Pass --strict to count it.{RESET}")
                 return
+            if host and host[0] in LOCAL_ONLY_HOST_CLASSES:
+                self.out.local_only.append(f"{head} (exit {code}; {host[0]})")
+                print(f"{YELLOW}⚠ {took} {head} (exit {code}) — LOCAL ONLY: "
+                      f"{host[1]}. A host fact, not a CI failure. Pass --strict to "
+                      f"count it.{RESET}")
+                return
+        if host:
+            self.fail(head, f"exit {code}; host environment: {host[0]} — "
+                            f"{host[1]}", step, took)
+            return
         self.fail(head, f"exit {code}", step, took)
 
     def fail(self, head, why, step, took=""):
         self.job_ok = False
         if step is not None and step.get("continue-on-error"):
+            # step-level softening: CI records the step's conclusion as
+            # success and the job keeps going, so this is NOT an unsoftened
+            # failure — later implicit-success steps still run there
+            # (#780 review).
+            self.out.advisory.append(head)
+            print(f"{YELLOW}⚠ {took} {head} ({why}) "
+                  f"— continue-on-error: advisory, as in CI{RESET}")
+            return
+        # An unsoftened step failure — a job-level soft-gate's step or a
+        # hard one: in CI the job itself has failed, so its later
+        # implicit-success steps are skipped. run_step gates on this.
+        self.job_unsoftened = True
+        if self.job_continue:
             self.out.advisory.append(head)
             print(f"{YELLOW}⚠ {took} {head} ({why}) "
                   f"— continue-on-error: advisory, as in CI{RESET}")
@@ -1463,15 +2348,70 @@ class Runner:
             print(f"  {YELLOW}⚠ {f}{RESET}")
         for s in self.out.skipped:
             print(f"  {YELLOW}· skipped{RESET} {s}")
+        # Which secrets were real and which were blanked (#708) — the run's
+        # honesty about where its values came from. Names only, never values.
+        if SECRETS_REAL:
+            print(f"  {GREEN}✓{RESET} secrets resolved for real: "
+                  f"{', '.join(SECRETS_REAL)}")
+        if SECRETS_BLANKED:
+            print(f"  {YELLOW}·{RESET} secrets blanked (no local value): "
+                  f"{', '.join(SECRETS_BLANKED)}")
+
+
+def mask_secrets(text):
+    """Replace supplied secret values with *** (any text, any line count).
+
+    Shared by the streamed step output (stream_command) and the
+    --verbose/--plan command echo (run_step): both print a step's text with
+    ${{ secrets.* }} already substituted, so both must mask (dart_curl#76
+    review) — the body echo bypassed the masking before this helper.
+    """
+    # Find every match against the ORIGINAL text and redact the UNION of their
+    # spans (#256 review): replacing one value at a time mangles overlapping
+    # secrets. With A="abc" and B="abcXYZ", masking A first leaves "***XYZ" —
+    # B no longer matches and its suffix leaks into the log.
+    spans = []
+    for value in LOCAL_SECRETS.values():
+        if not value:
+            continue
+        start = 0
+        while True:
+            i = text.find(value, start)
+            if i < 0:
+                break
+            spans.append((i, i + len(value)))
+            start = i + 1
+    if not spans:
+        return text
+    spans.sort()
+    merged = []
+    for lo, hi in spans:
+        if merged and lo <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], hi))
+        else:
+            merged.append((lo, hi))
+    out, prev = [], 0
+    for lo, hi in merged:
+        out.append(text[prev:lo])
+        out.append("***")
+        prev = hi
+    out.append(text[prev:])
+    return "".join(out)
 
 
 def stream_command(cmd, cwd, env, cap=400_000):
-    """Run a step, echo its output live, and return (exit code, captured tail)."""
+    """Run a step, echo its output live, and return (exit code, captured tail).
+
+    Supplied secret values are replaced with *** on every echoed and captured
+    line, as GitHub masks them in a run log (#708 review) — a step that prints
+    its env, or a tool that logs its credential, writes no token here.
+    """
     buf, total = [], 0
     proc = subprocess.Popen(cmd, cwd=str(cwd), env=env, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, bufsize=1)
     try:
         for line in proc.stdout:
+            line = mask_secrets(line)
             sys.stdout.write(line)
             if total < cap:
                 buf.append(line)
@@ -1596,6 +2536,196 @@ def tool_version(exe, args=("--version",)):
 
 
 VERSION_RE = re.compile(r"\d+\.\d+(?:\.\d+)*")
+
+
+# ------------------------------------------------ tree protection (#34, #38)
+# A step can mutate the checkout it is running in: `dart pub get` / `flutter
+# pub downgrade` rewrite the (here committed) pubspec.lock, and `dart analyze`
+# / `flutter analyze` rewrites an analysis_options.yaml that lacks the
+# build/platform excludes — it prints "Upgrading analysis_options.yaml to
+# exclude build and platform directories." CI runs every step in a throwaway
+# checkout, so the mutation dies with the job. This gate runs in the
+# operator's working tree, so without protection the mutation SURVIVES the
+# run and poisons it: a rewritten lockfile failed 23 test files on
+# arrrrny/zuraffa_ui#34, and the analyze upgrade lands as a dirty
+# analysis_options.yaml that the next `git add -A` ships (#38).
+#
+# THIS SCRIPT IS THE FLEET'S CANONICAL COPY: rollout-local-ci.sh `cp`s it over
+# every fleet repo's scripts/local_ci.sh (see its `install_one`), so the
+# protection has to live HERE or a rollout silently re-drops it in every repo —
+# which is exactly what happened twice: the AGENTS.md standardization rollouts
+# fd9fa10 (dropped #34) and f387f5b (dropped #38 again) each replaced the
+# script wholesale, and zuraffa_ui had to restore the block by hand both times
+# (25b375e, then ec472cf for arrrrny/zuraffa_ui#60). The wiring is pinned by
+# test/unit/test_local_ci_script_test.dart ("tree protection ... on the
+# canonical copy") so a future rewrite fails THERE, at the cause.
+#
+# The contract: every pubspec.lock and analysis_options.yaml under the repo
+# root is snapshotted before the first step and restored when the run ends —
+# byte-identical for files that existed, removed for files a step created,
+# recreated for files a step deleted. Mid-run, later steps still see the
+# mutated files, exactly as in CI. A protected file the snapshot could not
+# READ is neither rewritten nor removed: its pre-run content is unknown, so
+# the restore leaves it alone and counts it failed (review of #983) — the
+# alternative reads "no snapshot entry" as "a step created this" and unlinks
+# a file the run never touched.
+#
+# The guarantee is "on exit or TERM": the restore rides atexit, and the
+# SIGTERM/SIGINT handler registered in main() raises SystemExit on the way
+# out, so a gate `bounded-command.sh --timeout` TERMs still restores. A gate
+# KILLed after the grace window restores nothing — atexit never runs for a
+# SIGKILL, and unlike the per-run temp tree (#941 has a cache-sweep arm),
+# the protected files have no sweep backstop. Recover by hand there:
+# `git status --porcelain` names them. FIRST inspect and save any remaining
+# diff (`git diff -- pubspec.lock analysis_options.yaml`) — the snapshot was of
+# the WORKING-TREE bytes, so unstaged edits that predate the run cannot be
+# recovered from the index at all (#256 review). `git checkout -- pubspec.lock
+# analysis_options.yaml` restores the INDEX version (an option only when that
+# is the version wanted) and can discard edits that survived the kill.
+PROTECTED_NAMES = ("pubspec.lock", "analysis_options.yaml")
+PROTECTED_PRUNE = {".git", ".dart_tool", "build", "node_modules", "Pods"}
+
+
+def _walk_protected(root):
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames
+                       if d not in PROTECTED_PRUNE and not d.startswith(".")]
+        for name in PROTECTED_NAMES:
+            if name in filenames:
+                yield Path(dirpath) / name
+
+
+def snapshot_protected_files(root):
+    """Every protected file under root -> its bytes, before any step runs.
+
+    Returns (found, unreadable). A file whose bytes could not be read comes
+    back in `unreadable`, never as a plain miss: the restore cannot tell a
+    snapshot miss from "this file did not exist before the run", and it reads
+    the latter as "a step created it" and unlinks it. So a mode-0000 file, a
+    broken symlink, an ACL denial or a mount hiccup would have been DELETED by
+    the restore while the summary reported it as a removal under the verdict
+    "a step's mutation never survives this run" (review of #983). Unknown is
+    not absent — those paths are skipped at restore time and warned about
+    here, so the operator learns that one file went unprotected.
+    """
+    found, unreadable = {}, set()
+    for path in _walk_protected(root):
+        try:
+            if path.is_symlink() and path.exists():
+                # Record the DIRECTORY ENTRY, not its target (#256 review):
+                # a later write_bytes() on a replaced symlink would follow it
+                # and corrupt the target. A broken link stays unreadable — the
+                # restore cannot know its intended content either.
+                found[path] = (os.readlink(path), "link")
+            else:
+                found[path] = (path.read_bytes(), "file")
+        except OSError:
+            unreadable.add(path)
+            print(f"local_ci: WARNING could not read {path} while "
+                  "snapshotting — it was NOT snapshotted and will be left "
+                  "untouched when this run ends", file=sys.stderr)
+    return found, unreadable
+
+
+def _atomic_write_bytes(path, data):
+    """Write `data` to `path` without ever truncating it first (#256 review).
+
+    A plain write_bytes() truncates the destination and then writes; if the
+    write fails (disk full, permissions) the protected file is left empty or
+    partial. Write a temp file BESIDE it and os.replace() only on success, so
+    a failed restore leaves the existing file intact.
+    """
+    tmp = path.with_name(f".{path.name}.local_ci.{os.getpid()}.tmp")
+    try:
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def restore_protected_files(snapshot, root, unreadable=()):
+    """Put every protected file back exactly as snapshotted.
+
+    Returns (rewritten, removed, recreated, failed): files a step mutated or
+    deleted are rewritten from the snapshot, files a step created are removed.
+    A path that was unreadable at snapshot time is SKIPPED and counted in
+    `failed`, because its pre-run content is unknown and `unlink` would
+    delete a file the run never touched. A restore that could not be applied
+    (permissions, file lock, disk full) is counted in `failed` and warned
+    about — a silent restore is no restore.
+    """
+    rewritten = removed = recreated = failed = 0
+    seen = set()
+    unreadable = set(unreadable)
+    unreadable_seen = set()
+    for path in _walk_protected(root):
+        seen.add(path)
+        if path in unreadable:
+            unreadable_seen.add(path)
+            failed += 1
+            print(f"local_ci: WARNING could not restore {path} "
+                  "(unreadable before the run — left untouched)",
+                  file=sys.stderr)
+            continue
+        try:
+            if path in snapshot:
+                payload, kind = snapshot[path]
+                if path.is_symlink():
+                    # Compare and replace the ENTRY, never its target (#256
+                    # review): a step that swapped a regular file for a link
+                    # must not take the write through to the other file.
+                    same = kind == "link" and os.readlink(path) == payload
+                    if not same:
+                        path.unlink()
+                        if kind == "link":
+                            path.symlink_to(payload)
+                        else:
+                            _atomic_write_bytes(path, payload)
+                        rewritten += 1
+                elif kind == "link":
+                    path.unlink()
+                    path.symlink_to(payload)
+                    rewritten += 1
+                elif path.read_bytes() != payload:
+                    _atomic_write_bytes(path, payload)
+                    rewritten += 1
+            else:
+                path.unlink()
+                removed += 1
+        except OSError:
+            failed += 1
+            print(f"local_ci: WARNING could not restore {path}",
+                  file=sys.stderr)
+    # A path that was unreadable at snapshot time still counts as a failed
+    # restore when a STEP deleted it and the second walk cannot see it (#256
+    # review). Report the original set, not just what the walk happened to
+    # find — without this, "0 failed" can hide a mutation that survived.
+    for path in sorted(unreadable - unreadable_seen):
+        failed += 1
+        print(f"local_ci: WARNING could not restore {path} "
+              "(unreadable before the run — left untouched)",
+              file=sys.stderr)
+    for path, (payload, kind) in snapshot.items():
+        if path not in seen:
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if kind == "link":
+                    path.symlink_to(payload)
+                else:
+                    _atomic_write_bytes(path, payload)
+                recreated += 1
+            except OSError:
+                failed += 1
+                print(f"local_ci: WARNING could not restore {path}",
+                      file=sys.stderr)
+    return rewritten, removed, recreated, failed
 
 
 def version_of(text):
@@ -1896,13 +3026,79 @@ def run(args):
     print(f"  event    : {args['event']} (simulated)")
     print(f"  platform : CI runs ubuntu-latest (Linux); this is {sys.platform}. "
           "Step set identical, platform not.")
+    # The host preflight comes before any step (forklift#941): the TMPDIR every
+    # step gets, the sqlite3 FFI remedy and the disk verdict are facts about THIS
+    # machine, so they are decided here — not discovered from 96 FFI failures or
+    # 42 "temporary directory" errors.
+    #
+    # `--plan` is a DRY RUN (forklift#941 review): it lists the steps and runs
+    # nothing, so it must not mkdtemp a real per-run TMPDIR (the wrapper TERMs a
+    # plan and the atexit handler never runs) and must not gain the exit-3
+    # failure mode on a full disk. `create=False` measures the host without
+    # creating anything, and the runner's own plan branch prints the steps.
+    try:
+        host = HostPreflight(create=not args["plan"])
+    except ValueError as exc:
+        return err(str(exc))
+    for line in host.plan_lines() if args["plan"] else host.banner_lines():
+        print(line)
+    if host.blocked and not args["plan"]:
+        # A real run cannot start on a host with no headroom; a PLAN still lists
+        # the steps — a dry run's job is to say what would happen, not to fail on
+        # a machine that happens to be tight right now (forklift#941 review).
+        print(f"\n{RED}local_ci: HOST BLOCKED — {host.blocked}{RESET}")
+        print("No step ran: this is a fact about the machine, not a verdict "
+              "about the repository.")
+        return 3
+    if LOCAL_SECRETS:
+        print(f"  secrets  : {', '.join(sorted(LOCAL_SECRETS))} supplied "
+              "locally (values are not echoed)")
+    if SECRETS_MISSING:
+        print(f"  {YELLOW}note     : LOCAL_CI_SECRETS names "
+              f"{', '.join(SECRETS_MISSING)}, but the ambient environment has "
+              "no value for it — it will resolve empty"
+              f"{RESET}")
+    if SECRETS_MULTILINE:
+        print(f"  {YELLOW}note     : {', '.join(sorted(set(SECRETS_MULTILINE)))} "
+              "was rejected — a multiline secret cannot be masked across "
+              "streamed output lines; it resolves empty until the runner "
+              "masks across lines"
+              f"{RESET}")
 
     runner = Runner(wf, doc, args)
     runner.github = build_github(guess_slug(), run_git("rev-parse", "--abbrev-ref", "HEAD"),
                                  args["event"], str(doc.get("name") or ""),
                                  run_git("rev-parse", "HEAD"))
-    runner.runner_temp = tempfile.mkdtemp(prefix="local_ci_")
-    atexit.register(shutil.rmtree, runner.runner_temp, ignore_errors=True)
+    runner.host = host
+    # The runner's own temp tree lives INSIDE the run's private TMPDIR, so one
+    # cleanup removes everything the run created and nothing lands in the shared
+    # /tmp the gate just stopped using. A --plan run still must not mkdtemp
+    # (#256 review): it gets a display-only path so runner.temp expands, and the
+    # plan branch below returns before any step would need a real directory.
+    if args["plan"]:
+        runner.runner_temp = str(Path(tempfile.gettempdir()) / "local_ci_plan")
+    else:
+        runner.runner_temp = tempfile.mkdtemp(prefix="local_ci_", dir=host.tmpdir)
+
+    # The gate is run under `bounded-command.sh --timeout`, which TERMs and then
+    # KILLs the process group on expiry — so `atexit` alone leaks the per-run
+    # TMPDIR (forklift#941 review). A signal handler reclaims it on the way out,
+    # and the cache sweep carries a `local_ci_*` arm as the backstop for a kill.
+    run_temp_dirs = [host.tmpdir,
+                     None if args["plan"] else runner.runner_temp]
+
+    def _reclaim_run_temp(*_a):
+        for path in run_temp_dirs:
+            if path:
+                shutil.rmtree(path, ignore_errors=True)
+
+    for _sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            signal.signal(_sig, lambda *_a: (_reclaim_run_temp(),
+                                             sys.exit(128 + int(_a[0]))))
+        except (ValueError, OSError):
+            pass  # not the main thread (a test harness) — atexit still applies
+    atexit.register(_reclaim_run_temp)
     if runner.absent_prefixes:
         print(f"  note     : this checkout has {len(runner.absent_prefixes)} "
               "gitignored/untracked path(s) that CI's clean checkout does not "
@@ -1912,6 +3108,57 @@ def run(args):
     if run_git("status", "--porcelain"):
         print("  note     : working tree has uncommitted changes; CI runs the "
               "committed tree")
+    protected_snapshot = {}
+    protected_unreadable = set()
+    checkout_lock = None
+    if not args["plan"]:
+        # Two gates in one checkout can interleave snapshot/restore and leave a
+        # step's pubspec.lock behind (#256 review): run 1 snapshots A, run 2
+        # snapshots the mutated B, run 1 restores A, run 2 restores B. Take a
+        # checkout-level, non-blocking flock from here through the atexit
+        # restore; a competing gate REFUSES with an actionable message instead
+        # of waiting forever on a shared host. The OS releases the lock if the
+        # process is killed before its handlers run.
+        try:
+            import fcntl
+        except ImportError:  # a platform without advisory locks: no guard
+            fcntl = None
+        if fcntl is not None:
+            git_dir = ROOT / ".git"
+            lock_path = (git_dir if git_dir.is_dir() else ROOT) / ".local_ci.run.lock"
+            try:
+                checkout_lock = open(lock_path, "a+")
+                fcntl.flock(checkout_lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                if checkout_lock is not None:
+                    checkout_lock.close()
+                    checkout_lock = None
+                print(f"{RED}local_ci: another gate is already running in "
+                      f"{ROOT} (lock: {lock_path}). Refusing to start a second "
+                      "run in one checkout — wait for it to finish, then "
+                      f"retry.{RESET}", file=sys.stderr)
+                return 3
+        protected_snapshot, protected_unreadable = snapshot_protected_files(ROOT)
+        if protected_snapshot:
+            print(f"  note     : snapshotted {len(protected_snapshot)} "
+                  "protected file(s) (pubspec.lock, analysis_options.yaml) — "
+                  "steps that mutate them (pub get/downgrade, analyze) are "
+                  "restored when this run ends (#34, #38)")
+
+        def _restore_protected():
+            rewritten, removed, recreated, failed = restore_protected_files(
+                protected_snapshot, ROOT, protected_unreadable)
+            if rewritten or removed or recreated or failed:
+                verdict = ("a step's mutation never survives this run"
+                           if not failed else
+                           f"{failed} restore(s) FAILED — see the WARNING "
+                           "lines above")
+                print(f"\nlocal_ci: protected files vs their pre-run state "
+                      f"({rewritten} rewritten, {removed} removed, "
+                      f"{recreated} recreated, {failed} failed) — "
+                      f"{verdict} (#34, #38)")
+
+        atexit.register(_restore_protected)
     runner.run()
     runner.summary()
     if args["plan"]:

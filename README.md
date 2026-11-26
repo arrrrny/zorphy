@@ -169,10 +169,10 @@ Add the dependencies to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zorphy_annotation: ^2.4.6
+  zorphy_annotation: ^3.0.0-dev.2
 
 dev_dependencies:
-  zorphy: ^2.4.6
+  zorphy: ^3.0.0-dev.2
   build_runner: ^2.4.0
 ```
 
@@ -1369,7 +1369,11 @@ zorphy build --clean
   `adds_to_library: true`, so `build_runner` emits a single
   `<library>.part.dart` per annotated library and inserts the `part`
   directive itself. Delete any hand-written `part '*.zorphy.dart';` line and
-  the 2.x `<file>.zorphy.dart` files, then rebuild. (2.x wrote one
+  the 2.x `<file>.zorphy.dart` files, then rebuild — or let
+  `dart run zorphy:migrate_v3 <path> --apply` do both: it strips the stale
+  directives (and the `part '*.g.dart';` of migrated files that declare no
+  own `@JsonSerializable` classes) and deletes the stale files; the dry run
+  lists them. (2.x wrote one
   `<file>.zorphy.dart` beside every source file; that layout is gone, and
   build_runner 2.17 removed `--delete-conflicting-outputs` — passing it is
   ignored with a warning, so the stale files are yours to delete.) Each
@@ -1385,6 +1389,51 @@ zorphy build --clean
 ### Generated Patch Classes
 
 - **`ClassNamePatch`** - Patch class for partial updates
+
+<a id="v3-migration"></a>
+## 🔄 Migrating v2 → v3
+
+Zorphy 3.0.0 is a breaking major that drops every legacy preset and
+`generate*` toggle and unifies all five zero-preset archetypes
+(`@ZorphyEntity`, `@ZorphyValue`, `@ZorphyUnion`, `@ZorphyState`,
+`@ZorphyIntent`). Migrate with the bundled codemod — never hand-edit v2
+annotations. Before running the codemod, bump `zorphy` and
+`zorphy_annotation` to `^3.0.0` (they move in lockstep), then run
+`dart pub get`. The `migrate_v3` executable ships with 3.0, not with 2.x.
+
+### v2 → v3 at a glance
+
+| v2 (removed) | v3 (replacement) |
+| --- | --- |
+| `@Zorphy(...)` / `@Zorphy2(...)` on an `id`-bearing class | `@ZorphyEntity(principalKey: #id)` |
+| `@Zorphy(...)` on an `id`-less class | `@ZorphyValue()` |
+| `@ZorphySealed(...)` / `$$Base` sealed roots | `@ZorphyUnion()` (closed) / `@ZorphyState()` (composed) |
+| every `preset:` / `generate*` argument (`generateJson`, `generatePatch`, `generateCompareTo`, `generateFilter`, `generateCopyWithFn`, `explicitSubTypes`, `nonSealed`, `hidePublicConstructor`, …) | deleted — an archetype names what the class IS; polymorphism is `discriminator` + `explicitSubTypes` on the annotation |
+| `copyWith(...)` / `copyWithField(...)` / `copyWithFn(...)` | `ZorphyPatch` — `EntityPatch.diff(before, after).apply(target)` |
+| `toJson()` / `fromJson()` / `toJsonLean()` | `toWire()` / `fromWire()` (the v3 wire codecs; no JSON codec is generated) |
+| `<Entity>Patch.create()..withX(...)` + `patchWith<Entity>(...)` | `<Entity>Patch.diff(before, after)` + `patch.apply(target)` (`compose` / `invert` / `changedPaths` for three-way sync) |
+| `compareTo<Entity>(other)` | `<Entity>.descriptor` + `Field<E, T>` selectors (`ProductFields`-style) and the patch `changedPaths` / `conflictingPaths` |
+| `Entity.descriptor` (implicit) | `Entity.descriptor` — a reflection-free `ZorphyEntityDescriptor<T>` (`principalKeyField`, `fields`) |
+| hand-written `part '*.zorphy.dart';` + per-file `<file>.zorphy.dart` | one shared `<library>.part.dart` under `lib/_br_/`; `build_runner` inserts the `part` directive |
+| `dart run build_runner build --delete-conflicting-outputs` | `dart run build_runner build` (the flag was removed in build_runner 2.17) |
+
+### Codemod
+
+```bash
+dart run zorphy:migrate_v3 <path>          # dry-run preview
+dart run zorphy:migrate_v3 <path> --apply  # rewrite in place
+```
+
+It strips every `preset:` / `generate*` argument and emits the zero-preset v3
+archetypes plus the `fromWire` / `toWire` codecs. After migrating:
+
+1. Delete the 2.x `<file>.zorphy.dart` files and any hand-written
+   `part '*.zorphy.dart';` line — 3.0 emits one shared `<library>.part.dart`
+   under `lib/_br_/` and `build_runner` inserts the `part` directive itself.
+2. Run `dart run build_runner build` to regenerate the shared parts.
+
+The v3 wire codecs (`fromWire` / `toWire`) replace the legacy
+`fromJson` / `toJson`; generated output no longer emits JSON codecs.
 
 ## 🔄 Migration from Morphy
 
@@ -1416,7 +1465,8 @@ If you get type not found errors, ensure:
 2. You removed any leftover `part 'filename.zorphy.dart';` line and any stale
    `filename.zorphy.dart` from the 2.x layout — 3.0 no longer writes per-file
    generated libraries, and `build_runner` adds the shared-part directive
-   itself
+   itself; `dart run zorphy:migrate_v3 <path> --apply` strips the directives
+   and deletes the stale files for you
 3. The import includes `package:zorphy_annotation/zorphy_annotation.dart`
 
 ### Generic Type Issues
