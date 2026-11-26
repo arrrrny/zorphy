@@ -13,6 +13,7 @@
 ## Scripts
 
 - **Publish**: `./scripts/publish.sh <version> [description]` — updates versions, dependencies, changelogs, publishes all 3 packages to pub.dev directly, commits, tags, and pushes
+- **Preview a release**: `./scripts/publish.sh <version> [description] --dry-run` — prints every step the release would take and changes nothing (no files rewritten, no commit, no tag, no push, no publish)
 - **Build binaries**: `./scripts/build-binaries.sh [output-dir]` — compiles CLI and MCP server binaries
 - **Dev setup**: `./scripts/to_path.sh` — switches dependencies back to local path references for development
 

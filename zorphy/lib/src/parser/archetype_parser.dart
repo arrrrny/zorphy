@@ -8,11 +8,20 @@
 /// the first match in [ZorphyArchetype.all] wins.
 library;
 
+import 'package:analyzer/dart/analysis/results.dart';
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:source_gen/source_gen.dart';
 
 import 'polymorphic_ir.dart';
+
+/// A member body's source and whether it was an expression body (`=>`).
+final class ZorphyMemberBody {
+  final String source;
+  final bool isLambda;
+  const ZorphyMemberBody(this.source, this.isLambda);
+}
 
 /// The five v3 archetype annotations, as analyzable type checkers.
 ///
@@ -193,5 +202,177 @@ final class ArchetypeParser {
       if (target is ClassElement) variants[target.name ?? ''] = target;
     }
     return variants.values.toList();
+  }
+
+  /// The redirecting variant factories of a `@ZorphyUnion` root, in
+  /// declaration order (issue #271).
+  ///
+  /// A union declares its variants with redirecting factories
+  /// (`factory $AppFailure.network({...}) = $NetworkFailure;`); each becomes a
+  /// [ZorphyVariantFactoryIr] the sealed root re-emits as a redirecting const
+  /// factory. A body factory (`factory $AppFailure.from(...) { ... }`) has no
+  /// `redirectedConstructor` and is NOT a variant — it is a user member.
+  static List<ZorphyVariantFactoryIr> unionVariantFactories(
+    ClassElement element,
+  ) {
+    final factories = <ZorphyVariantFactoryIr>[];
+    for (final constructor in element.constructors) {
+      if (!constructor.isFactory) continue;
+      final target = constructor.redirectedConstructor?.enclosingElement;
+      if (target is! ClassElement) continue;
+      final name = constructor.name;
+      if (name == null || name.isEmpty) continue;
+      factories.add(
+        ZorphyVariantFactoryIr(name: name, variantClassName: target.name ?? ''),
+      );
+    }
+    return factories;
+  }
+
+  /// The user-declared `static` methods and body `factory` constructors of a
+  /// `@ZorphyUnion` root, in declaration order (issue #271).
+  ///
+  /// The signature is read from the analyzer element (lossless); the body is
+  /// read from the compilation-unit AST by [classMemberBodies] and spliced by
+  /// the emitter. A body factory (`factory $AppFailure.from(...) { ... }`) has
+  /// no `redirectedConstructor`; a redirecting factory is a variant, not a user
+  /// member.
+  static List<ZorphyUserMemberIr> unionUserMembers(
+    ClassElement element,
+    Map<String, ZorphyMemberBody> bodyByName,
+  ) {
+    final members = <ZorphyUserMemberIr>[];
+    for (final method in element.methods) {
+      if (!method.isStatic) continue;
+      final name = method.name;
+      if (name == null || name.isEmpty) continue;
+      final body = bodyByName[name];
+      if (body == null) continue;
+      members.add(
+        _userMember(
+          name: name,
+          isFactory: false,
+          returnType: method.returnType.getDisplayString(),
+          typeParameters: List.unmodifiable(
+            method.typeParameters.map((p) => p.toString()),
+          ),
+          parameters: method.firstFragment.formalParameters
+              .map(_userParam)
+              .toList(),
+          body: body,
+        ),
+      );
+    }
+    for (final constructor in element.constructors) {
+      if (!constructor.isFactory) continue;
+      // A redirecting factory is a variant, not a user member.
+      if (constructor.redirectedConstructor != null) continue;
+      final name = constructor.name ?? '';
+      final body = bodyByName[name];
+      if (body == null) continue;
+      members.add(
+        _userMember(
+          name: name,
+          isFactory: true,
+          returnType: null,
+          typeParameters: const [],
+          parameters: constructor.firstFragment.formalParameters
+              .map(_userParam)
+              .toList(),
+          body: body,
+        ),
+      );
+    }
+    return members;
+  }
+
+  static ZorphyUserMemberIr _userMember({
+    required String name,
+    required bool isFactory,
+    required String? returnType,
+    required List<String> typeParameters,
+    required List<ZorphyUserParamIr> parameters,
+    required ZorphyMemberBody body,
+  }) {
+    return ZorphyUserMemberIr(
+      name: name,
+      isFactory: isFactory,
+      returnType: returnType,
+      typeParameters: typeParameters,
+      parameters: parameters,
+      bodySource: body.source,
+      bodyIsLambda: body.isLambda,
+    );
+  }
+
+  static ZorphyUserParamIr _userParam(FormalParameterFragment fragment) {
+    final p = fragment.element;
+    // The parameter type KEEPS its `?`: a user member's signature is spliced
+    // verbatim, so `StackTrace? st` must stay nullable (unlike a field, whose
+    // nullability the emitter re-applies from a separate flag).
+    return ZorphyUserParamIr(
+      name: p.name ?? '',
+      type: p.type.getDisplayString(),
+      isNamed: p.isNamed,
+      isRequired: p.isRequired,
+      isOptionalPositional: p.isOptionalPositional,
+      defaultValue: p.defaultValueCode,
+    );
+  }
+
+  /// Reads the ORIGINAL body source of [element]'s class members, keyed by
+  /// source name — a method by its name, a constructor by its name (`''` for an
+  /// unnamed one).
+  ///
+  /// The analyzer's element model in this SDK is fragment-based and does not
+  /// expose a lossless `toSource()` on members, so the body is read from the
+  /// parsed compilation unit: a block body yields its statements' source (the
+  /// outer braces are re-added by the emitter), an expression body yields the
+  /// expression source WITHOUT the leading `=>` / trailing `;`. A library that
+  /// cannot be parsed yields an empty map, and the caller then carries no user
+  /// members (fail closed, never a half-rewritten member).
+  static Map<String, ZorphyMemberBody> classMemberBodies(ClassElement element) {
+    final bodies = <String, ZorphyMemberBody>{};
+    final session = element.session;
+    if (session == null) return bodies;
+    final SomeParsedLibraryResult parsed;
+    try {
+      parsed = session.getParsedLibraryByElement(element.library);
+    } on Object {
+      return bodies;
+    }
+    if (parsed is! ParsedLibraryResult) return bodies;
+    for (final unit in parsed.units) {
+      for (final declaration in unit.unit.declarations) {
+        if (declaration is! ClassDeclaration) continue;
+        if (declaration.namePart.typeName.lexeme != element.name) continue;
+        for (final member in declaration.body.members) {
+          if (member is MethodDeclaration) {
+            bodies[member.name.lexeme] = _bodyOf(member.body);
+          } else if (member is ConstructorDeclaration) {
+            bodies[member.name?.lexeme ?? ''] = _bodyOf(member.body);
+          }
+        }
+      }
+    }
+    return bodies;
+  }
+
+  /// The source of a [FunctionBody]: a block's statements joined by newlines
+  /// (braces re-added downstream), or an expression body's expression text
+  /// (no `=>` / `;`). An empty body yields an empty block.
+  static ZorphyMemberBody _bodyOf(FunctionBody body) {
+    if (body is BlockFunctionBody) {
+      final statements = body.block.statements;
+      if (statements.isEmpty) return const ZorphyMemberBody('', false);
+      return ZorphyMemberBody(
+        statements.map((s) => s.toSource()).join('\n'),
+        false,
+      );
+    }
+    if (body is ExpressionFunctionBody) {
+      return ZorphyMemberBody(body.expression.toSource(), true);
+    }
+    return const ZorphyMemberBody('', false);
   }
 }
