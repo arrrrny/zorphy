@@ -2,35 +2,34 @@
 title: Defaults and Converters
 ---
 
-This page reflects `complex_example.dart`, `initialization_params_example.dart`, and `test_json_key.dart`.
+This page reflects `complex_example.dart`, `initialization_params_example.dart`,
+and `test_json_key.dart`.
 
-## Default values with JsonKey
+In v3 there is no `@JsonKey` — default values are expressed with a field
+initializer on the abstract declaration, and custom conversions happen at the
+wire boundary.
+
+## Default values
 
 ```dart
-@Zorphy(generateJson: true)
+@ZorphyValue()
 abstract class $TreeNode {
-  @JsonKey(defaultValue: "root")
   String get value;
 
-  @JsonKey(defaultValue: const [])
-  List<$TreeNode>? get children;
+  const $TreeNode();
 
-  @JsonKey(defaultValue: Duration(seconds: 5))
+  List<$TreeNode>? get children;
   Duration get timeout;
 }
 ```
 
-## Custom JSON converters
+A field with an initializer (`Duration get timeout => Duration(seconds: 5);`)
+supplies the default the generated constructor uses when the argument is
+omitted.
 
-```dart
-@Zorphy(generateJson: true, generateFilter: true)
-abstract class $InitializationParamsExample {
-  Duration get timeout => Duration(seconds: 5);
-  bool get forceRefresh => true;
+## Custom converters
 
-  @JsonKey(toJson: LocaleConverter.toJson, fromJson: LocaleConverter.fromJson)
-  Locale? get locale;
-}
-```
-
-The same converter pattern works with plain `json_annotation` classes as well.
+A field whose wire shape differs from its Dart type is converted at the trust
+boundary: decode with `fromWire`, then map the raw value into the field type
+yourself (the same pattern plain `json_annotation` classes use for custom
+converters).

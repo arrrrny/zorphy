@@ -7,7 +7,7 @@ From `enum_example.dart`, Zorphy keeps enums as first-class fields.
 ```dart
 enum Status { active, inactive, pending, suspended }
 
-@Zorphy(generateJson: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $Task {
   String get id;
   String get title;
@@ -17,7 +17,7 @@ abstract class $Task {
 
 ## Why it matters
 
-- Enums serialize cleanly with JSON.
+- Enums serialize cleanly with the wire codecs (`toWire` writes the enum NAME).
 - Pattern matching stays expressive.
 - Generated helpers still work the same.
 

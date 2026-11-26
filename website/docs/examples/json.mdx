@@ -2,10 +2,12 @@
 title: JSON Serialization
 ---
 
-Based on `json_example.dart`, this shows full JSON and lean JSON.
+Based on `json_example.dart`, v3 replaces the JSON codecs with the wire codecs:
+`toWire()` / `fromWire()`. No JSON codec is generated; the wire form is the
+serialization surface.
 
 ```dart
-@Zorphy(generateJson: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $Product {
   String get id;
   String get name;
@@ -14,7 +16,7 @@ abstract class $Product {
 }
 ```
 
-## Full vs lean JSON
+## Wire serialization
 
 ```dart
 final product = Product(
@@ -24,9 +26,10 @@ final product = Product(
   createdAt: DateTime(2024, 1, 15),
 );
 
-final fullJson = product.toJson();
-final leanJson = product.toJsonLean();
-final restored = Product.fromJson(fullJson);
+final wire = product.toWire();
+final restored = Product.fromWire(wire); // ZorphyBoundaryResult<Product>
 ```
 
-Lean JSON strips the `__typename` metadata and is useful for API payloads that do not need Zorphy type info.
+`fromWire` validates through the trusted constructors and accumulates
+`FieldViolation`s at JSON pointers instead of throwing — handle the
+`BoundaryErr` case at your trust boundary.

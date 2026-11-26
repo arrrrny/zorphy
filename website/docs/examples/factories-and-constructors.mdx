@@ -4,25 +4,14 @@ title: Factories and Constructors
 
 This page uses `factory_test.dart` and the domain entity factory in `assistant_message.dart`.
 
-## Hide the public constructor
-
-```dart
-@Zorphy(generateJson: true, hidePublicConstructor: true)
-abstract class $TestWithFactory {
-  String get id;
-
-  static TestWithFactory create({required String id}) =>
-      TestWithFactory._(id: id);
-}
-```
-
-This keeps instantiation controlled while still letting generated code construct instances.
+In v3 there is no constructor-hiding toggle — a generated class always has
+a public constructor, and you add static factories for controlled creation.
 
 ## Static factory helpers
 
 ```dart
-@Zorphy(generateJson: true)
-abstract class $AssistantMessage implements $$ChatMessage {
+@ZorphyEntity()
+abstract class $AssistantMessage implements $ChatMessage {
   @override
   ChatMessageRole get role => ChatMessageRole.assistant;
 
@@ -38,3 +27,6 @@ abstract class $AssistantMessage implements $$ChatMessage {
   );
 }
 ```
+
+Static constructors are useful for canned instances, defaults, and convenience
+APIs while the generated constructor stays available to the generator.

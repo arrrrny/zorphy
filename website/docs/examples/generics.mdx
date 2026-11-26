@@ -2,12 +2,14 @@
 title: Generics
 ---
 
-From `generic_example.dart`, Zorphy supports generic entities and generic JSON factories.
+From `generic_example.dart`, Zorphy supports generic entities. The wire codecs
+carry the type arguments, and converters for generic fields are expressed with
+the wire boundary.
 
 ## Generic entities
 
 ```dart
-@Zorphy(generateJson: true)
+@ZorphyValue()
 abstract class $Result<T> {
   bool get success;
   T? get data;
@@ -17,20 +19,14 @@ abstract class $Result<T> {
 
 ## Generic converters
 
-```dart
-class GenericConverter<T> implements JsonConverter<T?, Object?> {
-  const GenericConverter();
-  @override
-  T? fromJson(Object? json) => json as T?;
-  @override
-  Object? toJson(T? object) => object;
-}
+A generic field is decoded at the trust boundary; supply the type argument when
+you call `fromWire`, and convert the payload yourself if it needs a custom
+shape.
 
-@Zorphy(generateJson: true)
+```dart
+@ZorphyValue()
 abstract class $ResultWithConverter<T> {
   bool get success;
-  @JsonKey(name: 'data_field')
-  @GenericConverter()
   T? get data;
 }
 ```
@@ -39,5 +35,5 @@ abstract class $ResultWithConverter<T> {
 
 ```dart
 final result = Result<String>(success: true, data: 'ok');
-final json = result.toJson((value) => value);
+final wire = result.toWire();
 ```

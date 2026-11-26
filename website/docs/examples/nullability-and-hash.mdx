@@ -2,12 +2,13 @@
 title: Nullability and Hashing
 ---
 
-`nullable_test.dart` and `hash_code_test.dart` demonstrate how Zorphy treats nullable fields and large field counts.
+`nullable_test.dart` and `hash_code_test.dart` demonstrate how Zorphy treats
+nullable fields and large field counts.
 
 ## Nullable fields
 
 ```dart
-@Zorphy(generateJson: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $ErrorLog {
   String? get id;
   String get message;
@@ -17,13 +18,16 @@ abstract class $ErrorLog {
 }
 ```
 
-Nullability is preserved in generated constructors, copyWith, and JSON.
+Nullability is preserved in generated constructors, `copyWith`, and the wire
+codecs. A deliberate `null` on a nullable field decodes as a clear value, never
+as a failed read.
 
 ## Large hashCode
 
 ```dart
-@Zorphy(generateJson: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $LargeClass {
+  String get id;
   String get f1;
   String get f2;
   String get f3;

@@ -2,19 +2,30 @@
 title: Filters and Queries
 ---
 
-This combines `query_example.dart`, `filter_non_generic_example.dart`, and `filter_generic_example.dart`.
+This combines `query_example.dart`, `filter_non_generic_example.dart`, and
+`filter_generic_example.dart`.
 
-## Enable filters
+In v3 the filter/query surface is built on the reflection-free descriptor:
+`Entity.descriptor.fields` exposes `Field<E, T>` selectors, and the
+`zorphy_annotation` query helpers (`eq`, `gt`, `lt`, `contains`, `and`, `or`,
+`sort`) operate on them.
+
+## The descriptor and its fields
 
 ```dart
-@Zorphy(generateJson: true, generateFilter: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $Product {
-  int get id;
+  String get id;
   String get name;
   double get price;
   DateTime get createdAt;
   bool get isAvailable;
 }
+```
+
+```dart
+// Product.descriptor.fields carries a Field<Product, T> per field.
+final price = Product.descriptor.fields.firstWhere((f) => f.name == 'price');
 ```
 
 ## Build filters
@@ -42,7 +53,7 @@ final results = products.filter(filter).orderBy(sortByPrice);
 ## Generic filter fields
 
 ```dart
-@Zorphy(generateFilter: true)
+@ZorphyValue()
 abstract class $CreateParams<T, P> {
   T get data;
   P? get params;

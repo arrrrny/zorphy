@@ -7,23 +7,21 @@ title: Zorphy vs Freezed
 
 Both generate immutable data classes. Zorphy goes further — it is a full
 **entity toolkit** with a nested patch system, filter/query descriptors,
-compareTo diffs, and an AI-agent CLI/MCP server.
+three-way merge primitives, and an AI-agent CLI/MCP server.
 
-| Capability | zorphy 2.0 | freezed 3.2.5 |
+| Capability | zorphy 3.0 | freezed 3.2.5 |
 | --- | --- | --- |
 | Immutable data classes + copyWith | ✅ | ✅ |
-| Function-based copyWith (`copyWithFn`) | ✅ opt-in (`ZorphyPreset.full`) | ❌ |
-| JSON + polymorphic discriminators + `toJsonLean` | ✅ | ✅ (no `toJsonLean`) |
-| Sealed unions | ✅ sealed `$$Base` + Dart 3 pattern matching | ✅ via `when`/`map` helpers |
-| **Nested patch system** (partial updates of deep graphs) | ✅ `UserPatch()..withAddressPatch(...)` | ❌ manual nested copyWith chains |
-| **Filter/query descriptors** (`Field<E, T>`) | ✅ | ❌ |
-| **compareTo diffs** between instances | ✅ | ❌ |
+| Wire codecs (`toWire` / `fromWire`) with boundary validation | ✅ | ✅ (JSON) |
+| Sealed unions | ✅ `@ZorphyUnion()` + Dart 3 pattern matching | ✅ via `when`/`map` helpers |
+| **Nested patch system** (partial updates of deep graphs) | ✅ `EntityPatch.diff(a, b).apply(target)` | ❌ manual nested copyWith chains |
+| **Filter/query descriptors** (`Field<E, T>` + `Entity.descriptor`) | ✅ | ❌ |
+| **Three-way merge** (`changedPaths` / `conflictingPaths` / `compose`) | ✅ | ❌ |
 | **changeTo conversions** between subtypes | ✅ | ❌ |
 | Multiple interface inheritance with generics | ✅ | ❌ |
 | Self-referencing types | ✅ | ✅ |
+| Reflection-free, AOT-safe output (no `dart:mirrors`) | ✅ | ✅ |
 | CLI + MCP server for scaffolding | ✅ | ❌ |
-| Output size control | ✅ `ZorphyPreset.lean/standard/full` + per-feature flags | ❌ |
-| analyzer 14 support | ✅ `>=13.0.0 <15.0.0` | ❌ caps `analyzer <11.0.0` (as of 2026-07-30) |
 
 ## Where freezed differs (honest notes)
 
@@ -47,10 +45,10 @@ class User with _$User {
 }
 ```
 
-**zorphy** (lean preset — no patch/filter/compareTo bloat):
+**zorphy:**
 
 ```dart
-@Zorphy(preset: ZorphyPreset.lean, generateJson: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $User {
   String get id;
   String get name;
@@ -73,14 +71,14 @@ class Result with _$Result {
 **zorphy** (real sealed hierarchy, exhaustive Dart 3 switch):
 
 ```dart
-@Zorphy(explicitSubTypes: [$Ok, $Err])
-abstract class $$Result {}
+@ZorphyUnion()
+abstract class $Result {}
 
-@Zorphy()
-abstract class $Ok implements $$Result { String get value; }
+@ZorphyEntity()
+abstract class $Ok implements $Result { String get value; }
 
-@Zorphy()
-abstract class $Err implements $$Result { String get message; }
+@ZorphyEntity()
+abstract class $Err implements $Result { String get message; }
 
 String describe(Result r) => switch (r) {
   Ok(:final value) => 'ok: $value',
@@ -99,10 +97,8 @@ user.copyWith(address: user.address.copyWith(city: 'Berlin'));
 **zorphy**'s patch system composes:
 
 ```dart
-final patch = ProfilePatch()
-  ..withName('Ada')
-  ..withAddressPatch(AddressPatch()..withCity('Berlin'));
-final updated = patch.applyTo(profile);
+final patch = ProfilePatch.diff(before, after); // carries a nested AddressPatch
+final updated = patch.apply(profile);
 ```
 
 All three zorphy examples are real, compilable code — see

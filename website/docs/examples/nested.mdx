@@ -5,8 +5,15 @@ title: Nested Objects
 From `nested_example.dart`, Zorphy handles nested entities, self-references, and nested patching.
 
 ```dart
-@zorphy
+@ZorphyValue()
+abstract class $Address {
+  String get street;
+  String get city;
+}
+
+@ZorphyEntity(principalKey: #id)
 abstract class $Person {
+  String get id;
   String get name;
   int get age;
   $Address get address;
@@ -15,17 +22,22 @@ abstract class $Person {
 
 ## Nested patching
 
-```dart
-final personPatch = PersonPatch.create()
-  ..withAddressPatch(AddressPatch.create()..withCity('Los Angeles'));
+A patch diff carries a nested sub-patch for a nested `@ZorphyValue` /
+`@ZorphyEntity` field, so applying it updates only the changed leaf:
 
-final updated = person.patchWithPerson(patchInput: personPatch);
+```dart
+final before = person;
+final after = person.copyWith(
+  address: person.address.copyWith(city: 'Los Angeles'),
+);
+final personPatch = PersonPatch.diff(before, after);
+final updated = personPatch.apply(person);
 ```
 
 ## Self-referencing trees
 
 ```dart
-@Zorphy(generateJson: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $CategoryNode {
   String get id;
   String get name;

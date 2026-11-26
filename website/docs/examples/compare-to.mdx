@@ -2,14 +2,25 @@
 title: Compare Helpers
 ---
 
-`compare_test.dart` enables field-by-field diffing using generated compare helpers.
+`compare_test.dart` shows field-by-field diffing. In v3 the comparison surface
+is the reflection-free descriptor plus the patch algebra: `Entity.descriptor`
+exposes `Field<E, T>` selectors, and `<Entity>Patch.changedPaths` /
+`conflictingPaths` report exactly which JSON pointers two instances differ on.
 
 ```dart
-@Zorphy(generateCompareTo: true)
+@ZorphyEntity(principalKey: #id)
 abstract class $Person {
+  String get id;
   String get name;
   int get age;
 }
 ```
 
-The generator adds a `compareToPerson` extension that returns a map of changed fields.
+```dart
+final a = Person(id: 'p1', name: 'Ada', age: 30);
+final b = a.copyWith(age: 31);
+
+// The patch carries the changed fields; changedPaths names their pointers.
+final patch = PersonPatch.diff(a, b);
+print(patch.changedPaths); // {/age}
+```

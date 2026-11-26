@@ -7,7 +7,7 @@ title: Migrating from Freezed
 
 `zorphy_migrator` is a codemod that converts freezed model classes to
 zorphy using resolved AST analysis — not regex — so union variants,
-generics, defaults, and `@JsonKey` renames are handled correctly.
+generics, defaults, and renames are handled correctly. It emits v3 archetypes.
 
 ## Usage
 
@@ -25,18 +25,13 @@ Exit codes: `0` = clean migration, `1` = items need manual attention,
 
 ## What gets converted
 
-| freezed construct | zorphy output |
+| freezed construct | zorphy v3 output |
 | --- | --- |
-| `@freezed class Foo with _$Foo { const factory Foo({...}) = _Foo; }` | `@Zorphy(preset: ZorphyPreset.lean) abstract class $Foo { ... }` |
-| Union `factory Foo.ok(T v) = Ok;` | sealed `$$Foo` base + `$Ok implements $$Foo` subtypes |
-| `factory Foo.fromJson(...)` | `generateJson: true` on the annotation |
-| `@Default(expr)` | `@JsonKey(defaultValue: expr)` on the getter |
-| `@JsonKey(...)` | preserved verbatim on the getter |
+| `@freezed class Foo with _$Foo { const factory Foo({...}) = _Foo; }` | `@ZorphyEntity(principalKey: #id) abstract class $Foo { ... }` (or `@ZorphyValue()` when `id`-less) |
+| Union `factory Foo.ok(T v) = Ok;` | `@ZorphyUnion()` base + `$Ok implements $Foo` variants |
+| `factory Foo.fromJson(...)` | the v3 wire codecs (`toWire` / `fromWire`) — no toggle |
+| `@Default(expr)` | a field initializer on the getter |
 | Field types referencing other migrated classes | rewritten to `$`-prefixed form (`List<CartItem>` → `List<$CartItem>`) |
-
-Classes that provably use only lean features are emitted with
-`preset: ZorphyPreset.lean`; everything else uses the standard preset
-(byte-compatible with zorphy 1.x defaults).
 
 ## What is NOT converted (always reported, never dropped)
 
@@ -54,10 +49,9 @@ The report tail walks you through it:
 
 1. Remove `freezed` / `freezed_annotation` from pubspec; add `zorphy`
    (dev) + `zorphy_annotation`.
-2. Delete `*.freezed.dart` files; keep `.g.dart` only where
-   `generateJson: true` was emitted.
-3. Update `part` directives: drop `.freezed.dart`, add `.zorphy.dart`.
-4. Replace `when`/`map` calls with Dart 3 `switch` expressions on the
+2. Delete `*.freezed.dart` files and any hand-written `part` directive for
+   them — v3 emits one shared `<library>.part.dart` under `lib/_br_/`.
+3. Replace `when`/`map` calls with Dart 3 `switch` expressions on the
    sealed base.
-5. `dart run build_runner build --delete-conflicting-outputs`, then
-   `dart analyze`.
+4. Run `dart run build_runner build` (no `--delete-conflicting-outputs` —
+   build_runner 2.17 removed it), then `dart analyze`.

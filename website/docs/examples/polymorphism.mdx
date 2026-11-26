@@ -2,53 +2,47 @@
 title: Polymorphism
 ---
 
-Zorphy supports sealed and open hierarchies with explicit subtype lists. This page combines `sealed_class_example.dart` and the domain entities like `$$Attachment` and `$$ChatMessage`.
+Zorphy supports closed unions and open hierarchies. In v3 polymorphism is
+declarative: a closed set of sibling variants is a `@ZorphyUnion()`, and an open
+hierarchy is a `@ZorphyState()` root whose subtypes the generator infers from the
+same-library declarations (or that you list with `explicitSubTypes`). This page
+combines `sealed_class_example.dart` and the domain entities like `$Attachment`
+and `$ChatMessage`.
 
-## Sealed hierarchy
+## Closed union
 
 ```dart
-@Zorphy(
-  generateJson: true,
-  explicitSubTypes: [$CreditCard, $PayPal, $BankTransfer],
-)
-abstract class $$PaymentMethod {
+@ZorphyUnion()
+abstract class $PaymentMethod {
   String get displayName;
-  String get processPayment;
 }
 ```
 
-Concrete types implement the sealed base:
+Concrete variants implement the union root:
 
 ```dart
-@Zorphy(generateJson: true)
-abstract class $CreditCard implements $$PaymentMethod {
+@ZorphyEntity()
+abstract class $CreditCard implements $PaymentMethod {
   String get cardNumber;
 }
 ```
 
 ## Open hierarchy with explicit subtypes
 
-The domain entities use `nonSealed: true` to keep the base open while still enabling polymorphic JSON.
+A `@ZorphyState()` root keeps the base open while still enabling polymorphic
+wire dispatch. Subtypes in another library are listed with `explicitSubTypes`.
 
 ```dart
-@Zorphy(
-  generateJson: true,
-  explicitSubTypes: [$FileAttachment, $LinkAttachment],
-  nonSealed: true,
-)
-abstract class $$Attachment {
+@ZorphyState(explicitSubTypes: [$FileAttachment, $LinkAttachment])
+abstract class $Attachment {
   String get name;
   String get mimeType;
 }
 ```
 
 ```dart
-@Zorphy(
-  generateJson: true,
-  explicitSubTypes: [$UserMessage, $AssistantMessage],
-  nonSealed: true,
-)
-abstract class $$ChatMessage {
+@ZorphyState(explicitSubTypes: [$UserMessage, $AssistantMessage])
+abstract class $ChatMessage {
   String get text;
   ChatMessageRole get role;
 }
@@ -56,6 +50,6 @@ abstract class $$ChatMessage {
 
 ## Why this matters
 
-- Safe polymorphic JSON dispatch.
+- Safe polymorphic wire dispatch keyed on the `kind` discriminator.
 - Strong typing when switching on subtype.
 - Clear separation between base contracts and concrete classes.
