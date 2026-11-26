@@ -1,3 +1,47 @@
+## [Unreleased]
+
+### Fixed
+
+- **A type-parameter field compares by content (#294).** A field whose declared
+  type is one of the node's own type parameters (`P data`, `T payload`) can hold
+  a `List`/`Set`/`Map` at runtime, and `==` compared it by identity — so two
+  values with equal `Map` payloads were never equal and `value ==
+  value.copyWith()` failed. The same defect #285 fixed for DECLARED
+  collections, resurfacing through a generic. Such fields now route through the
+  dynamic `_zorphyCollectionEquals` / `_zorphyCollectionHash` helpers (which
+  fall back to `==` / `hashCode` for a non-collection), and the helpers are
+  emitted for them.
+
+- **A union root's body factories can construct their variants (#293).** A
+  user body factory on a `@ZorphyUnion()` root is written against the SOURCE
+  variant (`return $NetworkFailure(message: message)` — the only constructor
+  it has), but the generated leaf exposes the trusted constructor as
+  `fromTrusted` (#178) and no unnamed one, so the forwarded body did not
+  compile. `$Variant(...)` constructor invocations in forwarded bodies are now
+  rewritten to `Variant.fromTrusted(...)` for the variants whose source lacks
+  `fromTrusted`; type positions, member accesses, string literals and comments
+  are untouched. The variant set is computed from the union's hierarchy edges,
+  so a union that declares every variant as a body factory (no redirects) is
+  covered too.
+
+- **Union variant factories honour the source declaration (#290).** The factory
+  a `@ZorphyUnion()` root re-emits per variant (`factory $AppFailure.network(…)
+  = $NetworkFailure;`, #271) now carries the SOURCE factory's own parameter
+  list — names, requiredness and defaults exactly as written — instead of a list
+  re-derived from the variant's fields, where every non-nullable field turned
+  `required` and the author's `bool isRetryable = false` was silently lost.
+  Dart constrains a redirecting factory to the target's exact signature and
+  forbids defaults on it, so the emitted shape is decided per variant: a `const`
+  redirect when the declaration is already the target's signature and the
+  target's `fromTrusted` is const; a body factory forwarding each declared
+  parameter to the field of the same name otherwise (a declared default, a
+  positional declaration such as `ready(String value) = $Ready;`, or a
+  collection field whose defensive copy makes `fromTrusted` non-const, #284).
+  Previously a collection-bearing variant emitted a const redirect to a
+  non-const constructor (`redirect_to_non_const_constructor`).
+  `ZorphyVariantFactoryIr` gains `parameters`; the parser fills it from the
+  analyzer element, and an IR built without one keeps the field-derived list.
+
 ## [3.0.0-dev.3] - 2026-11-26
 
 ### Added

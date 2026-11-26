@@ -606,6 +606,7 @@ final class ArchetypeComposer {
             type: field.type,
             isNullable: field.isNullable,
             suppressQuestionMark: field.suppressQuestionMark,
+            constructorDefault: field.constructorDefault,
           ),
       ],
   };

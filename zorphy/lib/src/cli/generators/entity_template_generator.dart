@@ -1,3 +1,5 @@
+import 'package:path/path.dart' as p;
+
 import '../models/entity_config.dart';
 
 /// Generates entity template code
@@ -24,7 +26,7 @@ class EntityTemplateGenerator {
 
     _writeHeader(buffer);
     _writeImports(buffer, imports);
-    _writePartDirectives(buffer, config);
+    _writePartDirective(buffer, config);
     _writeClassDefinition(buffer, config);
 
     return buffer.toString();
@@ -42,7 +44,7 @@ class EntityTemplateGenerator {
 
     _writeHeader(buffer);
     _writeImports(buffer, imports);
-    _writeSubtypePartDirectives(buffer, subtypeConfig);
+    _writePartDirective(buffer, subtypeConfig);
     _writeSubtypeClassDefinition(
       buffer,
       subtypeConfig,
@@ -73,17 +75,48 @@ class EntityTemplateGenerator {
     buffer.writeln();
   }
 
-  static void _writePartDirectives(StringBuffer buffer, EntityConfig config) {
-    buffer.writeln("part '${config.snakeName}.zorphy.dart';");
+  static void _writePartDirective(StringBuffer buffer, EntityConfig config) {
+    buffer.writeln("part '${escapeDartStringLiteral(sharedPartUri(config))}';");
     buffer.writeln();
   }
 
-  static void _writeSubtypePartDirectives(
-    StringBuffer buffer,
-    EntityConfig config,
-  ) {
-    buffer.writeln("part '${config.snakeName}.zorphy.dart';");
-    buffer.writeln();
+  /// The `part` URI of the v3 shared part for [config]'s library (issue #297).
+  ///
+  /// The v3 builder contributes to a shared part: build_runner writes
+  /// `<library>.part.dart` in its reserved `_br_` namespace, mirroring the
+  /// library's own path (`lib/a/b.dart` gets `lib/_br_/a/b.part.dart`, and
+  /// a library outside `lib/` gets `_br_/a/b.part.dart` at the package
+  /// root). No standalone `<name>.zorphy.dart` is ever written, so a
+  /// scaffold pointing at the v2 filename never compiles.
+  ///
+  /// [EntityConfig.outputDir] is read package-relative. The caller
+  /// (`EntityCreator`) resolves an on-disk output path to a package-relative
+  /// dir before generating, so this method stays a pure function of its
+  /// inputs — it never touches the filesystem. An absolute path handed to
+  /// this method directly is rebased on its last `lib` segment (the only
+  /// rebase that can be done without filesystem knowledge).
+  static String sharedPartUri(EntityConfig config) {
+    var output = (config.outputDir ?? config.defaultOutputDir).replaceAll(
+      r'\',
+      '/',
+    );
+    if (p.posix.isAbsolute(output) || RegExp(r'^[A-Za-z]:').hasMatch(output)) {
+      final segments = p.posix.split(p.posix.normalize(output));
+      final libIndex = segments.lastIndexOf('lib');
+      output = libIndex >= 0 ? p.posix.joinAll(segments.sublist(libIndex)) : '';
+    }
+    final library = p.posix.normalize(
+      p.posix.join(output, config.snakeName, '${config.snakeName}.dart'),
+    );
+    final segments = p.posix.split(library);
+    final isLib = segments.first == 'lib';
+    final dir = segments.sublist(0, segments.length - 1);
+    final part = p.posix.joinAll([
+      if (isLib) ...['lib', '_br_'] else '_br_',
+      ...dir.sublist(isLib ? 1 : 0),
+      '${config.snakeName}.part.dart',
+    ]);
+    return p.url.relative(part, from: p.posix.joinAll(dir));
   }
 
   static void _writeClassDefinition(StringBuffer buffer, EntityConfig config) {
@@ -119,7 +152,7 @@ class EntityTemplateGenerator {
     }
     buffer.writeln();
 
-    _writeFields(buffer, config.fields);
+    _writeFields(buffer, config.fields, prependAutoId: _ownsIdentity(config));
 
     _writeStatics(buffer, config.staticMembers);
 
@@ -184,6 +217,19 @@ class EntityTemplateGenerator {
     return '@ZorphyValue()';
   }
 
+  /// Whether this scaffold is a root `@ZorphyEntity`, whose annotation
+  /// promises `principalKey: #id` (issue #297).
+  ///
+  /// Identity is not a toggle: the field is declared even when the
+  /// caller listed none, because the v3 diagnostics (`ZORPHY_E001`)
+  /// reject a key that names no field. A class implementing another
+  /// interface inherits its identity instead, so an inherited getter is
+  /// never redeclared.
+  static bool _ownsIdentity(EntityConfig config) =>
+      !config.isSealed &&
+      config.kind == ZorphyKind.entity &&
+      config.extendsInterface == null;
+
   /// Generate inline subtype (for sealed classes)
   static String generateInlineSubtype(
     String subtypeName,
@@ -213,11 +259,6 @@ class EntityTemplateGenerator {
     return buffer.toString();
   }
 
-  /// Writes the getter declarations for [fields], emitting an
-  /// `@JsonKey(name: ...)` annotation above a getter when the field's
-  /// [FieldDefinition.jsonName] differs from its Dart [FieldDefinition.name].
-  ///
-  /// When [prependAutoId] is true (and no field is already named `id`), a
   /// Emits static final class members in "name:type:value" format.
   static void _writeStatics(StringBuffer buffer, List<String> staticMembers) {
     for (final entry in staticMembers) {
@@ -232,8 +273,12 @@ class EntityTemplateGenerator {
     if (staticMembers.isNotEmpty) buffer.writeln();
   }
 
-  /// `String get id;` declaration is written first — the `autoId: true`
-  /// annotation makes the concrete constructor default it to `Uuid().v4()`.
+  /// Writes the getter declarations for [fields], emitting an
+  /// `@JsonKey(name: ...)` annotation above a getter when the field's
+  /// [FieldDefinition.jsonName] differs from its Dart [FieldDefinition.name].
+  ///
+  /// When [prependAutoId] is true and no field is named `id`, the
+  /// `String get id;` identity field is written first.
   static void _writeFields(
     StringBuffer buffer,
     List<FieldDefinition> fields, {

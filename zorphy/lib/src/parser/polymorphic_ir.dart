@@ -152,12 +152,22 @@ final class ZorphyFieldIr {
   /// the flag, so the escape hatch changes no emitted code.
   final bool isDomainBool;
 
+  /// The source constructor's default for this field, as written (`0`,
+  /// `'unknown'`), or `null` when the constructor has none.
+  ///
+  /// A generated `fromTrusted` makes every non-nullable field REQUIRED, so a
+  /// root factory whose source declaration omitted a defaulted field could not
+  /// redirect to it (#291). Carrying the default lets the emitter supply it in
+  /// the body-factory fallback instead of emitting a call that cannot compile.
+  final String? constructorDefault;
+
   const ZorphyFieldIr({
     required this.name,
     required this.type,
     this.isNullable = false,
     this.suppressQuestionMark = false,
     this.isDomainBool = false,
+    this.constructorDefault,
   });
 
   /// Whether the emitted type text carries a `?`.
@@ -190,9 +200,33 @@ final class ZorphyVariantFactoryIr {
   /// `$`-prefixed name is lowered.
   final String variantClassName;
 
+  /// The factory's parameters EXACTLY as the source declared them (names,
+  /// requiredness, defaults), or `const []` when the IR was built without the
+  /// analyzer element.
+  ///
+  /// The declaration is the contract: `bool isRetryable = false` on the source
+  /// factory must stay optional on the generated one, instead of being
+  /// re-derived from the variant's fields where every non-nullable field
+  /// becomes `required` (#290). The emitter falls back to the field-derived
+  /// list only when declaration metadata is UNAVAILABLE — see
+  /// [hasDeclaredParameters].
+  final List<ZorphyUserParamIr> parameters;
+
+  /// Whether [parameters] came from a real source declaration.
+  ///
+  /// `[]` is ambiguous: it is both an explicitly empty declaration
+  /// (`factory $State.idle() = $Idle`) and the "no analyzer element" sentinel
+  /// used by hand-built IR. Conflating the two made the emitter generate
+  /// `idle({required int count})` for an author who wrote `idle()` (#291).
+  /// The parser sets this to `true`; hand-built IR leaves it `false` and keeps
+  /// the field-derived fallback.
+  final bool hasDeclaredParameters;
+
   const ZorphyVariantFactoryIr({
     required this.name,
     required this.variantClassName,
+    this.parameters = const [],
+    this.hasDeclaredParameters = false,
   });
 
   @override
@@ -387,6 +421,19 @@ final class ZorphyNodeIr {
   /// except a union ROOT (issue #271).
   final List<ZorphyUserMemberIr> userMembers;
 
+  /// The clean names of this union's variants whose SOURCE class declares no
+  /// `fromTrusted` (issue #293).
+  ///
+  /// A user body factory on the root constructs a variant the way the source
+  /// declares it — `$NetworkFailure(message: message)` — because that is the
+  /// only constructor the source has. The GENERATED leaf exposes the trusted
+  /// constructor as `fromTrusted` (#178) and no unnamed one, so the forwarded
+  /// body has to target `NetworkFailure.fromTrusted(...)` instead. The emitter
+  /// consults this set while rewriting `$Variant` tokens in forwarded bodies; a
+  /// variant that DOES declare `fromTrusted` on the source keeps the plain
+  /// `$Variant` → `Variant` lowering. Empty on non-union nodes.
+  final Set<String> variantsWithoutFromTrusted;
+
   const ZorphyNodeIr({
     required this.className,
     required this.cleanName,
@@ -409,6 +456,7 @@ final class ZorphyNodeIr {
     this.typeParameters = const [],
     this.variantFactories = const [],
     this.userMembers = const [],
+    this.variantsWithoutFromTrusted = const {},
   });
 
   /// A copy with the named fields replaced, used by the resolver while it
@@ -436,6 +484,7 @@ final class ZorphyNodeIr {
     List<String>? typeParameters,
     List<ZorphyVariantFactoryIr>? variantFactories,
     List<ZorphyUserMemberIr>? userMembers,
+    Set<String>? variantsWithoutFromTrusted,
   }) {
     return ZorphyNodeIr(
       className: className,
@@ -464,6 +513,8 @@ final class ZorphyNodeIr {
       typeParameters: typeParameters ?? this.typeParameters,
       variantFactories: variantFactories ?? this.variantFactories,
       userMembers: userMembers ?? this.userMembers,
+      variantsWithoutFromTrusted:
+          variantsWithoutFromTrusted ?? this.variantsWithoutFromTrusted,
     );
   }
 
