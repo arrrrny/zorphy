@@ -119,7 +119,14 @@ class EntityTemplateGenerator {
     }
     buffer.writeln();
 
-    _writeFields(buffer, config.fields);
+    // Issue #297: an entity's identity is unconditional under the v3
+    // zero-toggle surface, so a root `@ZorphyEntity` scaffold MUST declare
+    // the `id` field its `principalKey: #id` annotation promises — unless it
+    // implements another interface, in which case it inherits that identity.
+    // `_writeFields` skips the prepend when the caller already listed an `id`.
+    final prependAutoId =
+        config.kind == ZorphyKind.entity && config.extendsInterface == null;
+    _writeFields(buffer, config.fields, prependAutoId: prependAutoId);
 
     _writeStatics(buffer, config.staticMembers);
 
@@ -217,7 +224,10 @@ class EntityTemplateGenerator {
   /// `@JsonKey(name: ...)` annotation above a getter when the field's
   /// [FieldDefinition.jsonName] differs from its Dart [FieldDefinition.name].
   ///
-  /// When [prependAutoId] is true (and no field is already named `id`), a
+  /// When [prependAutoId] is true and no field is already named `id`, a
+  /// `String get id;` declaration is written first — the `principalKey: #id`
+  /// annotation on a root `@ZorphyEntity` (issue #297) makes that identity
+  /// unconditional, so the field must exist for the class to build.
   /// Emits static final class members in "name:type:value" format.
   static void _writeStatics(StringBuffer buffer, List<String> staticMembers) {
     for (final entry in staticMembers) {
@@ -232,8 +242,6 @@ class EntityTemplateGenerator {
     if (staticMembers.isNotEmpty) buffer.writeln();
   }
 
-  /// `String get id;` declaration is written first — the `autoId: true`
-  /// annotation makes the concrete constructor default it to `Uuid().v4()`.
   static void _writeFields(
     StringBuffer buffer,
     List<FieldDefinition> fields, {
