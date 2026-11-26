@@ -1459,9 +1459,9 @@ class PatchEmitter {
   /// approximated.
   static bool _isGenericType(String type, List<String> genericTypeNames) {
     if (genericTypeNames.isEmpty) return false;
-    final identifiers = RegExp(
-      r'[A-Za-z_$][A-Za-z0-9_$]*',
-    ).allMatches(type).map((m) => m.group(0));
+    final identifiers = RegExp(r'[A-Za-z_$][A-Za-z0-9_$]*')
+        .allMatches(type)
+        .map((m) => m.group(0));
     return identifiers.any(genericTypeNames.contains);
   }
 
