@@ -1000,9 +1000,7 @@ final class PolymorphicClassEmitter {
       } else if (c == 0x29 /* ) */ ) {
         if (parenDepth > 0) {
           parenDepth--;
-        } else if (angleDepth == 1 &&
-            bracketDepth == 0 &&
-            braceDepth == 0) {
+        } else if (angleDepth == 1 && bracketDepth == 0 && braceDepth == 0) {
           return null;
         }
       } else if (c == 0x5b /* [ */ ) {
@@ -1010,9 +1008,7 @@ final class PolymorphicClassEmitter {
       } else if (c == 0x5d /* ] */ ) {
         if (bracketDepth > 0) {
           bracketDepth--;
-        } else if (angleDepth == 1 &&
-            parenDepth == 0 &&
-            braceDepth == 0) {
+        } else if (angleDepth == 1 && parenDepth == 0 && braceDepth == 0) {
           return null;
         }
       } else if (c == 0x7b /* { */ ) {
@@ -1020,9 +1016,7 @@ final class PolymorphicClassEmitter {
       } else if (c == 0x7d /* } */ ) {
         if (braceDepth > 0) {
           braceDepth--;
-        } else if (angleDepth == 1 &&
-            parenDepth == 0 &&
-            bracketDepth == 0) {
+        } else if (angleDepth == 1 && parenDepth == 0 && bracketDepth == 0) {
           return null;
         }
       } else if (angleDepth == 1 &&
