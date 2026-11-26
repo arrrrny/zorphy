@@ -677,6 +677,7 @@ final class HierarchyResolver {
 
     // Recurse into children, passing this node as their `root`.
     final finalizedChildren = <ZorphyNodeIr>[];
+    final withoutFromTrusted = <String>[];
     for (final child in node.directSubTypes) {
       final childElement = _elementForChild(child, resolved);
       if (childElement == null) {
@@ -684,7 +685,18 @@ final class HierarchyResolver {
         continue;
       }
       _finalizeNode(childElement, stamped, parents, resolved);
-      finalizedChildren.add(resolved[childElement]!.node);
+      final finalizedChild = resolved[childElement]!.node;
+      finalizedChildren.add(finalizedChild);
+      final leaves = finalizedChild.isConcreteLeaf
+          ? [finalizedChild]
+          : finalizedChild.allConcreteLeaves;
+      for (final leaf in leaves) {
+        final leafElement = _elementForChild(leaf, resolved);
+        if (leafElement != null &&
+            !leafElement.constructors.any((c) => c.name == 'fromTrusted')) {
+          withoutFromTrusted.add(leaf.cleanName);
+        }
+      }
     }
 
     // Rebuild once more so `directSubTypes` references the finalized children.
@@ -694,6 +706,9 @@ final class HierarchyResolver {
         for (final child in finalizedChildren)
           if (child.isConcreteLeaf) child else ...child.allConcreteLeaves,
       ]),
+      variantsWithoutFromTrusted: root == null
+          ? List.unmodifiable(withoutFromTrusted)
+          : const [],
     );
     resolved[element] = _Declaration(element, finalNode);
   }

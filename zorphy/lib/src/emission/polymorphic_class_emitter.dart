@@ -811,7 +811,10 @@ final class PolymorphicClassEmitter {
         _logSkipped(node, member.name);
         continue;
       }
-      final body = _rewriteVariants(member.bodySource);
+      final body = _rewriteVariants(
+        member.bodySource,
+        node.variantsWithoutFromTrusted,
+      );
       final (required, optional) = _splitParams(member);
       if (member.isFactory) {
         c.constructors.add(
@@ -891,7 +894,11 @@ final class PolymorphicClassEmitter {
   /// `$` characters inside string literals (interpolation, raw strings,
   /// escapes) and comments are copied verbatim. A raw `replaceAll(r'$', '')`
   /// silently corrupted `'cost: $amount'` and `r'$raw'` (issue #281 review).
-  static String _rewriteVariants(String source) {
+  static String _rewriteVariants(
+    String source, [
+    List<String> variantsWithoutFromTrusted = const [],
+  ]) {
+    final withoutSet = variantsWithoutFromTrusted.toSet();
     final result = <String>[];
     var i = 0;
     while (i < source.length) {
@@ -929,8 +936,20 @@ final class PolymorphicClassEmitter {
           end++;
         }
         if (end > i + 1) {
+          final cleanName = source.substring(i + 1, end);
+          // Issue #293: a `$Variant(...)` (or `$Variant<...>(...)` with no
+          // whitespace) constructor invocation of a variant whose source
+          // declares no `fromTrusted` is emitted as `Variant.fromTrusted(...)`.
+          if (withoutSet.contains(cleanName)) {
+            final afterName = _constructorInvocationParen(source, end);
+            if (afterName != null) {
+              result.add('$cleanName.fromTrusted');
+              i = end;
+              continue;
+            }
+          }
           // `$Name` is one Dart identifier token; drop only its leading `$`.
-          result.add(source.substring(i + 1, end));
+          result.add(cleanName);
           i = end;
           continue;
         }
@@ -940,6 +959,46 @@ final class PolymorphicClassEmitter {
       i++;
     }
     return result.join();
+  }
+
+  /// If [source] at [pos] starts `<...>(` with no whitespace (or `(` directly),
+  /// returns the index of `(`, or `null` otherwise (issue #293).
+  static int? _constructorInvocationParen(String source, int pos) {
+    if (pos >= source.length) return null;
+    if (source.codeUnitAt(pos) == 0x28 /* ( */ ) return pos;
+    if (source.codeUnitAt(pos) != 0x3c /* < */ ) return null;
+    var depth = 0;
+    var j = pos;
+    while (j < source.length) {
+      final c = source.codeUnitAt(j);
+      if (c == 0x3c /* < */ ) {
+        depth++;
+      } else if (c == 0x3e /* > */ ) {
+        depth--;
+        if (depth == 0) {
+          final next = j + 1;
+          if (next < source.length &&
+              source.codeUnitAt(next) == 0x28 /* ( */ ) {
+            return next;
+          }
+          return null;
+        }
+      } else if (depth == 1 &&
+          (c == 0x20 ||
+              c == 0x09 ||
+              c == 0x0a ||
+              c == 0x0d ||
+              c == 0x3b /* ; */ ||
+              c == 0x2c /* , */ ||
+              c == 0x29 /* ) */ ||
+              c == 0x5d /* ] */ ||
+              c == 0x7d /* } */ ||
+              c == 0x3d /* = */ )) {
+        return null;
+      }
+      j++;
+    }
+    return null;
   }
 
   static int _endOfLineComment(String s, int i) {

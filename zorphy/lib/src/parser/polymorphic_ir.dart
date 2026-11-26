@@ -387,6 +387,11 @@ final class ZorphyNodeIr {
   /// except a union ROOT (issue #271).
   final List<ZorphyUserMemberIr> userMembers;
 
+  /// The clean names of the union's variants whose SOURCE declares no
+  /// `fromTrusted` constructor (issue #293). Empty on every node except a union
+  /// ROOT.
+  final List<String> variantsWithoutFromTrusted;
+
   const ZorphyNodeIr({
     required this.className,
     required this.cleanName,
@@ -409,6 +414,7 @@ final class ZorphyNodeIr {
     this.typeParameters = const [],
     this.variantFactories = const [],
     this.userMembers = const [],
+    this.variantsWithoutFromTrusted = const [],
   });
 
   /// A copy with the named fields replaced, used by the resolver while it
@@ -436,6 +442,7 @@ final class ZorphyNodeIr {
     List<String>? typeParameters,
     List<ZorphyVariantFactoryIr>? variantFactories,
     List<ZorphyUserMemberIr>? userMembers,
+    List<String>? variantsWithoutFromTrusted,
   }) {
     return ZorphyNodeIr(
       className: className,
@@ -464,6 +471,8 @@ final class ZorphyNodeIr {
       typeParameters: typeParameters ?? this.typeParameters,
       variantFactories: variantFactories ?? this.variantFactories,
       userMembers: userMembers ?? this.userMembers,
+      variantsWithoutFromTrusted:
+          variantsWithoutFromTrusted ?? this.variantsWithoutFromTrusted,
     );
   }
 
