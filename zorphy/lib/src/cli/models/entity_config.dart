@@ -23,12 +23,6 @@ class EntityConfig {
   final bool dryRun;
   final bool prefixNested;
 
-  /// Whether the entity owns an auto-generated uuid `id` field. When true
-  /// the generated template declares `String get id;`, adds
-  /// `autoId: true` to the annotation and imports
-  /// `package:uuid/uuid.dart`.
-  final bool autoId;
-
   /// The semantic kind of this class — [ZorphyKind.entity] (default) or
   /// [ZorphyKind.valueObject].
   final ZorphyKind kind;
@@ -63,7 +57,6 @@ class EntityConfig {
     this.generateSubtypes = false,
     this.dryRun = false,
     this.prefixNested = true,
-    this.autoId = false,
     this.kind = ZorphyKind.entity,
     this.typeKey,
     this.subtypeWireValue,
@@ -108,7 +101,6 @@ class EntityConfig {
     bool? generateSubtypes,
     bool? dryRun,
     bool? prefixNested,
-    bool? autoId,
     ZorphyKind? kind,
     String? typeKey,
     String? subtypeWireValue,
@@ -130,7 +122,6 @@ class EntityConfig {
       generateSubtypes: generateSubtypes ?? this.generateSubtypes,
       dryRun: dryRun ?? this.dryRun,
       prefixNested: prefixNested ?? this.prefixNested,
-      autoId: autoId ?? this.autoId,
       kind: kind ?? this.kind,
       typeKey: typeKey ?? this.typeKey,
       subtypeWireValue: subtypeWireValue ?? this.subtypeWireValue,

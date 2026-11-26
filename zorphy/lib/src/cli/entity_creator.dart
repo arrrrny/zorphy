@@ -29,6 +29,42 @@ class EntityCreator {
   EntityCreator({String? baseOutputDir})
     : baseOutputDir = baseOutputDir ?? 'lib/src/domain/entities';
 
+  /// Resolve an on-disk output dir to the package-relative form the
+  /// template generator needs for the v3 shared-part URI.
+  ///
+  /// Filesystem probing lives here at the call site, where the real output
+  /// path is known, so `EntityTemplateGenerator` stays a pure function of
+  /// its inputs. Relative dirs pass through; an absolute dir is resolved
+  /// against the NEAREST ancestor (or itself) holding a `pubspec.yaml` —
+  /// that is the package root, and the package-relative dir is what the
+  /// shared-part URI needs. The last-`lib`-segment rebase is only a
+  /// fallback for a directory no package claims: searching for the package
+  /// root first keeps a `lib` directory ABOVE the package root (e.g.
+  /// `/tmp/lib/app/pubspec.yaml` with output `/tmp/lib/app/domain/entities`)
+  /// from being mistaken for the package's own `lib`.
+  static String packageRelativeOutputDir(String? outputDir) {
+    final path = (outputDir ?? 'lib/src/domain/entities').replaceAll(r'\', '/');
+    if (!p.posix.isAbsolute(path) && !RegExp(r'^[A-Za-z]:').hasMatch(path)) {
+      return path;
+    }
+    final normalized = p.posix.normalize(path);
+    final below = <String>[];
+    var dir = Directory(normalized);
+    while (true) {
+      if (File(p.join(dir.path, 'pubspec.yaml')).existsSync()) {
+        return p.posix.joinAll(below);
+      }
+      final parent = dir.parent;
+      if (parent.path == dir.path) break; // no package claims this path
+      below.insert(0, p.posix.basename(dir.path));
+      dir = parent;
+    }
+    final segments = p.posix.split(normalized);
+    final libIndex = segments.lastIndexOf('lib');
+    if (libIndex >= 0) return p.posix.joinAll(segments.sublist(libIndex));
+    return '';
+  }
+
   /// Create an entity and return the result
   Future<EntityResult> create(EntityConfig config) async {
     try {
@@ -51,8 +87,11 @@ class EntityCreator {
         isSealed: normalizedConfig.isSealed,
       );
 
+      final generatorConfig = normalizedConfig.copyWith(
+        outputDir: packageRelativeOutputDir(effectiveOutputDir),
+      );
       final content = EntityTemplateGenerator.generate(
-        normalizedConfig,
+        generatorConfig,
         imports.toList(),
       );
 
@@ -264,7 +303,7 @@ class EntityCreator {
 
       final subtypeConfig = EntityConfig(
         name: className,
-        outputDir: effectiveOutputDir,
+        outputDir: packageRelativeOutputDir(effectiveOutputDir),
         fields: fields,
         generateJson: parentConfig.generateJson,
         generateCopyWithFn: parentConfig.generateCopyWithFn,
