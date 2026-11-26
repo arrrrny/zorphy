@@ -753,35 +753,6 @@ final class PolymorphicClassEmitter {
     return null;
   }
 
-  /// Whether [field] is typed by one of [node]'s OWN type parameters (`T`,
-  /// `T?`, `T extends num` — bounds stripped) rather than a concrete type.
-  ///
-  /// A bare type parameter is opaque to [_collectionSnapshot]: `T` is neither
-  /// a `List<`/`Set<`/`Map<` nor a visible scalar, so the field would fall
-  /// through to a plain `==` and compare a `Map`/`List`/`Set` payload by
-  /// IDENTITY — two values with equal `data` maps were never `==` (#294). The
-  /// nullable suffix is stripped before the match: `T?` is still the type
-  /// parameter `T`.
-  static bool _isTypeParameterField(ZorphyNodeIr node, PolymorphicField field) {
-    var bare = _lowerType(field.type).trim();
-    if (bare.endsWith('?')) {
-      bare = bare.substring(0, bare.length - 1).trim();
-    }
-    return bareParameterNames(node.typeParameters).contains(bare);
-  }
-
-  /// Whether [field]'s `==`/`hashCode` must compare by CONTENT rather than by
-  /// identity: a declared collection (defensively snapshotted, so a fresh
-  /// instance per value) OR a bare type-parameter field (which may hold a
-  /// collection at the use site) (#285, #294).
-  ///
-  /// The dynamic `_zorphyCollectionEquals`/`_zorphyCollectionHash` helpers
-  /// fall back to `==`/`hashCode` for a non-collection, so a scalar
-  /// type-parameter payload (`Box<int>`) is unaffected.
-  static bool _comparesByContent(ZorphyNodeIr node, PolymorphicField field) =>
-      _collectionSnapshot(field.emittedType) != null ||
-      _isTypeParameterField(node, field);
-
   // ── Union root: variant factories & user members (#271) ───────────
 
   /// The names a union root already declares, so a forwarded member never
