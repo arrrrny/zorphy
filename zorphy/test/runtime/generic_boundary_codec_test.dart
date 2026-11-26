@@ -10,9 +10,12 @@
 //   > Generated output analyzes clean under `dart analyze --fatal-infos`.
 //
 // It composes a tiny generic program — a hand-shaped `CreateParams<T>` with
-// the EMITTER'S REAL output spliced into its body, nothing hand-written into
-// the codec — writes it inside the example package (so `package:` URIs
-// resolve), analyzes it with `--fatal-infos`, then runs it.
+// a scalar `T` field AND a `List<T>` field (the two shapes the emitter routes
+// through a type parameter), with the EMITTER'S REAL output spliced into its
+// body, nothing hand-written into the codec — writes it inside the example
+// package (so `package:` URIs resolve), analyzes it with `--fatal-infos`, then
+// runs it. The `List<T>` case exercises the element-wise encode/decode paths
+// that the golden tests only pin by shape.
 
 @Timeout(Duration(minutes: 5))
 library;
@@ -68,9 +71,14 @@ void main() {
   // method is parameterized by ITS OWN type argument, so the call is
   // `CreateParams.fromWire<Product>(...)` — `CreateParams<Product>.fromWire`
   // would parse as a named-constructor invocation.
+  final items = <Object?>[
+    <String, Object?>{'sku': 'item-a', 'price': 1.5},
+    <String, Object?>{'sku': 'item-b', 'price': 2.5},
+  ];
   final wire = <String, Object?>{
     'data': <String, Object?>{'sku': 'sku-1', 'price': 9.5},
     'idempotencyKey': 'idem-7',
+    'items': items,
   };
 
   final ok = CreateParams.fromWire<Product>(wire, Product.fromWire);
@@ -78,21 +86,38 @@ void main() {
   final params = ok.getOrThrow();
   check(params.data.sku == 'sku-1', 'the wrapped value decoded');
   check(params.idempotencyKey == 'idem-7', 'the scalar field decoded');
+  // The List<T> element-wise decode path compiles and runs: each element goes
+  // through the parameter's decoder, not a plain `is` test.
+  check(params.items.length == 2, 'the List<T> field decoded element-wise');
+  check(params.items.first.sku == 'item-a', 'the first List<T> element decoded');
+  check(params.items.last.sku == 'item-b', 'the second List<T> element decoded');
 
   final encoded = params.toWire(encodeProduct);
   check((encoded['data'] as Map)['sku'] == 'sku-1', 'the wrapped value encoded');
   check(encoded['idempotencyKey'] == 'idem-7', 'the scalar re-encoded');
+  // The List<T> element-wise encode path maps the parameter's encoder over
+  // every element and round-trips back to the same wire shape.
+  final encodedItems = (encoded['items'] as List).cast<Map<String, Object?>>();
+  check(encodedItems.length == 2, 'the List<T> field encoded element-wise');
+  check(encodedItems.first['sku'] == 'item-a', 'the first List<T> element encoded');
+  check(encodedItems.last['sku'] == 'item-b', 'the second List<T> element encoded');
 
   // An absent nullable scalar is legal.
   final noKey = CreateParams.fromWire<Product>(
-    <String, Object?>{'data': <String, Object?>{'sku': 'sku-2', 'price': 1}},
+    <String, Object?>{
+      'data': <String, Object?>{'sku': 'sku-2', 'price': 1},
+      'items': items,
+    },
     Product.fromWire,
   );
   check(noKey.isOk, 'a missing nullable field is not a violation');
 
   // A corrupt wrapped value merges the inner violation under /data.
   final bad = CreateParams.fromWire<Product>(
-    <String, Object?>{'data': <String, Object?>{'sku': 7, 'price': 'x'}},
+    <String, Object?>{
+      'data': <String, Object?>{'sku': 7, 'price': 'x'},
+      'items': items,
+    },
     Product.fromWire,
   );
   check(!bad.isOk, 'a corrupt wrapped value is an error');
@@ -100,6 +125,23 @@ void main() {
       .map((v) => v.path)
       .toList();
   check(paths.any((p) => p.startsWith('/data')), 'the inner violation re-paths under /data');
+
+  // A corrupt List<T> element re-paths the inner violation under [index].
+  final badItem = CreateParams.fromWire<Product>(
+    <String, Object?>{
+      'data': <String, Object?>{'sku': 'sku-3', 'price': 3},
+      'items': <Object?>[<String, Object?>{'sku': 7, 'price': 'x'}],
+    },
+    Product.fromWire,
+  );
+  check(!badItem.isOk, 'a corrupt List<T> element is an error');
+  final itemPaths = (badItem as BoundaryErr<CreateParams<Product>>).violations
+      .map((v) => v.path)
+      .toList();
+  check(
+    itemPaths.any((p) => p.startsWith('/items[0]')),
+    'the inner violation re-paths under the element pointer: $itemPaths',
+  );
 
   print('ALL GENERIC BOUNDARY CHECKS PASSED');
 }
@@ -118,6 +160,9 @@ String _buildProgram() {
     r'$CreateParams': const [
       BoundaryField(name: 'data', type: 'T'),
       BoundaryField(name: 'idempotencyKey', type: 'String?'),
+      // The element-wise encode/decode branches the golden layer only pins by
+      // shape: this runtime case compiles and executes them.
+      BoundaryField(name: 'items', type: 'List<T>'),
     ],
     // The hand-shaped wrapped type's own decode needs `_boundaryAs` +
     // `_boundaryDouble`; listing it here keeps the helper set complete without
@@ -170,10 +215,12 @@ final class Product {
 final class CreateParams<T> {
   final T data;
   final String? idempotencyKey;
+  final List<T> items;
 
   const CreateParams.fromTrusted({
     required this.data,
     this.idempotencyKey,
+    required this.items,
   });
 
 ${_indent(_codecFor(node, fields))}

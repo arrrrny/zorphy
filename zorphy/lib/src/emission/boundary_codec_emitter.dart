@@ -983,9 +983,15 @@ class BoundaryCodecEmitter {
     Set<String> typeParams = const {},
   }) {
     final base = _strip(type);
-    // A type parameter is checked FIRST: `T`, `T?` and a `List<T>` /
-    // `Map<String, T>` element all route through the parameter's codec, never
-    // a reified `is` test (which could not name the parameter's bound).
+    // A type parameter is checked FIRST: a bare `T`, a nullable `T?` FIELD
+    // (`baseType` has already lifted its trailing `?`), and a `T` element of a
+    // `List<T>` / `Map<String, T>` all route through the parameter's codec,
+    // never a reified `is` test (which could not name the parameter's bound).
+    // Nullable ELEMENTS (`List<T?>`, `Map<String, T?>`) are deliberately
+    // outside ZRP-009's listed shapes: `_strip` keeps their trailing `?`, so
+    // they fall through to `scalar` and decode via `_boundaryAs` instead of
+    // the parameter's decoder. A bare `T?` field is unaffected — its `?` is
+    // stripped by `baseType` before classification.
     if (typeParams.contains(base)) return _Shape.typeParam;
     if (base == 'DateTime') return _Shape.dateTime;
     if (base == 'double' || (widenNumbers && base == 'num')) {
