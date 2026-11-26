@@ -399,6 +399,19 @@ final class ZorphyNodeIr {
   /// except a union ROOT (issue #271).
   final List<ZorphyUserMemberIr> userMembers;
 
+  /// The clean names of this union's variants whose SOURCE class declares no
+  /// `fromTrusted` (issue #293).
+  ///
+  /// A user body factory on the root constructs a variant the way the source
+  /// declares it — `$NetworkFailure(message: message)` — because that is the
+  /// only constructor the source has. The GENERATED leaf exposes the trusted
+  /// constructor as `fromTrusted` (#178) and no unnamed one, so the forwarded
+  /// body has to target `NetworkFailure.fromTrusted(...)` instead. The emitter
+  /// consults this set while rewriting `$Variant` tokens in forwarded bodies; a
+  /// variant that DOES declare `fromTrusted` on the source keeps the plain
+  /// `$Variant` → `Variant` lowering. Empty on non-union nodes.
+  final Set<String> variantsWithoutFromTrusted;
+
   const ZorphyNodeIr({
     required this.className,
     required this.cleanName,
@@ -421,6 +434,7 @@ final class ZorphyNodeIr {
     this.typeParameters = const [],
     this.variantFactories = const [],
     this.userMembers = const [],
+    this.variantsWithoutFromTrusted = const {},
   });
 
   /// A copy with the named fields replaced, used by the resolver while it
@@ -448,6 +462,7 @@ final class ZorphyNodeIr {
     List<String>? typeParameters,
     List<ZorphyVariantFactoryIr>? variantFactories,
     List<ZorphyUserMemberIr>? userMembers,
+    Set<String>? variantsWithoutFromTrusted,
   }) {
     return ZorphyNodeIr(
       className: className,
@@ -476,6 +491,8 @@ final class ZorphyNodeIr {
       typeParameters: typeParameters ?? this.typeParameters,
       variantFactories: variantFactories ?? this.variantFactories,
       userMembers: userMembers ?? this.userMembers,
+      variantsWithoutFromTrusted:
+          variantsWithoutFromTrusted ?? this.variantsWithoutFromTrusted,
     );
   }
 

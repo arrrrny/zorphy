@@ -2,6 +2,18 @@
 
 ### Fixed
 
+- **A union root's body factories can construct their variants (#293).** A
+  user body factory on a `@ZorphyUnion()` root is written against the SOURCE
+  variant (`return $NetworkFailure(message: message)` — the only constructor
+  it has), but the generated leaf exposes the trusted constructor as
+  `fromTrusted` (#178) and no unnamed one, so the forwarded body did not
+  compile. `$Variant(...)` constructor invocations in forwarded bodies are now
+  rewritten to `Variant.fromTrusted(...)` for the variants whose source lacks
+  `fromTrusted`; type positions, member accesses, string literals and comments
+  are untouched. The variant set is computed from the union's hierarchy edges,
+  so a union that declares every variant as a body factory (no redirects) is
+  covered too.
+
 - **Union variant factories honour the source declaration (#290).** The factory
   a `@ZorphyUnion()` root re-emits per variant (`factory $AppFailure.network(…)
   = $NetworkFailure;`, #271) now carries the SOURCE factory's own parameter

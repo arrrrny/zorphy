@@ -866,7 +866,10 @@ final class PolymorphicClassEmitter {
         _logSkipped(node, member.name);
         continue;
       }
-      final body = _rewriteVariants(member.bodySource);
+      final body = _rewriteVariants(
+        member.bodySource,
+        variantsWithoutFromTrusted: node.variantsWithoutFromTrusted,
+      );
       final (required, optional) = _splitParams(member.parameters);
       if (member.isFactory) {
         c.constructors.add(
@@ -950,7 +953,18 @@ final class PolymorphicClassEmitter {
   /// `$` characters inside string literals (interpolation, raw strings,
   /// escapes) and comments are copied verbatim. A raw `replaceAll(r'$', '')`
   /// silently corrupted `'cost: $amount'` and `r'$raw'` (issue #281 review).
-  static String _rewriteVariants(String source) {
+  ///
+  /// [variantsWithoutFromTrusted] names the union's variants whose SOURCE has
+  /// no `fromTrusted` (issue #293): a `$Variant(...)` CONSTRUCTOR invocation
+  /// of one of those is emitted as `Variant.fromTrusted(...)`, because the
+  /// generated leaf exposes the trusted constructor under that name (#178)
+  /// and no unnamed one. A `$Variant.x` member access, a `$Variant` type
+  /// position, or a variant that declares `fromTrusted` keeps the plain
+  /// lowering — only the call shape is rewritten.
+  static String _rewriteVariants(
+    String source, {
+    Set<String> variantsWithoutFromTrusted = const {},
+  }) {
     final result = <String>[];
     var i = 0;
     while (i < source.length) {
@@ -988,8 +1002,32 @@ final class PolymorphicClassEmitter {
           end++;
         }
         if (end > i + 1) {
-          // `$Name` is one Dart identifier token; drop only its leading `$`.
-          result.add(source.substring(i + 1, end));
+          final name = source.substring(i + 1, end);
+          // `$Name` is one Dart identifier token; drop only its leading `$` —
+          // unless it is a constructor INVOCATION of a variant whose source has
+          // no `fromTrusted`, in which case the generated leaf's trusted
+          // constructor is the target (issue #293). `<...>` type arguments may
+          // sit between the name and the call's `(`; whitespace may not.
+          var cursor = end;
+          if (cursor < source.length && source.codeUnitAt(cursor) == 0x3c) {
+            var depth = 0;
+            while (cursor < source.length) {
+              final c = source.codeUnitAt(cursor);
+              if (c == 0x3c) depth++;
+              if (c == 0x3e && --depth == 0) {
+                cursor++;
+                break;
+              }
+              cursor++;
+            }
+          }
+          final isCall =
+              cursor < source.length && source.codeUnitAt(cursor) == 0x28;
+          result.add(
+            isCall && variantsWithoutFromTrusted.contains(name)
+                ? '$name.fromTrusted'
+                : name,
+          );
           i = end;
           continue;
         }

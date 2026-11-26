@@ -325,6 +325,105 @@ class $Violation implements $AppFailure {
       });
     });
 
+    // Issue #293: a user body factory constructs a variant the way the SOURCE
+    // declares it; the generated leaf only has `fromTrusted`.
+    group('#293 — body factories construct variants through fromTrusted', () {
+      const bodyFactory =
+          '$_annotationImport'
+          r"""
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class $AppFailure {
+  factory $AppFailure.network({required String message, bool isRetryable = false}) {
+    return $NetworkFailure(message: message, isRetryable: isRetryable);
+  }
+  static Type networkType() => $NetworkFailure;
+  static String describe($AppFailure failure, String amount) {
+    // `$NetworkFailure(` inside a string must not be touched.
+    final literal = 'cost: $amount for $NetworkFailure(...) in prose';
+    return '$literal ${failure.runtimeType}';
+  }
+}
+
+@ZorphyValue()
+class $NetworkFailure implements $AppFailure {
+  @override
+  final String message;
+  @override
+  final bool isRetryable;
+
+  const $NetworkFailure({required this.message, this.isRetryable = false});
+}
+""";
+
+      test(r'a $Variant(...) call becomes Variant.fromTrusted(...)', () async {
+        final (_, out) = await _compose({'nodes.dart': bodyFactory});
+        final flat = out.replaceAll(RegExp(r'[\s,]+'), '');
+        expect(
+          flat,
+          contains(
+            'returnNetworkFailure.fromTrusted(message:message'
+            'isRetryable:isRetryable);',
+          ),
+        );
+      });
+
+      test(
+        'type positions, member accesses, comments and strings are left alone',
+        () async {
+          final (_, out) = await _compose({'nodes.dart': bodyFactory});
+          final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+          expect(
+            flat,
+            contains('static Type networkType() => NetworkFailure;'),
+          );
+          // The string literal and the comment survive byte-for-byte (modulo the
+          // `$AppFailure` parameter type lowering, which is the plain rule).
+          expect(
+            flat,
+            contains(r"'cost: $amount for $NetworkFailure(...) in prose'"),
+          );
+          expect(flat, isNot(contains('AppFailure.fromTrusted(')));
+        },
+      );
+
+      test('the emitted root compiles (the analyze acceptance gate)', () async {
+        final (_, out) = await _compose({'nodes.dart': bodyFactory});
+        final probe = Directory('test/.union293_tmp').absolute.path;
+        Directory(probe).createSync(recursive: true);
+        final fixture = Directory(probe).createTempSync('fixture_');
+        addTearDown(() => fixture.deleteSync(recursive: true));
+        File('${fixture.path}/pubspec.yaml').writeAsStringSync(
+          'name: probe_293\n'
+          'environment:\n'
+          '  sdk: ">=3.11.0 <4.0.0"\n'
+          'dependencies:\n'
+          '  zorphy_annotation:\n'
+          '    path: ${Directory.current.parent.uri.resolve('zorphy_annotation/').toFilePath()}\n',
+        );
+        Directory('${fixture.path}/lib').createSync();
+        File('${fixture.path}/lib/emitted.dart').writeAsStringSync(
+          "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$out",
+        );
+        final pubGet = Process.runSync('dart', [
+          'pub',
+          'get',
+        ], workingDirectory: fixture.path);
+        expect(pubGet.exitCode, 0, reason: '${pubGet.stdout}${pubGet.stderr}');
+        final analyze = Process.runSync('dart', [
+          'analyze',
+          '--fatal-infos',
+          'lib/emitted.dart',
+        ], workingDirectory: fixture.path);
+        expect(
+          analyze.exitCode,
+          0,
+          reason: '${analyze.stdout}${analyze.stderr}',
+        );
+      });
+    });
+
     test(
       'a factory name that collides with an existing member is skipped',
       () async {
@@ -381,8 +480,14 @@ class \$Ok implements \$Result {
         );
         expect(
           flat,
-          contains('NetworkFailure(message: amount)'),
-          reason: r'real $Variant identifiers are still rewritten',
+          contains('NetworkFailure.fromTrusted(message: amount)'),
+          reason:
+              // #293: a `$Variant(...)` constructor invocation in a forwarded
+              // body targets the generated leaf's `fromTrusted` — the only
+              // constructor it has. Everything else in the body (the raw
+              // `r'\$literal'`, the interpolation, the `$kind` reference) is
+              // preserved verbatim.
+              r'real $Variant identifiers are still rewritten',
         );
       },
     );

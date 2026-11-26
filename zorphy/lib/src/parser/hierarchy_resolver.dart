@@ -687,6 +687,19 @@ final class HierarchyResolver {
       finalizedChildren.add(resolved[childElement]!.node);
     }
 
+    // Issue #293: a union root's forwarded bodies construct its variants. The
+    // set of variants whose SOURCE lacks `fromTrusted` is read off the root's
+    // own hierarchy children once they are final — the `implements $Union`
+    // edge, which exists whether the variant was declared through a redirecting
+    // factory or a body one.
+    final variantsWithoutFromTrusted = node.isUnion
+        ? ArchetypeParser.unionVariantsWithoutFromTrusted([
+            for (final child in node.directSubTypes)
+              if (_elementForChild(child, resolved) case final element?)
+                element,
+          ])
+        : const <String>{};
+
     // Rebuild once more so `directSubTypes` references the finalized children.
     final finalNode = stamped.copyWith(
       directSubTypes: List.unmodifiable(finalizedChildren),
@@ -694,6 +707,7 @@ final class HierarchyResolver {
         for (final child in finalizedChildren)
           if (child.isConcreteLeaf) child else ...child.allConcreteLeaves,
       ]),
+      variantsWithoutFromTrusted: variantsWithoutFromTrusted,
     );
     resolved[element] = _Declaration(element, finalNode);
   }
