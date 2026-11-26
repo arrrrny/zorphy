@@ -12,6 +12,7 @@ import 'package:zorphy/src/emission/polymorphic_class_emitter.dart';
 import 'package:zorphy/src/emission/polymorphic_patch_emitter.dart';
 import 'package:zorphy/src/emitters/mock_fixture_emitter.dart';
 import 'package:zorphy/src/parser/polymorphic_ir.dart';
+import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 ZorphyNodeIr _node({
   required String className,
@@ -247,6 +248,185 @@ void main() {
       // envelope decode points at /ops/id while a bare patch keeps /id.
       expect(source, contains('ZorphyPatchWire.opsPathOf(raw)'));
       expect(_compact(source), contains("fieldValue(ops['id'],'\$prefix/id'"));
+    });
+  });
+
+  // Follow-ups from the #285 review: the snapshot fix exposed several ways the
+  // emitted type/equality/hint paths disagreed with the declared field.
+  group('#285 review — collection snapshot correctness follow-ups', () {
+    test('fromTrusted lowers \$ in a collection element type', () {
+      final leaf = _node(
+        className: r'$OrderCart',
+        archetype: ArchetypeKind.entity,
+        principalKey: 'id',
+      );
+      final root = _node(
+        className: r'$Cart',
+        archetype: ArchetypeKind.entity,
+        isSealedRoot: true,
+        principalKey: 'id',
+        children: [leaf],
+      );
+      final source = const PolymorphicClassEmitter().emit(
+        root: root,
+        fields: {
+          r'$Cart': [_field('id', 'String')],
+          r'$OrderCart': [
+            _field('id', 'String'),
+            _field('addresses', r'List<$Address>'),
+          ],
+        },
+      );
+      final compact = _compact(source);
+
+      // The parameter, the storage field and the `.of` copy must all agree on
+      // the lowered type; the generator's `$` declaration prefix never reaches
+      // emitted source.
+      expect(compact, contains('requiredList<Address>addresses'));
+      expect(compact, contains('List<Address>.of(addresses)'));
+      expect(compact, isNot(contains(r'List<$Address>')));
+    });
+
+    test('the snapshot strips only the outer ? and keeps element nullability', () {
+      final leaf = _node(
+        className: r'$OrderCart',
+        archetype: ArchetypeKind.entity,
+        principalKey: 'id',
+      );
+      final root = _node(
+        className: r'$Cart',
+        archetype: ArchetypeKind.entity,
+        isSealedRoot: true,
+        principalKey: 'id',
+        children: [leaf],
+      );
+      final source = const PolymorphicClassEmitter().emit(
+        root: root,
+        fields: {
+          r'$Cart': [_field('id', 'String')],
+          r'$OrderCart': [
+            _field('id', 'String'),
+            _field('items', 'List<String?>'),
+            _field('scores', 'Map<String, int?>'),
+            _field('maybe', 'List<String>', nullable: true),
+          ],
+        },
+      );
+      final compact = _compact(source);
+
+      expect(compact, contains('List<String?>.of(items)'));
+      expect(compact, contains('Map<String,int?>.of(scores)'));
+      expect(compact, contains('maybe=maybe==null?null:List<String>.of(maybe)'));
+      expect(compact, isNot(contains('List<String>.of(items)')));
+    });
+
+    test('collection fields use content-based == and hashCode', () {
+      final leaf = _node(
+        className: r'$OrderCart',
+        archetype: ArchetypeKind.entity,
+        principalKey: 'id',
+      );
+      final root = _node(
+        className: r'$Cart',
+        archetype: ArchetypeKind.entity,
+        isSealedRoot: true,
+        principalKey: 'id',
+        children: [leaf],
+      );
+      final source = const PolymorphicClassEmitter().emit(
+        root: root,
+        fields: {
+          r'$Cart': [_field('id', 'String')],
+          r'$OrderCart': [
+            _field('id', 'String'),
+            _field('items', 'List<String>'),
+          ],
+        },
+      );
+      final compact = _compact(source);
+
+      // A defensive copy gives each value a different list instance, so the
+      // generated operators must compare/hash CONTENTS to keep
+      // `value == value.copyWith()` true.
+      expect(
+        compact,
+        contains('OrderCart._zorphyCollectionEquals(this.items,other.items)'),
+      );
+      expect(compact, contains('OrderCart._zorphyCollectionHash(items)'));
+      expect(
+        compact,
+        contains('staticbool_zorphyCollectionEquals(Object?a,Object?b)'),
+      );
+      expect(compact, contains('staticint_zorphyCollectionHash(Object?value)'));
+    });
+
+    test('example hints render nested collections recursively', () {
+      final leaf = _node(
+        className: r'$Fixture',
+        archetype: ArchetypeKind.entity,
+        principalKey: 'id',
+        fields: const [
+          ZorphyFieldIr(name: 'nested', type: 'List<List<Status>>?'),
+        ],
+      );
+      final emitted = MockFixtureEmitter().emitForNode(
+        leaf,
+        mockSeeds: const {
+          'nested': ZorphyMock(example: <Object>[<Object>[]]),
+        },
+      );
+      final compact = _compact(emitted);
+
+      expect(compact, contains('nested:[[]]'));
+      expect(compact, isNot(contains("'[]'")));
+    });
+
+    test('example hints respect collection kind and element nullability', () {
+      final leaf = _node(
+        className: r'$Fixture',
+        archetype: ArchetypeKind.entity,
+        principalKey: 'id',
+        fields: const [
+          ZorphyFieldIr(name: 'setField', type: 'Set<Status>?'),
+          ZorphyFieldIr(name: 'mapField', type: 'Map<String, Status>'),
+          ZorphyFieldIr(name: 'nullableMap', type: 'Map<String, Status?>'),
+        ],
+      );
+      final emitted = MockFixtureEmitter().emitForNode(
+        leaf,
+        mockSeeds: const {
+          // A List hint cannot seed a Set field.
+          'setField': ZorphyMock(example: <Object>[]),
+          // A null hint cannot seed a non-nullable Status value.
+          'mapField': ZorphyMock(example: <String, Object?>{'first': null}),
+          // ...but a nullable Status? value still accepts it.
+          'nullableMap': ZorphyMock(example: <String, Object?>{'first': null}),
+        },
+      );
+      final compact = _compact(emitted);
+
+      expect(compact, contains('setField:{}'));
+      expect(compact, contains('mapField:{}'));
+      expect(compact, contains("nullableMap:{'first':null}"));
+    });
+
+    test('a compatible Set hint is still accepted', () {
+      final leaf = _node(
+        className: r'$Fixture',
+        archetype: ArchetypeKind.entity,
+        principalKey: 'id',
+        fields: const [
+          ZorphyFieldIr(name: 'setField', type: 'Set<String>'),
+        ],
+      );
+      final emitted = MockFixtureEmitter().emitForNode(
+        leaf,
+        mockSeeds: const {
+          'setField': ZorphyMock(example: <String>{'seed'}),
+        },
+      );
+
+      expect(_compact(emitted), contains("setField:{'seed'}"));
     });
   });
 }

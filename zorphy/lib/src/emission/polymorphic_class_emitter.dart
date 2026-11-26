@@ -668,7 +668,10 @@ final class PolymorphicClassEmitter {
             p.name = field.name;
             p.named = true;
             p.required = !field.isNullable;
-            p.type = referType(field.emittedType);
+            // Lower `$` here exactly as the storage field, `copyWith` and the
+            // variant factories do: a `$`-prefixed element type would emit a
+            // parameter the generated library cannot resolve (#285 review).
+            p.type = referType(_lowerType(field.emittedType));
           }),
         );
         final name = field.name;
@@ -688,11 +691,18 @@ final class PolymorphicClassEmitter {
   /// int>.of`), or `null` when the type is not a `List`/`Set`/`Map`.
   ///
   /// The element/value arguments are kept verbatim (`Map<String, int>.of`), so
-  /// the copy types against the declared field. A `$`-prefixed element type is
-  /// left as written — it is a generator declaration prefix the surrounding
-  /// library strips, the same way the field type itself is emitted.
+  /// the copy types against the declared field. Two normalizations matter:
+  /// * `$`-prefixed generator declarations are lowered, exactly like the
+  ///   storage field, `copyWith` and the `fromTrusted` parameter — otherwise
+  ///   `List<$Address>.of` emits a type that does not exist (#285 review).
+  /// * only the OUTER nullable suffix is removed. Inner `?` markers belong to
+  ///   the element type (`List<String?>`, `Map<String, int?>`) and must survive,
+  ///   or the `.of` copy cannot accept its own declared parameter (#285 review).
   static String? _collectionSnapshot(String emittedType) {
-    final bare = emittedType.replaceAll('?', '').trim();
+    var bare = _lowerType(emittedType).trim();
+    if (bare.endsWith('?')) {
+      bare = bare.substring(0, bare.length - 1).trim();
+    }
     if (bare.startsWith('List<') && bare.endsWith('>')) return '$bare.of';
     if (bare.startsWith('Set<') && bare.endsWith('>')) return '$bare.of';
     if (bare.startsWith('Map<') && bare.endsWith('>')) return '$bare.of';
@@ -1009,12 +1019,19 @@ final class PolymorphicClassEmitter {
     List<PolymorphicField> fields,
     bool isEntity,
   ) {
-    return [
+    final methods = <Method>[
       _copyWith(node, fields),
       _equals(node, fields),
       _hashCode(node, fields),
       _toString(node, fields),
     ];
+    // Only a class that actually snapshots a collection needs the helpers the
+    // generated `==`/`hashCode` call. They are private STATIC members of the
+    // class, so two hierarchies in one library part can never collide.
+    if (fields.any((field) => _collectionSnapshot(field.emittedType) != null)) {
+      methods.addAll([_collectionEqualsMethod(), _collectionHashMethod()]);
+    }
+    return methods;
   }
 
   /// `OrderNotification copyWith({String? id, ..., Object? nickname = _sentinel})`
@@ -1079,7 +1096,14 @@ final class PolymorphicClassEmitter {
         // The left reference is qualified with `this.`: a field literally named
         // `other` would otherwise resolve to the equality PARAMETER, making
         // `other == other.other` compare the parameter to itself.
-        for (final field in fields) 'this.${field.name} == other.${field.name}',
+        // A snapshotted collection is a DIFFERENT instance on every value, so
+        // a plain `==` compares identities and breaks `value == value.copyWith()`;
+        // those fields compare their contents instead (#285 review).
+        for (final field in fields)
+          _collectionSnapshot(field.emittedType) != null
+              ? '${node.cleanName}._zorphyCollectionEquals('
+                  'this.${field.name}, other.${field.name})'
+              : 'this.${field.name} == other.${field.name}',
       ];
       // `operator ==` is the method NAME (the repo's own convention in
       // `equals_tostring_generator.dart`); a bare `==` name emits
@@ -1109,10 +1133,94 @@ final class PolymorphicClassEmitter {
         // `Object.hashAll` accepts any nonempty iterable, covering both ends.
         fields.isEmpty
             ? 'runtimeType.hashCode'
-            : 'Object.hashAll([${[for (final f in fields) f.name].join(', ')}])',
+            : 'Object.hashAll([${[
+                for (final f in fields)
+                  _collectionSnapshot(f.emittedType) != null
+                      ? '${node.cleanName}._zorphyCollectionHash(${f.name})'
+                      : f.name,
+              ].join(', ')}])',
       );
     });
   }
+
+  /// Content-based equality for a snapshotted collection field (#285 review).
+  ///
+  /// The defensive copy in `fromTrusted` gives each value its OWN list/set/map,
+  /// so `Object`'s identity `==` would make `value == value.copyWith()` false.
+  /// Elements use their own `==`: value equality for generated nested values,
+  /// identity for nested collections (the snapshot copies only the outer one).
+  static Method _collectionEqualsMethod() => Method((m) {
+        m
+          ..name = '_zorphyCollectionEquals'
+          ..static = true
+          ..returns = referType('bool');
+        m.requiredParameters.addAll([
+          Parameter((p) {
+            p
+              ..name = 'a'
+              ..type = referType('Object?');
+          }),
+          Parameter((p) {
+            p
+              ..name = 'b'
+              ..type = referType('Object?');
+          }),
+        ]);
+        m.body = Code('''
+    if (identical(a, b)) return true;
+    if (a is List && b is List) {
+      if (a.length != b.length) return false;
+      for (var i = 0; i < a.length; i++) {
+        if (a[i] != b[i]) return false;
+      }
+      return true;
+    }
+    if (a is Set && b is Set) {
+      if (a.length != b.length) return false;
+      return a.every(b.contains);
+    }
+    if (a is Map && b is Map) {
+      if (a.length != b.length) return false;
+      for (final entry in a.entries) {
+        if (!b.containsKey(entry.key) || b[entry.key] != entry.value) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+    ''');
+      });
+
+  /// A hash compatible with [_collectionEqualsMethod]: order matters for a
+  /// `List`, but a `Set`/`Map` combines element hashes commutatively so two
+  /// equal collections always hash equal regardless of iteration order.
+  static Method _collectionHashMethod() => Method((m) {
+        m
+          ..name = '_zorphyCollectionHash'
+          ..static = true
+          ..returns = referType('int');
+        m.requiredParameters.add(
+          Parameter((p) {
+            p
+              ..name = 'value'
+              ..type = referType('Object?');
+          }),
+        );
+        m.body = Code('''
+    if (value is List) return Object.hashAll(value);
+    if (value is Set) {
+      return value.fold<int>(0, (hash, element) => hash + element.hashCode);
+    }
+    if (value is Map) {
+      return value.entries.fold<int>(
+        0,
+        (hash, entry) => hash + Object.hash(entry.key, entry.value),
+      );
+    }
+    return value.hashCode;
+    ''');
+      });
 
   /// `toString` — the class name and every field, in declaration order.
   Method _toString(ZorphyNodeIr node, List<PolymorphicField> fields) {

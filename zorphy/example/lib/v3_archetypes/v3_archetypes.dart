@@ -1,7 +1,6 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 part '../_br_/v3_archetypes/v3_archetypes.part.dart';
-part '../../../_br_/example/lib/v3_archetypes/v3_archetypes.part.dart';
 
 // Issue #223 e2e fixture: one class per v3 archetype, declared the way a real
 // consumer declares them (abstract `$`-prefixed declarations; the generated
