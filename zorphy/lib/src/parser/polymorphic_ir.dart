@@ -190,9 +190,21 @@ final class ZorphyVariantFactoryIr {
   /// `$`-prefixed name is lowered.
   final String variantClassName;
 
+  /// The factory's parameters EXACTLY as the source declared them (names,
+  /// requiredness, defaults), or `const []` when the IR was built without the
+  /// analyzer element.
+  ///
+  /// The declaration is the contract: `bool isRetryable = false` on the source
+  /// factory must stay optional on the generated one, instead of being
+  /// re-derived from the variant's fields where every non-nullable field
+  /// becomes `required` (#290). The emitter falls back to the field-derived
+  /// list only when this is empty.
+  final List<ZorphyUserParamIr> parameters;
+
   const ZorphyVariantFactoryIr({
     required this.name,
     required this.variantClassName,
+    this.parameters = const [],
   });
 
   @override

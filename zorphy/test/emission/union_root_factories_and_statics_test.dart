@@ -166,10 +166,12 @@ void main() {
       expect(flat, isNot(contains('\$AppFailure')));
     });
 
-    test('a generic union root keeps its type parameter on the factory', () async {
-      const generic =
-          '$_annotationImport'
-          '''
+    test(
+      'a generic union root keeps its type parameter on the factory',
+      () async {
+        const generic =
+            '$_annotationImport'
+            '''
 part 'nodes.zorphy.dart';
 
 @ZorphyUnion()
@@ -185,13 +187,142 @@ class \$SliceReady<T> implements \$AsyncSlice<T> {
   const \$SliceReady({required this.value});
 }
 ''';
-      final (_, out) = await _compose({'nodes.dart': generic});
-      final flat = out.replaceAll(RegExp(r'\s+'), ' ');
-      expect(flat, contains('sealed class AsyncSlice<T>'));
-      // The class carries `<T>`; the redirecting factory is a member of it, so
-      // its name does NOT repeat the type parameter (the issue's own example).
-      expect(flat, contains('const factory AsyncSlice.ready('));
-      expect(flat, contains('= SliceReady.fromTrusted;'));
+        final (_, out) = await _compose({'nodes.dart': generic});
+        final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+        expect(flat, contains('sealed class AsyncSlice<T>'));
+        // The class carries `<T>`; the redirecting factory is a member of it, so
+        // its name does NOT repeat the type parameter (the issue's own example).
+        expect(flat, contains('const factory AsyncSlice.ready('));
+        expect(flat, contains('= SliceReady.fromTrusted;'));
+      },
+    );
+
+    // Issue #290 (zuraffa 8.0 adoption): two defects the real AppFailure
+    // union exposed — a non-const `fromTrusted` target, and declared defaults
+    // being re-derived away from the variant's fields.
+    group('#290 — variant factory follows the source declaration', () {
+      const declared =
+          '$_annotationImport'
+          r"""
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class $AppFailure {
+  factory $AppFailure.network({
+    required String message,
+    bool isRetryable = false,
+    int? statusCode,
+  }) = $NetworkFailure;
+  factory $AppFailure.violation({
+    required String message,
+    List<String> violations = const [],
+  }) = $Violation;
+}
+
+@ZorphyValue()
+class $NetworkFailure implements $AppFailure {
+  @override
+  final String message;
+  @override
+  final bool isRetryable;
+  final int? statusCode;
+
+  const $NetworkFailure({
+    required this.message,
+    this.isRetryable = false,
+    this.statusCode,
+  });
+}
+
+@ZorphyValue()
+class $Violation implements $AppFailure {
+  @override
+  final String message;
+  final List<String> violations;
+
+  const $Violation({
+    required this.message,
+    this.violations = const [],
+  });
+}
+""";
+
+      test('a declared default is honoured via a body factory', () async {
+        final (_, out) = await _compose({'nodes.dart': declared});
+        final flat = out.replaceAll(RegExp(r'[\s,]+'), '');
+        // `isRetryable` is non-nullable on the variant; the field-derived list
+        // would have emitted `required bool isRetryable`. The source factory
+        // declared a default, so the generated one keeps it — as a BODY
+        // factory, since Dart forbids defaults on a redirecting one.
+        expect(
+          flat,
+          contains(
+            'factoryAppFailure.network({requiredStringmessage'
+            'boolisRetryable=falseint?statusCode})'
+            '=>NetworkFailure.fromTrusted(message:message'
+            'isRetryable:isRetryablestatusCode:statusCode);',
+          ),
+        );
+        // Only the ROOT factory is under test: the variant's own fromTrusted
+        // (and copyWithField) legitimately carry `required bool isRetryable`.
+        final rootFactory = flat.substring(
+          flat.indexOf('factoryAppFailure.network('),
+          flat.indexOf('factoryAppFailure.violation('),
+        );
+        expect(rootFactory, isNot(contains('requiredboolisRetryable')));
+      });
+
+      test('a collection-bearing variant never takes a const redirect', () async {
+        final (_, out) = await _compose({'nodes.dart': declared});
+        final flat = out.replaceAll(RegExp(r'[\s,]+'), '');
+        // `violations` is a List, so `Violation.fromTrusted` snapshots it in an
+        // initializer list and is NOT const; a const redirect to it would be
+        // `redirect_to_non_const_constructor`.
+        expect(flat, isNot(contains('constfactoryAppFailure.violation(')));
+        expect(
+          flat,
+          contains(
+            'factoryAppFailure.violation({requiredStringmessage'
+            'List<String>violations=const[]})'
+            '=>Violation.fromTrusted(message:messageviolations:violations);',
+          ),
+        );
+      });
+
+      test('the emitted root compiles (the analyze acceptance gate)', () async {
+        final (_, out) = await _compose({'nodes.dart': declared});
+        final probe = Directory('test/.union290_tmp').absolute.path;
+        Directory(probe).createSync(recursive: true);
+        final fixture = Directory(probe).createTempSync('fixture_');
+        addTearDown(() => fixture.deleteSync(recursive: true));
+        File('${fixture.path}/pubspec.yaml').writeAsStringSync(
+          'name: probe_290\n'
+          'environment:\n'
+          '  sdk: ">=3.11.0 <4.0.0"\n'
+          'dependencies:\n'
+          '  zorphy_annotation:\n'
+          '    path: ${Directory.current.parent.uri.resolve('zorphy_annotation/').toFilePath()}\n',
+        );
+        Directory('${fixture.path}/lib').createSync();
+        File('${fixture.path}/lib/emitted.dart').writeAsStringSync(
+          "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$out",
+        );
+        final pubGet = Process.runSync('dart', [
+          'pub',
+          'get',
+        ], workingDirectory: fixture.path);
+        expect(pubGet.exitCode, 0, reason: '${pubGet.stdout}${pubGet.stderr}');
+        final analyze = Process.runSync('dart', [
+          'analyze',
+          '--fatal-infos',
+          'lib/emitted.dart',
+        ], workingDirectory: fixture.path);
+        expect(
+          analyze.exitCode,
+          0,
+          reason: '${analyze.stdout}${analyze.stderr}',
+        );
+      });
     });
 
     test(

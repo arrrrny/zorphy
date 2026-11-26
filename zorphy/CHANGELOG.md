@@ -1,3 +1,25 @@
+## [Unreleased]
+
+### Fixed
+
+- **Union variant factories honour the source declaration (#290).** The factory
+  a `@ZorphyUnion()` root re-emits per variant (`factory $AppFailure.network(…)
+  = $NetworkFailure;`, #271) now carries the SOURCE factory's own parameter
+  list — names, requiredness and defaults exactly as written — instead of a list
+  re-derived from the variant's fields, where every non-nullable field turned
+  `required` and the author's `bool isRetryable = false` was silently lost.
+  Dart constrains a redirecting factory to the target's exact signature and
+  forbids defaults on it, so the emitted shape is decided per variant: a `const`
+  redirect when the declaration is already the target's signature and the
+  target's `fromTrusted` is const; a body factory forwarding each declared
+  parameter to the field of the same name otherwise (a declared default, a
+  positional declaration such as `ready(String value) = $Ready;`, or a
+  collection field whose defensive copy makes `fromTrusted` non-const, #284).
+  Previously a collection-bearing variant emitted a const redirect to a
+  non-const constructor (`redirect_to_non_const_constructor`).
+  `ZorphyVariantFactoryIr` gains `parameters`; the parser fills it from the
+  analyzer element, and an IR built without one keeps the field-derived list.
+
 ## [3.0.0-dev.3] - 2026-11-26
 
 ### Added

@@ -737,12 +737,32 @@ final class PolymorphicClassEmitter {
     };
   }
 
-  /// Emits one redirecting const factory per variant onto the sealed root
+  /// Emits one variant factory per variant onto the sealed root
   /// (issue #271 §3.1):
   /// `const factory AppFailure.network({...}) = NetworkFailure.fromTrusted;`.
   ///
-  /// The parameter list is the variant's `fromTrusted` list — the variant
-  /// leaf's full payload — so the redirect is legal (`fromTrusted` is const).
+  /// The parameter list is the SOURCE factory's own declaration (#290) —
+  /// names, requiredness and defaults exactly as written — so the author's
+  /// `bool isRetryable = false` stays optional instead of being re-derived
+  /// from the variant's fields, where every non-nullable field would turn
+  /// `required`. Only an IR built without the analyzer element (empty
+  /// [ZorphyVariantFactoryIr.parameters]) falls back to the field-derived list.
+  ///
+  /// Dart constrains a REDIRECTING factory to the target's exact signature and
+  /// forbids defaults on it (`default_value_in_redirecting_factory_constructor`,
+  /// `redirect_to_invalid_function_type`), and a `const` redirect must target
+  /// a `const` constructor. So the emitted shape is decided per variant:
+  ///
+  /// - **redirect** when the declaration is already the target's signature —
+  ///   every parameter named, no defaults — AND the target's `fromTrusted` is
+  ///   const; this keeps `const AppFailure.timeout(...)` and Dart 3
+  ///   dot-shorthand (`.timeout(...)`) working;
+  /// - **body factory** otherwise — `factory AppFailure.network({...}) =>
+  ///   NetworkFailure.fromTrusted(...)` forwarding every declared parameter to
+  ///   the field of the same name. A declared default, a positional
+  ///   declaration, or a collection field (which makes `fromTrusted`
+  ///   non-const, #284) each take this path.
+  ///
   /// A factory whose name collides with a member the root already has (an
   /// abstract getter, a codec/lens/descriptor member, or a user member) is
   /// skipped and named in the log.
@@ -770,24 +790,59 @@ final class PolymorphicClassEmitter {
               fields[variant.className] ?? const [],
               fields,
             );
+      // `fromTrusted` is const unless a collection field is snapshotted in
+      // its initializer list — the same predicate _fromTrustedConstructor uses.
+      final targetIsConst = !variantFields.any(
+        (field) => _collectionSnapshot(field.emittedType) != null,
+      );
+      final targetSymbol =
+          '${_lowerType(factory.variantClassName)}.fromTrusted';
       c.constructors.add(
         Constructor((ctor) {
-          ctor.constant = true;
           ctor.factory = true;
           ctor.name = factory.name;
-          for (final field in variantFields) {
-            ctor.optionalParameters.add(
-              Parameter((p) {
-                p.name = field.name;
-                p.named = true;
-                p.required = !field.isNullable;
-                p.type = referType(_lowerType(field.emittedType));
-              }),
-            );
+          if (factory.parameters.isEmpty) {
+            // No analyzer element behind the IR: the field-derived list is the
+            // only shape available, and it is redirect-compatible by design.
+            ctor.constant = targetIsConst;
+            for (final field in variantFields) {
+              ctor.optionalParameters.add(
+                Parameter((p) {
+                  p.name = field.name;
+                  p.named = true;
+                  p.required = !field.isNullable;
+                  p.type = referType(_lowerType(field.emittedType));
+                }),
+              );
+            }
+            ctor.redirect = refer(targetSymbol);
+            return;
           }
-          ctor.redirect = refer(
-            '${_lowerType(factory.variantClassName)}.fromTrusted',
-          );
+          final (required, optional) = _splitParams(factory.parameters);
+          ctor.requiredParameters.addAll(required);
+          ctor.optionalParameters.addAll(optional);
+          // A redirect is legal only when the declaration IS the target's
+          // signature: every parameter named, no defaults, and a const target.
+          // A positional declaration (`ready(String value) = $Ready;`, valid
+          // against the source class's `const $Ready(this.value)`) does not
+          // match the generated leaf's named `fromTrusted({required this.value})`
+          // — it becomes a body factory forwarding each parameter to the field
+          // of the same name (#290).
+          final redirectCompatible =
+              !factory.parameters.any(
+                (p) => p.defaultValue != null || !p.isNamed,
+              ) &&
+              targetIsConst;
+          if (redirectCompatible) {
+            ctor.constant = true;
+            ctor.redirect = refer(targetSymbol);
+            return;
+          }
+          ctor.lambda = true;
+          final forwarded = [
+            for (final p in factory.parameters) '${p.name}: ${p.name}',
+          ];
+          ctor.body = Code('$targetSymbol(${forwarded.join(', ')})');
         }),
       );
     }
@@ -812,7 +867,7 @@ final class PolymorphicClassEmitter {
         continue;
       }
       final body = _rewriteVariants(member.bodySource);
-      final (required, optional) = _splitParams(member);
+      final (required, optional) = _splitParams(member.parameters);
       if (member.isFactory) {
         c.constructors.add(
           Constructor((ctor) {
@@ -845,12 +900,16 @@ final class PolymorphicClassEmitter {
     }
   }
 
-  /// Splits [member]'s parameters into the positional [required] and the
-  /// [optional] lists code_builder renders as `(a, b)` and `{...}` / `[...]`.
-  (List<Parameter>, List<Parameter>) _splitParams(ZorphyUserMemberIr member) {
+  /// Splits [parameters] into the positional [required] and the [optional]
+  /// lists code_builder renders as `(a, b)` and `{...}` / `[...]`. Shared by
+  /// the forwarded user members and the variant factories, so a declared
+  /// default value (`bool isRetryable = false`) survives both paths.
+  (List<Parameter>, List<Parameter>) _splitParams(
+    List<ZorphyUserParamIr> parameters,
+  ) {
     final required = <Parameter>[];
     final optional = <Parameter>[];
-    for (final p in member.parameters) {
+    for (final p in parameters) {
       final parameter = Parameter((spec) {
         spec.name = p.name;
         if (p.type != null) spec.type = referType(_lowerType(p.type!));
