@@ -174,6 +174,113 @@ final class ZorphyFieldIr {
   String toString() => '$type${emitsQuestionMark ? '?' : ''} $name';
 }
 
+/// One redirecting variant factory declared on a `@ZorphyUnion` root
+/// (`factory $AppFailure.network({...}) = $NetworkFailure;`, issue #271).
+///
+/// The sealed root re-emits it as a `const factory <Union>.<name>({...}) =
+/// <Variant>.fromTrusted;` so a consumer can construct a variant through the
+/// root — and Dart 3 dot-shorthand (`.network(...)`) resolves — without
+/// importing the variant class or hand-writing a top-level wrapper.
+final class ZorphyVariantFactoryIr {
+  /// The factory's name on the root (`network`), without the class prefix.
+  final String name;
+
+  /// The variant class the factory redirects to, prefixes included
+  /// (`$NetworkFailure`) — the emitter lowers it the same way every other
+  /// `$`-prefixed name is lowered.
+  final String variantClassName;
+
+  const ZorphyVariantFactoryIr({
+    required this.name,
+    required this.variantClassName,
+  });
+
+  @override
+  String toString() => '$name = $variantClassName';
+}
+
+/// One user-declared member a `@ZorphyUnion` root carries onto its generated
+/// sealed class (issue #271): a `static` method or a body `factory`
+/// constructor.
+///
+/// The SIGNATURE is structured data read from the analyzer element (lossless),
+/// so the emitter rebuilds it as a `code_builder` [Method]/[Constructor]. The
+/// BODY cannot be rebuilt from the AST without loss, so its ORIGINAL source
+/// text is carried in [bodySource] and spliced through a `code_builder` `Code`
+/// after the emitter rewrites `$Variant` identifiers to `Variant`.
+final class ZorphyUserMemberIr {
+  /// The member's name (`from`, `describe`); `''` for an unnamed factory.
+  final String name;
+
+  /// Whether this is a body `factory` constructor (true) or a `static` method
+  /// (false).
+  final bool isFactory;
+
+  /// The method's return type as source text (`String`), or `null` for a
+  /// factory.
+  final String? returnType;
+
+  /// The method's type parameters as source text (`T extends num`), empty for
+  /// a non-generic member.
+  final List<String> typeParameters;
+
+  /// The member's formal parameters, in declaration order.
+  final List<ZorphyUserParamIr> parameters;
+
+  /// The member's ORIGINAL body source text, `$Variant` references included —
+  /// a block body WITHOUT its outer braces, or an expression body WITHOUT the
+  /// leading `=>` / trailing `;`.
+  final String bodySource;
+
+  /// Whether the body was an expression body (`=> expr`) rather than a block
+  /// (`{ ... }`).
+  final bool bodyIsLambda;
+
+  const ZorphyUserMemberIr({
+    required this.name,
+    required this.isFactory,
+    required this.returnType,
+    required this.typeParameters,
+    required this.parameters,
+    required this.bodySource,
+    required this.bodyIsLambda,
+  });
+
+  @override
+  String toString() => name;
+}
+
+/// One formal parameter of a [ZorphyUserMemberIr].
+final class ZorphyUserParamIr {
+  /// The parameter name.
+  final String name;
+
+  /// The declared type as source text (`String`, `StackTrace?`), or `null`
+  /// when the parameter has no explicit type.
+  final String? type;
+
+  /// Whether the parameter is named (`{ ... }`).
+  final bool isNamed;
+
+  /// Whether a named parameter is required.
+  final bool isRequired;
+
+  /// Whether the parameter is an optional positional (`[ ... ]`).
+  final bool isOptionalPositional;
+
+  /// The default-value source text (`3`), or `null` when there is none.
+  final String? defaultValue;
+
+  const ZorphyUserParamIr({
+    required this.name,
+    required this.type,
+    required this.isNamed,
+    required this.isRequired,
+    required this.isOptionalPositional,
+    required this.defaultValue,
+  });
+}
+
 /// One node of a polymorphic hierarchy.
 ///
 /// A node keeps BOTH names: [className] is the declared identifier
@@ -270,6 +377,16 @@ final class ZorphyNodeIr {
   /// emitting `class Box<T>MockData`.
   final List<String> typeParameters;
 
+  /// The redirecting variant factories the `@ZorphyUnion` source declared
+  /// (`factory $AppFailure.network(...) = $NetworkFailure;`), in declaration
+  /// order. Empty on every node except a union ROOT (issue #271).
+  final List<ZorphyVariantFactoryIr> variantFactories;
+
+  /// The user-declared `static` methods and body `factory` constructors the
+  /// `@ZorphyUnion` source declared, in declaration order. Empty on every node
+  /// except a union ROOT (issue #271).
+  final List<ZorphyUserMemberIr> userMembers;
+
   const ZorphyNodeIr({
     required this.className,
     required this.cleanName,
@@ -290,6 +407,8 @@ final class ZorphyNodeIr {
     this.root,
     this.fields = const [],
     this.typeParameters = const [],
+    this.variantFactories = const [],
+    this.userMembers = const [],
   });
 
   /// A copy with the named fields replaced, used by the resolver while it
@@ -315,6 +434,8 @@ final class ZorphyNodeIr {
     bool? isUnion,
     List<ZorphyFieldIr>? fields,
     List<String>? typeParameters,
+    List<ZorphyVariantFactoryIr>? variantFactories,
+    List<ZorphyUserMemberIr>? userMembers,
   }) {
     return ZorphyNodeIr(
       className: className,
@@ -341,6 +462,8 @@ final class ZorphyNodeIr {
       root: root ?? this.root,
       fields: fields ?? this.fields,
       typeParameters: typeParameters ?? this.typeParameters,
+      variantFactories: variantFactories ?? this.variantFactories,
+      userMembers: userMembers ?? this.userMembers,
     );
   }
 

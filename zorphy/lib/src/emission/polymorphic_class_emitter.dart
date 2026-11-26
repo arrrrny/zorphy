@@ -460,6 +460,15 @@ final class PolymorphicClassEmitter {
             }),
           );
         }
+        // Issue #271: a union ROOT re-emits its redirecting variant factories
+        // and forwards the user statics / body factories the source declared.
+        // A name that collides with a member the root already has (a user
+        // member, fromWire/toWire, descriptor, lenses) is skipped and named in
+        // the log — the same convention the descriptor emitter uses.
+        if (node.isUnion && node.isSealedRoot) {
+          _emitVariantFactories(c, node, fields);
+          _emitUserMembers(c, node, fields);
+        }
       }
 
       // The principal key is DEFINED on the root and inherited by every
@@ -629,6 +638,309 @@ final class PolymorphicClassEmitter {
         );
       }
     });
+  }
+
+  // ── Union root: variant factories & user members (#271) ───────────
+
+  /// The names a union root already declares, so a forwarded member never
+  /// collides with an existing one (issue #271 §3.4): the abstract getters and
+  /// the members another emitter splices in (`fromWire`, `toWire`,
+  /// `descriptor`, `lenses`, `resolvePath`). The user members and variant
+  /// factories being emitted are NOT in this set — each emitter adds the names
+  /// it has already emitted so a later one skips a collision.
+  Set<String> _rootBaseNames(
+    ZorphyNodeIr node,
+    List<PolymorphicField> ownFields,
+  ) {
+    return <String>{
+      for (final field in ownFields) field.name,
+      'fromWire',
+      'toWire',
+      'descriptor',
+      'lenses',
+      'resolvePath',
+    };
+  }
+
+  /// Emits one redirecting const factory per variant onto the sealed root
+  /// (issue #271 §3.1):
+  /// `const factory AppFailure.network({...}) = NetworkFailure.fromTrusted;`.
+  ///
+  /// The parameter list is the variant's `fromTrusted` list — the variant
+  /// leaf's full payload — so the redirect is legal (`fromTrusted` is const).
+  /// A factory whose name collides with a member the root already has (an
+  /// abstract getter, a codec/lens/descriptor member, or a user member) is
+  /// skipped and named in the log.
+  void _emitVariantFactories(
+    ClassBuilder c,
+    ZorphyNodeIr node,
+    Map<String, List<PolymorphicField>> fields,
+  ) {
+    final taken = _rootBaseNames(node, fields[node.className] ?? const []);
+    // A variant factory may not shadow a user member the root also forwards.
+    for (final member in node.userMembers) {
+      if (member.name.isNotEmpty) taken.add(member.name);
+    }
+    for (final factory in node.variantFactories) {
+      if (factory.name.isEmpty) continue;
+      if (!taken.add(factory.name)) {
+        _logSkipped(node, factory.name);
+        continue;
+      }
+      final variant = _variantNode(node, factory.variantClassName);
+      final variantFields = variant == null
+          ? const <PolymorphicField>[]
+          : _withInheritedFields(
+              variant,
+              fields[variant.className] ?? const [],
+              fields,
+            );
+      c.constructors.add(
+        Constructor((ctor) {
+          ctor.constant = true;
+          ctor.factory = true;
+          ctor.name = factory.name;
+          for (final field in variantFields) {
+            ctor.optionalParameters.add(
+              Parameter((p) {
+                p.name = field.name;
+                p.named = true;
+                p.required = !field.isNullable;
+                p.type = referType(_lowerType(field.emittedType));
+              }),
+            );
+          }
+          ctor.redirect = refer(
+            '${_lowerType(factory.variantClassName)}.fromTrusted',
+          );
+        }),
+      );
+    }
+  }
+
+  /// Forwards the user-declared static methods and body factory constructors
+  /// onto the sealed root (issue #271 §3.2), with every `$Variant` identifier
+  /// rewritten to `Variant`. The signature is rebuilt from structured IR; the
+  /// body is spliced through a `code_builder` `Code` (never a `StringBuffer`).
+  void _emitUserMembers(
+    ClassBuilder c,
+    ZorphyNodeIr node,
+    Map<String, List<PolymorphicField>> fields,
+  ) {
+    final taken = _rootBaseNames(node, fields[node.className] ?? const []);
+    // A user member is the author's OWN declaration and always survives (issue
+    // #271 §3.4 makes the GENERATED factory yield to it, never the reverse); it
+    // only yields to a member the root already carries from another emitter.
+    for (final member in node.userMembers) {
+      if (member.name.isNotEmpty && !taken.add(member.name)) {
+        _logSkipped(node, member.name);
+        continue;
+      }
+      final body = _rewriteVariants(member.bodySource);
+      final (required, optional) = _splitParams(member);
+      if (member.isFactory) {
+        c.constructors.add(
+          Constructor((ctor) {
+            ctor.factory = true;
+            if (member.name.isNotEmpty) ctor.name = member.name;
+            ctor.requiredParameters.addAll(required);
+            ctor.optionalParameters.addAll(optional);
+            ctor.lambda = member.bodyIsLambda;
+            ctor.body = Code(body);
+          }),
+        );
+      } else {
+        c.methods.add(
+          Method((m) {
+            m.static = true;
+            m.name = member.name;
+            if (member.returnType != null) {
+              m.returns = referType(_lowerType(member.returnType!));
+            }
+            for (final parameter in member.typeParameters) {
+              m.types.add(genericParameterSpec(parameter));
+            }
+            m.requiredParameters.addAll(required);
+            m.optionalParameters.addAll(optional);
+            m.lambda = member.bodyIsLambda;
+            m.body = Code(body);
+          }),
+        );
+      }
+    }
+  }
+
+  /// Splits [member]'s parameters into the positional [required] and the
+  /// [optional] lists code_builder renders as `(a, b)` and `{...}` / `[...]`.
+  (List<Parameter>, List<Parameter>) _splitParams(ZorphyUserMemberIr member) {
+    final required = <Parameter>[];
+    final optional = <Parameter>[];
+    for (final p in member.parameters) {
+      final parameter = Parameter((spec) {
+        spec.name = p.name;
+        if (p.type != null) spec.type = referType(_lowerType(p.type!));
+        if (p.isNamed) {
+          spec.named = true;
+          spec.required = p.isRequired;
+        }
+        if (p.defaultValue != null) spec.defaultTo = Code(p.defaultValue!);
+      });
+      (p.isOptionalPositional || p.isNamed ? optional : required).add(
+        parameter,
+      );
+    }
+    return (required, optional);
+  }
+
+  /// The variant leaf named [variantClassName] (`$NetworkFailure`) at or below
+  /// [node], or `null` when the IR does not carry it (a cross-library target
+  /// the resolver pruned) — the factory is then emitted with no parameters,
+  /// which is still a legal redirect to a no-arg `fromTrusted`.
+  ZorphyNodeIr? _variantNode(ZorphyNodeIr node, String variantClassName) {
+    // `allConcreteLeaves` is itself derived from `directSubTypes`, so one
+    // recursive walk visits every candidate exactly once (review nit #281).
+    for (final child in node.directSubTypes) {
+      if (child.className == variantClassName) return child;
+      final nested = _variantNode(child, variantClassName);
+      if (nested != null) return nested;
+    }
+    return null;
+  }
+
+  /// Rewrites every `$Variant` identifier in [source] to `Variant` — the same
+  /// `$`-lowering every other generator applies, so a forwarded member body
+  /// that names `$NetworkFailure` or `$AppFailure` compiles against the
+  /// generated classes.
+  ///
+  /// The rewrite is TOKEN-AWARE: only real identifier tokens lose their `$`.
+  /// `$` characters inside string literals (interpolation, raw strings,
+  /// escapes) and comments are copied verbatim. A raw `replaceAll(r'$', '')`
+  /// silently corrupted `'cost: $amount'` and `r'$raw'` (issue #281 review).
+  static String _rewriteVariants(String source) {
+    final result = <String>[];
+    var i = 0;
+    while (i < source.length) {
+      final code = source.codeUnitAt(i);
+
+      // Comments are prose: a `$` in them is never an identifier.
+      if (code == 0x2f /* / */ && i + 1 < source.length) {
+        final next = source.codeUnitAt(i + 1);
+        if (next == 0x2f) {
+          final end = _endOfLineComment(source, i + 2);
+          result.add(source.substring(i, end));
+          i = end;
+          continue;
+        }
+        if (next == 0x2a) {
+          final end = _endOfBlockComment(source, i + 2);
+          result.add(source.substring(i, end));
+          i = end;
+          continue;
+        }
+      }
+
+      // Skip the WHOLE string literal, interpolation and escapes included.
+      final stringEnd = _stringLiteralEnd(source, i);
+      if (stringEnd != null) {
+        result.add(source.substring(i, stringEnd));
+        i = stringEnd;
+        continue;
+      }
+
+      if (code == 0x24 /* $ */ ) {
+        var end = i + 1;
+        while (end < source.length &&
+            _isIdentifierPart(source.codeUnitAt(end))) {
+          end++;
+        }
+        if (end > i + 1) {
+          // `$Name` is one Dart identifier token; drop only its leading `$`.
+          result.add(source.substring(i + 1, end));
+          i = end;
+          continue;
+        }
+      }
+
+      result.add(source[i]);
+      i++;
+    }
+    return result.join();
+  }
+
+  static int _endOfLineComment(String s, int i) {
+    while (i < s.length && s.codeUnitAt(i) != 0x0a) i++;
+    return i;
+  }
+
+  static int _endOfBlockComment(String s, int i) {
+    while (i + 1 < s.length) {
+      if (s.codeUnitAt(i) == 0x2a && s.codeUnitAt(i + 1) == 0x2f) return i + 2;
+      i++;
+    }
+    return s.length;
+  }
+
+  /// Index just past the string literal beginning at [i], or `null` when [i]
+  /// does not start one. Handles raw (`r`/`R`) prefixes, single/double quotes,
+  /// triple quotes and backslash escapes. An unterminated literal is copied to
+  /// the end verbatim — fail closed, never a half-rewritten body.
+  static int? _stringLiteralEnd(String s, int i) {
+    var start = i;
+    var raw = false;
+    final first = s.codeUnitAt(i);
+    if ((first == 0x72 /* r */ || first == 0x52 /* R */ ) &&
+        i + 1 < s.length &&
+        (i == 0 || !_isIdentifierPart(s.codeUnitAt(i - 1)))) {
+      final next = s.codeUnitAt(i + 1);
+      if (next == 0x27 || next == 0x22) {
+        raw = true;
+        start = i + 1;
+      }
+    }
+    final quote = s.codeUnitAt(start);
+    if (quote != 0x27 && quote != 0x22) return null;
+    if (!raw && start > 0 && _isIdentifierPart(s.codeUnitAt(start - 1))) {
+      return null;
+    }
+
+    final triple =
+        start + 2 < s.length &&
+        s.codeUnitAt(start + 1) == quote &&
+        s.codeUnitAt(start + 2) == quote;
+    var j = start + (triple ? 3 : 1);
+    while (j < s.length) {
+      final c = s.codeUnitAt(j);
+      if (!raw && c == 0x5c /* \ */ ) {
+        j += 2;
+        continue;
+      }
+      if (c == quote) {
+        if (!triple) return j + 1;
+        if (j + 2 < s.length &&
+            s.codeUnitAt(j + 1) == quote &&
+            s.codeUnitAt(j + 2) == quote) {
+          return j + 3;
+        }
+      }
+      j++;
+    }
+    return s.length;
+  }
+
+  static bool _isIdentifierPart(int code) =>
+      (code >= 0x41 && code <= 0x5a) || // A-Z
+      (code >= 0x61 && code <= 0x7a) || // a-z
+      (code >= 0x30 && code <= 0x39) || // 0-9
+      code == 0x5f || // _
+      code == 0x24; // $
+
+  /// Names a skipped forwarded member in the build log (issue #271 §3.4).
+  void _logSkipped(ZorphyNodeIr node, String name) {
+    // ignore: avoid_print
+    print(
+      'zorphy: union ${node.cleanName} — skipped member "$name": the sealed '
+      'root already declares a member with that name',
+    );
   }
 
   // ── Value methods ─────────────────────────────────────────────────

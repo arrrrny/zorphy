@@ -295,6 +295,18 @@ final class HierarchyResolver {
   }) {
     final className = element.name ?? '';
     final cleanName = className.replaceAll(r'$', '');
+    // Issue #271: a union ROOT carries its redirecting variant factories and
+    // its user statics/body factories onto the generated sealed class. Only the
+    // root declares them; a variant or a non-union node carries none.
+    final variantFactories = declaration.isUnion
+        ? ArchetypeParser.unionVariantFactories(element)
+        : const <ZorphyVariantFactoryIr>[];
+    final userMembers = declaration.isUnion
+        ? ArchetypeParser.unionUserMembers(
+            element,
+            ArchetypeParser.classMemberBodies(element),
+          )
+        : const <ZorphyUserMemberIr>[];
     return ZorphyNodeIr(
       className: className,
       cleanName: cleanName,
@@ -316,6 +328,8 @@ final class HierarchyResolver {
       typeParameters: List.unmodifiable(
         element.typeParameters.map((parameter) => parameter.toString()),
       ),
+      variantFactories: variantFactories,
+      userMembers: userMembers,
     );
   }
 
