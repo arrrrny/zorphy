@@ -33,6 +33,7 @@ import 'package:code_builder/code_builder.dart';
 
 import '../ast/type_ref.dart';
 import '../parser/polymorphic_ir.dart';
+import 'emission_name_helpers.dart';
 
 /// Emits the v3 `ZorphyEntityDescriptor` surface for every emittable entity.
 final class EntityDescriptorGenerator {
@@ -107,7 +108,14 @@ final class EntityDescriptorGenerator {
     for (final owner in <ZorphyNodeIr>[node, ...node.superTypes]) {
       for (final field in owner.fields) {
         if (!seen.add(field.name)) continue;
-        fields.add(_DescriptorField(name: field.name));
+        fields.add(
+          _DescriptorField(
+            name: field.name,
+            type: concreteTypeName(
+              field.emitsQuestionMark ? '${field.type}?' : field.type,
+            ),
+          ),
+        );
       }
     }
     return fields;
@@ -169,14 +177,64 @@ final class EntityDescriptorGenerator {
     return Code(lines.join('\n'));
   }
 
+  /// The rebuild expression for a write through a descriptor field. A concrete
+  /// leaf writes through its own `copyWith`; a sealed hierarchy ROOT has no
+  /// `copyWith` of its own, so the write dispatches on the runtime subtype the
+  /// same way [JsonPointerEmitter] does — every concrete leaf below the root
+  /// carries the root's visible fields.
+  String _rebuild(ZorphyNodeIr node, String field, String type) {
+    final valueExpr = 'value as $type';
+    if (node.isConcreteLeaf) {
+      return 'entity.copyWith($field: $valueExpr)';
+    }
+    final leaves = _concreteLeavesBelow(node);
+    if (leaves.isEmpty) return 'entity';
+    final arms = [
+      for (final leaf in leaves)
+        '${leaf.cleanName} _node => '
+            '_node.copyWith($field: $valueExpr),',
+    ];
+    return 'switch (entity) { ${arms.join(' ')} }';
+  }
+
+  /// The concrete leaves strictly below [node], depth-first.
+  List<ZorphyNodeIr> _concreteLeavesBelow(ZorphyNodeIr node) {
+    final out = <ZorphyNodeIr>[];
+    void walk(ZorphyNodeIr current) {
+      for (final child in current.directSubTypes) {
+        if (child.typeParameters.isNotEmpty) continue;
+        if (child.isConcreteLeaf) {
+          out.add(child);
+        } else {
+          walk(child);
+        }
+      }
+    }
+
+    walk(node);
+    return out;
+  }
+
   Class _buildDescriptorClass(ZorphyNodeIr node) {
     final name = node.cleanName;
     final principalKey = node.principalKey!;
     final fields = _visibleFields(node);
+    final principalKeyType = fields
+        .firstWhere((field) => field.name == principalKey)
+        .type;
 
-    final fieldsList =
-        '[${fields.map((field) => "Field<$name, Object?>('${field.name}', "
-            '(entity) => entity.${field.name})').join(', ')}]';
+    // Every descriptor field carries a write bridge (zorphy#301): the value is
+    // widened to `Object?` by the `Field<T, Object?>` slot, so the generated
+    // closure casts it to the field's real type and rebuilds through copyWith
+    // (a sealed root dispatches to its concrete leaf). A correctly typed value
+    // writes through; a mistyped one raises TypeError.
+    String fieldDescriptor(_DescriptorField field) =>
+        "Field<$name, Object?>('${field.name}', "
+        '(entity) => entity.${field.name}, '
+        '(entity, value) => '
+        '${_rebuild(node, field.name, field.type)})';
+
+    final fieldsList = '[${fields.map(fieldDescriptor).join(', ')}]';
 
     return Class((c) {
       c.name = '_${name}Descriptor';
@@ -210,7 +268,9 @@ final class EntityDescriptorGenerator {
             ..returns = referType('Field<$name, Object?>')
             ..body = Code(
               "return Field<$name, Object?>('$principalKey', "
-              '(entity) => entity.$principalKey);',
+              '(entity) => entity.$principalKey, '
+              '(entity, value) => '
+              '${_rebuild(node, principalKey, principalKeyType)});',
             );
         }),
       );
@@ -388,11 +448,13 @@ final class EntityDescriptorGenerator {
   }
 }
 
-/// One visible field of the emitting node — only its name is needed, since the
-/// extractor closure reads `entity.<name>` and the field is widened to
-/// `Object?`.
+/// One visible field of the emitting node. The name drives the read/write
+/// closures (`entity.<name>` / `copyWith(<name>: …)`); the declared type is the
+/// target of the write bridge's `as` cast, which keeps a widened `Object?`
+/// write type-safe (zorphy#301).
 final class _DescriptorField {
   final String name;
+  final String type;
 
-  const _DescriptorField({required this.name});
+  const _DescriptorField({required this.name, required this.type});
 }
