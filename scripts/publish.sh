@@ -21,7 +21,7 @@ if [ -z "$VERSION" ]; then
 fi
 
 # Validate version format (supporting optional SemVer prerelease like -dev.N, -rc.1, etc.)
-if [[ ! "$VERSION" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
     echo "❌ Invalid version format. Expected format: X.Y.Z or X.Y.Z-prerelease (e.g., 3.0.0-dev.2)"
     exit 1
 fi
@@ -83,11 +83,11 @@ update_package "zorphy_migrator" "zorphy_migrator"
 for pkg in zorphy zorphy_migrator; do
     PERL_PUBSPEC="$pkg/pubspec.yaml"
     # 1. Two-line path form → single-line hosted
-    perl -0777 -i -pe 's/zorphy_annotation:\\s*\\n\\s*path:\\s*\\.\\.\\/zorphy_annotation/zorphy_annotation: ^'"$VERSION"'/g' "$PERL_PUBSPEC"
+    perl -0777 -i -pe 's/zorphy_annotation:\s*\n\s*path:\s*\.\.\/zorphy_annotation/zorphy_annotation: ^/g' "$PERL_PUBSPEC"
     # 2. Any remaining single-line form → hosted
     safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "$PERL_PUBSPEC"
     # 3. Strip dependency_overrides block entirely
-    perl -0777 -i -pe 's/\\n\\ndependency_overrides:\\n(?:[ \\t#].*\\n)*//s' "$PERL_PUBSPEC"
+    perl -0777 -i -pe 's/\n\ndependency_overrides:\n(?:[ \t#].*\n)*//s' "$PERL_PUBSPEC"
 
     if [ -f "$pkg/pubspec_overrides.yaml" ]; then
         echo "🧹 Cleaning $pkg/pubspec_overrides.yaml..."
