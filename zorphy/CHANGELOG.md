@@ -1,5 +1,28 @@
 ## [3.0.0] - 2026-11-25
 
+### Migration guide (#236)
+
+This release closes the #175 re-audit release gate (#236): 3.0.0 is the agreed
+v3 artifact, and the codemod plus the notes below are the supported path from
+2.x. The full side-by-side table (`@Zorphy` → the archetypes, `copyWith` →
+`ZorphyPatch`, `toJson`/`fromJson` → `toWire`/`fromWire`, `ProductFields` /
+`Product.descriptor`, and the `migrate_v3` codemod) lives in the README's
+[Migrating v2 → v3](#v3-migration) section. The short version:
+
+1. Bump `zorphy` and `zorphy_annotation` to `^3.0.0` (they move in lockstep),
+   then `dart pub get`. The `migrate_v3` executable ships with 3.0, not 2.x.
+2. Preview with `dart run zorphy:migrate_v3 <path>`, then rewrite in place with
+   `dart run zorphy:migrate_v3 <path> --apply`. The codemod strips every
+   `preset:` / `generate*` argument, emits the zero-preset archetypes
+   (`@ZorphyEntity(principalKey: #id)` / `@ZorphyValue()` / `@ZorphyUnion()` /
+   `@ZorphyState()` / `@ZorphyIntent(replaySafe: …)`), and moves codec call
+   sites to `.fromWire(...)` / `.toWire()`.
+3. Delete the 2.x `<file>.zorphy.dart` files and any hand-written
+   `part '*.zorphy.dart';` line — 3.0 emits one shared `<library>.part.dart`
+   under `lib/_br_/` and `build_runner` inserts the `part` directive itself.
+4. Run `dart run build_runner build` (no `--delete-conflicting-outputs` — the
+   flag was removed in build_runner 2.17), then `dart analyze`.
+
 ### Changed (BREAKING — v3.0.0)
 
 - **List patch fields are replaced atomically (#248).** A generated `<Name>Patch`

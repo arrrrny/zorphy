@@ -1390,6 +1390,7 @@ zorphy build --clean
 
 - **`ClassNamePatch`** - Patch class for partial updates
 
+<a id="v3-migration"></a>
 ## 🔄 Migrating v2 → v3
 
 Zorphy 3.0.0 is a breaking major that drops every legacy preset and
@@ -1399,6 +1400,24 @@ Zorphy 3.0.0 is a breaking major that drops every legacy preset and
 annotations. Before running the codemod, bump `zorphy` and
 `zorphy_annotation` to `^3.0.0` (they move in lockstep), then run
 `dart pub get`. The `migrate_v3` executable ships with 3.0, not with 2.x.
+
+### v2 → v3 at a glance
+
+| v2 (removed) | v3 (replacement) |
+| --- | --- |
+| `@Zorphy(...)` / `@Zorphy2(...)` on an `id`-bearing class | `@ZorphyEntity(principalKey: #id)` |
+| `@Zorphy(...)` on an `id`-less class | `@ZorphyValue()` |
+| `@ZorphySealed(...)` / `$$Base` sealed roots | `@ZorphyUnion()` (closed) / `@ZorphyState()` (composed) |
+| every `preset:` / `generate*` argument (`generateJson`, `generatePatch`, `generateCompareTo`, `generateFilter`, `generateCopyWithFn`, `explicitSubTypes`, `nonSealed`, `hidePublicConstructor`, …) | deleted — an archetype names what the class IS; polymorphism is `discriminator` + `explicitSubTypes` on the annotation |
+| `copyWith(...)` / `copyWithField(...)` / `copyWithFn(...)` | `ZorphyPatch` — `EntityPatch.diff(before, after).apply(target)` |
+| `toJson()` / `fromJson()` / `toJsonLean()` | `toWire()` / `fromWire()` (the v3 wire codecs; no JSON codec is generated) |
+| `<Entity>Patch.create()..withX(...)` + `patchWith<Entity>(...)` | `<Entity>Patch.diff(before, after)` + `patch.apply(target)` (`compose` / `invert` / `changedPaths` for three-way sync) |
+| `compareTo<Entity>(other)` | `<Entity>.descriptor` + `Field<E, T>` selectors (`ProductFields`-style) and the patch `changedPaths` / `conflictingPaths` |
+| `Entity.descriptor` (implicit) | `Entity.descriptor` — a reflection-free `ZorphyEntityDescriptor<T>` (`principalKeyField`, `fields`) |
+| hand-written `part '*.zorphy.dart';` + per-file `<file>.zorphy.dart` | one shared `<library>.part.dart` under `lib/_br_/`; `build_runner` inserts the `part` directive |
+| `dart run build_runner build --delete-conflicting-outputs` | `dart run build_runner build` (the flag was removed in build_runner 2.17) |
+
+### Codemod
 
 ```bash
 dart run zorphy:migrate_v3 <path>          # dry-run preview

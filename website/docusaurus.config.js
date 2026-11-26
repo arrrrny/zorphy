@@ -7,6 +7,7 @@ const config = {
   baseUrl: '/zorphy',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'throw',
+  onBrokenAnchors: 'throw',
   favicon: 'img/favicon.ico',
   organizationName: 'zorphy',
   projectName: 'zorphy',

@@ -3,43 +3,45 @@ sidebar_position: 2
 title: Features
 ---
 
-Zorphy keeps the source declarations tiny and pushes the heavy lifting into generated code.
+Zorphy keeps the source declarations tiny and pushes the heavy lifting into generated code. A class carries exactly one v3 archetype — `@ZorphyEntity`, `@ZorphyValue`, `@ZorphyUnion`, `@ZorphyState`, or `@ZorphyIntent` — and there are no presets or `generate*` toggles to keep in sync.
 
 ## Core generation
 
 - Immutable concrete classes generated from `$`-prefixed abstract definitions.
 - `copyWith` helpers for partial updates.
-- `copyWithField(Field<E, T> field, T value)` for single-field updates driven by a typed field selector; passing `null` to a nullable field preserves the current value.
 - Structural equality, `hashCode`, and `toString`.
-- Optional `compareTo` helpers for diffing two instances.
-- Optional patch APIs for controlled updates.
+- Patch classes `<Name>Patch` with `diff` / `apply` / `compose` / `invert`.
 
-## JSON serialization
+## Wire serialization
 
-- `toJson` and `fromJson` for every generated class.
-- Lean JSON output for clean payloads when you want to remove metadata.
-- Manual converters via `@JsonKey(toJson: ..., fromJson: ...)`.
-- Polymorphic JSON for sealed and explicit subtype hierarchies.
+- `toWire` and `fromWire` for every generated class.
+- `fromWire` validates through the trusted constructors and accumulates `FieldViolation`s at JSON pointers instead of throwing.
+- Polymorphic wire dispatch for unions and explicit-subtype hierarchies, keyed on the `kind` discriminator.
 
 ## Polymorphism
 
-- Sealed bases with `$$`.
-- `explicitSubTypes` for safe JSON dispatch.
-- `nonSealed` for open hierarchies used in domain entities.
+- Closed unions via `@ZorphyUnion()`.
+- Open hierarchies via `@ZorphyState()` with `explicitSubTypes` for subtypes the generator cannot infer.
+- Exhaustive Dart 3 `switch` over the sealed base.
 
 ## Generics
 
-- Generic entities with `genericArgumentFactories`.
-- Custom converters for generic fields.
+- Generic entities and values.
+- Type arguments carried through the wire codecs.
 
 ## Query helpers
 
-- Field descriptors for filters and sorting.
+- A reflection-free `Entity.descriptor` exposing `Field<E, T>` selectors.
 - Built-in filter operators: `eq`, `gt`, `lt`, `contains`, `and`, `or`.
 - In-memory query helpers for quick iteration.
 
+## Patches and three-way sync
+
+- `<Name>Patch.changedPaths` / `conflictingPaths` for exact three-way merge.
+- `compose` coalesces bursts left-to-right; `invert` captures prior values for undo.
+
 ## Quality of life
 
-- Default values via `@JsonKey(defaultValue: ...)`.
-- Hidden constructors with factory methods.
-- Nullability annotations that align with generated code.
+- Default values via a field initializer on the abstract declaration.
+- Static factory methods alongside the generated constructor.
+- Nullability that aligns with the generated code and the wire boundary.
