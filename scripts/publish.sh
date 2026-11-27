@@ -64,6 +64,52 @@ run() {
     fi
 }
 
+# Release gate (issue #314): run the SAME clean-checkout CI simulation CI runs,
+# against a pristine clone of the release commit, BEFORE anything is published
+# or pushed. A maintainer machine never proves the release — local locks, a
+# gitignored pubspec_overrides.yaml and local package resolution all differ from
+# CI's pristine checkout, and 3.0.0-dev.4 shipped base-red exactly that way.
+# Any failing step aborts the whole release (set -e), naming the step.
+release_gate() {
+    echo "🧪 Running release gate (clean-checkout CI simulation)…"
+
+    local check_dir
+    if $DRY_RUN; then
+        check_dir="<pristine-clone>"
+    else
+        check_dir="$(mktemp -d "${TMPDIR:-/tmp}/zorphy-release-check.XXXXXX")"
+    fi
+
+    # A pristine clone of the release commit — exactly what CI checks out.
+    run git clone --depth 1 "file://$REPO_ROOT" "$check_dir"
+
+    # 1. Version sync across the 3 packages.
+    echo "  == check_version_sync.sh"
+    run bash -c "cd '$check_dir' && bash scripts/check_version_sync.sh"
+
+    # 2. Each committed pubspec.lock must match its pubspec.yaml (the same
+    #    4-package --enforce-lockfile loop the CI version_sync job runs).
+    local pkg
+    for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
+        echo "  == $pkg (enforce-lockfile)"
+        run bash -c "cd '$check_dir/$pkg' && dart pub get --enforce-lockfile"
+    done
+
+    # 3. Format from zorphy/ with NO pub get — an unresolved include is CI's
+    #    own format-job environment; the formatter must still succeed.
+    echo "  == dart format (zorphy/)"
+    run bash -c "cd '$check_dir/zorphy' && dart format --output=none --set-exit-if-changed ."
+
+    # 4. The release guard test suite.
+    echo "  == dart test test/release/"
+    run bash -c "cd '$check_dir/zorphy' && dart test test/release/"
+
+    if ! $DRY_RUN; then
+        rm -rf "$check_dir"
+    fi
+    echo "✅ Release gate passed."
+}
+
 echo "🚀 Streamlining release for zorphy version $VERSION..."
 echo "📍 Working directory: $REPO_ROOT"
 if $DRY_RUN; then
@@ -143,6 +189,10 @@ safe_sed "s/zorphy: .*/zorphy: ^$VERSION/" README.md
 echo "🔨 Committing changes..."
 run git add .
 run git commit -m "chore: release v$VERSION" || echo "  ⚠️ No changes to commit"
+
+# 5b. Release gate — abort BEFORE any push or publish unless the release commit
+# passes the clean-checkout CI simulation (issue #314).
+release_gate
 
 # 6. Create PR (if gh CLI available)
 if $DRY_RUN; then

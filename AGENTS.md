@@ -72,3 +72,15 @@ zorphy/ (monorepo)
 3. **All 3 Packages Version-Locked:** Never publish `zorphy_annotation` and `zorphy` without `zorphy_migrator` at the exact same version string (`3.0.0-dev.3` -> `3.0.0`).
 4. **Deterministic CI Assertions Only:** Gate CI on structural invariants (`changedPaths`, `conflictingPaths`, `resolvePath`, zero `dart:mirrors`) rather than wall-clock latency under host load.
 5. **Wire-capability matrix (hard rule):** Behavior for a field kind is defined ONCE, in `zorphy/test/release/wire_capability_matrix_test.dart`, for every consumption path (boundary codec, patch envelope, mock seeder). A behavior fix lands on ALL affected paths in the same PR or not at all; a new field kind adds its full row before the emitter that uses it merges. No second `#215`-style single-path fix may merge without the matrix rows it affects.
+
+---
+
+## Release gate (hard rule)
+
+`publish.sh` MUST run the clean-checkout CI simulation (version sync,
+enforce-lockfile ×4 packages, format from `zorphy/` with no package
+resolution, release guard tests) against a pristine clone of the release
+commit and abort on any failure BEFORE publishing or pushing. A maintainer
+machine never proves the release: local locks, local overrides files, and
+local package resolution all differ from CI's clean checkout. Releasing
+base-red is a process failure even when the code is correct.
