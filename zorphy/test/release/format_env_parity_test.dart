@@ -42,15 +42,18 @@ String? _functionBody(String script, String name) {
   return body.join('\n');
 }
 
-/// The `run:` bodies of a job's steps, in order (skipping `uses:` steps).
-List<String> _runSteps(YamlMap job) {
+/// A job's steps that have a non-empty `run:`, in order (skipping `uses:`
+/// steps). Each step map is kept whole so assertions can check its metadata —
+/// notably `working-directory`, which decides whether the resolve step creates
+/// the package config for the package the formatter actually walks.
+List<YamlMap> _runSteps(YamlMap job) {
   final steps = job['steps'];
   expect(steps, isA<YamlList>(), reason: 'the job must declare steps');
-  final runs = <String>[];
+  final runs = <YamlMap>[];
   for (final step in (steps as YamlList)) {
     if (step is! YamlMap) continue;
     final run = step['run'];
-    if (run is String && run.trim().isNotEmpty) runs.add(run);
+    if (run is String && run.trim().isNotEmpty) runs.add(step);
   }
   return runs;
 }
@@ -62,8 +65,10 @@ void main() {
       final formatJob = (ci['jobs'] as YamlMap)['format'] as YamlMap;
       final runs = _runSteps(formatJob);
 
-      final pubGetAt = runs.indexWhere((c) => c.contains('dart pub get'));
-      final formatAt = runs.indexWhere((c) => c.contains('dart format'));
+      final pubGetAt =
+          runs.indexWhere((s) => '${s['run']}'.contains('dart pub get'));
+      final formatAt =
+          runs.indexWhere((s) => '${s['run']}'.contains('dart format'));
 
       expect(
         formatAt,
@@ -85,6 +90,16 @@ void main() {
         reason:
             '`dart pub get` must run BEFORE `dart format` in the format job',
       );
+      for (final i in [pubGetAt, formatAt]) {
+        expect(
+          runs[i]['working-directory'],
+          'zorphy',
+          reason:
+              'both steps must target the package the formatter walks — a '
+              'different working-directory leaves the format step without its '
+              'package config and CI drifts back to short style (issue #327)',
+        );
+      }
     });
 
     test('release gate resolves dependencies before formatting', () {
@@ -96,8 +111,17 @@ void main() {
         isNotNull,
         reason: 'publish.sh must define pre_publish_gate',
       );
-      final pubGetAt = gate!.indexOf('dart pub get');
-      final formatAt = gate.indexOf('dart format');
+      // Comments and `echo`s mention `dart pub get` too, so match command
+      // lines only — a plain indexOf stays green when the resolve step is gone.
+      final commands = gate!
+          .split('\n')
+          .where((l) {
+            final t = l.trimLeft();
+            return !t.startsWith('#') && !t.startsWith('echo ');
+          })
+          .toList();
+      final pubGetAt = commands.indexWhere((l) => l.contains('dart pub get'));
+      final formatAt = commands.indexWhere((l) => l.contains('dart format'));
 
       expect(
         pubGetAt,
