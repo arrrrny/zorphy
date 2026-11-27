@@ -135,8 +135,12 @@ pre_publish_gate() {
         run bash -c "cd '$check_dir/$pkg' && dart pub get"
     done
 
-    # 4. Format from zorphy/ with NO pub get — an unresolved include is CI's
-    #    own format-job environment; the formatter must still succeed.
+    # 4. Format from zorphy/ AFTER step 3's `dart pub get`: the resolved package
+    #    config pins the package's declared language version (>=3.11 → tall
+    #    style). CI's `format` job now builds the same environment by running
+    #    `dart pub get` before `dart format` (issue #327), so the gate, CI and
+    #    the committed tree all agree on tall style instead of the gate resolving
+    #    tall (package config present) while CI fell back to short (none).
     echo "  == dart format (zorphy/)"
     run bash -c "cd '$check_dir/zorphy' && dart format --output=none --set-exit-if-changed ."
 
@@ -160,11 +164,12 @@ pre_publish_gate() {
 # for all 3 packages — the new version now exists on pub.dev — and BEFORE the
 # git tag is considered complete. This is the CI-equivalent lockfile gate that
 # the pre-publish phase cannot run: a fresh clone regenerates each lock against
-# the now-published version, proves it stable under --enforce-lockfile, runs the
-# release guard tests. It then carries the EXACT verified locks into the
-# worktree, bumps the internal `zorphy_annotation` constraints to ^<version>,
-# and commits both together as the release's final base-green commit before the
-# tag. This automates exactly what #308 did by hand after 3.0.0-dev.4.
+# the now-published version, proves it stable under --enforce-lockfile, bumps
+# the internal `zorphy_annotation` constraints to ^<version> (so the tree is
+# self-consistent BEFORE the release guard tests run — issue #330), runs those
+# tests, then carries the EXACT verified locks and bumped files into the
+# worktree and commits them together as the release's final base-green commit
+# before the tag. This automates exactly what #308 did by hand after 3.0.0-dev.4.
 post_publish_verify() {
     echo "🔒 Running post-publish verification (regenerate + enforce locks)…"
 
@@ -195,41 +200,62 @@ post_publish_verify() {
         run bash -c "cd '$check_dir/$pkg' && dart pub get --enforce-lockfile"
     done
 
-    # 3. Release guard tests against the regenerated tree.
-    echo "  == dart test test/release/"
-    run bash -c "cd '$check_dir/zorphy' && dart test test/release/"
-
-    # 4. Preserve the locks that JUST PASSED the enforced gate. Copying them
-    #    (instead of re-resolving in the maintainer worktree) guarantees the
-    #    committed locks are the ones CI will enforce on the release tip.
-    if ! $DRY_RUN; then
-        for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
-            run cp "$check_dir/$pkg/pubspec.lock" "$REPO_ROOT/$pkg/pubspec.lock"
-        done
-        rm -rf "$check_dir"
-    fi
-
-    # 5. Bump the internal `zorphy_annotation` constraints to ^<version> and
-    #    refresh the README examples. This used to happen BEFORE the release
-    #    commit; per issue #325 it now lands here, committed with the locks.
+    # 3. Bump the internal `zorphy_annotation` constraints to ^<version> and
+    #    refresh the README examples IN THE CLONE, BEFORE the release tests run
+    #    (issue #330). The per-release snapshot
+    #    (dependency_constraints_unchanged_test.dart) is advanced to ^<version>
+    #    as part of the release, so the committed constraint still holds the
+    #    previous line until this bump lands. Running `dart test test/release/`
+    #    before the bump fails that snapshot (`Actual ^<prev> != Expected
+    #    ^<version>`) and `set -e` aborts the release AFTER publishing but
+    #    BEFORE the tag. Bumping here — before the tests — is what makes the
+    #    tested tree self-consistent; the bumped files are carried back with the
+    #    locks below, so the commit is exactly what passed the gate.
     for pkg in zorphy zorphy_migrator; do
-        PERL_PUBSPEC="$REPO_ROOT/$pkg/pubspec.yaml"
+        PERL_PUBSPEC="$check_dir/$pkg/pubspec.yaml"
         run perl -0777 -i -pe 's/zorphy_annotation:\s*\n\s*path:\s*\.\.\/zorphy_annotation/zorphy_annotation: ^/g' "$PERL_PUBSPEC"
         safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "$PERL_PUBSPEC"
         run perl -0777 -i -pe 's/\n\ndependency_overrides:\n(?:[ \t#].*\n)*//s' "$PERL_PUBSPEC"
     done
     echo "📝 Updating README.md..."
-    safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "$REPO_ROOT/README.md"
-    safe_sed "s/zorphy: .*/zorphy: ^$VERSION/" "$REPO_ROOT/README.md"
+    safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "$check_dir/README.md"
+    safe_sed "s/zorphy: .*/zorphy: ^$VERSION/" "$check_dir/README.md"
 
-    # 6. Remove EVERY local override before staging — including the example's.
-    #    A surviving gitignored `zorphy/example/pubspec_overrides.yaml` would
-    #    record a local path source in the committed lock and make CI's
-    #    --enforce-lockfile gate fail on the release tip.
+    # 4. Release guard tests against the bumped, regenerated tree.
+    echo "  == dart test test/release/"
+    run bash -c "cd '$check_dir/zorphy' && dart test test/release/"
+
+    # 5. Preserve the locks that JUST PASSED the enforced gate AND the bumped
+    #    constraints/README. Copying them (instead of re-resolving / re-editing
+    #    in the maintainer worktree) guarantees the committed files are exactly
+    #    the ones CI will enforce on the release tip.
+    if ! $DRY_RUN; then
+        for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
+            run cp "$check_dir/$pkg/pubspec.lock" "$REPO_ROOT/$pkg/pubspec.lock"
+        done
+        run cp "$check_dir/zorphy/pubspec.yaml" "$REPO_ROOT/zorphy/pubspec.yaml"
+        run cp "$check_dir/zorphy_migrator/pubspec.yaml" "$REPO_ROOT/zorphy_migrator/pubspec.yaml"
+        run cp "$check_dir/README.md" "$REPO_ROOT/README.md"
+        rm -rf "$check_dir"
+    fi
+
+    # 6. Remove every UNTRACKED local override before staging — but KEEP the
+    #    git-TRACKED ones (issue #330). `zorphy/example/pubspec_overrides.yaml`
+    #    and `zorphy_annotation/pubspec_overrides.yaml` are committed (the
+    #    example path-depends on zorphy_annotation, which is required to
+    #    resolve); deleting them makes `dart pub get` for zorphy/zorphy/example
+    #    fail with `zorphy from path is forbidden`, so the post-publish
+    #    --enforce-lockfile step could not pass on the release tip. Only an
+    #    override that is actually untracked/gitignored is removed.
     for pkg in zorphy zorphy_migrator zorphy/example; do
-        if [ -f "$pkg/pubspec_overrides.yaml" ]; then
-            echo "🧹 Cleaning $pkg/pubspec_overrides.yaml..."
-            run rm -f "$pkg/pubspec_overrides.yaml"
+        local override="$pkg/pubspec_overrides.yaml"
+        if [ -f "$override" ]; then
+            if git -C "$REPO_ROOT" ls-files --error-unmatch "$override" >/dev/null 2>&1; then
+                echo "  ⚠️ Keeping git-tracked $override (committed path override required to resolve)"
+            else
+                echo "🧹 Cleaning untracked $override..."
+                run rm -f "$override"
+            fi
         fi
     done
 
