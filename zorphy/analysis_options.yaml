@@ -1,4 +1,9 @@
+# Type-safety floor for downstream ecosystem consumers.
 analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+    strict-inference: true
   exclude:
     - "**/*.g.dart"
     - "**/*.zorphy.dart"
@@ -25,3 +30,16 @@ analyzer:
     # launcher (`deterministic_structural_guards_test.dart`, which runs
     # generation first and stays analyzed), not by static analysis.
     - "test/audit/_structural_probe.dart"
+
+linter:
+  rules:
+    # Correctness rules the current package already satisfies.
+    - throw_in_finally
+    - unrelated_type_equality_checks
+    - avoid_empty_else
+    - valid_regexps
+    - await_only_futures
+    # Enabled after the dead v2 layer was removed; all remaining hits were fixed.
+    - prefer_final_locals
+    - avoid_dynamic_calls
+    - file_names

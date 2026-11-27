@@ -12,7 +12,7 @@
 import 'dart:io';
 
 import 'package:test/test.dart';
-import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/common/name_type.dart';
 import 'package:zorphy/src/emission/patch_emitter.dart';
 
 const _fixturePath = 'test/runtime/fixtures/account.dart';

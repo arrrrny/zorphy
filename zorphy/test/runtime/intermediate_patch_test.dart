@@ -78,9 +78,10 @@ void main() {
 
     test('a target outside the hierarchy fails loudly', () {
       expect(
-        () => SystemEventPatch(
-          source: PatchValue.set('x'),
-        ).apply(_Stranger(id: 's') as dynamic),
+        () => SystemEventPatch(source: PatchValue.set('x')).apply(
+          // ignore: argument_type_not_assignable
+          _Stranger(id: 's') as dynamic,
+        ),
         throwsA(isA<TypeError>()),
         reason:
             'apply is narrowed to SystemEvent, so an alien target is refused '

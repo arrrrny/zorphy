@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 import 'package:zorphy/src/helpers.dart' as helpers;
-import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/common/name_type.dart';
 
 void main() {
   test('Patch generation should handle function types correctly', () {
@@ -14,9 +14,6 @@ void main() {
     ];
 
     final patchClass = helpers.getPatchClass(fields, 'ValidationRule', []);
-
-    print('Generated Patch Class:');
-    print(patchClass);
 
     // Check for the problematic pattern
     expect(patchClass, isNot(contains('bool Function(Object)Patch')));

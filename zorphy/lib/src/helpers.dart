@@ -1,5 +1,5 @@
 import 'package:dartx/dartx.dart';
-import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/common/name_type.dart';
 import 'package:zorphy/src/common/classes.dart';
 
 /// Deduplicates fields, prioritizing interface definitions first.
@@ -7,7 +7,7 @@ List<NameTypeClassComment> getDistinctFields(
   List<NameTypeClassComment> allFields,
   List<Interface> interfaces,
 ) {
-  var allFieldsDistinct = <NameTypeClassComment>[];
+  final allFieldsDistinct = <NameTypeClassComment>[];
 
   // Add interface fields first (deduplicate by name)
   for (var i in interfaces) {
@@ -17,7 +17,7 @@ List<NameTypeClassComment> getDistinctFields(
         continue;
       }
 
-      var field = allFields.firstOrNullWhere((x) => x.name == f.name);
+      final field = allFields.firstOrNullWhere((x) => x.name == f.name);
       if (field != null) {
         allFieldsDistinct.add(field);
       } else {
@@ -194,8 +194,8 @@ String getEnumPropertyList(
 ) {
   if (fields.isEmpty) return '';
 
-  String classNameTrimmed = '${className.replaceAll("\$", "")}';
-  String enumName = '${classNameTrimmed}\$';
+  final String classNameTrimmed = '${className.replaceAll("\$", "")}';
+  final String enumName = '${classNameTrimmed}\$';
 
   final lines = <String>[];
 
@@ -214,8 +214,8 @@ String getPatchClass(
   List<String> knownClasses, [
   List<String> genericTypeNames = const [],
 ]) {
-  String classNameTrimmed = '${className.replaceAll("\$", "")}';
-  String enumName = '${classNameTrimmed}\$';
+  final String classNameTrimmed = '${className.replaceAll("\$", "")}';
+  final String enumName = '${classNameTrimmed}\$';
 
   final lines = <String>[];
 
@@ -244,21 +244,21 @@ String getPatchClass(
 
   // Generate with methods
   for (var field in fields) {
-    var name = field.name.startsWith("_")
+    final name = field.name.startsWith("_")
         ? field.name.substring(1)
         : field.name;
     var baseType = field.type ?? "dynamic";
     baseType = baseType.replaceAll('\$', '');
-    var capitalizedName =
+    final capitalizedName =
         name.substring(0, 1).toUpperCase() + name.substring(1);
 
-    var cleanBaseType = baseType.replaceAll("?", "");
-    var isGenericType =
+    final cleanBaseType = baseType.replaceAll("?", "");
+    final isGenericType =
         genericTypeNames.contains(cleanBaseType) ||
         baseType.contains('<') &&
             genericTypeNames.any((g) => baseType.contains(g));
 
-    var parameterType = isGenericType
+    final parameterType = isGenericType
         ? 'dynamic'
         : ((baseType.endsWith('?') ||
                   baseType == 'dynamic' ||
@@ -276,9 +276,9 @@ String getPatchClass(
     lines.add('');
 
     // Generate cross-file nested patch methods for Zorphy types
-    var fieldType = field.type ?? "";
-    var fieldTypeWithoutDollars = fieldType.replaceAll('\$', '');
-    var innerType = fieldTypeWithoutDollars.replaceAll("?", "");
+    final fieldType = field.type ?? "";
+    final fieldTypeWithoutDollars = fieldType.replaceAll('\$', '');
+    final innerType = fieldTypeWithoutDollars.replaceAll("?", "");
 
     // Check if this is a Zorphy type (starts with $ and not a generic)
     bool isKnownClassType(String type, bool isEnum) {
@@ -295,7 +295,7 @@ String getPatchClass(
       return false;
     }
 
-    var isZorphyType =
+    final isZorphyType =
         isKnownClassType(innerType, field.isEnum) ||
         (innerType.startsWith("List<") &&
             (() {
@@ -313,18 +313,18 @@ String getPatchClass(
     if (isZorphyType && !isGenericType) {
       // Handle List types
       if (innerType.startsWith("List<")) {
-        var listMatch = RegExp(r'^List<(.+)>$').firstMatch(innerType);
+        final listMatch = RegExp(r'^List<(.+)>$').firstMatch(innerType);
         if (listMatch != null) {
-          var elementType = listMatch.group(1) ?? "";
-          var elementTypeWithoutDollars = elementType.replaceAll('\$', '');
-          var elementTypeIsZorphy =
+          final elementType = listMatch.group(1) ?? "";
+          final elementTypeWithoutDollars = elementType.replaceAll('\$', '');
+          final elementTypeIsZorphy =
               elementType.startsWith("\$") ||
               isKnownClassType(elementTypeWithoutDollars, false);
           // Don't generate updateAt for abstract classes ($$) as they don't have Patch classes
           // Check the original field type to see if it had $$
-          var isAbstractType = fieldType.contains("\$\$");
+          final isAbstractType = fieldType.contains("\$\$");
           if (elementTypeIsZorphy && !isAbstractType) {
-            var elementPatchType = elementTypeWithoutDollars + "Patch";
+            final elementPatchType = elementTypeWithoutDollars + "Patch";
             lines.add(
               "  ${classNameTrimmed}Patch update${capitalizedName}At(int index, $elementPatchType Function($elementPatchType) patch) {",
             );
@@ -349,16 +349,16 @@ String getPatchClass(
       }
       // Handle Map types
       else if (innerType.startsWith("Map<")) {
-        var mapMatch = RegExp(r'^Map<(.+), (.+)>$').firstMatch(innerType);
+        final mapMatch = RegExp(r'^Map<(.+), (.+)>$').firstMatch(innerType);
         if (mapMatch != null) {
-          var keyType = mapMatch.group(1) ?? "";
-          var valueType = mapMatch.group(2) ?? "";
-          var valueTypeWithoutDollars = valueType.replaceAll('\$', '');
-          var valueTypeIsZorphy =
+          final keyType = mapMatch.group(1) ?? "";
+          final valueType = mapMatch.group(2) ?? "";
+          final valueTypeWithoutDollars = valueType.replaceAll('\$', '');
+          final valueTypeIsZorphy =
               valueType.startsWith("\$") ||
               isKnownClassType(valueTypeWithoutDollars, false);
           if (valueTypeIsZorphy) {
-            var valuePatchType = valueTypeWithoutDollars + "Patch";
+            final valuePatchType = valueTypeWithoutDollars + "Patch";
             lines.add(
               "  ${classNameTrimmed}Patch update${capitalizedName}Value($keyType key, $valuePatchType Function($valuePatchType) patch) {",
             );
@@ -387,7 +387,7 @@ String getPatchClass(
           continue;
         }
 
-        var patchType = innerType + "Patch";
+        final patchType = innerType + "Patch";
         // with{CapitalizedName}Patch method for direct patch application
         lines.add(
           "  ${classNameTrimmed}Patch with${capitalizedName}Patch($patchType patch) {",
@@ -398,7 +398,7 @@ String getPatchClass(
         lines.add('');
 
         // with{CapitalizedName}PatchFunc method for function-based patching
-        var funcParamType = "$patchType Function($patchType)";
+        final funcParamType = "$patchType Function($patchType)";
         lines.add(
           "  ${classNameTrimmed}Patch with${capitalizedName}PatchFunc($funcParamType patch) {",
         );

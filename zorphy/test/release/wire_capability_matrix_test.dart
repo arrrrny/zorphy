@@ -1197,7 +1197,7 @@ String _checkPatchMatrix() {
       addressPatch,
     );
   final nestedWire = nestedPatch.toWire();
-  expect(nestedWire['address'], isA<Map>());
+  expect(nestedWire['address'], isA<Map<Object?, Object?>>());
   final nestedAfterTransport =
       jsonDecode(jsonEncode(nestedWire)) as Map<String, Object?>;
   expect(
@@ -1271,11 +1271,19 @@ void _expectWireForm(Enforced cell, Object? wire, String label) {
     case 'name':
       expect(wire, isA<String>(), reason: '$label: encode=name');
     case 'element-wise':
-      expect(wire, isA<List>(), reason: '$label: encode=element-wise');
+      expect(wire, isA<List<Object?>>(), reason: '$label: encode=element-wise');
     case 'entry-wise':
-      expect(wire, isA<Map>(), reason: '$label: encode=entry-wise');
+      expect(
+        wire,
+        isA<Map<Object?, Object?>>(),
+        reason: '$label: encode=entry-wise',
+      );
     case 'nested toWire()':
-      expect(wire, isA<Map>(), reason: '$label: encode=nested toWire()');
+      expect(
+        wire,
+        isA<Map<Object?, Object?>>(),
+        reason: '$label: encode=nested toWire()',
+      );
     case 'seeded':
       expect(wire, isNotNull, reason: '$label: encode=seeded');
     default:

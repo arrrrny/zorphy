@@ -38,14 +38,15 @@ final class JsonPointerEmitter {
   /// Creates a pointer emitter over [ir], the whole library graph — a node's
   /// resolver dispatches into its subtypes and nested types, so the emitter
   /// needs every node, not just the one it is emitting.
-  const JsonPointerEmitter(this.ir);
+  JsonPointerEmitter(this.ir);
 
   /// The whole resolved library graph.
   final PolymorphicIr ir;
 
   /// The clean names that will carry a `resolvePath` — the only legal targets
   /// of a nested delegation (`<Type>.resolvePath(remainder)`).
-  Set<String> get _resolverNames => {
+  /// Memoized because nested resolution checks this once per field.
+  late final Set<String> _resolverNames = {
     for (final node in ir.nodes.values)
       // An intent carries no `resolvePath` (see [resolvePathMethods]), so it
       // is never a legal nested-delegation target: naming it here would emit

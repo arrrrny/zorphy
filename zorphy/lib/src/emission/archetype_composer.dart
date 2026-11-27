@@ -64,7 +64,7 @@ library;
 
 import 'package:code_builder/code_builder.dart';
 
-import '../common/NameType.dart';
+import '../common/name_type.dart';
 import '../emitters/intent_emitter.dart';
 import '../emitters/mock_fixture_emitter.dart';
 import '../parser/polymorphic_ir.dart';
@@ -321,7 +321,7 @@ final class ArchetypeComposer {
           if (node.archetype == ArchetypeKind.intent) node.className,
       };
       fragments.add(
-        ZorphyEmitter().emitSpecs(
+        ZorphyEmitter.shared.emitSpecs(
           BoundaryCodecEmitter.usedHelperSpecs(
             codecNodes,
             payloads,
@@ -335,7 +335,7 @@ final class ArchetypeComposer {
       // field referencing them (ISSUE-0230).
       final lensClasses = const LensEmitter().lensClasses(topLevelIr);
       if (lensClasses.isNotEmpty) {
-        fragments.add(ZorphyEmitter().emitSpecs(lensClasses));
+        fragments.add(ZorphyEmitter.shared.emitSpecs(lensClasses));
       }
       // The `<Name>Fields` descriptor classes ride the same seam (issue
       // #247): top-level, one per concrete entity/value node, emitted once
@@ -345,7 +345,7 @@ final class ArchetypeComposer {
         topLevelIr,
       );
       if (fieldsClasses.isNotEmpty) {
-        fragments.add(ZorphyEmitter().emitSpecs(fieldsClasses));
+        fragments.add(ZorphyEmitter.shared.emitSpecs(fieldsClasses));
       }
     }
 
@@ -354,7 +354,7 @@ final class ArchetypeComposer {
     // own the `descriptor` registry field referencing them.
     final descriptorClasses = descriptorGenerator.descriptorClasses();
     if (descriptorClasses.isNotEmpty) {
-      fragments.add(ZorphyEmitter().emitSpecs(descriptorClasses));
+      fragments.add(ZorphyEmitter.shared.emitSpecs(descriptorClasses));
     }
 
     // Intent hierarchies emit their own class surface (see the library doc) —

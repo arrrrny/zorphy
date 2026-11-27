@@ -52,14 +52,17 @@ final class HierarchyResolver {
   /// Resolves a set of libraries as ONE graph, so a subtype declared in a
   /// second library joins the root declared in the first (the cross-library
   /// shape issue #142 established must keep working).
-  static PolymorphicIr resolveLibraries(Iterable<LibraryElement> libraries) {
+  static PolymorphicIr resolveLibraries(
+    Iterable<LibraryElement> libraries, {
+    Map<LibraryElement, ArchetypeLibraryIr>? parsedLibraries,
+  }) {
     final declarations = <ClassElement, _Declaration>{};
     final unionVariants = <ClassElement, ClassElement>{};
 
     for (final library in libraries) {
-      for (final element in ArchetypeParser.annotatedClasses(library)) {
-        final declaration = ArchetypeParser.parse(element);
-        if (declaration == null) continue;
+      final parsed =
+          parsedLibraries?[library] ?? ArchetypeParser.parseLibrary(library);
+      for (final (element, declaration) in parsed.declarations) {
         declarations.putIfAbsent(
           element,
           () => _Declaration(
@@ -117,8 +120,10 @@ final class HierarchyResolver {
       children.putIfAbsent(parent, () => <ClassElement>[]).add(child);
     }
 
+    // Reused across every supertype walk.
+    final declaredSet = declarations.keys.toSet();
     for (final element in declarations.keys) {
-      final parent = _nearestAnnotatedSupertype(element, declarations.keys);
+      final parent = _nearestAnnotatedSupertype(element, declaredSet);
       if (parent != null) link(element, parent);
     }
     // Union factory targets are leaves of their union ROOT even though the
@@ -521,9 +526,8 @@ final class HierarchyResolver {
   /// `$ZfaButtonNode -> $InteractiveUiNode`, never straight to the root.
   static ClassElement? _nearestAnnotatedSupertype(
     ClassElement element,
-    Iterable<ClassElement> declared,
+    Set<ClassElement> declaredSet,
   ) {
-    final declaredSet = declared.toSet();
     for (final supertype in element.allSupertypes) {
       final superElement = supertype.element;
       if (superElement is! ClassElement) continue;

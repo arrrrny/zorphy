@@ -13,6 +13,9 @@ class ZorphyEmitter {
   /// Use [ZorphyEmitter.withPageWidth] to override.
   static const int defaultPageWidth = 80;
 
+  /// Shared formatter reused by fragment-at-a-time emission.
+  static final ZorphyEmitter shared = ZorphyEmitter();
+
   /// Page width configured for this emitter instance.
   final int pageWidth;
 

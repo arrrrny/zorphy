@@ -12,7 +12,7 @@
 // These tests lock the emitted surface.
 
 import 'package:test/test.dart';
-import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/common/name_type.dart';
 import 'package:zorphy/src/emission/polymorphic_patch_emitter.dart';
 
 import 'dart:io';

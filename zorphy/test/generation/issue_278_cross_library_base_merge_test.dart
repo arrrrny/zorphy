@@ -1,5 +1,6 @@
-// Regression for issue #278: a value-class hierarchy split across two
-// libraries must merge the base's fields into the leaf.
+// Regression for issue #278: a value-class hierarchy split across libraries
+// must merge inherited fields, including a base reached through an intermediate
+// library rather than a direct import.
 //
 // The shared-part builder used to resolve each library in isolation
 // (`HierarchyResolver.resolveLibrary`), so a leaf whose base lives in another
@@ -17,9 +18,13 @@ import '../support/provision_example_fixture.dart';
 
 void main() {
   final basePart = File('example/lib/crosslib/base_shape.zorphy.dart');
+  final intermediatePart = File(
+    'example/lib/crosslib/intermediate.zorphy.dart',
+  );
   final circlePart = File('example/lib/crosslib/circle.zorphy.dart');
 
   late String base;
+  late String intermediate;
   late String circle;
 
   setUpAll(() {
@@ -36,12 +41,18 @@ void main() {
       );
     }
     base = basePart.readAsStringSync();
+    intermediate = intermediatePart.readAsStringSync();
     circle = circlePart.readAsStringSync();
   });
 
   group('#278 cross-library base-class merge', () {
-    test('the leaf extends the generated base class', () {
-      expect(circle, contains('final class Circle extends Shape'));
+    test('the leaf extends the transitive intermediate class', () {
+      expect(circle, contains('final class Circle extends Intermediate'));
+    });
+
+    test('the intermediate class extends the cross-library base', () {
+      expect(intermediate, contains('final class Intermediate extends Shape'));
+      expect(intermediate, contains('required this.color'));
     });
 
     test('the leaf constructor takes the inherited field', () {

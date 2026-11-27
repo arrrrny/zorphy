@@ -5,7 +5,7 @@
 // fixed; the generated `.part.dart` files are never hand-edited.
 
 import 'package:test/test.dart';
-import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/common/name_type.dart';
 import 'package:zorphy/src/emission/boundary_codec_emitter.dart';
 import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/emission/polymorphic_class_emitter.dart';

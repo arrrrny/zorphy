@@ -3,7 +3,7 @@
 // emission change (ISSUE-0223 added the with* fluent builders; ISSUE-0229 added
 // the static diff). Prints the three emissions between their markers; splice
 // verbatim.
-import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/common/name_type.dart';
 import 'package:zorphy/src/emission/polymorphic_patch_emitter.dart';
 
 void main() {
