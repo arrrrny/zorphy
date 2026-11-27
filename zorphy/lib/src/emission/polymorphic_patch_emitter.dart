@@ -9,7 +9,7 @@ import '../helpers.dart' as helpers;
 /// Emits the polymorphic patch surface for a sealed hierarchy (ISSUE-009).
 ///
 /// A polymorphic root (`abstract class $$Notification`) gets no patch from
-/// `PatchEmitter`: the root is abstract, so `PatchClassGenerator` returns
+/// legacy emitter: the root is abstract, so `PatchClassGenerator` returns
 /// early. A caller holding a heterogeneous `List<Notification>` therefore
 /// cannot apply a shared-field update (`markAllRead`) without downcasting every
 /// element first.
@@ -69,7 +69,7 @@ import '../helpers.dart' as helpers;
 /// shape, and `polymorphic_patch_test.dart` for the clearing cases.
 ///
 /// Everything is assembled as [Spec] objects and formatted by [ZorphyEmitter]:
-/// no source text is concatenated here, matching `PatchEmitter`.
+/// no source text is concatenated here, matching legacy emitter.
 class PolymorphicPatchEmitter {
   /// Creates an emitter. Stateless: one instance serves every hierarchy.
   const PolymorphicPatchEmitter();
@@ -883,7 +883,7 @@ class PolymorphicPatchEmitter {
   /// by value and the whole new value is set: the polymorphic patch carries a
   /// typed [PatchValue] per field, so a nested node, a list or a map is
   /// replaced wholesale rather than as a delta — the granular delta algebra
-  /// lives on the legacy [PatchEmitter] surface, whose field map is untyped.
+  /// lives on the legacy legacy patch emitter surface, whose field map is untyped.
   Method _diffMethod(String entityName, List<NameTypeClassComment> fields) =>
       Method((m) {
         final patchName = '${_clean(entityName)}Patch';
@@ -1045,32 +1045,34 @@ class PolymorphicPatchEmitter {
   });
 
   /// `toWire` for a concrete patch: only the fields it actually sets.
-  Method _concreteToWireMethod(List<NameTypeClassComment> fields) =>
-      Method((m) {
-        m
-          ..name = 'toWire'
-          ..returns = referType('Map<String, Object?>');
-        m.annotations.add(refer('override'));
+  Method _concreteToWireMethod(List<NameTypeClassComment> fields) => Method((
+    m,
+  ) {
+    m
+      ..name = 'toWire'
+      ..returns = referType('Map<String, Object?>');
+    m.annotations.add(refer('override'));
 
-        if (fields.isEmpty) {
-          m.body = const Code('return const {};');
-          return;
-        }
+    if (fields.isEmpty) {
+      m.body = const Code('return const {};');
+      return;
+    }
 
-        final lines = <String>['final wire = <String, Object?>{};'];
-        for (final field in fields) {
-          final name = _memberName(field.name);
-          // `wire` is the output map: qualify the patch field with `this` so
-          // a field named `wire` reads the patch, not the map. `wire[…]`
-          // stays the map write.
-          lines.add(
-            'if (this.$name.isSet) '
-            "wire['${field.name}'] = this.$name.valueOrNull;",
-          );
-        }
-        lines.add('return wire;');
-        m.body = Code(lines.join('\n'));
-      });
+    final lines = <String>['final wire = <String, Object?>{};'];
+    for (final field in fields) {
+      final name = _memberName(field.name);
+      // `wire` is the output map: qualify the patch field with `this` so
+      // a field named `wire` reads the patch, not the map. `wire[…]`
+      // stays the map write.
+      final encoded = _wireEncodeExpression(field, 'this.$name.valueOrNull');
+      lines.add(
+        'if (this.$name.isSet) '
+        "wire['${field.name}'] = $encoded;",
+      );
+    }
+    lines.add('return wire;');
+    m.body = Code(lines.join('\n'));
+  });
 
   Parameter _covariantTarget(String type) => Parameter((p) {
     p
@@ -1089,7 +1091,7 @@ class PolymorphicPatchEmitter {
   /// ## Why a subtype kind decodes onto the SHARED surface
   ///
   /// A generated library gives the sealed root [emitRoot]'s patch but gives
-  /// each concrete leaf its own `PatchEmitter` patch, and that one extends
+  /// each concrete leaf its own legacy emitter patch, and that one extends
   /// `PatchBase<Leaf, Leaf$>` — NOT the root patch. So a leaf patch is not a
   /// `RootPatch`, and a root-typed `fromWire` cannot return one; the
   /// polymorphism here is real only when [emitSubtypePatch] built the leaves,
@@ -1101,7 +1103,7 @@ class PolymorphicPatchEmitter {
   /// op key that surface cannot express is a `FieldViolation` at
   /// `/ops/<field>` — never a silently dropped change. A caller that wants the
   /// subtype's own patch decodes the same `ops` through that subtype's
-  /// `fromWire`, which `PatchEmitter` emits for every concrete leaf.
+  /// `fromWire`, which legacy emitter emits for every concrete leaf.
   ///
   /// `entityType` is validated against the WHOLE hierarchy — the root name or
   /// any subtype — because a subtype patch names its own entity, and only a
@@ -1256,7 +1258,7 @@ class PolymorphicPatchEmitter {
       lines.add("final ops = ZorphyPatchWire.opsOf(raw, '', violations);");
       // The per-field read paths carry the envelope prefix, so a violation on
       // an envelope decode names `/ops/<field>` while a bare `toWire()` map
-      // keeps `/<field>` (#284) — the same split `PatchEmitter` already makes.
+      // keeps `/<field>` (#284) — the same split legacy emitter already makes.
       lines.add("final prefix = ZorphyPatchWire.opsPathOf(raw);");
     }
     for (final field in fields) {
@@ -1294,6 +1296,47 @@ class PolymorphicPatchEmitter {
     m.body = Code(lines.join('\n'));
   });
 
+  String _wireEncodeExpression(NameTypeClassComment field, String value) {
+    if (field.isEnum) return '$value?.name';
+    return _encodeValue(_concreteType(field.type), value);
+  }
+
+  String _encodeValue(String type, String value) {
+    final bare = type.replaceAll('?', '').trim();
+    final args = _typeArguments(bare);
+    if (args != null && bare.startsWith('List<') && args.length == 1) {
+      final encoded = _encodeValue(args.single, 'element');
+      return '$value?.map((element) => $encoded).toList()';
+    }
+    if (args != null && bare.startsWith('Map<') && args.length == 2) {
+      final key = _encodeValue(args[0], 'key');
+      final entry = _encodeValue(args[1], 'value');
+      return '$value?.map((key, value) => MapEntry($key, $entry))';
+    }
+    if (bare == 'DateTime') return '$value?.toIso8601String()';
+    return value;
+  }
+
+  List<String>? _typeArguments(String type) {
+    final open = type.indexOf('<');
+    if (open < 0 || !type.endsWith('>')) return null;
+    final inner = type.substring(open + 1, type.length - 1);
+    final args = <String>[];
+    var depth = 0;
+    var start = 0;
+    for (var i = 0; i < inner.length; i++) {
+      final char = inner[i];
+      if (char == '<') depth++;
+      if (char == '>') depth--;
+      if (char == ',' && depth == 0) {
+        args.add(inner.substring(start, i).trim());
+        start = i + 1;
+      }
+    }
+    args.add(inner.substring(start).trim());
+    return args;
+  }
+
   /// The decode expression for one field's wire value.
   ///
   /// Every arm answers a `PatchValue<T>?`: `PatchValue.set(<decoded>)` on a
@@ -1308,21 +1351,7 @@ class PolymorphicPatchEmitter {
     // The read path carries the envelope prefix (`$prefix/<field>`), so an
     // envelope decode reports `/ops/<field>` and a bare patch `/<field>` (#284).
     final path = _literal('\$prefix/$nome');
-    final String read;
-    if (field.isEnum) {
-      read =
-          'ZorphyPatchWire.enumByName<$bare>('
-          '$bare.values, $value, $path, violations)';
-    } else if (bare == 'DateTime') {
-      read = 'ZorphyPatchWire.asDateTime($value, $path, violations)';
-    } else if (bare == 'double') {
-      read = 'ZorphyPatchWire.asDouble($value, $path, violations)';
-    } else if (bare == 'num') {
-      // A declared `num` keeps an integer intact; only `double` converts.
-      read = 'ZorphyPatchWire.asNum($value, $path, violations)';
-    } else {
-      read = 'ZorphyPatchWire.as<$declared>($value, $path, violations)';
-    }
+    final read = _readValue(field, bare, value, path);
     // A local is what promotes: `switch` over a nullable result does not
     // narrow the binder itself, and `PatchValue.set` needs the non-null value.
     // A nullable declared type with an explicit null is a CLEAR, not a failed
@@ -1339,6 +1368,47 @@ class PolymorphicPatchEmitter {
         'return $local == null '
         '? null '
         ': PatchValue<$declared>.set($local); })()';
+  }
+
+  String _readValue(
+    NameTypeClassComment field,
+    String type,
+    String value,
+    String path,
+  ) {
+    if (type.endsWith('?')) {
+      final bare = type.substring(0, type.length - 1).trim();
+      return '($value == null ? null : ${_readValue(field, bare, value, path)})';
+    }
+    if (field.isEnum) {
+      return 'ZorphyPatchWire.enumByName<$type>('
+          '$type.values, $value, $path, violations)';
+    }
+    final args = _typeArguments(type);
+    if (args != null && type.startsWith('List<') && args.length == 1) {
+      final element = _readValue(field, args.single, 'element', 'elementPath');
+      return 'ZorphyPatchWire.listValue<${args.single}>('
+          '$value, $path, violations, '
+          '(element, elementPath, violations) => $element)';
+    }
+    if (args != null && type.startsWith('Map<') && args.length == 2) {
+      final key = _readValue(field, args[0], 'key', 'keyPath');
+      final entry = _readValue(field, args[1], 'entry', 'entryPath');
+      return 'ZorphyPatchWire.mapValue<${args[0]}, ${args[1]}>('
+          '$value, $path, violations, '
+          'decodeKey: (key, keyPath, violations) => $key, '
+          'decodeValue: (entry, entryPath, violations) => $entry)';
+    }
+    if (type == 'DateTime') {
+      return 'ZorphyPatchWire.asDateTime($value, $path, violations)';
+    }
+    if (type == 'double') {
+      return 'ZorphyPatchWire.asDouble($value, $path, violations)';
+    }
+    if (type == 'num') {
+      return 'ZorphyPatchWire.asNum($value, $path, violations)';
+    }
+    return 'ZorphyPatchWire.as<$type>($value, $path, violations)';
   }
 
   /// `toEnvelope()` — the polymorphic envelope a concrete patch travels in.

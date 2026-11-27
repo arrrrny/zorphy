@@ -12,11 +12,6 @@ const sidebars = {
     },
     {
       type: 'doc',
-      id: 'plugins',
-      label: 'Plugin API'
-    },
-    {
-      type: 'doc',
       id: 'vs-freezed',
       label: 'Zorphy vs Freezed'
     },

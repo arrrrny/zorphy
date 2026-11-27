@@ -4,7 +4,7 @@
 // the required behavior across ALL THREE consumption paths:
 //
 //   * boundary codec  — `BoundaryCodecEmitter` (`toWire`/`fromWire`),
-//   * patch envelope   — `PatchEmitter` + `ZorphyPatchWire` (`toWire`/`fromWire`),
+//   * patch envelope   — `PolymorphicPatchEmitter` + `ZorphyPatchWire` (`toWire`/`fromWire`),
 //   * mock seeder      — `MockFixtureEmitter` (`<Name>MockData`).
 //
 // The table below IS the contract; each row names the emitter responsible. A
@@ -37,14 +37,13 @@ import 'dart:io';
 import 'package:test/test.dart';
 import 'package:zorphy/src/emission/boundary_codec_emitter.dart';
 import 'package:zorphy/src/emission/emitter.dart';
-import 'package:zorphy/src/emission/patch_emitter.dart';
 import 'package:zorphy/src/emission/wire_kind.dart';
 import 'package:zorphy/src/emitters/mock_fixture_emitter.dart';
 import 'package:zorphy/src/parser/polymorphic_ir.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-import '../runtime/fixtures/account.dart';
-import '../runtime/fixtures/profile.dart';
+import '../runtime/fixtures/notification.dart';
+import '../runtime/fixtures/patch_contract.dart';
 
 // ── The contract table ────────────────────────────────────────────────
 
@@ -192,7 +191,8 @@ final class WireRow {
 const _matrix = <WireRow>[
   WireRow(
     kind: 'String',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     boundary: Enforced(
       encode: 'instance',
       jsonSurvives: true,
@@ -203,7 +203,8 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'int',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     boundary: Enforced(
       encode: 'instance',
       jsonSurvives: true,
@@ -214,7 +215,8 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'bool',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     boundary: Enforced(
       encode: 'instance',
       jsonSurvives: true,
@@ -225,7 +227,8 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'double',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     boundary: Enforced(
       encode: 'instance (JSON int widens)',
       jsonSurvives: true,
@@ -240,7 +243,8 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'num',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     // The boundary codec widens a `num` via `toDouble()` on encode but decodes
     // with `asNum` (int preserved) — an asymmetric pair with no clean contract
     // to pin yet. The patch path's `asNum`/`asDouble` ARE clean and enforced.
@@ -258,7 +262,8 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'DateTime',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     boundary: Enforced(
       encode: 'ISO-8601 String',
       jsonSurvives: true,
@@ -273,7 +278,8 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'Duration',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     // No dedicated boundary/patch wire form: a Duration is a scalar `is`-test
     // and encodes as a raw instance, which `jsonEncode` cannot survive. The
     // mock seeder DOES seed it, so that cell is enforced.
@@ -291,7 +297,8 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'enum',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     // #313 Gap 1: the boundary codec emits the raw instance (breaks
     // jsonEncode) and decodes by `is`-test, no name resolution. The patch path
     // (#215) already does `.name` + `enumByName`.
@@ -334,16 +341,17 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'nested entity',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     boundary: Enforced(
       encode: 'nested toWire()',
       jsonSurvives: true,
       decode: 'recursive fromWire (re-pathed violations)',
     ),
-    patch: Enforced(
-      encode: 'nested toWire()',
-      jsonSurvives: true,
-      decode: 'recursive fromWire (re-pathed violations)',
+    patch: Omitted(
+      reason:
+          'v3 patch carries an atomic live nested instance; nested toWire/'
+          'fromWire transport is not implemented yet',
     ),
     // The mock seeder seeds scalars and collections only; a nested entity is
     // not constructed (`_defaultSeedValue` has no branch for a node type).
@@ -366,7 +374,8 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'List<T>',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     boundary: Enforced(
       encode: 'element-wise',
       jsonSurvives: true,
@@ -381,7 +390,8 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'Map<String, V>',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     // The entry-wise claim holds for the element kinds the emitters actually
     // recurse into (scalars, DateTime, nested nodes, type params). Enum VALUES
     // are NOT converted recursively by either path — see the dedicated
@@ -418,25 +428,26 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'Map<K, V> (non-String key)',
-    responsible: 'PatchEmitter / MockFixtureEmitter',
-    // A non-String-key map has dedicated patch (`MapPatchDelta<K,V>`) and mock
-    // (example `{1: 10}`) handling. The boundary `_Shape.map` bucket assumes
-    // String keys, so that cell stays an omission.
+    responsible: 'PolymorphicPatchEmitter / MockFixtureEmitter',
+    // The v3 patch carries the map atomically; the mock seeder handles the
+    // non-String-key example. The boundary `_Shape.map` bucket assumes String
+    // keys, so that cell stays an omission.
     boundary: Omitted(
       reason:
           'boundary `_Shape.map` assumes String keys; non-String-key maps '
           'are not decoded entry-wise by the boundary codec',
     ),
-    patch: Enforced(
-      encode: 'entry-wise',
-      jsonSurvives: true,
-      decode: 'entry-wise (re-pathed violations)',
+    patch: Omitted(
+      reason:
+          'v3 patch carries an atomic Map<K, V>; JSON transport stringifies '
+          'non-String keys and typed decode is not supported yet',
     ),
     seed: Enforced(encode: 'seeded', jsonSurvives: true, decode: 'n/a'),
   ),
   WireRow(
     kind: 'scalar catch-all',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    responsible:
+        'BoundaryCodecEmitter / PolymorphicPatchEmitter / MockFixtureEmitter',
     // The boundary and patch classifiers are total via an open-ended scalar
     // is-test branch (String/int/bool/enum/Duration/Uint8List/Uri/…). The kind
     // is a structural classification, not a wire form, so no path can enforce
@@ -460,38 +471,38 @@ const _matrix = <WireRow>[
   ),
   WireRow(
     kind: 'List<enum>',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter',
+    responsible: 'BoundaryCodecEmitter / PolymorphicPatchEmitter',
     // Regression for the over-broad `List<T>` JSON-survival claim: neither
-    // path recurses into enum ELEMENTS, so `List<AccountTier>` still holds raw
+    // path recurses into enum ELEMENTS, so `List<PatchProbeStatus>` still holds raw
     // enum instances and `jsonEncode` throws. Tracked with the #313 enum gaps.
     boundary: Omitted(
       issue: '#313',
       reason:
           'element-wise conversion does not recurse into enum elements; '
-          'List<AccountTier> still contains raw enums and jsonEncode throws',
+          'List<PatchProbeStatus> still contains raw enums and jsonEncode throws',
     ),
     patch: Omitted(
       issue: '#313',
       reason:
           'element-wise conversion does not recurse into enum elements; '
-          'List<AccountTier> still contains raw enums and jsonEncode throws',
+          'List<PatchProbeStatus> still contains raw enums and jsonEncode throws',
     ),
     seed: Omitted(reason: 'an enum collection element is not seeded'),
   ),
   WireRow(
     kind: 'Map<String, enum>',
-    responsible: 'BoundaryCodecEmitter / PatchEmitter',
+    responsible: 'BoundaryCodecEmitter / PolymorphicPatchEmitter',
     boundary: Omitted(
       issue: '#313',
       reason:
           'entry-wise conversion does not recurse into enum values; '
-          'Map<String, AccountTier> still contains raw enums and jsonEncode throws',
+          'Map<String, PatchProbeStatus> still contains raw enums and jsonEncode throws',
     ),
     patch: Omitted(
       issue: '#313',
       reason:
           'entry-wise conversion does not recurse into enum values; '
-          'Map<String, AccountTier> still contains raw enums and jsonEncode throws',
+          'Map<String, PatchProbeStatus> still contains raw enums and jsonEncode throws',
     ),
     seed: Omitted(reason: 'an enum map value is not seeded'),
   ),
@@ -545,7 +556,7 @@ void main() {
       expect(
         <Set<String>>[
           BoundaryCodecEmitter.classifiedKinds.map((k) => k.matrixKey).toSet(),
-          PatchEmitter.classifiedKinds.map((k) => k.matrixKey).toSet(),
+          patchClassifiedKinds.map((k) => k.matrixKey).toSet(),
           MockFixtureEmitter.classifiedKinds.map((k) => k.matrixKey).toSet(),
         ].reduce((a, b) => a..addAll(b)),
         _recognizedKinds,
@@ -1128,109 +1139,116 @@ String _checkPatchMatrix() {
 
   // enum resolves by NAME (not index); a mismatch is a violation.
   expect(
-    ZorphyPatchWire.enumByName(AccountTier.values, 'enterprise', '/tier', v()),
-    AccountTier.enterprise,
+    ZorphyPatchWire.enumByName(
+      PatchProbeStatus.values,
+      'paused',
+      '/status',
+      v(),
+    ),
+    PatchProbeStatus.paused,
   );
   final badEnum = v();
   expect(
-    ZorphyPatchWire.enumByName(AccountTier.values, 'nope', '/tier', badEnum),
+    ZorphyPatchWire.enumByName(
+      PatchProbeStatus.values,
+      'nope',
+      '/status',
+      badEnum,
+    ),
     isNull,
   );
-  expect(badEnum.single.path, '/tier');
+  expect(badEnum.single.path, '/status');
   coverage('enum');
 
-  // The patch EMITTER's real output (account fixture): enum encodes as its
-  // name and the envelope jsonEncode-survives; nested/List/Map round-trip.
-  final tierPatch = AccountPatch()..withTier(AccountTier.enterprise);
-  final tierWire = tierPatch.toWire();
+  final date = DateTime.utc(2026, 11, 23);
+  final datePatch = NotificationSharedPatch(readAt: PatchValue.set(date));
+  final dateWire = datePatch.toWire();
   _expectEnforcedCell(
-    _cellFor('enum', (r) => r.patch),
-    tierWire['tier'],
-    'patch/enum',
+    _cellFor('DateTime', (r) => r.patch),
+    dateWire['readAt'],
+    'patch/DateTime',
   );
-  // A REAL transport hop: serialize and parse before decoding, not just a
-  // jsonEncode "returnsNormally" smoke check.
-  final tierAfterTransport = jsonDecode(jsonEncode(tierWire)) as Map;
-  expect(tierAfterTransport['tier'], 'enterprise');
+  final dateAfterTransport =
+      jsonDecode(jsonEncode(dateWire)) as Map<String, Object?>;
   expect(
-    AccountPatch.fromWire(
-      Map<String, Object?>.from(tierAfterTransport),
-    ).getOrThrow().apply(const Account(id: 'a1', name: 'ada', score: 1)).tier,
-    AccountTier.enterprise,
+    NotificationSharedPatch.fromWire(
+      dateAfterTransport,
+    ).getOrThrow().readAt.valueOrNull,
+    date,
   );
 
-  final profilePatch = ProfilePatch()
-    ..withDisplayName('grace')
-    ..withTags(<String>['x'])
-    ..withScores(<String, int>{'k': 1});
-  final profileWire = profilePatch.toWire();
-  expect(() => jsonEncode(profileWire), returnsNormally);
-  final profileAfterTransport =
-      jsonDecode(jsonEncode(profileWire)) as Map<String, Object?>;
-  final decodedProfile = ProfilePatch.fromWire(
-    profileAfterTransport,
+  final statusPatch = PatchProbePatch().withStatus(PatchProbeStatus.paused);
+  final statusWire = statusPatch.toWire();
+  _expectEnforcedCell(
+    _cellFor('enum', (r) => r.patch),
+    statusWire['status'],
+    'patch/enum',
+  );
+  final statusAfterTransport =
+      jsonDecode(jsonEncode(statusWire)) as Map<String, Object?>;
+  expect(statusAfterTransport['status'], 'paused');
+  expect(
+    PatchProbePatch.fromWire(
+      statusAfterTransport,
+    ).getOrThrow().apply(_emptyProbe()).status,
+    PatchProbeStatus.paused,
+  );
+
+  final collectionPatch = PatchProbePatch()
+      .withTitle('grace')
+      .withTags(<String>['x'])
+      .withScores(<String, int>{'k': 1});
+  final collectionWire = collectionPatch.toWire();
+  expect(() => jsonEncode(collectionWire), returnsNormally);
+  final collectionAfterTransport =
+      jsonDecode(jsonEncode(collectionWire)) as Map<String, Object?>;
+  final decodedCollection = PatchProbePatch.fromWire(
+    collectionAfterTransport,
   ).getOrThrow();
-  expect(decodedProfile.apply(_emptyProfile()).displayName, 'grace');
+  expect(decodedCollection.apply(_emptyProbe()).title, 'grace');
   _expectEnforcedCell(
     _cellFor('List<T>', (r) => r.patch),
-    profileWire['tags'],
+    collectionWire['tags'],
     'patch/List<T>',
   );
   _expectEnforcedCell(
     _cellFor('Map<String, V>', (r) => r.patch),
-    profileWire['scores'],
+    collectionWire['scores'],
     'patch/Map<String, V>',
   );
   coverage('List<T>');
   coverage('Map<String, V>');
 
-  // Nested entity patch: a real nested AddressPatch must be emitted, encoded,
-  // transported and applied — the matrix's `nested entity` row is no longer
-  // backed by a claim alone.
-  final addressPatch = AddressPatch()..patchMap[Address$.city] = 'oslo';
-  // PatchNested makes the nested delta self-describing on the wire (a Map),
-  // so a real jsonEncode/jsonDecode hop is possible. A bare whole-value
-  // replacement is a PatchWireReplacement carrying a live object — a different
-  // wire form, exercised by the fixture's own golden test.
-  final nestedPatch = ProfilePatch()
-    ..patchMap[Profile$.address] = PatchNested<Address, AddressPatch>(
-      addressPatch,
-    );
+  final nestedPatch = PatchProbePatch().withAddress(
+    const ProbeAddress(street: 'Elm', city: 'oslo'),
+  );
   final nestedWire = nestedPatch.toWire();
-  expect(nestedWire['address'], isA<Map<Object?, Object?>>());
-  final nestedAfterTransport =
-      jsonDecode(jsonEncode(nestedWire)) as Map<String, Object?>;
+  expect(nestedWire['address'], isA<ProbeAddress>());
   expect(
-    ProfilePatch.fromWire(
-      nestedAfterTransport,
-    ).getOrThrow().apply(_emptyProfile()).address.city,
+    PatchProbePatch.fromWire(
+      nestedWire,
+    ).getOrThrow().apply(_emptyProbe()).address.city,
     'oslo',
   );
-  coverage('nested entity');
-
-  // Non-String-key map: the patch path's dedicated MapPatchDelta<K,V> branch.
-  final intMapDelta = MapPatchDelta.diff<int, int>({1: 10}, {1: 11, 2: 20});
-  final intMapWire = intMapDelta.toWire();
-  expect(() => jsonEncode(intMapWire), returnsNormally);
-  expect(intMapDelta.apply({1: 10}), {1: 11, 2: 20});
-  coverage('Map<K, V> (non-String key)');
-
-  // ── Regressions for the over-broad collection JSON claim (#319) ────────
-  // `List<T>` / `Map<String,V>` are Enforced for JSON-safe elements, but the
-  // emitters do NOT recurse into enum ELEMENTS. Prove the documented omission
-  // is real (raw enums are not json-encodable) rather than a guessed contract.
-  final rawEnumList = <Object?>[AccountTier.enterprise];
+  final intMapPatch = PatchProbePatch().withCounts(<int, int>{1: 10, 2: 20});
+  final intMapWire = intMapPatch.toWire();
+  expect(intMapWire['counts'], isA<Map<int, int>>());
+  expect(
+    PatchProbePatch.fromWire(
+      intMapWire,
+    ).getOrThrow().apply(_emptyProbe()).counts,
+    {1: 10, 2: 20},
+  );
+  final rawEnumList = <Object?>[PatchProbeStatus.paused];
   expect(
     () => jsonEncode(rawEnumList),
     throwsA(isA<JsonUnsupportedObjectError>()),
   );
-  final rawEnumMap = <String, Object?>{'tier': AccountTier.pro};
+  final rawEnumMap = <String, Object?>{'status': PatchProbeStatus.active};
   expect(
     () => jsonEncode(rawEnumMap),
     throwsA(isA<JsonUnsupportedObjectError>()),
   );
-  // `List<num>` asymmetry: boundary decodes number elements through the double
-  // helper but emits integer elements unchanged. Pin both directions here.
   expect(jsonDecode(jsonEncode(<num>[1, 2.5])), [1, 2.5]);
   expect(ZorphyPatchWire.asDouble(1, '/n', v()), 1.0);
   expect(ZorphyPatchWire.asNum(1, '/n', v()), isA<int>());
@@ -1293,10 +1311,12 @@ void _expectWireForm(Enforced cell, Object? wire, String label) {
   }
 }
 
-Profile _emptyProfile() => const Profile(
+PatchProbe _emptyProbe() => const PatchProbe(
   id: 'p1',
-  displayName: 'anon',
-  address: Address(street: 's', city: 'c'),
+  title: 'anon',
   tags: [],
   scores: {},
+  counts: {},
+  status: PatchProbeStatus.active,
+  address: ProbeAddress(street: 's', city: 'c'),
 );

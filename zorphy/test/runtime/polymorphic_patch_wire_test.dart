@@ -1,522 +1,242 @@
-// Runtime tests for ISSUE-017 (zorphy#192) — patch wire codecs.
+// Runtime patch wire codec tests on the v3-generated fixture.
 //
-// `toWire()` has existed since ISSUE-007/008/009; what this issue adds is the
-// DECODE half: `static ZorphyBoundaryResult<Patch> fromWire(Map<String,
-// Object?> raw)` on concrete and polymorphic patches, plus the polymorphic
-// ENVELOPE (`entityType` / `patchKind` / `ops`) a cross-process transport
-// (`ZfaLink`, platform channels) needs to name what it is carrying.
+// PatchProbePatch in `test/runtime/fixtures/patch_contract.dart` carries scalar
+// changes, atomic list/map replacements, and whole nested values. Its bare ops
+// map and standalone envelope decode through the same boundary result.
 //
-// The acceptance gate is twofold and both halves are proven here:
-//
-//   * a wire round-trip preserves algebraic equivalence — decoding a patch's
-//     own wire form and applying it produces the same entity as applying the
-//     original patch, across every polymorphic subtype;
-//   * a corrupt patch is REJECTED at the boundary, never thrown: the result is
-//     a `BoundaryErr` naming the offending JSON pointer.
-//
-// The fixtures (`fixtures/account.dart`, `fixtures/profile.dart`,
-// `fixtures/notification.dart`) carry the emitters' real output, so these
-// tests exercise emitted code rather than a hand-written lookalike.
+// The fixture has no polymorphic hierarchy or calendar fields, so this suite
+// retains the applicable scalar/enum, malformed-input, envelope, and in-memory
+// nested round-trip laws rather than v2 fixture-specific dispatch.
 
 import 'dart:convert';
 
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
 
-import 'fixtures/account.dart';
-import 'fixtures/notification.dart';
-import 'fixtures/profile.dart';
+import 'fixtures/patch_contract.dart';
+
+PatchProbe _base() => const PatchProbe(
+  id: 'p1',
+  title: 'ada',
+  tags: ['a'],
+  scores: {'a': 1},
+  counts: {1: 1},
+  status: PatchProbeStatus.active,
+  address: ProbeAddress(street: 'Main', city: 'Springfield'),
+);
+
+void _expectViolation(
+  ZorphyBoundaryResult<PatchProbePatch> result,
+  String path,
+) {
+  expect(result.isOk, isFalse);
+  final error = result as BoundaryErr<PatchProbePatch>;
+  expect(error.violations.map((violation) => violation.path), contains(path));
+}
 
 void main() {
-  group('ISSUE-017 concrete patch fromWire', () {
-    test('round-trips the scalar changes toWire rendered', () {
-      final patch = AccountPatch()
-        ..withName('grace')
-        ..withScore(9);
+  group('v3 concrete patch fromWire', () {
+    test('scalar changes survive a JSON wire round-trip', () {
+      final patch = PatchProbePatch().withId('p2').withTitle('grace');
+      final transported = jsonDecode(jsonEncode(patch.toWire())) as Map;
+      final result = PatchProbePatch.fromWire(
+        Map<String, Object?>.from(transported),
+      );
 
-      final result = AccountPatch.fromWire(patch.toWire());
-
-      expect(result.isOk, isTrue, reason: 'a valid wire map must decode');
+      expect(result.isOk, isTrue);
       final decoded = result.getOrThrow();
-      expect(decoded.isEmpty, isFalse);
-      expect(
-        decoded.apply(const Account(id: 'a1', name: 'ada', score: 1)),
-        patch.apply(const Account(id: 'a1', name: 'ada', score: 1)),
-        reason: 'the decoded patch must be algebraically equivalent',
-      );
+      expect(decoded.toWire(), patch.toWire());
+      expect(decoded.apply(_base()), patch.apply(_base()));
     });
 
-    test('decodes an enum field by its name, not its index', () {
-      final patch = AccountPatch()..withTier(AccountTier.enterprise);
+    test('an enum survives a JSON wire round-trip by its name', () {
+      final patch = PatchProbePatch().withStatus(PatchProbeStatus.paused);
+      final transported = jsonDecode(jsonEncode(patch.toWire())) as Map;
+      final decoded = PatchProbePatch.fromWire(
+        Map<String, Object?>.from(transported),
+      ).getOrThrow();
 
-      final decoded = AccountPatch.fromWire(patch.toWire()).getOrThrow();
-
-      expect(
-        decoded.apply(const Account(id: 'a1', name: 'ada', score: 1)).tier,
-        AccountTier.enterprise,
-      );
-    });
-
-    test('round-trips a collection delta', () {
-      const previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: Address(street: 'Main', city: 'Springfield'),
-        tags: ['x'],
-        scores: {},
-      );
-      final next = previous.copyWith(tags: const ['x', 'y']);
-      final patch = ProfilePatch.diff(previous, next);
-
-      final decoded = ProfilePatch.fromWire(patch.toWire()).getOrThrow();
-
-      expect(decoded.apply(previous).tags, [
-        'x',
-        'y',
-      ], reason: 'a ListPatchOp delta must round-trip through the wire');
-    });
-
-    test('round-trips a map delta', () {
-      const previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: Address(street: 'Main', city: 'Springfield'),
-        tags: [],
-        scores: {},
-      );
-      final next = previous.copyWith(scores: const {'math': 9});
-      final patch = ProfilePatch.diff(previous, next);
-
-      final decoded = ProfilePatch.fromWire(patch.toWire()).getOrThrow();
-
-      expect(decoded.apply(previous).scores, {'math': 9});
-    });
-
-    test('round-trips a nested sub-patch as a PatchNested', () {
-      const previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: Address(street: 'Main', city: 'Springfield'),
-        tags: [],
-        scores: {},
-      );
-      final next = previous.copyWith(
-        address: const Address(street: 'Elm', city: 'Springfield'),
-      );
-      final patch = ProfilePatch.diff(previous, next);
-
-      final decoded = ProfilePatch.fromWire(patch.toWire()).getOrThrow();
-
-      expect(decoded.apply(previous).address.street, 'Elm');
+      expect(transported['status'], 'paused');
+      expect(decoded.apply(_base()).status, PatchProbeStatus.paused);
     });
 
     test('an absent key leaves the field unchanged', () {
-      final decoded = AccountPatch.fromWire(const {}).getOrThrow();
-
+      final base = _base();
+      final decoded = PatchProbePatch.fromWire(const {}).getOrThrow();
       expect(decoded.isEmpty, isTrue);
+      expect(identical(decoded.apply(base), base), isTrue);
     });
 
-    test('an explicit null clears a nullable field', () {
-      const before = Account(id: 'a1', name: 'ada', score: 1, note: 'hi');
-      final patch = AccountPatch()..withNote(null);
-
-      final decoded = AccountPatch.fromWire(patch.toWire()).getOrThrow();
-
-      expect(decoded.apply(before).note, isNull);
-    });
-  });
-
-  group('ISSUE-017 corrupt concrete patch rejection', () {
-    test('a wrong scalar type is a violation, never a thrown cast', () {
-      final result = AccountPatch.fromWire(const {'score': 'not-a-number'});
-
-      expect(result.isOk, isFalse);
-      final error = result as BoundaryErr<AccountPatch>;
-      expect(
-        error.violations.map((v) => v.path),
-        contains('/score'),
-        reason: 'the violation must name the offending pointer',
+    test('an explicit null clears a nullable nested field', () {
+      final before = _base().copyWith(
+        previousAddress: const ProbeAddress(street: 'Oak', city: 'Ogdenville'),
       );
+      final patch = PatchProbePatch().withPreviousAddress(null);
+      final decoded = PatchProbePatch.fromWire(patch.toWire()).getOrThrow();
+
+      expect(decoded.apply(before).previousAddress, isNull);
     });
 
-    test('a corrupt list element names its position', () {
-      // Atomic list replacement (zorphy#248): the list is a bare JSON array, so
-      // a bad element is named at its index, not at a delta op.
-      final result = ProfilePatch.fromWire(const {
-        'tags': ['a', 123],
-      });
-
-      expect(result.isOk, isFalse);
-      final error = result as BoundaryErr<ProfilePatch>;
-      expect(error.violations.map((v) => v.path), contains('/tags/1'));
-    });
-
-    test('a non-map nested value is a violation', () {
-      final result = ProfilePatch.fromWire(const {'address': 'Elm St'});
-
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<ProfilePatch>).violations.map((v) => v.path),
-        contains('/address'),
+    test('an atomic list replacement round-trips in memory', () {
+      final patch = PatchProbePatch.diff(
+        _base(),
+        _base().copyWith(tags: const ['a', 'b']),
       );
-    });
-  });
+      final decoded = PatchProbePatch.fromWire(patch.toWire()).getOrThrow();
 
-  group('ISSUE-017 polymorphic patch envelope', () {
-    test('a shared patch renders and decodes its envelope', () {
-      final readAt = DateTime.utc(2026, 11, 22, 10);
-      final patch = NotificationPatch.shared(readAt: PatchValue.set(readAt));
-
-      final envelope = patch.toEnvelope();
-      expect(envelope['entityType'], 'Notification');
-      expect(envelope['patchKind'], 'shared');
-      expect(envelope['ops'], {'readAt': readAt});
-
-      final decoded = NotificationPatch.fromWire(envelope).getOrThrow();
-      expect(decoded, isA<NotificationSharedPatch>());
+      expect(decoded.apply(_base()).tags, ['a', 'b']);
     });
 
-    test('the shared envelope reaches every subtype after a round-trip', () {
-      final readAt = DateTime.utc(2026, 11, 22, 10);
-      final patch = NotificationPatch.shared(readAt: PatchValue.set(readAt));
-      final decoded = NotificationPatch.fromWire(
-        patch.toEnvelope(),
-      ).getOrThrow();
-
-      final notifications = <Notification>[
-        const OrderNotification(id: 'o1', itemCount: 2),
-        const PriceDropNotification(id: 'p1', newPrice: 19.99),
-      ];
-
-      for (final notification in notifications) {
-        expect(
-          decoded.apply(notification).readAt,
-          readAt,
-          reason:
-              'algebraic equivalence must survive the wire for '
-              '${notification.runtimeType}',
-        );
+    test('atomic maps and literal op keys round-trip in memory', () {
+      for (final scores in const <Map<String, int>>[
+        {'math': 9},
+        {'op': 7},
+        {'ops': 7},
+      ]) {
+        final patch = PatchProbePatch().withScores(scores);
+        final decoded = PatchProbePatch.fromWire(patch.toWire()).getOrThrow();
+        expect(decoded.apply(_base()).scores, scores);
       }
     });
 
-    test('a subtype envelope decodes onto the root surface it can express', () {
-      final patch = OrderNotificationPatch(itemCount: const PatchValue.set(3));
-
-      final envelope = patch.toEnvelope();
-      expect(envelope['entityType'], 'OrderNotification');
-      expect(envelope['patchKind'], 'OrderNotification');
-
-      // A generated library gives each concrete leaf a `PatchBase` patch, not
-      // one that extends the root patch, so a root-typed decode cannot return
-      // a leaf instance. What it MUST do is disclose the op it cannot express
-      // rather than silently dropping it.
-      final result = NotificationPatch.fromWire(envelope);
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<NotificationPatch>).violations.map(
-          (v) => v.path,
-        ),
-        contains('/ops/itemCount'),
-      );
+    test('an atomic non-String-key map replacement round-trips in memory', () {
+      final patch = PatchProbePatch().withCounts(const {1: 2, 2: 3});
+      final decoded = PatchProbePatch.fromWire(patch.toWire()).getOrThrow();
+      expect(decoded.apply(_base()).counts, {1: 2, 2: 3});
     });
 
-    test('a subtype envelope whose ops are all shared fields decodes', () {
-      final readAt = DateTime.utc(2026, 11, 22, 10);
-      final patch = OrderNotificationPatch(readAt: PatchValue.set(readAt));
-
-      final decoded = NotificationPatch.fromWire(
-        patch.toEnvelope(),
-      ).getOrThrow();
-
-      expect(
-        decoded.apply(const OrderNotification(id: 'o1', itemCount: 1)).readAt,
-        readAt,
+    test('a whole nested replacement round-trips in memory', () {
+      final previous = _base();
+      final next = previous.copyWith(
+        address: const ProbeAddress(street: 'Elm', city: 'Springfield'),
       );
-    });
+      final patch = PatchProbePatch.diff(previous, next);
+      final decoded = PatchProbePatch.fromWire(patch.toWire()).getOrThrow();
 
-    test('a bare ops map still decodes on a concrete patch', () {
-      // `toWire()` keeps its ISSUE-009 contract (the ops map), so a transport
-      // that already knows the kind must not be forced through an envelope.
-      final patch = OrderNotificationPatch(itemCount: const PatchValue.set(3));
-
-      final decoded = OrderNotificationPatch.fromWire(
-        patch.toWire(),
-      ).getOrThrow();
-
-      // The fixture entities carry no `operator ==`, so equivalence is read
-      // off the field the patch set.
-      expect(
-        decoded
-            .apply(const OrderNotification(id: 'o1', itemCount: 1))
-            .itemCount,
-        3,
-      );
-    });
-
-    test('an unknown patchKind is a violation at /patchKind', () {
-      final result = NotificationPatch.fromWire(const {
-        'entityType': 'Notification',
-        'patchKind': 'telepathy',
-        'ops': <String, Object?>{},
-      });
-
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<NotificationPatch>).violations.map(
-          (v) => v.path,
-        ),
-        contains('/patchKind'),
-      );
-    });
-
-    test('a missing patchKind is a violation, never a default', () {
-      final result = NotificationPatch.fromWire(const {
-        'entityType': 'Notification',
-        'ops': <String, Object?>{},
-      });
-
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<NotificationPatch>).violations.map(
-          (v) => v.path,
-        ),
-        contains('/patchKind'),
-      );
-    });
-
-    test('a wrong entityType is a violation, never a silent accept', () {
-      final result = NotificationPatch.fromWire(const {
-        'entityType': 'Invoice',
-        'patchKind': 'shared',
-        'ops': <String, Object?>{},
-      });
-
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<NotificationPatch>).violations.map(
-          (v) => v.path,
-        ),
-        contains('/entityType'),
-      );
-    });
-
-    test('a corrupt shared field is re-pathed under /ops', () {
-      final result = NotificationPatch.fromWire(const {
-        'entityType': 'Notification',
-        'patchKind': 'shared',
-        'ops': {'readAt': 42},
-      });
-
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<NotificationPatch>).violations.map(
-          (v) => v.path,
-        ),
-        contains('/ops/readAt'),
-      );
-    });
-  });
-
-  group('review findings #215', () {
-    test('an enum patch survives a JSON envelope hop with a principal key', () {
-      final envelope = (AccountPatch()..withTier(AccountTier.enterprise))
-          .toEnvelope(principalKey: 'a1');
-      final wire = jsonDecode(jsonEncode(envelope)) as Map<String, dynamic>;
-
-      expect(wire['principalKey'], 'a1');
-      expect((wire['ops'] as Map)['tier'], 'enterprise');
-
-      final decoded = AccountPatch.fromWire(Map<String, Object?>.from(wire));
-      expect(decoded.isOk, isTrue);
-      expect(
-        decoded
-            .getOrThrow()
-            .apply(const Account(id: 'a1', name: 'ada', score: 1))
-            .tier,
-        AccountTier.enterprise,
-      );
-    });
-
-    test('a corrupt calendar date is a violation, not a normalized date', () {
-      final result = NotificationPatch.fromWire(const {
-        'entityType': 'Notification',
-        'patchKind': 'shared',
-        'ops': {'readAt': '2020-01-42'},
-      });
-
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<NotificationPatch>).violations.map(
-          (v) => v.path,
-        ),
-        contains('/ops/readAt'),
-      );
-    });
-
-    test('a literal op key in a replacement map field round-trips', () {
-      final patch = ProfilePatch()..withScores(const {'op': 7});
-
-      final decoded = ProfilePatch.fromWire(patch.toWire()).getOrThrow();
-      const before = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: Address(street: 'Main', city: 'Springfield'),
-        tags: [],
-        scores: {},
-      );
-      expect(decoded.apply(before).scores, {'op': 7});
-    });
-
-    test('a literal ops key in a replacement map field round-trips', () {
-      final patch = ProfilePatch()..withScores(const {'ops': 7});
-
-      final decoded = ProfilePatch.fromWire(patch.toWire()).getOrThrow();
-      const before = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: Address(street: 'Main', city: 'Springfield'),
-        tags: [],
-        scores: {},
-      );
-      expect(decoded.apply(before).scores, {'ops': 7});
-    });
-
-    test('a map delta keeps its ordered steps on the wire', () {
-      const before = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: Address(street: 'Main', city: 'Springfield'),
-        tags: [],
-        scores: {},
-      );
-      final patch = ProfilePatch.diff(
-        before,
-        before.copyWith(scores: const {'math': 9}),
-      );
-      final wire = patch.toWire();
-
-      expect(wire['scores'], isA<List<Object?>>());
-      expect(ProfilePatch.fromWire(wire).getOrThrow().apply(before).scores, {
-        'math': 9,
-      });
+      expect(decoded.apply(previous), next);
     });
 
     test('a nested replacement from null round-trips as a whole value', () {
-      const before = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: Address(street: 'Main', city: 'Springfield'),
-        tags: [],
-        scores: {},
+      final previous = _base();
+      final next = previous.copyWith(
+        previousAddress: const ProbeAddress(street: 'Elm', city: 'Springfield'),
       );
-      final next = before.copyWith(
-        previousAddress: const Address(street: 'Elm', city: 'Springfield'),
-      );
-      final patch = ProfilePatch.diff(before, next);
+      final patch = PatchProbePatch.diff(previous, next);
+      final decoded = PatchProbePatch.fromWire(patch.toWire()).getOrThrow();
 
-      final decoded = ProfilePatch.fromWire(patch.toWire()).getOrThrow();
-      expect(decoded.apply(before).previousAddress, next.previousAddress);
+      expect(decoded.apply(previous).previousAddress, next.previousAddress);
     });
 
-    test('a non-array list value is a decode violation', () {
-      // The old `{'ops': [...]}` delta form is no longer a list wire value
-      // (zorphy#248): a map where a bare array is required fails at the field.
-      final result = ProfilePatch.fromWire(const {
-        'tags': {'ops': <Object?>[]},
-      });
+    test('a standalone envelope retains its principal and scalar ops', () {
+      final patch = PatchProbePatch().withTitle('grace');
+      final envelope = patch.toEnvelope(principalKey: 'p1');
+      expect(envelope['entityType'], 'PatchProbe');
+      expect(envelope['patchKind'], 'PatchProbe');
+      expect(envelope['principalKey'], 'p1');
+      expect(envelope['ops'], {'title': 'grace'});
 
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<ProfilePatch>).violations.map((v) => v.path),
-        contains('/tags'),
-      );
+      final transported = jsonDecode(jsonEncode(envelope)) as Map;
+      final decoded = PatchProbePatch.fromWire(
+        Map<String, Object?>.from(transported),
+      ).getOrThrow();
+      expect(decoded.apply(_base()).title, 'grace');
     });
 
-    test('a list with one bad element is rejected whole', () {
-      // All-or-nothing, like every other wire read: a single bad element fails
-      // the field rather than shipping a silently short list.
-      final result = ProfilePatch.fromWire(const {
-        'tags': ['a', 'b', 3],
-      });
+    test(
+      'an explicit PatchWireSet can set a scalar and clear a nullable field',
+      () {
+        final decoded = PatchProbePatch.fromWire(const {
+          'title': PatchWireSet('grace'),
+          'previousAddress': PatchWireSet(null),
+        }).getOrThrow();
+        final applied = decoded.apply(_base());
 
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<ProfilePatch>).violations.map((v) => v.path),
-        contains('/tags/2'),
-      );
+        expect(applied.title, 'grace');
+        expect(applied.previousAddress, isNull);
+      },
+    );
+  });
+
+  group('corrupt patch rejection', () {
+    test('a wrong scalar type is a violation, never a thrown cast', () {
+      _expectViolation(PatchProbePatch.fromWire(const {'title': 42}), '/title');
     });
 
-    test('the root entity name is not a valid patch kind', () {
-      final result = NotificationPatch.fromWire(const {
-        'entityType': 'Notification',
-        'patchKind': 'Notification',
-        'ops': <String, Object?>{},
-      });
-
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<NotificationPatch>).violations.map(
-          (v) => v.path,
-        ),
-        contains('/patchKind'),
+    test('an unknown enum name is a violation', () {
+      _expectViolation(
+        PatchProbePatch.fromWire(const {'status': 'telepathy'}),
+        '/status',
       );
     });
 
-    test('a shared envelope rejects an op the shared patch cannot express', () {
-      final result = NotificationPatch.fromWire(const {
-        'entityType': 'Notification',
-        'patchKind': 'shared',
-        'ops': {'itemCount': 3},
-      });
-
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<NotificationPatch>).violations.map(
-          (v) => v.path,
-        ),
-        contains('/ops/itemCount'),
+    test('a wrong nullable nested type is a violation', () {
+      _expectViolation(
+        PatchProbePatch.fromWire(const {'previousAddress': 'Elm St'}),
+        '/previousAddress',
       );
     });
 
-    test('a subtype field violation is prefixed with /ops', () {
-      final result = NotificationPatch.fromWire(const {
-        'entityType': 'OrderNotification',
-        'patchKind': 'OrderNotification',
-        'ops': {'readAt': 42},
-      });
-
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<NotificationPatch>).violations.map(
-          (v) => v.path,
-        ),
-        contains('/ops/readAt'),
+    test('a non-array list value is a violation', () {
+      _expectViolation(
+        PatchProbePatch.fromWire(const {
+          'tags': {'ops': <Object?>[]},
+        }),
+        '/tags',
       );
     });
 
-    test('an explicit null clear through PatchWireSet wins over a shape', () {
-      final patch = AccountPatch.fromWire(const {
-        'note': PatchWireSet(null),
-        'tier': PatchWireSet(AccountTier.pro),
-      });
-
-      expect(patch.isOk, isTrue);
-      final applied = patch.getOrThrow().apply(
-        const Account(id: 'a1', name: 'ada', score: 1, note: 'old'),
+    test('a list with a bad element is rejected whole', () {
+      _expectViolation(
+        PatchProbePatch.fromWire(const {
+          'tags': ['a', 123],
+        }),
+        '/tags/1',
       );
-      expect(applied.note, isNull);
-      expect(applied.tier, AccountTier.pro);
+    });
+
+    test('a map with a bad value is rejected whole', () {
+      _expectViolation(
+        PatchProbePatch.fromWire(const {
+          'scores': {'math': 'nine'},
+        }),
+        '/scores/math',
+      );
+    });
+
+    test('a non-instance nested value is a violation', () {
+      _expectViolation(
+        PatchProbePatch.fromWire(const {'address': 'Elm St'}),
+        '/address',
+      );
     });
 
     test('a descriptor with no value cannot silently clear a scalar', () {
-      final result = AccountPatch.fromWire(const {
-        'note': {'op': 'set'},
-      });
+      _expectViolation(
+        PatchProbePatch.fromWire(const {
+          'title': {'op': 'set'},
+        }),
+        '/title',
+      );
+    });
 
-      expect(result.isOk, isFalse);
-      expect(
-        (result as BoundaryErr<AccountPatch>).violations.map((v) => v.path),
-        contains('/note'),
+    test('an envelope without ops is rejected at the envelope pointer', () {
+      _expectViolation(
+        PatchProbePatch.fromWire(const {
+          'entityType': 'PatchProbe',
+          'patchKind': 'PatchProbe',
+        }),
+        '/ops',
+      );
+    });
+
+    test('an envelope scalar violation is re-pathed under ops', () {
+      _expectViolation(
+        PatchProbePatch.fromWire(const {
+          'entityType': 'PatchProbe',
+          'patchKind': 'PatchProbe',
+          'ops': {'title': 42},
+        }),
+        '/ops/title',
       );
     });
   });

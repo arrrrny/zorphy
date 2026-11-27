@@ -484,6 +484,49 @@ abstract final class ZorphyPatchWire {
     return items;
   }
 
+  /// The atomic map [raw] carries for a map field, or `null` when it could not
+  /// be decoded in full.
+  static Map<K, V>? mapValue<K, V>(
+    Object? raw,
+    String path,
+    List<FieldViolation> violations, {
+    required K? Function(
+      Object? value,
+      String path,
+      List<FieldViolation> violations,
+    )
+    decodeKey,
+    required V? Function(
+      Object? value,
+      String path,
+      List<FieldViolation> violations,
+    )
+    decodeValue,
+  }) {
+    if (raw is! Map) {
+      violations.add(
+        FieldViolation(
+          path: path,
+          expected: 'Map<$K, $V>',
+          actual: describe(raw),
+        ),
+      );
+      return null;
+    }
+    final before = violations.length;
+    final out = <K, V>{};
+    for (final entry in raw.entries) {
+      final entryPath = '$path/${entry.key}';
+      final key = decodeKey(entry.key, entryPath, violations);
+      final value = decodeValue(entry.value, entryPath, violations);
+      if (violations.length == before) {
+        out[key as K] = value as V;
+      }
+    }
+    if (violations.length != before) return null;
+    return out;
+  }
+
   /// Reads an `index` member for a positional list step, refusing a negative
   /// index and an index that the tracked length proves out of range (#215).
   static int? _listIndex(

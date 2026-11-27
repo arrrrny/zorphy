@@ -356,14 +356,11 @@ void main() {
       // `value == value.copyWith()` true.
       expect(
         compact,
-        contains('OrderCart._zorphyCollectionEquals(this.items,other.items)'),
+        contains('zorphyCollectionEquals(this.items,other.items)'),
       );
-      expect(compact, contains('OrderCart._zorphyCollectionHash(items)'));
-      expect(
-        compact,
-        contains('staticbool_zorphyCollectionEquals(Object?a,Object?b)'),
-      );
-      expect(compact, contains('staticint_zorphyCollectionHash(Object?value)'));
+      expect(compact, contains('zorphyCollectionHash(items)'));
+      expect(compact, isNot(contains('_zorphyCollectionEquals')));
+      expect(compact, isNot(contains('_zorphyCollectionHash')));
     });
 
     test('example hints render nested collections recursively', () {

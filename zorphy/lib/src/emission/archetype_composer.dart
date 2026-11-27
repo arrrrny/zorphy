@@ -3,9 +3,9 @@
 ///
 /// The closed v3 parser/emitter PRs (#177, #178, #188, #189, #190) each shipped
 /// a tested `PolymorphicIr` consumer, but no production caller composed them:
-/// `ZorphyGenerator` registered only the legacy `@Zorphy`/`@Zorphy2` checkers,
+/// the old generator registered only the legacy `@Zorphy`/`@Zorphy2` checkers,
 /// so a real consumer's archetype-annotated class generated nothing. This
-/// composer is the missing production wiring — the generator resolves the
+/// composer is the missing production wiring — the shared-part builder resolves the
 /// library's [PolymorphicIr] and hands it here, and the returned fragment is
 /// appended to the library's shared part.
 ///

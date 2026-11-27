@@ -330,60 +330,11 @@ Field name (or press Enter to finish):
   - age: int
 ```
 
-## 🔮 Plugin API
+## Extension points
 
-Zorphy 2.0 supports third-party plugins that can inspect and mutate generated code before it is emitted. Plugins are Dart classes that extend `ZorphyPlugin` and implement transform hooks for classes, methods, and fields.
-
-**Quick example** — a plugin that adds a timestamp field:
-
-```dart
-import 'package:code_builder/code_builder.dart';
-import 'package:zorphy/zorphy_plugin.dart';
-
-class TimestampPlugin extends ZorphyPlugin {
-  @override
-  String get name => 'timestamp';
-
-  @override
-  Spec transformClass(Spec spec, PluginContext context) {
-    if (spec is! Class) return spec;
-    return spec.rebuild((c) => c
-      ..methods.add(Method((m) {
-        m.name = 'generatedAt';
-        m.type = MethodType.getter;
-        m.returns = refer('DateTime');
-        m.lambda = true;
-        m.body = refer('DateTime').property('now').call([]).code;
-      })));
-  }
-}
-```
-
-**Register via `build.yaml`:**
-
-```yaml
-targets:
-  $default:
-    builders:
-      zorphy:zorphy:
-        options:
-          plugins:
-            - package:my_package/timestamp_plugin.dart
-```
-
-**Programmatic registration:**
-
-```dart
-import 'package:zorphy/zorphy_plugin.dart';
-
-final registry = PluginRegistry();
-registry.register(TimestampPlugin());
-final generator = ZorphyGenerator(pluginRegistry: registry);
-```
-
-Plugins execute in topological order via `runBefore`/`runAfter` constraints. When no plugins are registered, output is byte-identical to the pre-plugin pipeline.
-
-📚 **[Full Plugin API docs](https://arrrrny.github.io/zorphy/docs/plugins)** · [Example](./example/lib/plugin_example.dart)
+Zorphy v3 does not load plugins from `build.yaml`. For custom generation, write a
+`package:build` builder that consumes Zorphy's colocated `.zorphy.dart` output or
+add the required extension point upstream.
 
 ## 🔌 Zorphy MCP Server
 

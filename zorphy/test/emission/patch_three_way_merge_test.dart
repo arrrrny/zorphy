@@ -1,232 +1,200 @@
-// Three-way offline-sync primitives on the REAL emitted patch (zorphy#248).
-//
-// `ProfilePatch` / `AddressPatch` in `test/runtime/fixtures/profile.dart` are
-// byte-locked to `PatchEmitter`'s output by
-// `test/golden/nested_and_collection_patch_golden_test.dart`, so the invariants
-// below are stated against generated code rather than a hand-written lookalike.
-//
-// Laws under test (issue #248):
-//   * `changedPaths` — the JSON pointers a patch touches, e.g. {'/displayName'}
-//   * `conflictingPaths` — the exact intersection of two patches' changed paths
-//   * `composePatches` — applies `next` over this patch (the three-way name for
-//     `compose`); disjoint edits merge cleanly
-//   * atomic list replacement — a changed `List<E>` field is carried as the
-//     whole list value, never as positional index ops, so a concurrent list
-//     edit is an exact `/tags` conflict rather than silent index corruption
+import 'dart:convert';
 
 import 'package:test/test.dart';
 import 'package:zorphy_annotation/zorphy.dart';
 
-import '../runtime/fixtures/account.dart';
-import '../runtime/fixtures/profile.dart';
+import '../runtime/fixtures/patch_contract.dart';
 
-Profile _base() => const Profile(
+PatchProbe _base() => const PatchProbe(
   id: 'p1',
-  displayName: 'ada',
-  address: Address(street: 'Main', city: 'Springfield'),
+  title: 'ada',
   tags: ['a', 'b'],
-  scores: {'a': 1},
+  scores: const {'a': 1},
+  counts: const {1: 1},
+  status: PatchProbeStatus.active,
+  address: ProbeAddress(street: 'Main', city: 'Springfield'),
 );
 
 void main() {
   group('changedPaths', () {
     test('names every changed field as a JSON pointer', () {
-      final patch = ProfilePatch.diff(
+      final patch = PatchProbePatch.diff(
         _base(),
-        _base().copyWith(displayName: 'grace', id: 'p2'),
+        _base().copyWith(title: 'grace', id: 'p2'),
       );
-      expect(patch.changedPaths, {'/id', '/displayName'});
+      expect(patch.changedPaths, {'/id', '/title'});
     });
 
     test('an empty patch changes no path', () {
-      expect(ProfilePatch.diff(_base(), _base()).changedPaths, isEmpty);
+      expect(PatchProbePatch.diff(_base(), _base()).changedPaths, isEmpty);
     });
 
-    test('a nested change expands to the leaf pointer', () {
-      final patch = ProfilePatch.diff(
+    test('a nested change is an atomic whole-value pointer', () {
+      final patch = PatchProbePatch.diff(
         _base(),
         _base().copyWith(
-          address: const Address(street: 'Elm', city: 'Springfield'),
+          address: const ProbeAddress(street: 'Elm', city: 'Springfield'),
         ),
       );
-      expect(patch.changedPaths, {'/address/street'});
+      expect(patch.changedPaths, {'/address'});
     });
 
-    test('an escaped enum member reports the original wire field name', () {
-      // `name` is a reserved enum member, so the field enum carries `name_`
-      // while `toWire()` writes `name`. The pointer must name the wire field.
-      final before = const Account(id: 'a', name: 'old', score: 1);
-      final patch = AccountPatch.diff(before, before.copyWith(name: 'new'));
-      expect(patch.changedPaths, {'/name'});
-      expect(patch.toWire(), containsPair('name', 'new'));
+    test('an enum field reports its wire name', () {
+      final patch = PatchProbePatch.diff(
+        _base(),
+        _base().copyWith(status: PatchProbeStatus.paused),
+      );
+      expect(patch.changedPaths, {'/status'});
+      expect(patch.toWire(), containsPair('status', 'paused'));
     });
   });
 
   group('conflictingPaths', () {
     test('disjoint scalar edits do not conflict', () {
-      final a = ProfilePatch.diff(_base(), _base().copyWith(displayName: 'x'));
-      final b = ProfilePatch.diff(_base(), _base().copyWith(id: 'p9'));
+      final a = PatchProbePatch.diff(_base(), _base().copyWith(title: 'x'));
+      final b = PatchProbePatch.diff(_base(), _base().copyWith(id: 'p9'));
       expect(a.conflictingPaths(b), isEmpty);
     });
 
     test('overlapping scalar edits report the exact pointer', () {
-      final a = ProfilePatch.diff(_base(), _base().copyWith(displayName: 'x'));
-      final b = ProfilePatch.diff(_base(), _base().copyWith(displayName: 'y'));
-      expect(a.conflictingPaths(b), {'/displayName'});
+      final a = PatchProbePatch.diff(_base(), _base().copyWith(title: 'x'));
+      final b = PatchProbePatch.diff(_base(), _base().copyWith(title: 'y'));
+      expect(a.conflictingPaths(b), {'/title'});
     });
 
-    test('disjoint nested edits under one object do not conflict', () {
-      final a = ProfilePatch.diff(
+    test('nested values conflict on the whole field', () {
+      final a = PatchProbePatch.diff(
         _base(),
         _base().copyWith(
-          address: const Address(street: 'Elm', city: 'Springfield'),
+          address: const ProbeAddress(street: 'Elm', city: 'Springfield'),
         ),
       );
-      final b = ProfilePatch.diff(
+      final b = PatchProbePatch.diff(
         _base(),
         _base().copyWith(
-          address: const Address(street: 'Main', city: 'Shelbyville'),
+          address: const ProbeAddress(street: 'Main', city: 'Shelbyville'),
         ),
       );
-      expect(a.conflictingPaths(b), isEmpty);
-    });
-
-    test('the same nested leaf conflicts exactly', () {
-      final a = ProfilePatch.diff(
-        _base(),
-        _base().copyWith(
-          address: const Address(street: 'Elm', city: 'Springfield'),
-        ),
-      );
-      final b = ProfilePatch.diff(
-        _base(),
-        _base().copyWith(
-          address: const Address(street: 'Oak', city: 'Springfield'),
-        ),
-      );
-      expect(a.conflictingPaths(b), {'/address/street'});
+      expect(a.conflictingPaths(b), {'/address'});
     });
 
     test('a concurrent list replacement conflicts on the whole field', () {
-      final a = ProfilePatch.diff(_base(), _base().copyWith(tags: const ['x']));
-      final b = ProfilePatch.diff(_base(), _base().copyWith(tags: const ['y']));
+      final a = PatchProbePatch.diff(_base(), _base().copyWith(tags: ['x']));
+      final b = PatchProbePatch.diff(_base(), _base().copyWith(tags: ['y']));
       expect(a.conflictingPaths(b), {'/tags'});
     });
 
-    test('a list edit and a disjoint field edit do not conflict', () {
-      final a = ProfilePatch.diff(_base(), _base().copyWith(tags: const ['x']));
-      final b = ProfilePatch.diff(
+    test('a list edit and a disjoint map edit do not conflict', () {
+      final a = PatchProbePatch.diff(_base(), _base().copyWith(tags: ['x']));
+      final b = PatchProbePatch.diff(
         _base(),
-        _base().copyWith(scores: const {'a': 2}),
+        _base().copyWith(scores: {'a': 2}),
       );
       expect(a.conflictingPaths(b), isEmpty);
     });
 
-    test('a whole-value replacement conflicts with an edit beneath it', () {
+    test('nullable nested replacement conflicts with another replacement', () {
       final withAddress = _base().copyWith(
-        previousAddress: const Address(street: 'Main', city: 'Springfield'),
+        previousAddress: const ProbeAddress(
+          street: 'Main',
+          city: 'Springfield',
+        ),
       );
-      // A null on one side carries the raw whole value at `/previousAddress`.
-      final replacement = ProfilePatch.diff(withAddress, _base());
-      final nested = ProfilePatch.diff(
+      final replacement = PatchProbePatch.diff(withAddress, _base());
+      final nested = PatchProbePatch.diff(
         withAddress,
         withAddress.copyWith(
-          previousAddress: const Address(street: 'Elm', city: 'Springfield'),
+          previousAddress: const ProbeAddress(
+            street: 'Elm',
+            city: 'Springfield',
+          ),
         ),
       );
       expect(replacement.changedPaths, {'/previousAddress'});
-      expect(nested.changedPaths, {'/previousAddress/street'});
+      expect(nested.changedPaths, {'/previousAddress'});
       expect(replacement.conflictingPaths(nested), {'/previousAddress'});
-      expect(nested.conflictingPaths(replacement), {'/previousAddress'});
     });
   });
 
   group('composePatches', () {
     test('merges disjoint edits cleanly', () {
       final base = _base();
-      final a = ProfilePatch.diff(base, base.copyWith(displayName: 'grace'));
-      final b = ProfilePatch.diff(base, base.copyWith(id: 'p2'));
+      final a = PatchProbePatch.diff(base, base.copyWith(title: 'grace'));
+      final b = PatchProbePatch.diff(base, base.copyWith(id: 'p2'));
 
       final merged = a.composePatches(b).apply(base);
-      expect(merged.displayName, 'grace');
+      expect(merged.title, 'grace');
       expect(merged.id, 'p2');
     });
 
     test('threads left to right like compose', () {
       final base = _base();
-      final mid = base.copyWith(displayName: 'grace');
-      final end = mid.copyWith(tags: const ['a', 'b', 'c']);
-      final a = ProfilePatch.diff(base, mid);
-      final b = ProfilePatch.diff(mid, end);
+      final mid = base.copyWith(title: 'grace');
+      final end = mid.copyWith(tags: ['a', 'b', 'c']);
+      final a = PatchProbePatch.diff(base, mid);
+      final b = PatchProbePatch.diff(mid, end);
 
       expect(a.composePatches(b).apply(base), b.apply(a.apply(base)));
       expect(a.composePatches(b).apply(base), end);
     });
 
-    test('preserves disjoint nested edits instead of replacing the carry', () {
+    test('nested composition keeps the later atomic value and invert law', () {
       final base = _base();
-      final a = ProfilePatch.diff(
+      final a = PatchProbePatch.diff(
         base,
         base.copyWith(
-          address: const Address(street: 'Elm', city: 'Springfield'),
+          address: const ProbeAddress(street: 'Elm', city: 'Springfield'),
         ),
       );
-      final b = ProfilePatch.diff(
+      final b = PatchProbePatch.diff(
         base,
         base.copyWith(
-          address: const Address(street: 'Main', city: 'Shelbyville'),
+          address: const ProbeAddress(street: 'Main', city: 'Shelbyville'),
         ),
       );
 
       final composed = a.composePatches(b);
       expect(
         composed.apply(base).address,
-        const Address(street: 'Elm', city: 'Shelbyville'),
+        const ProbeAddress(street: 'Main', city: 'Shelbyville'),
       );
-      // The composed carry keeps its concrete `PatchNested` type, so `invert`
-      // narrows it without a cast failure.
       expect(composed.invert(base).apply(composed.apply(base)), base);
     });
   });
 
-  group('atomic list replacement', () {
+  group('atomic collection replacement', () {
     test('a changed list is carried as the whole value, not a delta', () {
-      final patch = ProfilePatch.diff(
+      final patch = PatchProbePatch.diff(
         _base(),
-        _base().copyWith(tags: const ['a', 'b', 'c']),
+        _base().copyWith(tags: ['a', 'b', 'c']),
       );
-      expect(patch.patchMap[Profile$.tags], isA<List<String>>());
-      expect(
-        patch.patchMap[Profile$.tags],
-        isNot(isA<ListPatchDelta<String>>()),
-      );
+      expect(patch.tags.valueOrNull, ['a', 'b', 'c']);
       expect(patch.apply(_base()).tags, ['a', 'b', 'c']);
     });
 
     test('an unchanged list carries nothing', () {
-      final patch = ProfilePatch.diff(
-        _base(),
-        _base().copyWith(tags: const ['a', 'b']),
-      );
-      expect(patch.patchMap.containsKey(Profile$.tags), isFalse);
+      final patch = PatchProbePatch.diff(_base(), _base());
+      expect(patch.tags.isUnchanged, isTrue);
     });
 
     test('the list renders as a bare JSON array on the wire', () {
-      final wire = ProfilePatch.diff(
+      final wire = PatchProbePatch.diff(
         _base(),
-        _base().copyWith(tags: const ['a', 'b', 'c']),
+        _base().copyWith(tags: ['a', 'b', 'c']),
       ).toWire();
       expect(wire['tags'], ['a', 'b', 'c']);
     });
 
-    test('a list change round-trips through the wire', () {
-      final patch = ProfilePatch.diff(
+    test('list and map changes round-trip through JSON with their types', () {
+      final patch = PatchProbePatch.diff(
         _base(),
-        _base().copyWith(tags: const ['a', 'b', 'c']),
+        _base().copyWith(tags: ['a', 'b', 'c'], scores: {'a': 2}),
       );
-      final decoded = ProfilePatch.fromWire(patch.toWire());
-      final restored = decoded.fold((p) => p, (_) => ProfilePatch());
+      final transported =
+          jsonDecode(jsonEncode(patch.toWire())) as Map<String, Object?>;
+      final restored = PatchProbePatch.fromWire(transported).getOrThrow();
       expect(restored.apply(_base()).tags, ['a', 'b', 'c']);
+      expect(restored.apply(_base()).scores, {'a': 2});
     });
   });
 }

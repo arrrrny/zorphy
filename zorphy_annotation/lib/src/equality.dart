@@ -77,6 +77,47 @@ class MapEquality<K, V> {
       : (map == null ? 0 : map.hashCode);
 }
 
+/// Shallow content equality for snapshotted outer collections.
+bool zorphyCollectionEquals(Object? a, Object? b) {
+  if (identical(a, b)) return true;
+  if (a is List<Object?> && b is List<Object?>) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+  if (a is Set<Object?> && b is Set<Object?>) {
+    if (a.length != b.length) return false;
+    return a.every(b.contains);
+  }
+  if (a is Map<Object?, Object?> && b is Map<Object?, Object?>) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (!b.containsKey(entry.key) || b[entry.key] != entry.value) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return a == b;
+}
+
+/// Hash compatible with [zorphyCollectionEquals].
+int zorphyCollectionHash(Object? value) {
+  if (value is List<Object?>) return Object.hashAll(value);
+  if (value is Set<Object?>) {
+    return value.fold<int>(0, (hash, element) => hash + element.hashCode);
+  }
+  if (value is Map<Object?, Object?>) {
+    return value.entries.fold<int>(
+      0,
+      (hash, entry) => hash + Object.hash(entry.key, entry.value),
+    );
+  }
+  return value.hashCode;
+}
+
 bool _deepEquals(Object? a, Object? b) {
   if (identical(a, b)) return true;
   if (a is List && b is List) return _listEquality.equals(a, b);

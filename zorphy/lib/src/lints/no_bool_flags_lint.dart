@@ -18,8 +18,8 @@
 /// **Where the rejection actually happens.** `HierarchyResolver` runs the rule
 /// and appends its hits to [PolymorphicIr.diagnostics] (phase 4c), and every
 /// diagnostic there is an error ([ZorphyDiagnostic.isError]). Since #223 the
-/// v3 IR pipeline IS the path `build_runner` calls: `ZorphyGenerator` resolves
-/// the library's [PolymorphicIr] and throws `InvalidGenerationSourceError` on
+/// v3 IR pipeline IS the path `build_runner` calls: the shared-part builder
+/// resolves the library's [PolymorphicIr] and throws `InvalidGenerationSourceError` on
 /// any diagnostic, so a flagged boolean fails the real `build_runner` run.
 /// [NoBoolFlagsLint.enforce] remains for a caller that wants the lint alone.
 ///
@@ -145,7 +145,7 @@ final class NoBoolFlagsLint {
   ///
   /// This is the FAIL-the-build entry point for a caller that wants the lint
   /// alone. The production `build_runner` path does not call it: since #223
-  /// `ZorphyGenerator` enforces the rule through the IR diagnostics (the
+  /// The shared-part builder enforces the rule through IR diagnostics (the
   /// resolver appends the hits in phase 4c, and the generator throws on any
   /// diagnostic), which covers this lint alongside ZORPHY_E001..E005.
   static void enforce(PolymorphicIr ir) {
