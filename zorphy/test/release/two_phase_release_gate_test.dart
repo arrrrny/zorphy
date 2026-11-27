@@ -247,6 +247,71 @@ void main() {
     });
   });
 
+  group('post-publish ordering and tracked overrides (issue #330)', () {
+    test('the constraint bump runs BEFORE the release tests', () {
+      final post = _functionBody(
+        _read('scripts/publish.sh'),
+        'post_publish_verify',
+      );
+
+      expect(
+        post,
+        isNotNull,
+        reason: 'a post_publish_verify function must exist',
+      );
+
+      // The per-release snapshot (dependency_constraints_unchanged_test.dart)
+      // is advanced to ^<version> as part of the release, so the committed
+      // constraint still holds the previous line until the bump lands. Running
+      // `dart test test/release/` BEFORE the bump therefore fails that snapshot
+      // (`Actual ^<prev> != Expected ^<version>`) and `set -e` aborts the
+      // release AFTER publishing but BEFORE the tag (issue #330).
+      final bumpIndex = post!.indexOf(r'zorphy_annotation: ^$VERSION');
+      final testIndex = post.indexOf('&& dart test test/release/');
+
+      expect(
+        bumpIndex,
+        isNonNegative,
+        reason: 'the ^<version> bump is present',
+      );
+      expect(testIndex, isNonNegative, reason: 'the release tests are run');
+      expect(
+        bumpIndex < testIndex,
+        isTrue,
+        reason:
+            'the internal constraint must be bumped BEFORE test/release/ so '
+            'the tested tree is self-consistent (issue #330)',
+      );
+    });
+
+    test('post-publish never deletes a git-tracked pubspec_overrides.yaml', () {
+      final post = _functionBody(
+        _read('scripts/publish.sh'),
+        'post_publish_verify',
+      );
+
+      expect(
+        post,
+        isNotNull,
+        reason: 'a post_publish_verify function must exist',
+      );
+
+      // zorphy/example and zorphy_annotation carry a COMMITTED
+      // pubspec_overrides.yaml (the example path-depends on zorphy_annotation,
+      // which is required to resolve). An unconditional `rm -f` of every
+      // override makes `dart pub get` fail on the release tip
+      // (`zorphy from path is forbidden`), so the cleanup must remove only
+      // overrides that are actually untracked (issue #330).
+      expect(
+        post,
+        contains('ls-files --error-unmatch'),
+        reason:
+            'the override cleanup must test whether each override is tracked '
+            'before removing it (issue #330)',
+      );
+    });
+  });
+
   group('internal-constraint admission check (issue #325)', () {
     late Directory root;
 
