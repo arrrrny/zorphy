@@ -57,9 +57,8 @@ final class HierarchyResolver {
     final unionVariants = <ClassElement, ClassElement>{};
 
     for (final library in libraries) {
-      for (final element in ArchetypeParser.annotatedClasses(library)) {
-        final declaration = ArchetypeParser.parse(element);
-        if (declaration == null) continue;
+      for (final (element, declaration)
+          in ArchetypeParser.annotatedDeclarations(library)) {
         declarations.putIfAbsent(
           element,
           () => _Declaration(
@@ -117,8 +116,10 @@ final class HierarchyResolver {
       children.putIfAbsent(parent, () => <ClassElement>[]).add(child);
     }
 
+    // Reused across every supertype walk.
+    final declaredSet = declarations.keys.toSet();
     for (final element in declarations.keys) {
-      final parent = _nearestAnnotatedSupertype(element, declarations.keys);
+      final parent = _nearestAnnotatedSupertype(element, declaredSet);
       if (parent != null) link(element, parent);
     }
     // Union factory targets are leaves of their union ROOT even though the
@@ -521,9 +522,8 @@ final class HierarchyResolver {
   /// `$ZfaButtonNode -> $InteractiveUiNode`, never straight to the root.
   static ClassElement? _nearestAnnotatedSupertype(
     ClassElement element,
-    Iterable<ClassElement> declared,
+    Set<ClassElement> declaredSet,
   ) {
-    final declaredSet = declared.toSet();
     for (final supertype in element.allSupertypes) {
       final superElement = supertype.element;
       if (superElement is! ClassElement) continue;

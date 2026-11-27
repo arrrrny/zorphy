@@ -1,8 +1,8 @@
 import 'package:code_builder/code_builder.dart';
 import 'package:zorphy_annotation/zorphy.dart' show ZorphyPatchWire;
 
-import '../ast/ast.dart';
-import '../common/NameType.dart';
+import '../ast/type_ref.dart';
+import '../common/name_type.dart';
 import '../emission/emitter.dart';
 import '../helpers.dart' as helpers;
 
@@ -334,7 +334,7 @@ class PolymorphicPatchEmitter {
   /// otherwise hands the specs through unformatted, so a multi-class emission
   /// (root + shared) goes out one formatted class at a time.
   static String _emit(List<Spec> specs) => specs
-      .map((spec) => ZorphyEmitter().emitSpecs([spec]).trim())
+      .map((spec) => ZorphyEmitter.shared.emitSpecs([spec]).trim())
       .where((source) => source.isNotEmpty)
       .join('\n\n');
 

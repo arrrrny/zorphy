@@ -422,7 +422,7 @@ class EntityCreator {
   }
 
   String _formatClassName(String name) {
-    var n = name.replaceAll('\$', '');
+    final n = name.replaceAll('\$', '');
     final parts = n.split(RegExp(r'[_\s\-]+'));
     return parts
         .map((part) {

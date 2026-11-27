@@ -4,7 +4,7 @@ class NamingUtils {
 
   /// Convert to PascalCase (ClassName)
   static String toPascalCase(String input) {
-    var name = input.replaceAll('\$', '');
+    final name = input.replaceAll('\$', '');
     final parts = name.split(RegExp(r'[_\s\-]+'));
     return parts
         .map((part) {
@@ -70,7 +70,7 @@ class NamingUtils {
   /// Extract type references from a type string (including generics)
   static Set<String> extractTypeReferences(String type) {
     final refs = <String>{};
-    var cleanType = type.replaceAll('?', '');
+    final cleanType = type.replaceAll('?', '');
 
     final pattern = RegExp(r'\$*[A-Z][a-zA-Z0-9]*');
     final matches = pattern.allMatches(cleanType);

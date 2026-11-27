@@ -63,7 +63,7 @@ class _ZorphySharedPartBuilder extends Builder {
       }
     }
 
-    final ir = HierarchyResolver.resolveLibraries(libraries);
+    final ir = await _resolveWithCache(buildStep, libraries, inputLibrary);
     if (ir.hasErrors) {
       throw InvalidGenerationSourceError(
         'Zorphy v3 archetype diagnostics:\n'
@@ -131,6 +131,77 @@ class _ZorphySharedPartBuilder extends Builder {
       outputId,
       '$partOf${_withLintHeader(output)}',
     );
+  }
+
+  /// Resolves [libraries] once per transitive same-package content closure.
+  static final Map<String, PolymorphicIr> _irCache = {};
+  static Resolver? _irCacheResolver;
+
+  /// Bound retained graphs; clearing only sacrifices a cache hit.
+  static const int _irCacheLimit = 128;
+
+  Future<PolymorphicIr> _resolveWithCache(
+    BuildStep buildStep,
+    List<LibraryElement> libraries,
+    LibraryElement root,
+  ) async {
+    final resolver = buildStep.resolver;
+    if (!identical(resolver, _irCacheResolver)) {
+      _irCacheResolver = resolver;
+      _irCache.clear();
+    }
+
+    final key = await _closureDigestKey(buildStep, root);
+    if (key != null) {
+      final cached = _irCache[key];
+      if (cached != null) return cached;
+    }
+
+    final ir = HierarchyResolver.resolveLibraries(libraries);
+    if (key != null) {
+      if (_irCache.length >= _irCacheLimit) _irCache.clear();
+      _irCache[key] = ir;
+    }
+    return ir;
+  }
+
+  /// Digest key for [root]'s transitive same-package imports, or null.
+  Future<String?> _closureDigestKey(
+    BuildStep buildStep,
+    LibraryElement root,
+  ) async {
+    final resolver = buildStep.resolver;
+    final rootPackage = root.uri.pathSegments.first;
+    final seen = <LibraryElement>{};
+    final pending = <LibraryElement>[root];
+    final parts = <String>[];
+
+    while (pending.isNotEmpty) {
+      final library = pending.removeLast();
+      if (!seen.add(library)) continue;
+
+      final AssetId assetId;
+      try {
+        assetId = await resolver.assetIdForElement(library);
+      } on Object {
+        // An undigestable library disables caching for this call.
+        return null;
+      }
+      final digest = await buildStep.digest(assetId);
+      parts.add('${assetId.path}=$digest');
+
+      for (final fragment in library.fragments) {
+        for (final imported in fragment.libraryImports) {
+          final importedLibrary = imported.importedLibrary;
+          if (importedLibrary == null) continue;
+          if (importedLibrary.uri.pathSegments.first != rootPackage) continue;
+          pending.add(importedLibrary);
+        }
+      }
+    }
+
+    parts.sort();
+    return parts.join('|');
   }
 }
 

@@ -1,8 +1,8 @@
 import 'package:code_builder/code_builder.dart';
 import 'package:zorphy_annotation/zorphy.dart' show ZorphyPatchWire;
 
-import '../ast/ast.dart';
-import '../common/NameType.dart';
+import '../ast/type_ref.dart';
+import '../common/name_type.dart';
 import '../emission/emitter.dart';
 import '../emission/wire_kind.dart';
 import '../helpers.dart' as helpers;

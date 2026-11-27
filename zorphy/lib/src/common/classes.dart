@@ -1,4 +1,4 @@
-import 'NameType.dart';
+import 'name_type.dart';
 
 class Interface {
   final String interfaceName;

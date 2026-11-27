@@ -14,6 +14,9 @@
 // entity (`address`), a nullable nested one (`previousAddress`), a
 // `List<String>` (`tags`), a `Map<String, int>` (`scores`) and scalars.
 
+// Legacy PatchEmitter output is byte-locked; its dynamic patch map is intentional.
+// ignore_for_file: avoid_dynamic_calls
+
 import 'package:zorphy_annotation/zorphy.dart';
 
 /// The `Address` entity's field enum, as `FieldEnumGenerator` emits it.

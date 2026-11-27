@@ -3,7 +3,7 @@
 // emitters refuse it instead of shipping a silently ambiguous codec.
 
 import 'package:test/test.dart';
-import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/common/name_type.dart';
 import 'package:zorphy/src/emission/patch_emitter.dart';
 import 'package:zorphy/src/emission/polymorphic_patch_emitter.dart';
 

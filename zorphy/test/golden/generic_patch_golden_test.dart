@@ -20,7 +20,7 @@
 import 'dart:io';
 
 import 'package:test/test.dart';
-import 'package:zorphy/src/common/NameType.dart';
+import 'package:zorphy/src/common/name_type.dart';
 import 'package:zorphy/src/emission/patch_emitter.dart';
 
 const _goldenPath = 'test/runtime/fixtures/progress_box_patch.golden.txt';

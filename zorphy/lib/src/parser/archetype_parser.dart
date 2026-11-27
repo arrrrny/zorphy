@@ -145,13 +145,16 @@ final class ArchetypeParser {
     return null;
   }
 
-  /// Every class of [library] that carries one of the five annotations,
-  /// in declaration order.
-  static List<ClassElement> annotatedClasses(LibraryElement library) {
-    return [
-      for (final element in library.classes)
-        if (parse(element) != null) element,
-    ];
+  /// Annotated classes paired with their parsed declarations.
+  static List<(ClassElement, ArchetypeDeclaration)> annotatedDeclarations(
+    LibraryElement library,
+  ) {
+    final annotated = <(ClassElement, ArchetypeDeclaration)>[];
+    for (final element in library.classes) {
+      final declaration = parse(element);
+      if (declaration != null) annotated.add((element, declaration));
+    }
+    return annotated;
   }
 
   static ArchetypeDeclaration _read(

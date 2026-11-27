@@ -437,7 +437,8 @@ final class PolymorphicClassEmitter {
         // it `@override` is an analyzer error.
         final inheritedNames = {
           for (final ancestor in ancestors)
-            for (final field in fields[ancestor.className] ?? const [])
+            for (final field
+                in fields[ancestor.className] ?? const <PolymorphicField>[])
               field.name,
         };
         for (final field in allFields) {
@@ -468,7 +469,8 @@ final class PolymorphicClassEmitter {
         c.constructors.add(_constConstructor());
         final ancestorNames = {
           for (final ancestor in ancestors)
-            for (final field in fields[ancestor.className] ?? const [])
+            for (final field
+                in fields[ancestor.className] ?? const <PolymorphicField>[])
               field.name,
         };
         for (final field in ownFields) {
@@ -546,7 +548,8 @@ final class PolymorphicClassEmitter {
     // one and the leaf's own list overwrites everything above it.
     for (final ancestor in node.superTypes.reversed) {
       final ancestorParameters = bareParameterNames(ancestor.typeParameters);
-      for (final field in fields[ancestor.className] ?? const []) {
+      for (final field
+          in fields[ancestor.className] ?? const <PolymorphicField>[]) {
         byName[field.name] = substituteFieldScope(
           field,
           ancestorParameters,
