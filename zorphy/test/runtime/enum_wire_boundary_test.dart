@@ -25,7 +25,6 @@ import 'package:zorphy/src/emission/boundary_codec_emitter.dart';
 import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/emitters/mock_fixture_emitter.dart';
 import 'package:zorphy/src/parser/polymorphic_ir.dart';
-import 'package:code_builder/code_builder.dart';
 
 const _annotationImport =
     "import 'package:zorphy_annotation/zorphy_annotation.dart';\n";
@@ -69,17 +68,16 @@ String _indent(String source) =>
 
 String _codecSource() {
   const emitter = BoundaryCodecEmitter();
-  final methods = <Method>[
-    emitter.fromWire(_account(), _fields),
-    emitter.toWire(_account(), _fields),
-  ];
-  return ZorphyEmitter().emitSpecs(methods);
+  return ZorphyEmitter().emitSpecs(
+    emitter.emitJsonAliases(_account(), _fields),
+  );
 }
 
 String _mockSource() => MockFixtureEmitter().emitForNode(_account());
 
-String _helperSource() =>
-    ZorphyEmitter().emitSpecs(BoundaryCodecEmitter.helperSpecs());
+String _helperSource() => ZorphyEmitter().emitSpecs(
+  BoundaryCodecEmitter.usedHelperSpecs([_account()], _fields),
+);
 
 const _checks = r'''
 void check(bool condition, String message) {
@@ -91,6 +89,8 @@ void main() {
   final account = Account.fromTrusted(id: 'a1', tier: AccountTier.pro);
   final wire = account.toWire();
   check(wire['tier'] == 'pro', 'toWire writes the enum name (got ' + wire['tier'].toString() + ')');
+  final json = account.toJson();
+  check(json['tier'] == 'pro', 'toJson aliases the enum name (got ' + json['tier'].toString() + ')');
   final encoded = jsonEncode(wire);
   check(encoded.contains('"tier":"pro"'), 'jsonEncode survives (got ' + encoded + ')');
 
@@ -185,6 +185,20 @@ void main() {
 
     final file = File('${directory.path}/enum_wire_program.dart')
       ..writeAsStringSync(program);
+
+    final analyze = Process.runSync(
+      Platform.resolvedExecutable,
+      ['analyze', '--fatal-infos', file.path],
+      workingDirectory: 'example',
+      stdoutEncoding: const SystemEncoding(),
+      stderrEncoding: const SystemEncoding(),
+    );
+    final analyzeOutput = '${analyze.stdout}\n${analyze.stderr}';
+    expect(
+      analyze.exitCode,
+      0,
+      reason: 'generated enum-wire program failed to analyze:\n$analyzeOutput',
+    );
 
     final result = Process.runSync(
       Platform.resolvedExecutable,

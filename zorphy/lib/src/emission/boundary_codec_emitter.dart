@@ -1041,8 +1041,7 @@ class BoundaryCodecEmitter {
           _Shape.typeParam => '$name.map(${_encoderName(type.inner)}).toList()',
           _Shape.node => '$name.map((e) => e.toWire()).toList()',
           _Shape.dateTime => '$name.map((e) => e.toIso8601String()).toList()',
-          _Shape.enumValue =>
-            '$name.map((e) => e is Enum ? e.name : e).toList()',
+          _Shape.enumValue => '$name.map((e) => e.name).toList()',
           _ => name,
         };
       case _Shape.map:
@@ -1052,8 +1051,7 @@ class BoundaryCodecEmitter {
           _Shape.node => '$name.map((key, e) => MapEntry(key, e.toWire()))',
           _Shape.dateTime =>
             '$name.map((key, e) => MapEntry(key, e.toIso8601String()))',
-          _Shape.enumValue =>
-            '$name.map((key, e) => MapEntry(key, e is Enum ? e.name : e))',
+          _Shape.enumValue => '$name.map((key, e) => MapEntry(key, e.name))',
           _ => name,
         };
       case _Shape.dateTime:
@@ -1067,11 +1065,8 @@ class BoundaryCodecEmitter {
       case _Shape.scalar:
         return name;
       case _Shape.enumValue:
-        // An `Enum` instance is not JSON-encodable: write its NAME so
-        // `jsonEncode(toWire())` survives a transport hop (#215's fix, here for
-        // the entity boundary codec). A same-process value already decoded in
-        // flight is still an `Enum`, so the `is Enum` guard is total.
-        return '$name is Enum ? $name.name : $name';
+        // This shape is analyzer-proven; dynamic wire values use other paths.
+        return '$name.name';
     }
   }
 
