@@ -356,9 +356,9 @@ void main() {
       // `value == value.copyWith()` true.
       expect(
         compact,
-        contains('zorphyCollectionEquals(this.items,other.items)'),
+        contains('ZorphyCollections.equals(this.items,other.items)'),
       );
-      expect(compact, contains('zorphyCollectionHash(items)'));
+      expect(compact, contains('ZorphyCollections.hash(items)'));
       expect(compact, isNot(contains('_zorphyCollectionEquals')));
       expect(compact, isNot(contains('_zorphyCollectionHash')));
     });

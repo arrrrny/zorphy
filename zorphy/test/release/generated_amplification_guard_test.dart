@@ -44,8 +44,8 @@ void main() {
       source,
       isNot(RegExp(r'\brequired\s+(?:String|int|bool|double)\s+this\.')),
     );
-    expect(source, contains('zorphyCollectionEquals(this.items, other.items)'));
-    expect(source, contains('zorphyCollectionHash(items)'));
+    expect(source, contains('ZorphyCollections.equals(this.items, other.items)'));
+    expect(source, contains('ZorphyCollections.hash(items)'));
     expect(source, isNot(contains('_zorphyCollectionEquals')));
     expect(source, isNot(contains('_zorphyCollectionHash')));
   });

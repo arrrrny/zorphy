@@ -448,13 +448,13 @@ class $Box<T> {
         expect(
           flat,
           contains(
-            'return other is Box && zorphyCollectionEquals('
+            'return other is Box && ZorphyCollections.equals('
             'this.payload, other.payload) && this.id == other.id;',
           ),
         );
         expect(
           flat,
-          contains('Object.hashAll([zorphyCollectionHash(payload), id])'),
+          contains('Object.hashAll([ZorphyCollections.hash(payload), id])'),
         );
         expect(flat, isNot(contains('static bool _zorphyCollectionEquals(')));
         expect(flat, contains('this.id == other.id'));
