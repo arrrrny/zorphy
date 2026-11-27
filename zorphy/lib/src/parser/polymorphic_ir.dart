@@ -179,6 +179,18 @@ final class ZorphyFieldIr {
   /// case (issue #313's v2-parity directive).
   final List<String> enumValues;
 
+  /// The names of enum types used as an element/value of this field's
+  /// collection type (`{'AccountTier'}` for a `List<AccountTier>` or a
+  /// `Map<String, AccountTier>`), or the empty set otherwise.
+  ///
+  /// [isEnum] describes only a field typed directly by an enum. A collection
+  /// element is a different type from the field itself, so the resolver walks
+  /// the type arguments separately and records the enum names here. The
+  /// boundary codec needs them to classify a collection element as an enum
+  /// (issue #313 review: the element-level `enumValue` branches were otherwise
+  /// unreachable and a `List<Enum>` reproduced the top-level Gap-1 bug).
+  final Set<String> enumElementTypes;
+
   const ZorphyFieldIr({
     required this.name,
     required this.type,
@@ -188,6 +200,7 @@ final class ZorphyFieldIr {
     this.constructorDefault,
     this.isEnum = false,
     this.enumValues = const [],
+    this.enumElementTypes = const {},
   });
 
   /// Whether the emitted type text carries a `?`.

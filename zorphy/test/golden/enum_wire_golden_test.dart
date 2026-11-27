@@ -102,6 +102,77 @@ void main() {
     });
   });
 
+  group('golden: collection-of-enum (#313 review)', () {
+    late String compact;
+
+    setUpAll(() {
+      final node = _leaf(
+        className: r'$Catalog',
+        principalKey: 'id',
+        fields: const [
+          ZorphyFieldIr(name: 'id', type: 'String'),
+          ZorphyFieldIr(
+            name: 'tiers',
+            type: 'List<AccountTier>',
+            enumElementTypes: {'AccountTier'},
+          ),
+          ZorphyFieldIr(
+            name: 'labels',
+            type: 'Map<String, AccountTier>',
+            enumElementTypes: {'AccountTier'},
+          ),
+        ],
+      );
+      final fields = <String, List<BoundaryField>>{
+        r'$Catalog': const [
+          BoundaryField(name: 'id', type: 'String'),
+          BoundaryField(
+            name: 'tiers',
+            type: 'List<AccountTier>',
+            enumElementTypes: {'AccountTier'},
+          ),
+          BoundaryField(
+            name: 'labels',
+            type: 'Map<String, AccountTier>',
+            enumElementTypes: {'AccountTier'},
+          ),
+        ],
+      };
+      const emitter = BoundaryCodecEmitter();
+      compact = _compact(_emit([
+        emitter.fromWire(node, fields),
+        emitter.toWire(node, fields),
+      ]));
+    });
+
+    test('a list element encodes by name, not as a raw Enum', () {
+      expect(
+        compact,
+        contains('this.tiers.map((e)=>eisEnum?e.name:e).toList()'),
+      );
+    });
+
+    test('a map value encodes by name, not as a raw Enum', () {
+      expect(
+        compact,
+        contains('this.labels.map((key,e)=>MapEntry(key,eisEnum?e.name:e))'),
+      );
+    });
+
+    test('collection elements decode by name through enumByName', () {
+      expect(
+        compact,
+        contains(
+          'ZorphyPatchWire.enumByName<AccountTier>(AccountTier.values,',
+        ),
+      );
+    });
+
+    test('the plain scalar reified test is NOT used for the elements', () {
+      expect(compact, isNot(contains('_boundaryAs<AccountTier>')));
+    });
+  });
+
   group('golden: MockData enum seed (#313)', () {
     late String source;
 

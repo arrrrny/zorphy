@@ -171,15 +171,19 @@ final class IntentEmitter {
   /// which the constructor restores exactly (#232).
   Method _fromWireMethod(ZorphyNodeIr node, List<ZorphyFieldIr> payload) {
     return _codec.fromWire(node, {
-      node.className: [
-        for (final field in payload)
-          BoundaryField(
-            name: field.name,
-            type: field.emitsQuestionMark ? '${field.type}?' : field.type,
-          ),
-      ],
+      node.className: [for (final field in payload) _boundaryField(field)],
     });
   }
+
+  /// The codec-facing shape of an intent payload field. The SAME conversion
+  /// feeds decode and encode so an enum field is classified identically on
+  /// both sides of the wire.
+  BoundaryField _boundaryField(ZorphyFieldIr field) => BoundaryField(
+    name: field.name,
+    type: field.emitsQuestionMark ? '${field.type}?' : field.type,
+    isEnum: field.isEnum,
+    enumElementTypes: field.enumElementTypes,
+  );
 
   /// `InspectProductIntent({required this.productId, this.note});`
   ///
@@ -244,8 +248,13 @@ final class IntentEmitter {
         ..returns = refer('Map<String, Object?>')
         ..body = literalMap({
           node.discriminatorKey: refer('intentName'),
+          // Go through the codec's shared encode seam so an enum field writes
+          // its NAME (and a collection of enums maps each element to its name)
+          // instead of leaving a raw `Enum` for `jsonEncode` to choke on.
           for (final field in payload)
-            field.name: refer('this').property(field.name),
+            field.name: CodeExpression(
+              Code(_codec.wireExpression(_boundaryField(field))),
+            ),
         }).code;
     });
   }
@@ -263,9 +272,15 @@ final class IntentEmitter {
         ..returns = refer('String')
         ..body = refer('ZorphyIntentDigest').property('compute').call([
           refer('intentName'),
+          // The digest must match `toWire()` field-for-field (its contract
+          // above). Reading the raw Enum instance throws in
+          // `ZorphyIntentDigest._canonicalJson`, so enum fields go through the
+          // SAME encode seam as toWire — names on both sides (issue #313).
           literalMap({
             for (final field in payload)
-              field.name: refer('this').property(field.name),
+              field.name: CodeExpression(
+                Code(_codec.wireExpression(_boundaryField(field))),
+              ),
           }),
         ]).code;
     });

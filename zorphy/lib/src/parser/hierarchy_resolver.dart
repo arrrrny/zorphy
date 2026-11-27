@@ -391,6 +391,7 @@ final class HierarchyResolver {
           constructorDefault: constructorDefaults[name],
           isEnum: enumValues.isNotEmpty,
           enumValues: enumValues,
+          enumElementTypes: _enumElementTypes(type),
         ),
       );
     }
@@ -410,6 +411,7 @@ final class HierarchyResolver {
           constructorDefault: constructorDefaults[name],
           isEnum: enumValues.isNotEmpty,
           enumValues: enumValues,
+          enumElementTypes: _enumElementTypes(type),
         ),
       );
     }
@@ -430,6 +432,30 @@ final class HierarchyResolver {
         if (member is FieldElement && member.isEnumConstant)
           if ((member.name ?? '').isNotEmpty) member.name!,
     ];
+  }
+
+  /// The names of enum types appearing as a type argument of [type] — the
+  /// element of a `List<T>`/Set or the value of a `Map<K, V>` (issue #313
+  /// review). A collection's own `type.element` is the collection class, so
+  /// [_enumValues] sees no enum for `List<AccountTier>`; the codec needs the
+  /// element's name to take its enum decode/encode path. Nested collections are
+  /// walked so `List<List<AccountTier>>` does not lose the inner enum either.
+  static Set<String> _enumElementTypes(DartType type) {
+    final names = <String>{};
+    void walk(DartType current) {
+      if (current is! InterfaceType) return;
+      for (final argument in current.typeArguments) {
+        if (argument.element is EnumElement) {
+          final name = _typeText(argument);
+          if (name.isNotEmpty) names.add(name);
+        } else {
+          walk(argument);
+        }
+      }
+    }
+
+    walk(type);
+    return Set.unmodifiable(names);
   }
 
   /// The statically declared field called [name] in [declaredByName], or `null`.

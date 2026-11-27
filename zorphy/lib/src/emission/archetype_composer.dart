@@ -628,6 +628,7 @@ final class ArchetypeComposer {
                 name: field.name,
                 type: field.emitsQuestionMark ? '${field.type}?' : field.type,
                 isEnum: field.isEnum,
+                enumElementTypes: field.enumElementTypes,
               ),
             );
           }

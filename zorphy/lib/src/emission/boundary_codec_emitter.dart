@@ -75,10 +75,18 @@ final class BoundaryField {
   /// scalar reified `is` test that records a TYPE violation for a wire string.
   final bool isEnum;
 
+  /// The names of enum types used as elements/values of this field's
+  /// collection type (`{'AccountTier'}` for `List<AccountTier>`), from the
+  /// analyzer-resolved IR (issue #313 review). A collection's element is a
+  /// different type from the field, so [isEnum] cannot describe it; the codec
+  /// consults this set when classifying collection elements.
+  final Set<String> enumElementTypes;
+
   const BoundaryField({
     required this.name,
     required this.type,
     this.isEnum = false,
+    this.enumElementTypes = const {},
   });
 
   /// Whether the declaration is nullable (`String?`).
@@ -910,6 +918,26 @@ class BoundaryCodecEmitter {
     return body;
   }
 
+  /// The wire expression for [field] read from `this.<field>` — the shared
+  /// encode seam for emitters that build their own `toWire` map (the intent
+  /// surface), so an enum writes its NAME there exactly as it does in the
+  /// generated entity codec (issue #313 review: an intent with an enum field
+  /// otherwise emitted the raw `Enum` and `jsonEncode` threw).
+  String wireExpression(BoundaryField field) {
+    final type = _classify(field, const {}, const {});
+    if (!field.isNullable) return _wireExpression(field, type);
+    // A nullable field cannot have a member called on it without a guard, and
+    // its `null` is a canonical wire value that must survive unchanged. A bare
+    // `this.field == null ? … : this.field.map(…)` does NOT compile: a public
+    // field is not promoted across the second read. Bind a local in an IIFE
+    // (the same local promotion `_leafToWireBody` uses for entities) and render
+    // the expression against it through `source`.
+    final local = '_${field.name}';
+    final expression = _wireExpression(field, type, source: local);
+    return '(() { final $local = this.${field.name}; '
+        'return $local == null ? null : $expression; })()';
+  }
+
   /// [source] is the expression to encode — the field itself, or a local a
   /// nullable field was promoted into by [_leafToWireBody].
   String _wireExpression(
@@ -1014,6 +1042,7 @@ class BoundaryCodecEmitter {
           element,
           known: known,
           typeParams: typeParams,
+          enumTypes: field.enumElementTypes,
         ),
       );
     }
@@ -1023,7 +1052,12 @@ class BoundaryCodecEmitter {
       return _FieldType(
         _Shape.map,
         inner: value,
-        elementShape: _shapeOfType(value, known: known, typeParams: typeParams),
+        elementShape: _shapeOfType(
+          value,
+          known: known,
+          typeParams: typeParams,
+          enumTypes: field.enumElementTypes,
+        ),
       );
     }
     // A top-level enum field (issue #313) is its own shape: the wire carries
@@ -1043,6 +1077,7 @@ class BoundaryCodecEmitter {
     String type, {
     Set<String>? known,
     Set<String> typeParams = const {},
+    Set<String> enumTypes = const {},
   }) {
     final base = _strip(type);
     // A type parameter is checked FIRST: a bare `T`, a nullable `T?` FIELD
@@ -1055,6 +1090,11 @@ class BoundaryCodecEmitter {
     // the parameter's decoder. A bare `T?` field is unaffected — its `?` is
     // stripped by `baseType` before classification.
     if (typeParams.contains(base)) return _Shape.typeParam;
+    // An enum ELEMENT is a distinct type from its collection field, so it is
+    // named by the IR's `enumElementTypes` rather than `field.isEnum`. Without
+    // this check `List<Enum>`/`Map<String, Enum>` classify as scalars and the
+    // element-level `enumValue` branches below are dead code (issue #313).
+    if (enumTypes.contains(base)) return _Shape.enumValue;
     if (base == 'DateTime') return _Shape.dateTime;
     if (base == 'double' || (widenNumbers && base == 'num')) {
       return _Shape.number;

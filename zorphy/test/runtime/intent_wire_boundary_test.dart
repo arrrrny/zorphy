@@ -64,8 +64,9 @@ Future<PolymorphicIr> _resolve(Map<String, String> sources) async {
 Future<String> _runComposed(
   PolymorphicIr ir,
   Map<String, String> sources,
-  String body,
-) async {
+  String body, {
+  String preamble = '',
+}) async {
   final emitted = const ArchetypeComposer().compose(ir);
 
   final root = _tmpRoot.absolute;
@@ -77,7 +78,10 @@ Future<String> _runComposed(
   final program =
       '''
 $_annotationImport
+import 'dart:convert';
 import 'dart:io';
+
+$preamble
 
 $emitted
 
@@ -579,6 +583,100 @@ abstract class \$AmountIntent {
       expect(lines['items'], '[a, null, c]');
       expect(lines['labels'], '{k: null, v: x}');
       expect(lines['digestSame'], 'true');
+    });
+  });
+
+  group('#313 — review findings: enum fields on the intent surface', () {
+    // The intent codec used to build BoundaryField WITHOUT `isEnum` /
+    // `enumElementTypes`, and its toWire + intentDigest read raw fields. A
+    // collection of enums (the reachable case — a bare enum field is refused
+    // by E004) therefore reproduced Gap-1: wire names were TYPE violations,
+    // jsonEncode(toWire()) threw, and digest threw on the Enum instance.
+    // The IR already carries both flags.
+    const enumSource =
+        '''
+$_annotationImport
+part 'intents.zorphy.dart';
+
+enum AccountTier { free, pro, enterprise }
+
+@ZorphyIntent(replaySafe: true)
+abstract class \$TierIntent {
+  // A bare enum field is rejected by ZORPHY_E004's canonical-JSON gate; a
+  // collection OF enums is the reachable intent path for the same Gap-1 bug.
+  List<AccountTier> get tiers;
+  Map<String, AccountTier> get labels;
+  List<AccountTier>? get optionalTiers;
+}
+''';
+
+    test('toWire writes enum names and fromWire resolves them back', () async {
+      final enumIr = await _resolve({'intents.dart': enumSource});
+      expect(
+        enumIr.diagnostics.map((d) => d.codeName),
+        isEmpty,
+        reason: 'the enum fixture must resolve clean',
+      );
+      final out = await _runComposed(
+        enumIr,
+        {'intents.dart': enumSource},
+        '''
+  final intent = TierIntent(
+    tiers: [AccountTier.free, AccountTier.enterprise],
+    labels: {'primary': AccountTier.pro},
+    optionalTiers: [AccountTier.free],
+  );
+  final wire = intent.toWire();
+  stdout.writeln('tiers=' + wire['tiers'].toString());
+  stdout.writeln('labels=' + wire['labels'].toString());
+  stdout.writeln('optional=' + wire['optionalTiers'].toString());
+  stdout.writeln('json=' + jsonEncode(wire));
+  final back = TierIntent.fromWire(wire);
+  stdout.writeln('ok=' + (back is BoundaryOk).toString());
+  if (back is BoundaryOk<TierIntent>) {
+    stdout.writeln('tiersBack=' + back.value.tiers.toString());
+    stdout.writeln('labelsBack=' + back.value.labels.toString());
+    stdout.writeln('optionalBack=' + back.value.optionalTiers.toString());
+    stdout.writeln('digestSame=' +
+        (back.value.intentDigest() == intent.intentDigest()).toString());
+  }
+
+  final nullIntent = TierIntent(
+    tiers: [], labels: {}, optionalTiers: null,
+  );
+  final nullBack = TierIntent.fromWire(nullIntent.toWire());
+  stdout.writeln('nullOk=' + (nullBack is BoundaryOk).toString());
+  if (nullBack is BoundaryOk<TierIntent>) {
+    stdout.writeln('nullBack=' +
+        (nullBack.value.optionalTiers == null ? 'NULL' : 'NOT_NULL'));
+    stdout.writeln('nullDigestSame=' +
+        (nullBack.value.intentDigest() == nullIntent.intentDigest())
+            .toString());
+  }
+''',
+        // The part-file fragment has no directives; the composed program is
+        // self-contained, so the enum the source resolved must be re-declared
+        // here for the generated code to compile.
+        preamble: 'enum AccountTier { free, pro, enterprise }',
+      );
+
+      final lines = _lines(out);
+      expect(lines['tiers'], '[free, enterprise]');
+      expect(lines['labels'], '{primary: pro}');
+      expect(lines['optional'], '[free]');
+      expect(
+        lines['json'],
+        contains('"tiers":["free","enterprise"]'),
+        reason: 'jsonEncode(toWire()) survives for enum elements',
+      );
+      expect(lines['ok'], 'true', reason: 'fromWire resolves enum names');
+      expect(lines['tiersBack'], '[AccountTier.free, AccountTier.enterprise]');
+      expect(lines['labelsBack'], '{primary: AccountTier.pro}');
+      expect(lines['optionalBack'], '[AccountTier.free]');
+      expect(lines['digestSame'], 'true');
+      expect(lines['nullOk'], 'true');
+      expect(lines['nullBack'], 'NULL');
+      expect(lines['nullDigestSame'], 'true');
     });
   });
 }
