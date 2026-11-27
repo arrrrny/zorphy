@@ -88,6 +88,16 @@ final class ZorphyField<T, V> {
   /// A descending order over this field.
   ZorphySort<T> desc() => ZorphySort<T>(field: this, descending: true);
 
+  /// Matches when this field's value — or any element of it, when the value
+  /// is an [Iterable] — matches [inner], a predicate over the nested value
+  /// (issue #303).
+  ///
+  /// [inner] is `ZorphyFilter<dynamic>`, not `ZorphyFilter<V>`: a scalar `V`
+  /// and an element of an `Iterable<V>` both erase to `dynamic`, the only
+  /// common supertype — tightening it would break the iterable case.
+  ZorphyFilter<T> nested(ZorphyFilter<dynamic> inner) =>
+      ZorphyNested<T, V>(this, inner);
+
   @override
   String toString() => '$name($pointer)';
 }
