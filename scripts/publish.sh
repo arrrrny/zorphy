@@ -72,16 +72,18 @@ run() {
 # base-red exactly that way.
 #
 # It MUST NOT run `dart pub get --enforce-lockfile` here (issue #325): at this
-# point the release commit's internal constraints already point at the version
-# being released (`^3.0.0-dev.5`) while the committed lockfiles still pin the
-# previous line (`dev.4`), and they CANNOT pin the new version because it does
-# not exist on pub.dev yet — so an enforce-lockfile step is unresolvable
-# pre-publish, forever. The lockfile gate moves to `post_publish_verify`, which
-# runs after the new version is published. Here we only prove the constraints
+# point, the release commit's internal constraints still carry the previously
+# published line (`^3.0.0-dev.4`) while the new version (`3.0.0-dev.5`) does not
+# exist on pub.dev yet, so an enforce-lockfile step against the new version is
+# unresolvable pre-publish, forever. The lockfile gate moves to
+# `post_publish_verify`, which runs after the new version is published. Here we
+# only prove the constraints
 # are *satisfiable*: a resolve-allowed `dart pub get` per package (internal
 # deps resolved from the pristine clone via a throwaway override) plus a check
-# that the internal constraints stay on the previously published base line.
-# Any failing step aborts the whole release (set -e), naming the step.
+# that the internal constraints still ADMIT the previously published version
+# and stay on its base line. The internal constraint bump to ^<version> is NOT
+# committed here — it lands with the lock refresh in the post-publish phase
+# (issue #325). Any failing step aborts the whole release (set -e), naming it.
 pre_publish_gate() {
     echo "🧪 Running pre-publish gate (constraint satisfiability)…"
 
@@ -99,17 +101,22 @@ pre_publish_gate() {
     # the release (issue #322).
     run git clone "file://$REPO_ROOT" "$check_dir"
 
-    # 1. Version sync across the 3 packages (also enforces the internal
-    #    zorphy_annotation constraint is exactly ^<version>, i.e. on the
-    #    release's own base line).
+    # 1. Internal constraints must ADMIT the previously published version and
+    #    stay on its numeric base line: a prerelease bump advances -dev.N but
+    #    must not jump to a base no published version anchors (issue #325).
+    #    The helper strips the `^` prefix before extracting the base — a caret
+    #    constraint like ^3.0.0-dev.5 must not fail against a bare 3.0.0. This
+    #    reads the COMMITTED constraint, before the throwaway rewrite below.
+    echo "  == internal-constraint admission check"
+    run bash -c "cd '$check_dir' && bash scripts/check_internal_constraints.sh '$VERSION'"
+
+    # 2. Version sync across the 3 packages. The internal constraint is bumped
+    #    to ^<version> in this THROWAWAY clone only, so the strict
+    #    check_version_sync.sh contract (#314) sees the post-publish shape; the
+    #    committed line was validated by step 1 and this clone is discarded.
+    run bash -c "cd '$check_dir' && for p in zorphy zorphy_migrator; do perl -0777 -i -pe 's/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/' \"\$p/pubspec.yaml\"; done"
     echo "  == check_version_sync.sh"
     run bash -c "cd '$check_dir' && bash scripts/check_version_sync.sh"
-
-    # 2. Internal constraints must stay on the previously published base line
-    #    (major.minor.patch): a prerelease bump advances -dev.N but must not
-    #    jump to a base no published version anchors (issue #325).
-    echo "  == internal-constraint base-line check"
-    run bash -c "cd '$check_dir' && v='$VERSION'; base() { echo \"\$1\" | sed -E 's/^([0-9]+[.][0-9]+[.][0-9]+).*/\\1/'; }; b=\$(base \"\$v\"); for p in zorphy zorphy_migrator; do c=\$(awk '/^  zorphy_annotation:/ {print \$2; exit}' \"\$p/pubspec.yaml\"); if [ \"\$(base \"\$c\")\" != \"\$b\" ]; then echo \"ERROR: \$p internal constraint \$c is not on the published base line \$b\"; exit 1; fi; done; echo \"OK: internal constraints on published base line \$b\""
 
     # 3. Resolve-allowed `dart pub get` per package — proves the EXTERNAL
     #    constraints are satisfiable against *published* versions. The one
@@ -154,11 +161,15 @@ pre_publish_gate() {
 # git tag is considered complete. This is the CI-equivalent lockfile gate that
 # the pre-publish phase cannot run: a fresh clone regenerates each lock against
 # the now-published version, proves it stable under --enforce-lockfile, runs the
-# release guard tests, then commits the lock refresh (and the already-bumped
-# internal constraint) and pushes it as the release's final base-green commit.
-# This automates exactly what #308 did by hand after 3.0.0-dev.4.
+# release guard tests. It then carries the EXACT verified locks into the
+# worktree, bumps the internal `zorphy_annotation` constraints to ^<version>,
+# and commits both together as the release's final base-green commit before the
+# tag. This automates exactly what #308 did by hand after 3.0.0-dev.4.
 post_publish_verify() {
     echo "🔒 Running post-publish verification (regenerate + enforce locks)…"
+
+    # publish_after_indexing leaves the cwd in the last published package.
+    cd "$REPO_ROOT"
 
     local check_dir
     if $DRY_RUN; then
@@ -171,7 +182,7 @@ post_publish_verify() {
 
     local pkg
     # 1. Regenerate each lock against the now-published version (resolve-allowed;
-    #    the internal ^<version> constraint resolves from pub.dev now).
+    #    the internal constraint still admits the previous line at this point).
     for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
         echo "  == $pkg (regenerate lock)"
         run bash -c "cd '$check_dir/$pkg' && dart pub get"
@@ -188,26 +199,54 @@ post_publish_verify() {
     echo "  == dart test test/release/"
     run bash -c "cd '$check_dir/zorphy' && dart test test/release/"
 
+    # 4. Preserve the locks that JUST PASSED the enforced gate. Copying them
+    #    (instead of re-resolving in the maintainer worktree) guarantees the
+    #    committed locks are the ones CI will enforce on the release tip.
     if ! $DRY_RUN; then
+        for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
+            run cp "$check_dir/$pkg/pubspec.lock" "$REPO_ROOT/$pkg/pubspec.lock"
+        done
         rm -rf "$check_dir"
     fi
 
-    # 4. Apply the same regeneration to the real worktree and commit the lock
-    #    refresh as the release's final base-green commit, then push it.
-    for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
-        echo "  == $pkg (regenerate lock in worktree)"
-        run bash -c "cd '$REPO_ROOT/$pkg' && dart pub get"
+    # 5. Bump the internal `zorphy_annotation` constraints to ^<version> and
+    #    refresh the README examples. This used to happen BEFORE the release
+    #    commit; per issue #325 it now lands here, committed with the locks.
+    for pkg in zorphy zorphy_migrator; do
+        PERL_PUBSPEC="$REPO_ROOT/$pkg/pubspec.yaml"
+        run perl -0777 -i -pe 's/zorphy_annotation:\s*\n\s*path:\s*\.\.\/zorphy_annotation/zorphy_annotation: ^/g' "$PERL_PUBSPEC"
+        safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "$PERL_PUBSPEC"
+        run perl -0777 -i -pe 's/\n\ndependency_overrides:\n(?:[ \t#].*\n)*//s' "$PERL_PUBSPEC"
     done
-    echo "  == commit + push lock refresh"
+    echo "📝 Updating README.md..."
+    safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "$REPO_ROOT/README.md"
+    safe_sed "s/zorphy: .*/zorphy: ^$VERSION/" "$REPO_ROOT/README.md"
+
+    # 6. Remove EVERY local override before staging — including the example's.
+    #    A surviving gitignored `zorphy/example/pubspec_overrides.yaml` would
+    #    record a local path source in the committed lock and make CI's
+    #    --enforce-lockfile gate fail on the release tip.
+    for pkg in zorphy zorphy_migrator zorphy/example; do
+        if [ -f "$pkg/pubspec_overrides.yaml" ]; then
+            echo "🧹 Cleaning $pkg/pubspec_overrides.yaml..."
+            run rm -f "$pkg/pubspec_overrides.yaml"
+        fi
+    done
+
+    # 7. Commit the verified locks + the bump together. Tolerate a no-op
+    #    refresh (a re-run, or locks already current) so `set -e` cannot abort
+    #    the release AFTER publishing but BEFORE the tag.
+    echo "  == commit + push lock refresh + constraint bump"
     run git -C "$REPO_ROOT" add .
-    run git -C "$REPO_ROOT" commit -m "chore: refresh lockfiles for v$VERSION"
+    run git -C "$REPO_ROOT" commit -m "chore: refresh lockfiles + internal constraints for v$VERSION" \
+        || echo "  ⚠️ No lock/constraint changes to commit"
     if $DRY_RUN; then
         echo "  [dry-run] git -C $REPO_ROOT push origin <current branch>"
     else
         git -C "$REPO_ROOT" push origin "$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)"
     fi
 
-    echo "✅ Post-publish verification passed — locks refreshed and pushed."
+    echo "✅ Post-publish verification passed — locks + constraints refreshed and pushed."
 }
 
 echo "🚀 Streamlining release for zorphy version $VERSION..."
@@ -264,26 +303,11 @@ update_package "zorphy" "zorphy"
 # 3. Update zorphy_migrator
 update_package "zorphy_migrator" "zorphy_migrator"
 
-# Convert zorphy_annotation dependency in zorphy and zorphy_migrator to hosted version for publishing.
-for pkg in zorphy zorphy_migrator; do
-    PERL_PUBSPEC="$pkg/pubspec.yaml"
-    # 1. Two-line path form → single-line hosted
-    run perl -0777 -i -pe 's/zorphy_annotation:\s*\n\s*path:\s*\.\.\/zorphy_annotation/zorphy_annotation: ^/g' "$PERL_PUBSPEC"
-    # 2. Any remaining single-line form → hosted
-    safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" "$PERL_PUBSPEC"
-    # 3. Strip dependency_overrides block entirely
-    run perl -0777 -i -pe 's/\n\ndependency_overrides:\n(?:[ \t#].*\n)*//s' "$PERL_PUBSPEC"
-
-    if [ -f "$pkg/pubspec_overrides.yaml" ]; then
-        echo "🧹 Cleaning $pkg/pubspec_overrides.yaml..."
-        run rm -f "$pkg/pubspec_overrides.yaml"
-    fi
-done
-
-# 4. Update README
-echo "📝 Updating README.md..."
-safe_sed "s/zorphy_annotation: .*/zorphy_annotation: ^$VERSION/" README.md
-safe_sed "s/zorphy: .*/zorphy: ^$VERSION/" README.md
+# 4. NOTE: the internal `zorphy_annotation` constraint bump (to ^$VERSION) and
+#    the README examples are intentionally NOT rewritten here. Per issue #325
+#    they are committed with the lock refresh in `post_publish_verify`, after
+#    all 3 packages are published. The release commit therefore keeps the
+#    previously published constraint line, which the pre-publish gate checks.
 
 # 5. Commit changes
 echo "🔨 Committing changes..."

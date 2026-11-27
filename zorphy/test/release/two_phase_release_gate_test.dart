@@ -136,6 +136,67 @@ void main() {
       );
     });
 
+    test('internal constraint bump is committed in the post-publish phase', () {
+      final script = _read('scripts/publish.sh');
+      final pre = _prePublishBody(script);
+      final post = _functionBody(script, 'post_publish_verify');
+
+      expect(
+        pre,
+        contains('check_internal_constraints.sh'),
+        reason:
+            'the pre-publish gate checks admission against the published line',
+      );
+      expect(
+        post,
+        contains(r'zorphy_annotation: ^$VERSION'),
+        reason: 'the ^<version> bump is applied after publishing',
+      );
+      expect(
+        post,
+        contains(
+          r'chore: refresh lockfiles + internal constraints for v$VERSION',
+        ),
+        reason: 'the bump is committed together with the lock refresh',
+      );
+      expect(
+        pre,
+        isNot(contains('refresh lockfiles + internal constraints')),
+        reason: 'the bump is not committed by the pre-publish gate',
+      );
+    });
+
+    test(
+      'post-publish carries the verified locks and cleans every override',
+      () {
+        final post = _functionBody(
+          _read('scripts/publish.sh'),
+          'post_publish_verify',
+        );
+
+        expect(
+          post,
+          contains('pubspec.lock'),
+          reason: 'verified locks are copied',
+        );
+        expect(
+          post,
+          contains('cp '),
+          reason: 'the verified lock is copied, not re-resolved',
+        );
+        expect(
+          post,
+          contains('zorphy/example'),
+          reason: 'the example override is cleaned too',
+        );
+        expect(
+          post,
+          contains('No lock/constraint changes to commit'),
+          reason: 'a no-op commit cannot abort the release after publishing',
+        );
+      },
+    );
+
     test('--dry-run prints the two-phase plan', () async {
       final root = Directory.systemTemp.createTempSync('zorphy_two_phase_');
       try {
@@ -183,6 +244,93 @@ void main() {
       } finally {
         root.deleteSync(recursive: true);
       }
+    });
+  });
+
+  group('internal-constraint admission check (issue #325)', () {
+    late Directory root;
+
+    Future<ProcessResult> git(List<String> args) => Process.run('git', [
+      '-C',
+      root.path,
+      ...args,
+    ], workingDirectory: root.path);
+
+    Future<void> writeConstraint(String constraint) async {
+      for (final pkg in ['zorphy', 'zorphy_migrator']) {
+        File('${root.path}/$pkg/pubspec.yaml').writeAsStringSync(
+          'name: $pkg\n'
+          'version: 3.0.0-dev.5\n'
+          'dependencies:\n'
+          '  zorphy_annotation: $constraint\n',
+        );
+      }
+    }
+
+    Future<ProcessResult> check(String constraint) async {
+      await writeConstraint(constraint);
+      return Process.run('bash', [
+        'scripts/check_internal_constraints.sh',
+        '3.0.0-dev.5',
+      ], workingDirectory: root.path);
+    }
+
+    setUp(() async {
+      root = Directory.systemTemp.createTempSync('zorphy_constraint_check_');
+      Directory('${root.path}/scripts').createSync(recursive: true);
+      for (final pkg in ['zorphy', 'zorphy_migrator']) {
+        Directory('${root.path}/$pkg').createSync(recursive: true);
+      }
+      File(
+        '${root.path}/scripts/check_internal_constraints.sh',
+      ).writeAsStringSync(_read('scripts/check_internal_constraints.sh'));
+
+      await Process.run('git', ['init', '-q'], workingDirectory: root.path);
+      await git([
+        '-c',
+        'user.name=test',
+        '-c',
+        'user.email=test@example.com',
+        'commit',
+        '--allow-empty',
+        '-qm',
+        'init',
+      ]);
+      await git(['tag', 'annotation-v3.0.0-dev.4']);
+    });
+
+    tearDown(() => root.deleteSync(recursive: true));
+
+    test('accepts the previously published caret constraint', () async {
+      final result = await check('^3.0.0-dev.4');
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+      expect(
+        result.stdout,
+        contains('previously published version 3.0.0-dev.4'),
+      );
+    });
+
+    test('strips the constraint prefix before extracting the base', () async {
+      final result = await check('>=3.0.0-dev.4');
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    });
+
+    test('rejects a constraint on a different numeric base', () async {
+      final result = await check('^4.0.0-dev.4');
+      expect(result.exitCode, 1, reason: '${result.stdout}\n${result.stderr}');
+      expect(
+        result.stdout,
+        contains('not on the previously published base line'),
+      );
+    });
+
+    test('rejects a constraint that excludes the published version', () async {
+      final result = await check('^3.0.0-dev.5');
+      expect(result.exitCode, 1, reason: '${result.stdout}\n${result.stderr}');
+      expect(
+        result.stdout,
+        contains('excludes the previously published version'),
+      );
     });
   });
 }
