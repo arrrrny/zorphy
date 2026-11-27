@@ -268,12 +268,11 @@ packages:
   json_serializable:
     dependency: "direct dev"
     description:
-      path: json_serializable
-      ref: HEAD
-      resolved-ref: "72bc0441e8fa41683b9a95fad8df0df4c428e9f4"
-      url: "https://github.com/google/json_serializable.dart"
-    source: git
-    version: "7.0.0-wip"
+      name: json_serializable
+      sha256: cc7822761b40be9237bcaae62b755ffe5453ceff96a0001f1f5f2439251c66f1
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.15.2"
   logging:
     dependency: transitive
     description:
@@ -573,9 +572,10 @@ packages:
   zorphy_annotation:
     dependency: "direct main"
     description:
-      path: "../zorphy_annotation"
-      relative: true
-    source: path
-    version: "3.0.0-dev.3"
+      name: zorphy_annotation
+      sha256: f342a4224f62fa92bb5d42ec753e23fedc90d9d69ed88f016929f69111855c25
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.0-dev.4"
 sdks:
   dart: ">=3.13.0 <4.0.0"
