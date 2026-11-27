@@ -455,7 +455,20 @@ void main() {
     });
 
     test('a null nested value never matches', () {
-      final nested = UserFields.profile.nested(
+      // Use a nullable field descriptor whose getter actually returns null.
+      // The generated `User.profile` is non-nullable, so passing Profile(1)
+      // there only re-tested the nonmatching scalar case — it would still pass
+      // if the null guard in `ZorphyNested.matches` were removed (CodeRabbit
+      // nitpick on review #306). Keep an inner predicate that requires a
+      // `Profile`, so evaluating it on null throws instead of returning false.
+      final nullProfile = ZorphyField<User, Profile?>(
+        name: 'profile',
+        jsonKey: 'profile',
+        pointer: '/profile',
+        get: (User instance) => null,
+        set: (User instance, Profile? value) => instance,
+      );
+      final nested = nullProfile.nested(
         ProfileFields.age.greaterThan(18),
       );
       expect(nested.matches(const User('e', Profile(1), [])), isFalse);
