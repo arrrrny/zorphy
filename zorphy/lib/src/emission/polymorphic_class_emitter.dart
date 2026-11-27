@@ -724,7 +724,7 @@ final class PolymorphicClassEmitter {
   /// `==` then compares identities and `value == value.copyWith()` fails for
   /// a `Map` payload (#294) — the same defect #285 fixed for DECLARED
   /// collections, resurfacing through a generic. Those fields route through
-  /// the dynamic [_collectionEqualsMethod], which already falls back to `==`
+  /// the shared `zorphyCollectionEquals` runtime helper, which falls back to
   /// for a non-collection.
   static bool _isTypeParameterField(ZorphyNodeIr node, PolymorphicField field) {
     var bare = _lowerType(field.emittedType).trim();
@@ -1386,12 +1386,6 @@ final class PolymorphicClassEmitter {
       _hashCode(node, fields),
       _toString(node, fields),
     ];
-    // Only a class that actually snapshots a collection needs the helpers the
-    // generated `==`/`hashCode` call. They are private STATIC members of the
-    // class, so two hierarchies in one library part can never collide.
-    if (fields.any((field) => _comparesByContent(node, field))) {
-      methods.addAll([_collectionEqualsMethod(), _collectionHashMethod()]);
-    }
     return methods;
   }
 
@@ -1462,7 +1456,7 @@ final class PolymorphicClassEmitter {
         // those fields compare their contents instead (#285 review).
         for (final field in fields)
           _comparesByContent(node, field)
-              ? '${node.cleanName}._zorphyCollectionEquals('
+              ? 'ZorphyCollections.equals('
                     'this.${field.name}, other.${field.name})'
               : 'this.${field.name} == other.${field.name}',
       ];
@@ -1494,89 +1488,10 @@ final class PolymorphicClassEmitter {
         // `Object.hashAll` accepts any nonempty iterable, covering both ends.
         fields.isEmpty
             ? 'runtimeType.hashCode'
-            : 'Object.hashAll([${[for (final f in fields) _comparesByContent(node, f) ? '${node.cleanName}._zorphyCollectionHash(${f.name})' : f.name].join(', ')}])',
+            : 'Object.hashAll([${[for (final f in fields) _comparesByContent(node, f) ? 'ZorphyCollections.hash(${f.name})' : f.name].join(', ')}])',
       );
     });
   }
-
-  /// Content-based equality for a snapshotted collection field (#285 review).
-  ///
-  /// The defensive copy in `fromTrusted` gives each value its OWN list/set/map,
-  /// so `Object`'s identity `==` would make `value == value.copyWith()` false.
-  /// Elements use their own `==`: value equality for generated nested values,
-  /// identity for nested collections (the snapshot copies only the outer one).
-  static Method _collectionEqualsMethod() => Method((m) {
-    m
-      ..name = '_zorphyCollectionEquals'
-      ..static = true
-      ..returns = referType('bool');
-    m.requiredParameters.addAll([
-      Parameter((p) {
-        p
-          ..name = 'a'
-          ..type = referType('Object?');
-      }),
-      Parameter((p) {
-        p
-          ..name = 'b'
-          ..type = referType('Object?');
-      }),
-    ]);
-    m.body = Code('''
-    if (identical(a, b)) return true;
-    if (a is List && b is List) {
-      if (a.length != b.length) return false;
-      for (var i = 0; i < a.length; i++) {
-        if (a[i] != b[i]) return false;
-      }
-      return true;
-    }
-    if (a is Set && b is Set) {
-      if (a.length != b.length) return false;
-      return a.every(b.contains);
-    }
-    if (a is Map && b is Map) {
-      if (a.length != b.length) return false;
-      for (final entry in a.entries) {
-        if (!b.containsKey(entry.key) || b[entry.key] != entry.value) {
-          return false;
-        }
-      }
-      return true;
-    }
-    return false;
-    ''');
-  });
-
-  /// A hash compatible with [_collectionEqualsMethod]: order matters for a
-  /// `List`, but a `Set`/`Map` combines element hashes commutatively so two
-  /// equal collections always hash equal regardless of iteration order.
-  static Method _collectionHashMethod() => Method((m) {
-    m
-      ..name = '_zorphyCollectionHash'
-      ..static = true
-      ..returns = referType('int');
-    m.requiredParameters.add(
-      Parameter((p) {
-        p
-          ..name = 'value'
-          ..type = referType('Object?');
-      }),
-    );
-    m.body = Code('''
-    if (value is List) return Object.hashAll(value);
-    if (value is Set) {
-      return value.fold<int>(0, (hash, element) => hash + element.hashCode);
-    }
-    if (value is Map) {
-      return value.entries.fold<int>(
-        0,
-        (hash, entry) => hash + Object.hash(entry.key, entry.value),
-      );
-    }
-    return value.hashCode;
-    ''');
-  });
 
   /// `toString` — the class name and every field, in declaration order.
   Method _toString(ZorphyNodeIr node, List<PolymorphicField> fields) {

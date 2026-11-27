@@ -70,7 +70,7 @@ const Set<WireKind> boundaryClassifiedKinds = <WireKind>{
   WireKind.stringKeyEnumMap,
 };
 
-/// Kinds handled by [PatchEmitter] / `ZorphyPatchWire`'s helpers.
+/// Kinds handled by `PolymorphicPatchEmitter` / `ZorphyPatchWire`'s helpers.
 const Set<WireKind> patchClassifiedKinds = <WireKind>{
   WireKind.string,
   WireKind.integer,

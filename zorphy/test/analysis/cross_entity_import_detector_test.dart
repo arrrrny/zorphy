@@ -1,6 +1,5 @@
 // Unit tests for [CrossEntityImportDetector] — the pure-function helper
-// extracted from `ZorphyGenerator._detectMissingImportGuidance` as part
-// of the issue #117 follow-up.
+// extracted during the issue #117 follow-up.
 //
 // The detector scans a `@Zorphy` source file for cross-entity field
 // references (types whose declared name starts with `$`) and checks

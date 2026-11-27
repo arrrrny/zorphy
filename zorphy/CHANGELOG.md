@@ -2,6 +2,10 @@
 
 ### Change
 - ZorphyNested, fromJson/toJson aliases, enum boundary wire, colocated .zorphy.dart (retires _br_), wire-capability matrix, stacked-PR integrity, clean-checkout release gate
+- Removed the dead `ZorphyGenerator`/plugin option surface; `zorphyBuilder` is the only pipeline and rejects unsupported builder options instead of ignoring them
+- Removed `PatchEmitter`, the Account/Profile/ProgressBox v2 fixtures, the tracked v2 golden tree, ignored CLI v2 output, and all `_br_/` mirror trees; runtime patch laws now run against v3-generated fixtures
+- Moved shallow collection equality/hash into `zorphy_annotation` and added `ZorphyPatchAlgebra` (`changedPaths`, `conflictingPaths`, `composePatches`) for v3 patches
+- Corrected the wire matrix to document current v3 atomic nested/non-String-map patch omissions, and fixed DateTime/enum patch encoding to match its decoders
 
 ## [3.0.0-dev.4] - 2026-11-27
 
@@ -140,8 +144,7 @@ v3 artifact, and the codemod plus the notes below are the supported path from
   legacy hierarchy emitters and the plugin pipeline are deleted, along with the
   dead legacy analyzer layer (`class_analyzer`, `annotation_parser`,
   `class_graph`, `field_resolver`, `interface_collector`, `generation_config`).
-  `ZorphyGenerator` no longer registers the legacy type checkers and emits only
-  the v3 surface.
+  The production shared-part builder emits only the v3 surface.
 - **No generated archetype emits `fromJson` / `toJson` (#188, #233).** The v3
   wire codecs (`fromWire` / `toWire`) are unconditional; the legacy JSON codec
   generation is gone.

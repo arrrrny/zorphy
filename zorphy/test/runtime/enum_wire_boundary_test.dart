@@ -21,8 +21,10 @@ library;
 import 'dart:io';
 
 import 'package:test/test.dart';
+import 'package:zorphy/src/common/name_type.dart';
 import 'package:zorphy/src/emission/boundary_codec_emitter.dart';
 import 'package:zorphy/src/emission/emitter.dart';
+import 'package:zorphy/src/emission/polymorphic_patch_emitter.dart';
 import 'package:zorphy/src/emitters/mock_fixture_emitter.dart';
 import 'package:zorphy/src/parser/polymorphic_ir.dart';
 
@@ -74,6 +76,14 @@ String _codecSource() {
 }
 
 String _mockSource() => MockFixtureEmitter().emitForNode(_account());
+
+String _patchSource() => PolymorphicPatchEmitter().emitStandalone(
+  name: 'Account',
+  fields: [
+    NameTypeClassComment('id', 'String', ''),
+    NameTypeClassComment('tier', 'AccountTier', '', isEnum: true),
+  ],
+);
 
 String _helperSource() => ZorphyEmitter().emitSpecs(
   BoundaryCodecEmitter.usedHelperSpecs([_account()], _fields),
@@ -149,23 +159,16 @@ final class Account {
   final String id;
   final AccountTier tier;
 
+  Account copyWith({String? id, AccountTier? tier}) {
+    return Account.fromTrusted(id: id ?? this.id, tier: tier ?? this.tier);
+  }
+
 ${_indent(_codecSource())}
 }
 
 ${_helperSource()}
 
-final class AccountPatch {
-  final Map<String, Object?> changes = <String, Object?>{};
-  AccountPatch withId(String value) {
-    changes['id'] = value;
-    return this;
-  }
-
-  AccountPatch withTier(AccountTier value) {
-    changes['tier'] = value;
-    return this;
-  }
-}
+${_patchSource()}
 
 ${_mockSource()}
 

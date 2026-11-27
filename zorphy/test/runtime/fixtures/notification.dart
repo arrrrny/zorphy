@@ -288,7 +288,8 @@ final class NotificationSharedPatch extends NotificationPatch {
   Map<String, Object?> toWire() {
     final wire = <String, Object?>{};
     if (this.id.isSet) wire['id'] = this.id.valueOrNull;
-    if (this.readAt.isSet) wire['readAt'] = this.readAt.valueOrNull;
+    if (this.readAt.isSet)
+      wire['readAt'] = this.readAt.valueOrNull?.toIso8601String();
     return wire;
   }
 
@@ -467,7 +468,8 @@ final class OrderNotificationPatch extends NotificationPatch {
   Map<String, Object?> toWire() {
     final wire = <String, Object?>{};
     if (this.id.isSet) wire['id'] = this.id.valueOrNull;
-    if (this.readAt.isSet) wire['readAt'] = this.readAt.valueOrNull;
+    if (this.readAt.isSet)
+      wire['readAt'] = this.readAt.valueOrNull?.toIso8601String();
     if (this.itemCount.isSet) wire['itemCount'] = this.itemCount.valueOrNull;
     return wire;
   }
@@ -679,7 +681,8 @@ final class PriceDropNotificationPatch extends NotificationPatch {
   Map<String, Object?> toWire() {
     final wire = <String, Object?>{};
     if (this.id.isSet) wire['id'] = this.id.valueOrNull;
-    if (this.readAt.isSet) wire['readAt'] = this.readAt.valueOrNull;
+    if (this.readAt.isSet)
+      wire['readAt'] = this.readAt.valueOrNull?.toIso8601String();
     if (this.newPrice.isSet) wire['newPrice'] = this.newPrice.valueOrNull;
     return wire;
   }

@@ -5,8 +5,6 @@
 /// toString, and more.
 library zorphy;
 
-export 'src/zorphy_generator.dart';
-
 // Cross-emitter wire-kind vocabulary (shared by the wire-capability matrix
 // drift gate): https://github.com/arrrrny/zorphy/issues/316
 export 'src/emission/wire_kind.dart';

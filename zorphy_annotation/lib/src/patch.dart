@@ -88,6 +88,18 @@ abstract interface class ZorphyPatch<T> {
   Map<String, Object?> toWire();
 }
 
+extension ZorphyPatchAlgebra<T> on ZorphyPatch<T> {
+  /// Top-level JSON pointers changed by this patch.
+  Set<String> get changedPaths => toWire().keys.map((key) => '/$key').toSet();
+
+  /// The exact intersection of this patch's and [other]'s changed paths.
+  Set<String> conflictingPaths(ZorphyPatch<T> other) =>
+      changedPaths.intersection(other.changedPaths);
+
+  /// Three-way name for [compose], with the same left-to-right semantics.
+  ZorphyPatch<T> composePatches(ZorphyPatch<T> next) => compose(next);
+}
+
 /// A single field's contribution to a patch: either "leave it alone" or
 /// "set it to this value".
 ///

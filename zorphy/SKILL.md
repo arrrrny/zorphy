@@ -590,12 +590,10 @@ subtypes:
 
 **Where the rule reports.** `HierarchyResolver` runs the rule on the resolved
 `PolymorphicIr` and appends each hit to `PolymorphicIr.diagnostics` (code
-`ZORPHY_LINT_NO_BOOL_FLAGS`), and `NoBoolFlagsLint.enforce(ir)` is the
-fail-the-build entry point a v3 caller invokes itself. The v3 IR pipeline is
-not yet the path `build_runner` drives — `ZorphyGenerator` still runs the v2
-`Orchestrator` pipeline — so a flagged hierarchy does not fail a real
-`build_runner` run today. Do not document or assume otherwise until
-`enforce` is called from the generator.
+`ZORPHY_LINT_NO_BOOL_FLAGS`). The shared-part builder is the path
+`build_runner` drives; it rejects any error diagnostic before writing output,
+so a flagged hierarchy fails the real generation run.
+`NoBoolFlagsLint.enforce(ir)` remains for callers that want the lint alone.
 
 Union membership for the rule's scope includes a member that only
 `implements` the union root, not just the factory variants.

@@ -1,30 +1,22 @@
-// Runtime tests for ISSUE-008 (zorphy#183) — nested sub-patches and collection
-// deltas in the REAL emitted patch.
+// Runtime tests for ISSUE-008 (zorphy#183) — v3 nested and collection patches.
 //
-// `ProfilePatch` / `AddressPatch` in `test/runtime/fixtures/profile.dart` are
-// byte-locked to `PatchEmitter`'s output by
-// `test/golden/nested_and_collection_patch_golden_test.dart`, so the invariants
-// below are stated against generated code rather than a hand-written
-// lookalike.
+// PatchProbePatch comes from the v3-generated fixture
+// `test/runtime/fixtures/patch_contract.dart`. Nested objects, lists, and maps
+// are carried as atomic whole-value replacements; there are no nested
+// sub-patches, positional list ops, or granular map ops.
 //
 // Laws under test:
-//   * nested diff/apply — a changed sub-entity travels as a `PatchNested`
-//     carrying `SubPatch.diff`, and applying it delegates to the sub-entity's
-//     own patch
-//   * nullable nested — a null on either side is a whole-value transition, not
-//     a sub-patch
-//   * collection patches — a `List` change is an atomic whole-value
-//     replacement and a `Map` change travels as granular ops, each applied to
-//     the target collection
-//   * round-trip — `diff -> apply -> invert` restores the previous entity
-//   * composition — `(a.compose(b)).apply(x) == b.apply(a.apply(x))`
+//   * nested diff/apply — a changed object is replaced as a whole value
+//   * nullable nested — null and non-null transitions are whole-value sets
+//   * collections — list and map changes replace the complete collection
+//   * round-trip — diff -> apply -> invert restores the previous entity
+//   * composition — later whole-value replacements win, left to right
 
 import 'dart:math';
 
 import 'package:test/test.dart';
-import 'package:zorphy_annotation/zorphy.dart';
 
-import 'fixtures/profile.dart';
+import 'fixtures/patch_contract.dart';
 
 const _streets = ['Main', 'Elm', 'Oak', 'Pine', 'Cedar'];
 const _cities = [
@@ -35,15 +27,24 @@ const _cities = [
 ];
 const _tags = ['a', 'b', 'c', 'd', 'e'];
 
-Address _address(Random rng) => Address(
+ProbeAddress _address(Random rng) => ProbeAddress(
   street: _streets[rng.nextInt(_streets.length)],
   city: _cities[rng.nextInt(_cities.length)],
-  postalCode: rng.nextBool() ? null : '${10000 + rng.nextInt(89999)}',
 );
 
-Profile _profile(Random rng) => Profile(
+PatchProbe _base() => const PatchProbe(
+  id: 'p1',
+  title: 'ada',
+  tags: ['a', 'b'],
+  scores: {'a': 1, 'b': 2},
+  counts: {1: 1},
+  status: PatchProbeStatus.active,
+  address: ProbeAddress(street: 'Main', city: 'Springfield'),
+);
+
+PatchProbe _probe(Random rng) => PatchProbe(
   id: 'p-${rng.nextInt(1 << 16)}',
-  displayName: 'name-${rng.nextInt(100)}',
+  title: 'name-${rng.nextInt(100)}',
   address: _address(rng),
   tags: <String>[
     for (var i = 0; i < rng.nextInt(4); i++) _tags[rng.nextInt(_tags.length)],
@@ -52,290 +53,224 @@ Profile _profile(Random rng) => Profile(
     for (var i = 0; i < rng.nextInt(3); i++)
       'k${rng.nextInt(4)}': rng.nextInt(50),
   },
+  counts: <int, int>{
+    for (var i = 0; i < rng.nextInt(3); i++) rng.nextInt(4): rng.nextInt(50),
+  },
+  status: PatchProbeStatus.values[rng.nextInt(PatchProbeStatus.values.length)],
   previousAddress: rng.nextBool() ? _address(rng) : null,
 );
 
 void main() {
-  group('nested sub-patches', () {
-    test('a changed sub-entity travels as a PatchNested', () {
-      const before = Address(street: 'Main', city: 'Springfield');
-      final previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: before,
-        tags: const ['x'],
-        scores: const {'a': 1},
-      );
-      final next = previous.copyWith(
-        address: const Address(street: 'Elm', city: 'Springfield'),
-      );
+  group('atomic nested replacement', () {
+    test('a changed object is carried as the whole replacement value', () {
+      final previous = _base();
+      const replacement = ProbeAddress(street: 'Elm', city: 'Springfield');
+      final next = previous.copyWith(address: replacement);
 
-      final patch = ProfilePatch.diff(previous, next);
-      final carried = patch.patchMap[Profile$.address];
-      expect(carried, isA<PatchNested<Address, AddressPatch>>());
-      expect(
-        patch.apply(previous).address,
-        const Address(street: 'Elm', city: 'Springfield'),
-        reason: 'apply delegates to the sub-entity patch',
-      );
+      final patch = PatchProbePatch.diff(previous, next);
+
+      expect(patch.address.isSet, isTrue);
+      expect(patch.address.valueOrNull, replacement);
+      expect(patch.apply(previous).address, replacement);
     });
 
-    test('an unchanged sub-entity carries nothing', () {
+    test('a content-equal object carries no change', () {
       final rng = Random(3);
       for (var i = 0; i < 50; i++) {
-        final profile = _profile(rng);
-        final patch = ProfilePatch.diff(profile, profile.copyWith());
-        expect(
-          patch.patchMap.containsKey(Profile$.address),
-          isFalse,
-          reason: 'a content-equal nested value is no change',
+        final probe = _probe(rng);
+        final equalAddress = ProbeAddress(
+          street: probe.address.street,
+          city: probe.address.city,
         );
+        final patch = PatchProbePatch.diff(
+          probe,
+          probe.copyWith(address: equalAddress),
+        );
+        expect(patch.address.isUnchanged, isTrue);
       }
     });
 
-    test('a nullable sub-entity going null is a whole-value transition', () {
-      final previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: const Address(street: 'Main', city: 'Springfield'),
-        tags: const [],
-        scores: const {},
-        previousAddress: const Address(street: 'Oak', city: 'Ogdenville'),
+    test('a nullable object going null is an explicit whole-value set', () {
+      final previous = _base().copyWith(
+        previousAddress: const ProbeAddress(street: 'Oak', city: 'Ogdenville'),
       );
-      final next = Profile(
-        id: previous.id,
-        displayName: previous.displayName,
-        address: previous.address,
-        tags: previous.tags,
-        scores: previous.scores,
+      final patch = PatchProbePatch.diff(
+        previous,
+        previous.copyWith(previousAddress: null),
       );
 
-      final patch = ProfilePatch.diff(previous, next);
-      expect(
-        patch.patchMap[Profile$.previousAddress],
-        isNull,
-        reason: 'null is carried verbatim, never as a sub-patch',
-      );
+      expect(patch.previousAddress.isSet, isTrue);
+      expect(patch.previousAddress.valueOrNull, isNull);
+      expect(patch.toWire(), containsPair('previousAddress', null));
       expect(patch.apply(previous).previousAddress, isNull);
     });
 
-    test('a nullable sub-entity appearing from null is a whole value', () {
-      final previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: const Address(street: 'Main', city: 'Springfield'),
-        tags: const [],
-        scores: const {},
-      );
-      final next = previous.copyWith(
-        previousAddress: const Address(street: 'Oak', city: 'Ogdenville'),
+    test('a nullable object appearing from null is a whole-value set', () {
+      final previous = _base();
+      const replacement = ProbeAddress(street: 'Oak', city: 'Ogdenville');
+      final patch = PatchProbePatch.diff(
+        previous,
+        previous.copyWith(previousAddress: replacement),
       );
 
-      final patch = ProfilePatch.diff(previous, next);
-      expect(patch.apply(previous).previousAddress, next.previousAddress);
+      expect(patch.previousAddress.valueOrNull, replacement);
+      expect(patch.apply(previous).previousAddress, replacement);
     });
 
-    test('invert restores a fluent-built non-nullable nested value', () {
-      const originalAddress = Address(street: 'Main', city: 'Springfield');
-      final before = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: originalAddress,
-        tags: const [],
-        scores: const {},
-      );
-      // The always-emitted `withAddress` builder carries a RAW value, not a
-      // PatchNested — inverting must still restore the prior value (the
-      // non-nullable nested arm needs the same `is! PatchNested` fallback the
-      // list / map arms have).
-      final patch = ProfilePatch().withAddress(
-        const Address(street: 'Elm', city: 'Ogdenville'),
-      );
+    test('invert restores a fluent-built non-nullable object', () {
+      final before = _base();
+      const replacement = ProbeAddress(street: 'Elm', city: 'Ogdenville');
+      final patch = PatchProbePatch().withAddress(replacement);
       final patched = patch.apply(before);
-      expect(patched.address, const Address(street: 'Elm', city: 'Ogdenville'));
-      expect(
-        patch.invert(before).apply(patched).address,
-        originalAddress,
-        reason: 'invert restores the original nested value',
-      );
+
+      expect(patched.address, replacement);
+      expect(patch.invert(before).apply(patched), before);
     });
 
-    test('invert restores a fluent-built sub-patch nested value', () {
-      const originalAddress = Address(street: 'Main', city: 'Springfield');
-      final before = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: originalAddress,
-        tags: const [],
-        scores: const {},
+    test('composition keeps only the later whole-object replacement', () {
+      final base = _base();
+      final a = PatchProbePatch.diff(
+        base,
+        base.copyWith(
+          address: const ProbeAddress(street: 'Elm', city: 'Springfield'),
+        ),
       );
-      // `withAddressPatch` carries an AddressPatch (a Patch, but not a
-      // PatchNested); the fallback must still restore the prior value.
-      final patch = ProfilePatch().withAddressPatch(
-        AddressPatch()..withStreet('Elm'),
+      final b = PatchProbePatch.diff(
+        base,
+        base.copyWith(
+          address: const ProbeAddress(street: 'Main', city: 'Shelbyville'),
+        ),
       );
-      final patched = patch.apply(before);
-      expect(patched.address.street, 'Elm');
+
+      final composed = a.compose(b);
       expect(
-        patch.invert(before).apply(patched).address,
-        originalAddress,
-        reason: 'invert restores the original nested value',
+        composed.apply(base).address,
+        const ProbeAddress(street: 'Main', city: 'Shelbyville'),
       );
+      expect(composed.invert(base).apply(composed.apply(base)), base);
     });
   });
 
-  group('collection patches', () {
-    test('a changed list is carried as the whole atomic value', () {
-      final previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: const Address(street: 'Main', city: 'Springfield'),
-        tags: const ['x', 'y'],
-        scores: const {},
-      );
-      final patch = ProfilePatch.diff(
+  group('atomic collection replacement', () {
+    test('a changed list is carried as the whole value', () {
+      final previous = _base();
+      const replacement = ['a', 'b', 'c'];
+      final patch = PatchProbePatch.diff(
         previous,
-        previous.copyWith(tags: const ['x', 'y', 'z']),
+        previous.copyWith(tags: replacement),
       );
 
-      // zorphy#248: a list is replaced atomically, never edited by index, so
-      // the carried value is the whole new list.
-      final carried = patch.patchMap[Profile$.tags];
-      expect(carried, isA<List<String>>());
-      expect(carried, ['x', 'y', 'z']);
-      expect(patch.apply(previous).tags, ['x', 'y', 'z']);
+      expect(patch.tags.isSet, isTrue);
+      expect(patch.tags.valueOrNull, replacement);
+      expect(patch.apply(previous).tags, replacement);
     });
 
-    test('a changed score travels as one put', () {
-      final previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: const Address(street: 'Main', city: 'Springfield'),
-        tags: const [],
-        scores: const {'a': 1, 'b': 2},
-      );
-      final patch = ProfilePatch.diff(
+    test('a changed map is carried as the whole value, including removals', () {
+      final previous = _base();
+      const replacement = {'a': 9};
+      final patch = PatchProbePatch.diff(
         previous,
-        previous.copyWith(scores: const {'a': 1, 'b': 9}),
+        previous.copyWith(scores: replacement),
       );
 
-      expect(
-        patch.patchMap[Profile$.scores],
-        isA<MapPatchDelta<String, int>>(),
-      );
-      expect(patch.apply(previous).scores, {'a': 1, 'b': 9});
-    });
-
-    test('an unchanged collection carries no op', () {
-      final rng = Random(5);
-      for (var i = 0; i < 50; i++) {
-        final profile = _profile(rng);
-        final patch = ProfilePatch.diff(
-          profile,
-          profile.copyWith(
-            tags: List<String>.of(profile.tags),
-            scores: Map<String, int>.of(profile.scores),
-          ),
-        );
-        expect(patch.patchMap.containsKey(Profile$.tags), isFalse);
-        expect(patch.patchMap.containsKey(Profile$.scores), isFalse);
-      }
-    });
-
-    test('a changed list renders as a bare JSON array on the wire', () {
-      final previous = Profile(
-        id: 'p1',
-        displayName: 'ada',
-        address: const Address(street: 'Main', city: 'Springfield'),
-        tags: const ['x'],
-        scores: const {},
-      );
-      final wire = ProfilePatch.diff(
-        previous,
-        previous.copyWith(tags: const ['x', 'y']),
-      ).toWire();
-
-      // Atomic replacement (zorphy#248): the list is the whole new value, a
-      // bare JSON array — not an `{'ops': [...]}` delta.
-      expect(wire['tags'], ['x', 'y']);
+      expect(patch.scores.isSet, isTrue);
+      expect(patch.scores.valueOrNull, replacement);
+      expect(patch.apply(previous).scores, replacement);
     });
 
     test(
-      'a nested change renders the sub-patch on the wire, not an object',
+      'unchanged collections and content-equal nested values carry no change',
       () {
-        final previous = Profile(
-          id: 'p1',
-          displayName: 'ada',
-          address: const Address(street: 'Main', city: 'Springfield'),
-          tags: const [],
-          scores: const {},
-        );
-        final wire = ProfilePatch.diff(
-          previous,
-          previous.copyWith(
-            address: const Address(street: 'Elm', city: 'Springfield'),
-          ),
-        ).toWire();
-
-        // A nested field unwraps to its inner toWire map — plain JSON, never a
-        // live PatchNested object.
-        expect(wire['address'], <String, Object?>{'street': 'Elm'});
+        final rng = Random(5);
+        for (var i = 0; i < 50; i++) {
+          final probe = _probe(rng);
+          final previousAddress = probe.previousAddress;
+          final patch = PatchProbePatch.diff(
+            probe,
+            probe.copyWith(
+              tags: probe.tags,
+              scores: probe.scores,
+              counts: probe.counts,
+              address: ProbeAddress(
+                street: probe.address.street,
+                city: probe.address.city,
+              ),
+              previousAddress: previousAddress == null
+                  ? null
+                  : ProbeAddress(
+                      street: previousAddress.street,
+                      city: previousAddress.city,
+                    ),
+            ),
+          );
+          expect(patch.isEmpty, isTrue);
+          expect(identical(patch.apply(probe), probe), isTrue);
+        }
       },
     );
+
+    test('list and map wire values are bare replacement values', () {
+      final patch = PatchProbePatch.diff(
+        _base(),
+        _base().copyWith(tags: const ['x', 'y'], scores: const {'x': 3}),
+      );
+      final wire = patch.toWire();
+
+      expect(wire['tags'], ['x', 'y']);
+      expect(wire['scores'], {'x': 3});
+    });
+
+    test('composition keeps only the later list and map replacements', () {
+      final base = _base();
+      final a = PatchProbePatch.diff(
+        base,
+        base.copyWith(tags: const ['x'], scores: const {'a': 2}),
+      );
+      final b = PatchProbePatch.diff(
+        base,
+        base.copyWith(tags: const ['y'], scores: const {'b': 3}),
+      );
+
+      final composed = a.compose(b);
+      final applied = composed.apply(base);
+      expect(applied.tags, ['y']);
+      expect(applied.scores, {'b': 3});
+      expect(composed.invert(base).apply(applied), base);
+    });
   });
 
   group('round-trip and composition', () {
     test('diff -> apply -> invert restores the previous entity', () {
       final rng = Random(11);
       for (var i = 0; i < 200; i++) {
-        final previous = _profile(rng);
-        final next = Profile(
-          id: previous.id,
-          displayName: 'name-${rng.nextInt(100)}',
-          address: _address(rng),
-          tags: <String>[
-            for (var t = 0; t < rng.nextInt(4); t++)
-              _tags[rng.nextInt(_tags.length)],
-          ],
-          scores: <String, int>{
-            for (var k = 0; k < rng.nextInt(3); k++)
-              'k${rng.nextInt(4)}': rng.nextInt(50),
-          },
-          previousAddress: rng.nextBool() ? _address(rng) : null,
-        );
-
-        final patch = ProfilePatch.diff(previous, next);
+        final previous = _probe(rng);
+        final next = _probe(rng);
+        final patch = PatchProbePatch.diff(previous, next);
         final patched = patch.apply(previous);
-        expect(patched, next, reason: 'diff must carry every changed field');
-        expect(
-          patch.invert(previous).apply(patched),
-          previous,
-          reason: 'invert restores the previous entity',
-        );
+
+        expect(patched, next);
+        expect(patch.invert(previous).apply(patched), previous);
       }
     });
 
     test('composition threads left to right', () {
       final rng = Random(13);
       for (var i = 0; i < 200; i++) {
-        final base = _profile(rng);
+        final base = _probe(rng);
         final middle = base.copyWith(
-          displayName: 'name-${rng.nextInt(100)}',
+          title: 'name-${rng.nextInt(100)}',
           tags: <String>[for (var t = 0; t < rng.nextInt(3); t++) 't$t'],
         );
         final end = middle.copyWith(
           address: _address(rng),
           scores: <String, int>{'z': rng.nextInt(50)},
+          previousAddress: rng.nextBool() ? _address(rng) : null,
         );
 
-        final a = ProfilePatch.diff(base, middle);
-        final b = ProfilePatch.diff(middle, end);
+        final a = PatchProbePatch.diff(base, middle);
+        final b = PatchProbePatch.diff(middle, end);
 
-        expect(
-          a.compose(b).apply(base),
-          b.apply(a.apply(base)),
-          reason: 'compose is apply-then-apply',
-        );
+        expect(a.compose(b).apply(base), b.apply(a.apply(base)));
         expect(a.compose(b).apply(base), end);
       }
     });
@@ -343,11 +278,43 @@ void main() {
     test('an identical pair is the canonical empty patch', () {
       final rng = Random(17);
       for (var i = 0; i < 20; i++) {
-        final profile = _profile(rng);
-        final patch = ProfilePatch.diff(profile, profile);
+        final probe = _probe(rng);
+        final patch = PatchProbePatch.diff(probe, probe);
         expect(patch.isEmpty, isTrue);
-        expect(identical(patch.apply(profile), profile), isTrue);
+        expect(identical(patch.apply(probe), probe), isTrue);
       }
+    });
+
+    test('content-equal collections with fresh allocations are empty', () {
+      final previous = _base();
+      // Same contents, independently allocated collections (not identical).
+      final next = previous.copyWith(
+        tags: <String>['a', 'b'],
+        scores: <String, int>{'a': 1, 'b': 2},
+        counts: <int, int>{1: 1},
+      );
+      expect(identical(next.tags, previous.tags), isFalse);
+      expect(identical(next.scores, previous.scores), isFalse);
+      expect(identical(next.counts, previous.counts), isFalse);
+
+      final patch = PatchProbePatch.diff(previous, next);
+      expect(patch.isEmpty, isTrue);
+    });
+
+    test('genuinely different collections are still recorded', () {
+      final previous = _base();
+      final next = previous.copyWith(
+        tags: <String>['a', 'b', 'c'],
+        scores: <String, int>{'a': 1, 'b': 99},
+        counts: <int, int>{1: 1, 2: 2},
+      );
+
+      final patch = PatchProbePatch.diff(previous, next);
+      expect(patch.isEmpty, isFalse);
+      final applied = patch.apply(previous);
+      expect(applied.tags, next.tags);
+      expect(applied.scores, next.scores);
+      expect(applied.counts, next.counts);
     });
   });
 }

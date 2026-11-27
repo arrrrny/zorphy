@@ -1,14 +1,14 @@
 // Runtime property tests for ISSUE-007 (zorphy#182) — the patch algebra.
 //
-// These exercise the patch shape the emitter produces (`AccountPatch` in
-// `test/runtime/fixtures/account.dart`, byte-locked to `PatchEmitter`'s output
-// by `test/golden/patch_golden_test.dart`) across randomized entity
-// transitions.
+// These exercise PatchProbePatch from the v3-generated fixture
+// `test/runtime/fixtures/patch_contract.dart` across deterministic randomized
+// transitions, including scalars, atomic collections, and nested values.
 //
 // Laws under test:
 //   * identity      — an empty patch is the neutral element of compose()
 //   * zero-copy     — apply() on an empty patch returns the target itself
-//   * O(1) diff     — diff(x, x) is the canonical empty patch
+//   * diff          — identical values produce the canonical empty patch
+//   * diff/apply    — applying a diff carries every changed field
 //   * composition   — (a.compose(b)).apply(x) == b.apply(a.apply(x))
 //   * associativity — (a.compose(b)).compose(c) behaves like a.compose(b.compose(c))
 //   * invertibility — p.invert(x).apply(p.apply(x)) == x
@@ -19,63 +19,130 @@ import 'dart:math';
 
 import 'package:test/test.dart';
 
-import 'fixtures/account.dart';
+import 'fixtures/patch_contract.dart';
 
-const _names = ['ada', 'grace', 'alan', 'edsger', 'barbara', 'donald'];
-const _notes = [null, '', 'draft', 'review', 'shipped', 'a longer note value'];
-const _tiers = AccountTier.values;
+const _ids = ['id-1', 'id-2', 'id-3', 'id-4', 'id-5', 'id-6'];
+const _titles = ['ada', 'grace', 'alan', 'edsger', 'barbara', 'donald'];
+const _tags = ['a', 'b', 'c', 'd', 'e'];
+const _addresses = [
+  ProbeAddress(street: 'Main', city: 'Springfield'),
+  ProbeAddress(street: 'Elm', city: 'Shelbyville'),
+  ProbeAddress(street: 'Oak', city: 'Ogdenville'),
+  ProbeAddress(street: 'Pine', city: 'North Haverbrook'),
+];
 
-/// One randomized edit: a field name plus the value to set it to.
+/// One randomized edit: a field name plus the whole value to set it to.
 class _Edit {
   _Edit(this.field, this.value);
 
   final String field;
   final Object? value;
 
-  AccountPatch toPatch() {
-    final patch = AccountPatch();
+  PatchProbePatch toPatch() {
+    final patch = PatchProbePatch();
     switch (field) {
-      case 'name':
-        patch.withName(value as String?);
-      case 'score':
-        patch.withScore(value as int?);
-      case 'note':
-        patch.withNote(value as String?);
-      case 'tier':
-        patch.withTier(value as AccountTier?);
+      case 'id':
+        return patch.withId(value as String);
+      case 'title':
+        return patch.withTitle(value as String);
+      case 'tags':
+        return patch.withTags(value as List<String>);
+      case 'scores':
+        return patch.withScores(value as Map<String, int>);
+      case 'counts':
+        return patch.withCounts(value as Map<int, int>);
+      case 'status':
+        return patch.withStatus(value as PatchProbeStatus);
+      case 'address':
+        return patch.withAddress(value as ProbeAddress);
+      case 'previousAddress':
+        return patch.withPreviousAddress(value as ProbeAddress?);
       default:
         throw StateError('unmodelled field $field');
     }
-    return patch;
   }
 }
 
 /// Picks a value that differs from the field's current value on [entity].
-_Edit _randomEdit(Random rng, Account entity) {
-  final fields = <String>['name', 'score', 'note', 'tier'];
+_Edit _randomEdit(Random rng, PatchProbe entity) {
+  const fields = [
+    'id',
+    'title',
+    'tags',
+    'scores',
+    'counts',
+    'status',
+    'address',
+    'previousAddress',
+  ];
   final field = fields[rng.nextInt(fields.length)];
   switch (field) {
-    case 'name':
-      return _Edit('name', _names[rng.nextInt(_names.length)]);
-    case 'score':
-      final delta = rng.nextInt(10) + 1;
-      return _Edit('score', entity.score + (rng.nextBool() ? delta : -delta));
-    case 'note':
-      final candidates = _notes.where((n) => n != entity.note).toList();
-      return _Edit('note', candidates[rng.nextInt(candidates.length)]);
-    case 'tier':
-      final candidates = _tiers.where((t) => t != entity.tier).toList();
-      return _Edit('tier', candidates[rng.nextInt(candidates.length)]);
+    case 'id':
+      final candidates = _ids.where((value) => value != entity.id).toList();
+      return _Edit('id', candidates[rng.nextInt(candidates.length)]);
+    case 'title':
+      final candidates = _titles
+          .where((value) => value != entity.title)
+          .toList();
+      return _Edit('title', candidates[rng.nextInt(candidates.length)]);
+    case 'tags':
+      return _Edit('tags', <String>[
+        ...entity.tags,
+        _tags[rng.nextInt(_tags.length)],
+      ]);
+    case 'scores':
+      return _Edit('scores', <String, int>{
+        ...entity.scores,
+        'edit': (entity.scores['edit'] ?? 0) + 1,
+      });
+    case 'counts':
+      return _Edit('counts', <int, int>{
+        ...entity.counts,
+        1: (entity.counts[1] ?? 0) + 1,
+      });
+    case 'status':
+      return _Edit(
+        'status',
+        entity.status == PatchProbeStatus.active
+            ? PatchProbeStatus.paused
+            : PatchProbeStatus.active,
+      );
+    case 'address':
+      final candidates = _addresses
+          .where((value) => value != entity.address)
+          .toList();
+      return _Edit('address', candidates[rng.nextInt(candidates.length)]);
+    case 'previousAddress':
+      final candidates = <ProbeAddress?>[
+        ..._addresses,
+        null,
+      ].where((value) => value != entity.previousAddress).toList();
+      return _Edit(
+        'previousAddress',
+        candidates[rng.nextInt(candidates.length)],
+      );
   }
   throw StateError('unreachable');
 }
 
-Account _randomAccount(Random rng) => Account(
-  id: 'id-${rng.nextInt(1 << 20)}',
-  name: _names[rng.nextInt(_names.length)],
-  score: rng.nextInt(200) - 50,
-  note: _notes[rng.nextInt(_notes.length)],
-  tier: _tiers[rng.nextInt(_tiers.length)],
+PatchProbe _randomProbe(Random rng) => PatchProbe(
+  id: 'id-${rng.nextInt(6) + 1}',
+  title: _titles[rng.nextInt(_titles.length)],
+  tags: <String>[
+    for (var i = 0; i < rng.nextInt(4); i++) _tags[rng.nextInt(_tags.length)],
+  ],
+  scores: <String, int>{
+    for (var i = 0; i < rng.nextInt(3); i++)
+      'k${rng.nextInt(4)}': rng.nextInt(50),
+  },
+  counts: <int, int>{
+    for (var i = 0; i < rng.nextInt(3); i++) rng.nextInt(4): rng.nextInt(50),
+  },
+  status: PatchProbeStatus.values[rng.nextInt(PatchProbeStatus.values.length)],
+  address: _addresses[rng.nextInt(_addresses.length)],
+  previousAddress: rng.nextBool()
+      ? _addresses[rng.nextInt(_addresses.length)]
+      : null,
 );
 
 void main() {
@@ -84,106 +151,95 @@ void main() {
   group('ISSUE-007 patch algebra', () {
     test('identity: empty patch is the neutral element of compose', () {
       final rng = Random(7);
-      final empty = AccountPatch();
+      final empty = PatchProbePatch();
       for (var i = 0; i < transitions; i++) {
-        final base = _randomAccount(rng);
-        final edit = _randomEdit(rng, base);
-        final patch = empty.compose(edit.toPatch());
-        final other = edit.toPatch().compose(empty);
+        final base = _randomProbe(rng);
+        final edit = _randomEdit(rng, base).toPatch();
+        final left = empty.compose(edit);
+        final right = edit.compose(empty);
 
-        expect(patch.isEmpty, isFalse, reason: 'identity on the left');
-        expect(other.isEmpty, isFalse, reason: 'identity on the right');
-        expect(
-          patch.apply(base),
-          edit.toPatch().apply(base),
-          reason: 'empty.compose(p) behaves like p',
-        );
-        expect(
-          other.apply(base),
-          edit.toPatch().apply(base),
-          reason: 'p.compose(empty) behaves like p',
-        );
+        expect(left.isEmpty, isFalse, reason: 'identity on the left');
+        expect(right.isEmpty, isFalse, reason: 'identity on the right');
+        expect(left.apply(base), edit.apply(base));
+        expect(right.apply(base), edit.apply(base));
       }
     });
 
     test('zero-copy: apply() on an empty patch returns the target itself', () {
       final rng = Random(11);
-      final empty = AccountPatch();
+      final empty = PatchProbePatch();
       for (var i = 0; i < transitions; i++) {
-        final base = _randomAccount(rng);
-        final result = empty.apply(base);
-        expect(
-          identical(result, base),
-          isTrue,
-          reason: 'isEmpty ⇒ no allocation',
-        );
+        final base = _randomProbe(rng);
+        expect(identical(empty.apply(base), base), isTrue);
       }
     });
 
-    test('O(1) diff: diff(x, x) is the canonical empty patch', () {
-      final rng = Random(13);
-      for (var i = 0; i < transitions; i++) {
-        final base = _randomAccount(rng);
-        final patch = AccountPatch.diff(base, base);
-        expect(patch.isEmpty, isTrue);
-        expect(identical(patch.apply(base), base), isTrue);
-      }
-    });
+    test(
+      'diff: identical and content-equal values are canonical empty patches',
+      () {
+        final rng = Random(13);
+        for (var i = 0; i < transitions; i++) {
+          final base = _randomProbe(rng);
+          for (final next in [base, base.copyWith()]) {
+            final patch = PatchProbePatch.diff(base, next);
+            expect(patch.isEmpty, isTrue);
+            expect(identical(patch.apply(base), base), isTrue);
+          }
+        }
+      },
+    );
 
     test('diff: apply(diff(previous, next)) == next', () {
       final rng = Random(17);
       for (var i = 0; i < transitions; i++) {
-        final previous = _randomAccount(rng);
-        final next = previous.copyWith(
-          name: _randomEdit(rng, previous).field == 'name'
-              ? _names[rng.nextInt(_names.length)]
-              : previous.name,
-          score: rng.nextInt(500) - 250,
-          note: _notes[rng.nextInt(_notes.length)],
-          tier: _tiers[rng.nextInt(_tiers.length)],
-        );
-        final patch = AccountPatch.diff(previous, next);
-        expect(
-          patch.apply(previous),
-          next,
-          reason: 'diff must carry every changed field',
-        );
-        expect(patch.isEmpty, isFalse, reason: 'a changed pair is not empty');
+        final previous = _randomProbe(rng);
+        final next = _randomEdit(rng, previous).toPatch().apply(previous);
+        final patch = PatchProbePatch.diff(previous, next);
+
+        expect(patch.apply(previous), next);
+        expect(patch.isEmpty, isFalse);
       }
     });
 
-    test('diff: every field changed at once, id and name included', () {
-      // The randomized loop above keeps `id` fixed and only changes `name`
-      // when the coin lands, so `diff` is barely exercised for either (review
-      // of #203). This case is deterministic: EVERY field moves.
-      const previous = Account(
+    test('diff: every field changed at once is carried and inverted', () {
+      const previous = PatchProbe(
         id: 'id-before',
-        name: 'ada',
-        score: 1,
-        note: 'draft',
-        tier: AccountTier.free,
+        title: 'ada',
+        tags: ['a'],
+        scores: {'a': 1},
+        counts: {1: 1},
+        status: PatchProbeStatus.active,
+        address: ProbeAddress(street: 'Main', city: 'Springfield'),
+        previousAddress: ProbeAddress(street: 'Oak', city: 'Ogdenville'),
       );
-      const next = Account(
+      const next = PatchProbe(
         id: 'id-after',
-        name: 'grace',
-        score: 2,
-        note: 'shipped',
-        tier: AccountTier.enterprise,
+        title: 'grace',
+        tags: ['b', 'c'],
+        scores: {'a': 2, 'b': 3},
+        counts: {1: 2, 2: 3},
+        status: PatchProbeStatus.paused,
+        address: ProbeAddress(street: 'Elm', city: 'Shelbyville'),
+        previousAddress: ProbeAddress(street: 'Pine', city: 'North Haverbrook'),
       );
 
-      final patch = AccountPatch.diff(previous, next);
+      final patch = PatchProbePatch.diff(previous, next);
 
-      expect(patch.apply(previous), next, reason: 'every field is carried');
+      expect(patch.apply(previous), next);
       expect(
         patch.toWire().keys,
-        unorderedEquals(['id', 'name', 'score', 'note', 'tier']),
-        reason: 'no field escapes the diff',
+        unorderedEquals([
+          'id',
+          'title',
+          'tags',
+          'scores',
+          'counts',
+          'status',
+          'address',
+          'previousAddress',
+        ]),
       );
-      expect(
-        patch.invert(previous).apply(next),
-        previous,
-        reason: 'the inverse restores id and name too',
-      );
+      expect(patch.invert(previous).apply(next), previous);
     });
 
     test(
@@ -191,16 +247,12 @@ void main() {
       () {
         final rng = Random(23);
         for (var i = 0; i < transitions; i++) {
-          final base = _randomAccount(rng);
+          final base = _randomProbe(rng);
           final a = _randomEdit(rng, base).toPatch();
           final middle = a.apply(base);
           final b = _randomEdit(rng, middle).toPatch();
 
-          expect(
-            a.compose(b).apply(base),
-            b.apply(a.apply(base)),
-            reason: 'compose threads left to right',
-          );
+          expect(a.compose(b).apply(base), b.apply(a.apply(base)));
         }
       },
     );
@@ -208,7 +260,7 @@ void main() {
     test('associativity: (a∘b)∘c behaves like a∘(b∘c)', () {
       final rng = Random(29);
       for (var i = 0; i < transitions; i++) {
-        final base = _randomAccount(rng);
+        final base = _randomProbe(rng);
         final a = _randomEdit(rng, base).toPatch();
         final afterA = a.apply(base);
         final b = _randomEdit(rng, afterA).toPatch();
@@ -218,7 +270,6 @@ void main() {
         expect(
           a.compose(b).compose(c).apply(base),
           a.compose(b.compose(c)).apply(base),
-          reason: 'compose is associative',
         );
       }
     });
@@ -226,25 +277,19 @@ void main() {
     test('invertibility: p.invert(x).apply(p.apply(x)) == x', () {
       final rng = Random(31);
       for (var i = 0; i < transitions; i++) {
-        final base = _randomAccount(rng);
+        final base = _randomProbe(rng);
         final patch = _randomEdit(rng, base).toPatch();
         final patched = patch.apply(base);
 
-        expect(
-          patch.invert(base).apply(patched),
-          base,
-          reason: 'invert restores every field the patch changed',
-        );
+        expect(patch.invert(base).apply(patched), base);
       }
     });
 
     test('burst coalescing: chained edits collapse to one faithful patch', () {
       final rng = Random(37);
       for (var i = 0; i < transitions; i++) {
-        final base = _randomAccount(rng);
-
-        // A burst: load progress style, many edits on one value.
-        final burst = <AccountPatch>[];
+        final base = _randomProbe(rng);
+        final burst = <PatchProbePatch>[];
         var current = base;
         for (var step = 0; step < 5; step++) {
           final edit = _randomEdit(rng, current).toPatch();
@@ -252,23 +297,22 @@ void main() {
           current = edit.apply(current);
         }
 
-        var coalesced = AccountPatch();
+        var coalesced = PatchProbePatch();
         var applied = base;
         for (final edit in burst) {
           coalesced = coalesced.compose(edit);
           applied = edit.apply(applied);
         }
 
-        expect(coalesced.apply(base), applied, reason: 'coalesced burst');
+        expect(coalesced.apply(base), applied);
         expect(coalesced.apply(base), current);
       }
     });
 
     test('toWire: keys are field names, values are the carried changes', () {
-      final patch = AccountPatch().withName('grace').withScore(9);
-      expect(patch.toWire(), {'name': 'grace', 'score': 9});
-
-      expect(AccountPatch().toWire(), isEmpty);
+      final patch = PatchProbePatch().withId('p2').withTitle('grace');
+      expect(patch.toWire(), {'id': 'p2', 'title': 'grace'});
+      expect(PatchProbePatch().toWire(), isEmpty);
     });
   });
 }

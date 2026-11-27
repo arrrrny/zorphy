@@ -12,7 +12,7 @@ builders:
   # directive, which is the mirror tree #309 retires. The `.zorphy.dart`
   # extension below is the real on-disk file name, colocated with the source
   # library it extends.
-  # Handles both @Zorphy and @Zorphy2 annotations and resolves polymorphic
+  # Handles the zero-preset v3 archetype annotations and resolves polymorphic
   # ordering internally (topological order over the implements $$Base graph).
   zorphy:
     target: "zorphy"
