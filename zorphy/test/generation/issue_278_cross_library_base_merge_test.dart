@@ -13,6 +13,8 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
+import '../support/provision_example_fixture.dart';
+
 void main() {
   final basePart = File('example/lib/crosslib/base_shape.zorphy.dart');
   final circlePart = File('example/lib/crosslib/circle.zorphy.dart');
@@ -21,6 +23,12 @@ void main() {
   late String circle;
 
   setUpAll(() {
+    // Provision the example build_runner output on demand (issue #287): the
+    // cost-guards benchmark runs a scoped `build_runner` from the package root
+    // that cleans the example's generated parts, and `test/benchmark/` sorts
+    // before `test/generation/`, so a fresh clone — or a tree the benchmark
+    // just cleaned — has no crosslib parts until the example is rebuilt here.
+    provisionExampleFixture();
     if (!circlePart.existsSync()) {
       fail(
         'Missing generated file: ${circlePart.path}\n'
