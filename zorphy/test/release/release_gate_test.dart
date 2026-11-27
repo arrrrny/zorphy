@@ -14,8 +14,9 @@ import 'package:test/test.dart';
 
 /// The repository root: this test runs with the `zorphy` package as cwd (the
 /// documented `dart test` invocation) and the package sits directly under it.
-final String _repoRoot = Directory('${Directory.current.path}/..')
-    .resolveSymbolicLinksSync();
+final String _repoRoot = Directory(
+  '${Directory.current.path}/..',
+).resolveSymbolicLinksSync();
 
 String _read(String relative) =>
     File('$_repoRoot/$relative').readAsStringSync();
@@ -84,7 +85,7 @@ void main() {
         expect(
           commands,
           containsAll(<Matcher>[
-            contains('git clone --depth 1 file://'),
+            contains('git clone file://'),
             contains('scripts/check_version_sync.sh'),
             contains('dart pub get --enforce-lockfile'),
             contains('dart format --output=none --set-exit-if-changed'),

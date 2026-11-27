@@ -25,6 +25,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the sweep runs `git merge-base --is-ancestor` against
+          # master, which a depth-1 checkout cannot satisfy — a known master
+          # ancestor would be reported as orphaned (issue #322).
+          fetch-depth: 0
+      - name: Ensure the base ref (master) exists locally
+        # A tag / release checkout has no local master; create it from the
+        # fetched remote-tracking ref so the ancestry sweep has a base.
+        run: git rev-parse -q --verify master >/dev/null || git branch master origin/master
       - name: Sweep merged PRs for orphaned content
         env:
           GH_TOKEN: ${{ github.token }}

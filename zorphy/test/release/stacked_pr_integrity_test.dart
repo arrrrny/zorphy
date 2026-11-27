@@ -70,7 +70,44 @@ String _pr(int number, String oid, String base) => jsonEncode({
   'mergeCommit': {'oid': oid},
 });
 
+/// A merged-PR record that also carries a `mergedAt` timestamp, so the
+/// `SWEEP_DAYS` window has data to filter on (issue #322).
+String _prAt(int number, String oid, String base, String mergedAt) =>
+    jsonEncode({
+      'number': number,
+      'title': 'PR #$number',
+      'baseRefName': base,
+      'mergedAt': mergedAt,
+      'mergeCommit': {'oid': oid},
+    });
+
+/// A temp bin directory holding a `gh` that always fails, returned as a PATH
+/// prefix that activates it — simulates `gh` being unavailable (network/auth
+/// error) so the fail-closed behaviour can be exercised deterministically.
+String _failingGhPath(Directory root) {
+  final bin = Directory('${root.path}/fakebin')..createSync(recursive: true);
+  final gh = File('${bin.path}/gh')..writeAsStringSync('#!/bin/sh\nexit 1\n');
+  Process.runSync('chmod', ['+x', gh.path]);
+  return '${bin.path}:${Platform.environment['PATH'] ?? ''}';
+}
+
 void main() {
+  group('executable hook bits (issue #322)', () {
+    test('pre-push hook and install_hooks.sh are executable', () {
+      for (final rel in [
+        'scripts/git-hooks/pre-push',
+        'scripts/install_hooks.sh',
+      ]) {
+        final mode = File('$_repoRoot/$rel').statSync().mode;
+        expect(
+          mode & 0x49,
+          isNot(0),
+          reason: '$rel is not executable (mode ${mode.toRadixString(8)})',
+        );
+      }
+    });
+  });
+
   group('check_stacked_pr_integrity.sh', () {
     late Directory root;
     late String base; // a commit on master that is NOT the merge commit
@@ -132,12 +169,33 @@ void main() {
 
     test('passes a normal fast-forward push', () async {
       final stdin = 'refs/heads/master $rebased refs/heads/master $base\n';
-      final out = await _runWithStdin(root, [
-        'bash',
-        'scripts/check_stacked_pr_integrity.sh',
-      ], stdin);
+      // Offline empty inventory: a successful lookup with no merged PRs. The
+      // gate now fails closed on a real gh error, so the happy path supplies
+      // the explicit offline source instead of relying on gh being absent.
+      final out = await _runWithStdin(
+        root,
+        ['bash', 'scripts/check_stacked_pr_integrity.sh'],
+        stdin,
+        env: {'GH_PR_LIST_JSON': ''},
+      );
 
       expect(out, contains('exit=0'), reason: out);
+    });
+
+    test('refuses a push when gh is unavailable and no offline inventory is set '
+        '(fail closed)', () async {
+      // A real force-push on stdin, gh stubbed to fail, no GH_PR_LIST_JSON: the
+      // lookup error must NOT be read as an empty inventory that allows the
+      // push (the #322 fail-open bug).
+      final stdin = 'refs/heads/stack $rebased refs/heads/stack $stackTip\n';
+      final out = await _runWithStdin(
+        root,
+        ['bash', 'scripts/check_stacked_pr_integrity.sh'],
+        stdin,
+        env: {'PATH': _failingGhPath(root)},
+      );
+
+      expect(out, contains('exit=1'), reason: out);
     });
 
     test('allows the orphaning push with STACK_REBASE_OK=1', () async {
@@ -226,6 +284,72 @@ void main() {
 
       expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
       expect(result.stdout, contains('OK'));
+    });
+
+    test(
+      'fails closed when gh is unavailable and no offline inventory is set',
+      () async {
+        // gh stubbed to fail, no GH_PR_LIST_JSON: the lookup error must fail the
+        // sweep (non-zero) instead of being read as "no merged PRs — OK" (the
+        // #322 fail-open bug that silently skipped the release backstop).
+        final result = await Process.run(
+          'bash',
+          ['scripts/sweep_merged_content.sh'],
+          workingDirectory: root.path,
+          environment: {...Platform.environment, 'PATH': _failingGhPath(root)},
+        );
+
+        expect(
+          result.exitCode,
+          isNot(0),
+          reason: 'a gh lookup failure must fail the sweep, not pass it',
+        );
+      },
+    );
+
+    test('SWEEP_DAYS controls the merged-PR window', () async {
+      final fresh = DateTime.now().toIso8601String();
+      final old = DateTime.now()
+          .subtract(const Duration(days: 30))
+          .toIso8601String();
+      final prs = [
+        _prAt(1, onMaster, 'master', fresh),
+        _prAt(2, orphaned, 'master', old),
+      ].join('\n');
+
+      // A 1-day window excludes the 30-day-old orphan (#2): nothing to report.
+      final narrow = await Process.run(
+        'bash',
+        ['scripts/sweep_merged_content.sh'],
+        workingDirectory: root.path,
+        environment: {
+          ...Platform.environment,
+          'GH_PR_LIST_JSON': prs,
+          'SWEEP_DAYS': '1',
+        },
+      );
+      final narrowOut = '${narrow.stdout}${narrow.stderr}';
+      expect(narrow.exitCode, 0, reason: narrowOut);
+      expect(
+        narrowOut,
+        isNot(contains('orphaned merge: #2')),
+        reason: 'SWEEP_DAYS=1 must exclude the older merged PR',
+      );
+
+      // A 90-day window includes it again: the orphan is reported, exit 1.
+      final wide = await Process.run(
+        'bash',
+        ['scripts/sweep_merged_content.sh'],
+        workingDirectory: root.path,
+        environment: {
+          ...Platform.environment,
+          'GH_PR_LIST_JSON': prs,
+          'SWEEP_DAYS': '90',
+        },
+      );
+      final wideOut = '${wide.stdout}${wide.stderr}';
+      expect(wide.exitCode, 1, reason: wideOut);
+      expect(wideOut, contains('orphaned merge: #2'));
     });
   });
 }
