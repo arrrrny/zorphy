@@ -194,6 +194,37 @@ void main() {
       stderrEncoding: const SystemEncoding(),
     );
     final analyzeOutput = '${analyze.stdout}\n${analyze.stderr}';
+    // Reject an analyzer that never ran (startup failure, crash, bad flag):
+    // a non-zero exit with no diagnostic lines is not "clean", and a zero
+    // exit with no completion marker proves nothing was analyzed. Require the
+    // analyzer's own completion signal before trusting the diagnostic set.
+    expect(
+      analyzeOutput,
+      contains('No issues found!'),
+      reason:
+          'analyzer did not complete successfully (no "No issues found!" '
+          'marker — startup failure or unexpected error):\n$analyzeOutput',
+    );
+    // The fixture intentionally leaves an unused element behind, so permit
+    // `unused_element` infos explicitly; any OTHER diagnostic is unexpected
+    // and fails the test even if the process exit code were somehow 0.
+    final unexpected = analyzeOutput
+        .split('\n')
+        .where(
+          (line) =>
+              (line.contains(' error ') || line.contains(' warning ') ||
+                  line.contains(' info ')) &&
+              !line.contains('unused_element'),
+        )
+        .join('\n');
+    expect(
+      unexpected,
+      isEmpty,
+      reason:
+          'analyzer reported unexpected diagnostics (only unused_element is '
+          'permitted for this fixture):\n$unexpected\n---full---\n'
+          '$analyzeOutput',
+    );
     expect(
       analyze.exitCode,
       0,
