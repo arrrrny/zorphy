@@ -322,8 +322,9 @@ final class MockFixtureEmitter {
       // (#232): it carries no `fromTrusted` for the mock to call.
       final construct = node.archetype == ArchetypeKind.intent
           ? referType(node.cleanName).newInstance(const [], arguments)
-          : referType(node.cleanName)
-                .newInstanceNamed('fromTrusted', const [], arguments);
+          : referType(
+              node.cleanName,
+            ).newInstanceNamed('fromTrusted', const [], arguments);
       m.body = Block.of([construct.returned.statement]);
     });
   }

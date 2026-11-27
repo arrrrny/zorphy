@@ -192,57 +192,60 @@ void main() {
     });
   });
 
-  group('#290 union variant factory — generated code compiles (dart analyze)', () {
-    test(
-      'AppFailure.network / .violation analyze clean with no wrappers',
-      () async {
-        final (_, body) = await _compose({'nodes.dart': _appFailure});
-        final probeParent = Directory('test/.issue_290_$pid')
-          ..createSync(recursive: true);
-        final probe = probeParent.createTempSync('issue_290_').absolute;
-        addTearDown(() => probe.deleteSync(recursive: true));
+  group(
+    '#290 union variant factory — generated code compiles (dart analyze)',
+    () {
+      test(
+        'AppFailure.network / .violation analyze clean with no wrappers',
+        () async {
+          final (_, body) = await _compose({'nodes.dart': _appFailure});
+          final probeParent = Directory('test/.issue_290_$pid')
+            ..createSync(recursive: true);
+          final probe = probeParent.createTempSync('issue_290_').absolute;
+          addTearDown(() => probe.deleteSync(recursive: true));
 
-        final annotationRoot = Directory.current.parent.uri
-            .resolve('zorphy_annotation/')
-            .toFilePath();
+          final annotationRoot = Directory.current.parent.uri
+              .resolve('zorphy_annotation/')
+              .toFilePath();
 
-        File('${probe.path}/pubspec.yaml').writeAsStringSync(
-          'name: issue_290_probe\n'
-          'environment:\n'
-          '  sdk: ">=3.11.0 <4.0.0"\n'
-          'dependencies:\n'
-          '  zorphy_annotation:\n'
-          '    path: $annotationRoot\n',
-        );
-        Directory('${probe.path}/lib').createSync();
-        File('${probe.path}/lib/generated.dart').writeAsStringSync(
-          "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$body",
-        );
+          File('${probe.path}/pubspec.yaml').writeAsStringSync(
+            'name: issue_290_probe\n'
+            'environment:\n'
+            '  sdk: ">=3.11.0 <4.0.0"\n'
+            'dependencies:\n'
+            '  zorphy_annotation:\n'
+            '    path: $annotationRoot\n',
+          );
+          Directory('${probe.path}/lib').createSync();
+          File('${probe.path}/lib/generated.dart').writeAsStringSync(
+            "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$body",
+          );
 
-        final pubGet = Process.runSync('dart', [
-          'pub',
-          'get',
-        ], workingDirectory: probe.path);
-        expect(
-          pubGet.exitCode,
-          0,
-          reason: 'dart pub get failed:\n${pubGet.stdout}\n${pubGet.stderr}',
-        );
+          final pubGet = Process.runSync('dart', [
+            'pub',
+            'get',
+          ], workingDirectory: probe.path);
+          expect(
+            pubGet.exitCode,
+            0,
+            reason: 'dart pub get failed:\n${pubGet.stdout}\n${pubGet.stderr}',
+          );
 
-        final analyze = Process.runSync('dart', [
-          'analyze',
-          '--fatal-infos',
-          'lib/generated.dart',
-        ], workingDirectory: probe.path);
-        expect(
-          analyze.exitCode,
-          0,
-          reason:
-              'generated union surface does not compile:\n'
-              '${analyze.stdout}\n${analyze.stderr}',
-        );
-      },
-      timeout: const Timeout(Duration(minutes: 6)),
-    );
-  });
+          final analyze = Process.runSync('dart', [
+            'analyze',
+            '--fatal-infos',
+            'lib/generated.dart',
+          ], workingDirectory: probe.path);
+          expect(
+            analyze.exitCode,
+            0,
+            reason:
+                'generated union surface does not compile:\n'
+                '${analyze.stdout}\n${analyze.stderr}',
+          );
+        },
+        timeout: const Timeout(Duration(minutes: 6)),
+      );
+    },
+  );
 }

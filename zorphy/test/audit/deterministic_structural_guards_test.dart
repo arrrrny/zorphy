@@ -208,66 +208,70 @@ void main() {
       );
     });
 
-    test('the generated surface passes the structural probe (exit 0, green)', () async {
-      final root = _packageRoot();
-      final analyzerMajor = await _resolvedAnalyzerMajor(root);
-      if (analyzerMajor != null && analyzerMajor < 14) {
-        markTestSkipped(
-          'build_runner 2.17.x requires analyzer 14+ (AnalysisOptionsBuilder); '
-          'codegen cannot run under the analyzer-$analyzerMajor compat leg. '
-          'The default test job and the analyzer-14 leg cover this probe.',
+    test(
+      'the generated surface passes the structural probe (exit 0, green)',
+      () async {
+        final root = _packageRoot();
+        final analyzerMajor = await _resolvedAnalyzerMajor(root);
+        if (analyzerMajor != null && analyzerMajor < 14) {
+          markTestSkipped(
+            'build_runner 2.17.x requires analyzer 14+ (AnalysisOptionsBuilder); '
+            'codegen cannot run under the analyzer-$analyzerMajor compat leg. '
+            'The default test job and the analyzer-14 leg cover this probe.',
+          );
+          return;
+        }
+        final dart = Platform.resolvedExecutable;
+
+        // Generation is the prerequisite: a non-zero exit here is the loud
+        // build-time failure #234's acceptance gate requires.
+        final gen = await runWithDeadline(
+          dart,
+          <String>[
+            'run',
+            'build_runner',
+            'build',
+            '--delete-conflicting-outputs',
+            '--build-filter',
+            'benchmark/**',
+          ],
+          cwd: root.path,
+          deadline: const Duration(minutes: 4),
         );
-        return;
-      }
-      final dart = Platform.resolvedExecutable;
+        expect(
+          gen.exitCode,
+          0,
+          reason:
+              'build_runner generation failed (exit ${gen.exitCode}); the '
+              'structural probe measures generated code and cannot run without '
+              'it:\n${gen.stdout}\n${gen.stderr}',
+        );
 
-      // Generation is the prerequisite: a non-zero exit here is the loud
-      // build-time failure #234's acceptance gate requires.
-      final gen = await runWithDeadline(
-        dart,
-        <String>[
-          'run',
-          'build_runner',
-          'build',
-          '--delete-conflicting-outputs',
-          '--build-filter',
-          'benchmark/**',
-        ],
-        cwd: root.path,
-        deadline: const Duration(minutes: 4),
-      );
-      expect(
-        gen.exitCode,
-        0,
-        reason:
-            'build_runner generation failed (exit ${gen.exitCode}); the '
-            'structural probe measures generated code and cannot run without '
-            'it:\n${gen.stdout}\n${gen.stderr}',
-      );
+        final probe = await runWithDeadline(
+          dart,
+          <String>['run', 'test/audit/_structural_probe.dart'],
+          cwd: root.path,
+          deadline: const Duration(minutes: 2),
+        );
 
-      final probe = await runWithDeadline(
-        dart,
-        <String>['run', 'test/audit/_structural_probe.dart'],
-        cwd: root.path,
-        deadline: const Duration(minutes: 2),
-      );
-
-      final out = '${probe.stdout}\n${probe.stderr}';
-      expect(
-        probe.exitCode,
-        0,
-        reason:
-            'structural probe exited ${probe.exitCode} (-1=TIMEOUT, 1=FAILED; '
-            'a compile failure here means a generated surface — diff / '
-            'resolvePath / toWire — is missing):\n$out',
-      );
-      expect(
-        probe.stdout,
-        contains('ALL STRUCTURAL GUARDS GREEN'),
-        reason:
-            'the probe must exercise generated output and pass every '
-            'structural guard:\n$out',
-      );
-    }, timeout: const Timeout(Duration(minutes: 6)));
+        final out = '${probe.stdout}\n${probe.stderr}';
+        expect(
+          probe.exitCode,
+          0,
+          reason:
+              'structural probe exited ${probe.exitCode} (-1=TIMEOUT, 1=FAILED; '
+              'a compile failure here means a generated surface — diff / '
+              'resolvePath / toWire — is missing):\n$out',
+        );
+        expect(
+          probe.stdout,
+          contains('ALL STRUCTURAL GUARDS GREEN'),
+          reason:
+              'the probe must exercise generated output and pass every '
+              'structural guard:\n$out',
+        );
+      },
+      timeout: const Timeout(Duration(minutes: 6)),
+    );
   });
 }

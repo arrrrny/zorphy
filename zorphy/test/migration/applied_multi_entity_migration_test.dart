@@ -216,10 +216,9 @@ void assertExit(ProcessResult result, String step) {
   }
 }
 
-Future<List<File>> _zorphyPartFiles(Directory dir) async =>
-    (await _dartFiles(dir))
-        .where((f) => f.path.endsWith('.zorphy.dart'))
-        .toList();
+Future<List<File>> _zorphyPartFiles(Directory dir) async => (await _dartFiles(
+  dir,
+)).where((f) => f.path.endsWith('.zorphy.dart')).toList();
 
 Future<List<File>> _dartSources(Directory dir) async => (await _dartFiles(dir))
     .where((f) => f.path.endsWith('.dart') && !f.path.endsWith('.zorphy.dart'))
