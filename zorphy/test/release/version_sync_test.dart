@@ -76,7 +76,15 @@ void main() {
         ),
         'zorphy/pubspec.yaml': _read('zorphy/pubspec.yaml'),
         'zorphy/CHANGELOG.md': _read('zorphy/CHANGELOG.md'),
-        'zorphy/pubspec_overrides.yaml': _read('zorphy/pubspec_overrides.yaml'),
+        // The dev.4 release removed the committed zorphy/pubspec_overrides.yaml
+        // (it carried local path/git overrides that must never ship). The dry
+        // run still plans `rm -f zorphy/pubspec_overrides.yaml` only when the
+        // file is present, so the fixture synthesizes one — the test exercises
+        // the override-cleanup path without depending on a file the repo no
+        // longer carries.
+        'zorphy/pubspec_overrides.yaml':
+            'dependency_overrides:\n  zorphy_annotation:\n'
+            '    path: ../zorphy_annotation\n',
         'zorphy_migrator/pubspec.yaml': _read('zorphy_migrator/pubspec.yaml'),
         // No release heading: the note the script would insert carries the
         // description, which is what these tests read back.
