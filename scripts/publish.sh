@@ -135,8 +135,12 @@ pre_publish_gate() {
         run bash -c "cd '$check_dir/$pkg' && dart pub get"
     done
 
-    # 4. Format from zorphy/ with NO pub get — an unresolved include is CI's
-    #    own format-job environment; the formatter must still succeed.
+    # 4. Format from zorphy/ AFTER step 3's `dart pub get`: the resolved package
+    #    config pins the package's declared language version (>=3.11 → tall
+    #    style). CI's `format` job now builds the same environment by running
+    #    `dart pub get` before `dart format` (issue #327), so the gate, CI and
+    #    the committed tree all agree on tall style instead of the gate resolving
+    #    tall (package config present) while CI fell back to short (none).
     echo "  == dart format (zorphy/)"
     run bash -c "cd '$check_dir/zorphy' && dart format --output=none --set-exit-if-changed ."
 
