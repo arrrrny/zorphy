@@ -115,10 +115,17 @@ import 'package:zorphy_annotation/zorphy_annotation.dart';
 
 import '../ast/type_ref.dart';
 import '../emission/emitter.dart';
+import '../emission/wire_kind.dart';
 import '../parser/polymorphic_ir.dart';
 
 /// Emits `<Name>MockData` classes for the nodes of a resolved hierarchy.
 final class MockFixtureEmitter {
+  /// The field kinds this emitter's seed classifier branches handle.
+  ///
+  /// Exposed so the wire-capability matrix's drift gate can derive its
+  /// expected kind set from the emitters instead of a duplicate literal.
+  static Set<WireKind> get classifiedKinds => seedClassifiedKinds;
+
   /// The shared spec-emission pipeline, so page width and the formatter are
   /// owned in ONE place ([ZorphyEmitter]).
   final ZorphyEmitter _emitter;
@@ -315,8 +322,9 @@ final class MockFixtureEmitter {
       // (#232): it carries no `fromTrusted` for the mock to call.
       final construct = node.archetype == ArchetypeKind.intent
           ? referType(node.cleanName).newInstance(const [], arguments)
-          : referType(node.cleanName)
-                .newInstanceNamed('fromTrusted', const [], arguments);
+          : referType(
+              node.cleanName,
+            ).newInstanceNamed('fromTrusted', const [], arguments);
       m.body = Block.of([construct.returned.statement]);
     });
   }

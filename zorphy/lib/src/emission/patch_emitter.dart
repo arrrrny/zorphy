@@ -4,6 +4,7 @@ import 'package:zorphy_annotation/zorphy.dart' show ZorphyPatchWire;
 import '../ast/ast.dart';
 import '../common/NameType.dart';
 import '../emission/emitter.dart';
+import '../emission/wire_kind.dart';
 import '../helpers.dart' as helpers;
 
 /// Emits the concrete `<Name>Patch` class for one entity (ISSUE-007).
@@ -27,6 +28,12 @@ import '../helpers.dart' as helpers;
 /// [ZorphyEmitter]: this class assembles no source text of its own, and it
 /// introduces no preset or generation toggle.
 class PatchEmitter {
+  /// The field kinds this emitter / `ZorphyPatchWire`'s helpers handle.
+  ///
+  /// Exposed so the wire-capability matrix's drift gate can derive its
+  /// expected kind set from the emitters instead of a duplicate literal.
+  static Set<WireKind> get classifiedKinds => patchClassifiedKinds;
+
   /// Creates an emitter. Stateless: one instance serves every entity.
   const PatchEmitter();
 
@@ -1459,9 +1466,9 @@ class PatchEmitter {
   /// approximated.
   static bool _isGenericType(String type, List<String> genericTypeNames) {
     if (genericTypeNames.isEmpty) return false;
-    final identifiers = RegExp(r'[A-Za-z_$][A-Za-z0-9_$]*')
-        .allMatches(type)
-        .map((m) => m.group(0));
+    final identifiers = RegExp(
+      r'[A-Za-z_$][A-Za-z0-9_$]*',
+    ).allMatches(type).map((m) => m.group(0));
     return identifiers.any(genericTypeNames.contains);
   }
 

@@ -55,6 +55,7 @@ import 'package:code_builder/code_builder.dart';
 
 import '../ast/type_ref.dart';
 import '../parser/polymorphic_ir.dart';
+import 'wire_kind.dart';
 
 /// One field a codec must read off the wire and write back onto it.
 ///
@@ -124,6 +125,13 @@ enum _Shape {
 /// (ISSUE-003/#178 emits `fromTrusted`); a test or an alternative class shape
 /// can pin its own and keep the codec unchanged.
 class BoundaryCodecEmitter {
+  /// The field kinds this emitter's `_Shape` classifier branches handle.
+  ///
+  /// Exposed so the wire-capability matrix's drift gate can derive its
+  /// expected kind set from the emitters instead of a duplicate literal.
+  /// Adding a classifier branch MUST add its [WireKind] here.
+  static Set<WireKind> get classifiedKinds => boundaryClassifiedKinds;
+
   /// The trusted constructor each leaf's `fromWire` calls, `fromTrusted` by
   /// default (ISSUE-003/#178 emits it).
   ///

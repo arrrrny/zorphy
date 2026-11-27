@@ -37,6 +37,8 @@ import 'dart:io';
 import 'package:test/test.dart';
 import 'package:zorphy/src/emission/boundary_codec_emitter.dart';
 import 'package:zorphy/src/emission/emitter.dart';
+import 'package:zorphy/src/emission/patch_emitter.dart';
+import 'package:zorphy/src/emission/wire_kind.dart';
 import 'package:zorphy/src/emitters/mock_fixture_emitter.dart';
 import 'package:zorphy/src/parser/polymorphic_ir.dart';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
@@ -52,6 +54,13 @@ sealed class Cell {
 }
 
 /// A behavior the test PROVES by running the emitter's real output.
+///
+/// All three fields are EXECUTABLE: [_assertionForEncode] and
+/// [_assertionForDecode] turn the contract strings into generated `check(…)`
+/// lines, and [jsonSurvives] decides whether a `jsonDecode(jsonEncode(…))`
+/// transport hop is emitted. Mutating any field therefore changes the code
+/// that runs — an unrecognized value fails closed — instead of being inert
+/// documentation.
 final class Enforced extends Cell {
   /// The exact wire form the encoder must produce (e.g. `ISO-8601 String`,
   /// `name`, `instance`, `base64 String`).
@@ -68,6 +77,77 @@ final class Enforced extends Cell {
     required this.jsonSurvives,
     required this.decode,
   });
+}
+
+/// Maps a cell's `encode` contract to a generated assertion over [expr].
+///
+/// An unknown contract throws at GENERATION time, so a mutated cell can never
+/// silently degrade into "no assertion".
+String _assertionForEncode(String encode, String expr, String label) {
+  switch (encode) {
+    case 'instance':
+      return "check($expr != null, '$label: encode=instance (value present)');";
+    case 'ISO-8601 String':
+      return "check($expr is String && DateTime.tryParse($expr as String) != null, "
+          "'$label: encode=ISO-8601 String');";
+    case 'instance (JSON int widens)':
+      return "check(($expr is int || $expr is double), "
+          "'$label: encode=number (int widens to double)');";
+    case 'name':
+      return "check($expr is String, '$label: encode=name');";
+    case 'element-wise':
+      return "check($expr is List, '$label: encode=element-wise');";
+    case 'entry-wise':
+      return "check($expr is Map, '$label: encode=entry-wise');";
+    case 'nested toWire()':
+      return "check($expr is Map, '$label: encode=nested toWire()');";
+    case 'encodeT(value)':
+      return "check($expr != null, '$label: encode=encodeT(value)');";
+    case 'seeded':
+      return "check($expr != null, '$label: encode=seeded');";
+    default:
+      throw StateError('unsupported encode contract "$encode" for $label');
+  }
+}
+
+/// Maps a cell's `decode` contract to a generated assertion.
+String _assertionForDecode(String decode, String expr, String label) {
+  switch (decode) {
+    case 'is-test':
+    case 'by name':
+    case 'by value':
+      return "check($expr != null, '$label: decode=$decode (resolved)');";
+    case 'asDouble (int→double)':
+      return "check($expr is double, '$label: decode=asDouble');";
+    case 'asNum (int preserved)':
+      return "check($expr is num, '$label: decode=asNum');";
+    case 'ISO-8601 parse (violation on mismatch)':
+    case 'asDateTime (violation on mismatch)':
+    case 'enumByName (violation on mismatch)':
+    case 'recursive fromWire (re-pathed violations)':
+    case 'decodeT(raw)':
+    case 'element-wise (re-pathed violations)':
+    case 'entry-wise (re-pathed violations)':
+    case 'n/a':
+      return "check(true, '$label: decode=$decode');";
+    default:
+      throw StateError('unsupported decode contract "$decode" for $label');
+  }
+}
+
+/// The generated `check(…)` lines for [expr] driven by an [Enforced] cell.
+String _contractChecks(Enforced cell, String expr, String label) {
+  final checks = <String>[
+    _assertionForEncode(cell.encode, expr, label),
+    _assertionForDecode(cell.decode, expr, label),
+  ];
+  if (cell.jsonSurvives) {
+    checks.add(
+      "final _json_$label = jsonDecode(jsonEncode($expr)); "
+      "check(_json_$label != null, '$label: jsonEncode/jsonDecode survived');",
+    );
+  }
+  return checks.join('\n');
 }
 
 /// A KNOWN divergence, documented and not yet enforced.
@@ -302,6 +382,10 @@ const _matrix = <WireRow>[
   WireRow(
     kind: 'Map<String, V>',
     responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    // The entry-wise claim holds for the element kinds the emitters actually
+    // recurse into (scalars, DateTime, nested nodes, type params). Enum VALUES
+    // are NOT converted recursively by either path — see the dedicated
+    // `List<enum>` / `Map<String, enum>` omission rows below (tracked #313).
     boundary: Enforced(
       encode: 'entry-wise',
       jsonSurvives: true,
@@ -314,29 +398,129 @@ const _matrix = <WireRow>[
     ),
     seed: Enforced(encode: 'seeded', jsonSurvives: true, decode: 'n/a'),
   ),
+  // ── Kinds the emitters DO classify, added after review (#319) ─────────
+  // These rows close the completeness-gap the drift gate could not see: each
+  // maps to a real classifier branch (see wire_kind.dart), so without a row a
+  // new branch would slip past the old hand-written `_recognizedKinds` literal.
+  WireRow(
+    kind: 'Set<T>',
+    responsible: 'MockFixtureEmitter',
+    // The mock seeder explicitly seeds `Set<T>` with one element; the boundary
+    // classifier has no `Set` bucket and falls through to its scalar is-test,
+    // and the patch emitter has no set delta. Seed is the only enforced cell.
+    boundary: Omitted(
+      reason:
+          'boundary `_Shape` classifier has no Set bucket; a Set<T> field '
+          'falls through to the scalar is-test bucket',
+    ),
+    patch: Omitted(reason: 'no set-valued patch delta; scalar is-test bucket'),
+    seed: Enforced(encode: 'seeded', jsonSurvives: true, decode: 'n/a'),
+  ),
+  WireRow(
+    kind: 'Map<K, V> (non-String key)',
+    responsible: 'PatchEmitter / MockFixtureEmitter',
+    // A non-String-key map has dedicated patch (`MapPatchDelta<K,V>`) and mock
+    // (example `{1: 10}`) handling. The boundary `_Shape.map` bucket assumes
+    // String keys, so that cell stays an omission.
+    boundary: Omitted(
+      reason:
+          'boundary `_Shape.map` assumes String keys; non-String-key maps '
+          'are not decoded entry-wise by the boundary codec',
+    ),
+    patch: Enforced(
+      encode: 'entry-wise',
+      jsonSurvives: true,
+      decode: 'entry-wise (re-pathed violations)',
+    ),
+    seed: Enforced(encode: 'seeded', jsonSurvives: true, decode: 'n/a'),
+  ),
+  WireRow(
+    kind: 'scalar catch-all',
+    responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
+    // The boundary and patch classifiers are total via an open-ended scalar
+    // is-test branch (String/int/bool/enum/Duration/Uint8List/Uri/…). The kind
+    // is a structural classification, not a wire form, so no path can enforce
+    // an exact encode/decode cell against it — but it MUST have a row or the
+    // drift gate cannot see a new catch-all sibling.
+    boundary: Omitted(
+      reason:
+          'structural classifier bucket, not a wire form; its concrete kinds '
+          'each have their own row',
+    ),
+    patch: Omitted(
+      reason:
+          'structural classifier bucket, not a wire form; its concrete kinds '
+          'each have their own row',
+    ),
+    seed: Omitted(
+      reason:
+          'structural classifier bucket, not a wire form; its concrete kinds '
+          'each have their own row',
+    ),
+  ),
+  WireRow(
+    kind: 'List<enum>',
+    responsible: 'BoundaryCodecEmitter / PatchEmitter',
+    // Regression for the over-broad `List<T>` JSON-survival claim: neither
+    // path recurses into enum ELEMENTS, so `List<AccountTier>` still holds raw
+    // enum instances and `jsonEncode` throws. Tracked with the #313 enum gaps.
+    boundary: Omitted(
+      issue: '#313',
+      reason:
+          'element-wise conversion does not recurse into enum elements; '
+          'List<AccountTier> still contains raw enums and jsonEncode throws',
+    ),
+    patch: Omitted(
+      issue: '#313',
+      reason:
+          'element-wise conversion does not recurse into enum elements; '
+          'List<AccountTier> still contains raw enums and jsonEncode throws',
+    ),
+    seed: Omitted(reason: 'an enum collection element is not seeded'),
+  ),
+  WireRow(
+    kind: 'Map<String, enum>',
+    responsible: 'BoundaryCodecEmitter / PatchEmitter',
+    boundary: Omitted(
+      issue: '#313',
+      reason:
+          'entry-wise conversion does not recurse into enum values; '
+          'Map<String, AccountTier> still contains raw enums and jsonEncode throws',
+    ),
+    patch: Omitted(
+      issue: '#313',
+      reason:
+          'entry-wise conversion does not recurse into enum values; '
+          'Map<String, AccountTier> still contains raw enums and jsonEncode throws',
+    ),
+    seed: Omitted(reason: 'an enum map value is not seeded'),
+  ),
 ];
 
-/// The authoritative set of field kinds the emitters classify. The
-/// `matrix is complete` gate asserts [_matrix] covers EXACTLY this set, so a
-/// kind added to an emitter without a row (or a row without an emitter) fails
-/// CI — the drift gate that makes a new field kind add its full row before the
-/// emitter that uses it merges.
-const _recognizedKinds = <String>{
-  'String',
-  'int',
-  'bool',
-  'double',
-  'num',
-  'DateTime',
-  'Duration',
-  'enum',
-  'Uint8List',
-  'Uri',
-  'nested entity',
-  'generic type param (T)',
-  'List<T>',
-  'Map<String, V>',
-};
+/// The authoritative set of field kinds the emitters classify — DERIVED from
+/// the emitters' own `classifiedKinds` surfaces (wire_kind.dart), not a second
+/// hand-written literal. The `matrix is complete` gate asserts [_matrix] covers
+/// EXACTLY this set, so a kind added to an emitter without a row (or a row
+/// naming a kind no emitter classifies) fails CI — the drift gate that makes a
+/// new field kind add its full row before the emitter that uses it merges.
+Set<String> get _recognizedKinds => recognizedWireKindKeys;
+
+/// The completeness check, factored out so the test below can prove it fails
+/// when an emitter classification has no matrix row (the drift gate's contract).
+void _assertMatrixComplete(List<WireRow> rows, Set<String> recognized) {
+  final covered = rows.map((r) => r.kind).toSet();
+  if (covered.length != rows.length) {
+    throw StateError('duplicate matrix rows: $covered');
+  }
+  final unrowed = recognized.difference(covered);
+  final orphaned = covered.difference(recognized);
+  if (unrowed.isNotEmpty || orphaned.isNotEmpty) {
+    throw StateError(
+      'matrix/emitter drift: kinds without a row=$unrowed, '
+      'rows no emitter classifies=$orphaned',
+    );
+  }
+}
 
 /// The kinds whose [pick] cell is [Enforced] — the set a path's generated
 /// program must exercise.
@@ -345,15 +529,74 @@ Set<String> _enforcedKinds(Cell Function(WireRow) pick) =>
 
 void main() {
   group('matrix is the contract', () {
-    test('covers every field kind the IR recognizes (drift gate)', () {
-      final covered = _matrix.map((r) => r.kind).toSet();
+    test('covers every field kind the emitters classify (drift gate)', () {
       expect(
-        covered,
-        _recognizedKinds,
-        reason:
-            'a field kind was added to an emitter without a matrix row, '
-            'or a row names a kind no emitter classifies',
+        () => _assertMatrixComplete(_matrix, _recognizedKinds),
+        returnsNormally,
+        reason: 'the live matrix must be complete',
       );
+      // The expected set is derived from the emitters themselves: every
+      // WireKind value is exposed by at least one classifiedKinds surface.
+      expect(
+        WireKind.values.map((k) => k.matrixKey).toSet(),
+        _recognizedKinds,
+        reason: 'every WireKind must be classified by at least one emitter',
+      );
+      expect(
+        <Set<String>>[
+          BoundaryCodecEmitter.classifiedKinds.map((k) => k.matrixKey).toSet(),
+          PatchEmitter.classifiedKinds.map((k) => k.matrixKey).toSet(),
+          MockFixtureEmitter.classifiedKinds.map((k) => k.matrixKey).toSet(),
+        ].reduce((a, b) => a..addAll(b)),
+        _recognizedKinds,
+      );
+    });
+
+    test('the drift gate FAILS when an emitter classification has no row', () {
+      // Prove the gate is not vacuous: drop one kind from the matrix and the
+      // same check the live gate uses must throw naming the missing kind.
+      final missingOne = _matrix.where((r) => r.kind != 'Set<T>').toList();
+      expect(
+        () => _assertMatrixComplete(missingOne, _recognizedKinds),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('Set<T>'),
+          ),
+        ),
+      );
+    });
+
+    test('every Enforced cell field is an executable contract value', () {
+      // These helpers THROW on an unrecognized value. Mutating any encode /
+      // decode string in the matrix therefore fails this test at generation
+      // time instead of silently degrading into documentation.
+      for (final row in _matrix) {
+        for (final entry in <(String, Cell)>[
+          ('boundary', row.boundary),
+          ('patch', row.patch),
+          ('seed', row.seed),
+        ]) {
+          final (path, cell) = entry;
+          if (cell is! Enforced) continue;
+          expect(
+            () =>
+                _assertionForEncode(cell.encode, 'value', '$path/${row.kind}'),
+            returnsNormally,
+            reason: '$path/${row.kind}: unsupported encode contract',
+          );
+          expect(
+            () =>
+                _assertionForDecode(cell.decode, 'value', '$path/${row.kind}'),
+            returnsNormally,
+            reason: '$path/${row.kind}: unsupported decode contract',
+          );
+          // Reading jsonSurvives drives the generated transport check on the
+          // wire paths; here we assert it is a real bool the harness consumes.
+          expect(cell.jsonSurvives, isA<bool>());
+        }
+      }
     });
 
     test('every row names the emitter responsible', () {
@@ -412,21 +655,18 @@ void main() {
 
   group('patch envelope honors the matrix', () {
     test('every Enforced patch kind resolves/encodes per the contract', () {
-      _checkPatchMatrix();
-      // The patch column is exercised inline; assert the classification the
-      // inline checks cover matches the table.
-      expect(_enforcedKinds((r) => r.patch), <String>{
-        'String',
-        'int',
-        'bool',
-        'double',
-        'num',
-        'DateTime',
-        'enum',
-        'nested entity',
-        'List<T>',
-        'Map<String, V>',
-      });
+      // Coverage is derived from checks ACTUALLY executed, not a second
+      // hand-written set: _checkPatchMatrix emits a COVERAGE marker only after
+      // each real assertion, so a new Enforced cell without an executed check
+      // fails this gate.
+      final output = _checkPatchMatrix();
+      expect(
+        _coverage(output, 'patch'),
+        _enforcedKinds((r) => r.patch),
+        reason:
+            'the patch checks did not execute exactly the Enforced patch '
+            'kinds in the matrix',
+      );
     });
   });
 
@@ -458,8 +698,11 @@ Set<String> _coverage(String output, String path) => output
 /// Writes [program] inside the example package (so `package:` URIs resolve),
 /// runs it, and returns its combined output. Fails the test on a non-zero exit.
 String _runProgram(String program, String dirName) {
-  final directory = Directory('example/.dart_tool/$dirName').absolute
-    ..createSync(recursive: true);
+  // Unique child dir under example/.dart_tool so package: URIs still resolve,
+  // but two concurrent `dart test` processes never share (or delete) it.
+  final directory = Directory(
+    'example/.dart_tool',
+  ).createTempSync(dirName).absolute;
   addTearDown(() {
     if (directory.existsSync()) directory.deleteSync(recursive: true);
   });
@@ -479,6 +722,36 @@ String _runProgram(String program, String dirName) {
 }
 
 // ── Boundary codec program ──────────────────────────────────────────────
+
+/// Cell-driven `check(…)` lines for the boundary program: every Enforced
+/// boundary row contributes assertions selected by its own `encode`, `decode`
+/// and `jsonSurvives` values. An unknown contract fails generation.
+String _boundaryContractChecks() {
+  const exprs = <String, String>{
+    'String': 'v.s',
+    'int': 'v.i',
+    'bool': 'v.b',
+    'double': 'v.d',
+    'DateTime': "encoded['t']",
+    'nested entity': "encoded['child']",
+    'generic type param (T)': "boxEncoded['item']",
+    'List<T>': 'v.tags',
+    'Map<String, V>': 'v.scores',
+  };
+  final checks = <String>[];
+  var i = 0;
+  for (final row in _matrix) {
+    final cell = row.boundary;
+    if (cell is! Enforced) continue;
+    final expr = exprs[row.kind];
+    if (expr == null) {
+      throw StateError('no boundary probe for enforced kind ${row.kind}');
+    }
+    checks.add('  // ${row.kind}: driven by the matrix cell');
+    checks.add(_contractChecks(cell, expr, 'b${i++}'));
+  }
+  return checks.join('\n');
+}
 
 ZorphyNodeIr _valueNode(
   String className, {
@@ -641,18 +914,8 @@ void main() {
     'the inner violation re-paths under /item',
   );
   coverage('generic type param (T)');
-
-  print('ALL BOUNDARY CHECKS PASSED');
-}
-
-ZorphyBoundaryResult<int> _decodeInt(Map<String, Object?> raw) {
-  final violations = <FieldViolation>[];
-  final value = _boundaryAs<int>(raw['n'], '/item', violations);
-  if (violations.isNotEmpty) {
-    return BoundaryErr<int>(targetType: 'int', violations: violations);
-  }
-  return BoundaryOk<int>(value!);
-}
+  // main() stays open: _boundaryContractChecks() and the final print are
+  // appended by _buildBoundaryProgram so the matrix cell drives real checks.
 ''';
 
 String _buildBoundaryProgram() {
@@ -711,6 +974,22 @@ ${_indent(_codecFor(box, _boundaryFields))}
 
 $helpers
 $_boundaryChecks
+
+  // Cell-driven contract assertions (encode/decode/jsonSurvives) generated
+  // from the matrix — mutating a cell changes the code that actually runs.
+${_boundaryContractChecks()}
+
+  print('ALL BOUNDARY CHECKS PASSED');
+}
+
+ZorphyBoundaryResult<int> _decodeInt(Map<String, Object?> raw) {
+  final violations = <FieldViolation>[];
+  final value = _boundaryAs<int>(raw['n'], '/item', violations);
+  if (violations.isNotEmpty) {
+    return BoundaryErr<int>(targetType: 'int', violations: violations);
+  }
+  return BoundaryOk<int>(value!);
+}
 ''';
 }
 
@@ -734,6 +1013,8 @@ void main() {
   check(w.dur is Duration, 'Duration seeded');
   check(w.tags is List<String>, 'List<String> seeded');
   check(w.scores is Map<String, int>, 'Map<String,int> seeded');
+  check(w.labels is Set<String>, 'Set<String> seeded');
+  check(w.counts is Map<int, int>, 'Map<int,int> (non-String key) seeded');
   coverage('String');
   coverage('int');
   coverage('bool');
@@ -743,6 +1024,8 @@ void main() {
   coverage('Duration');
   coverage('List<T>');
   coverage('Map<String, V>');
+  coverage('Set<T>');
+  coverage('Map<K, V> (non-String key)');
 
   final many = WidgetMockData.list(count: 3);
   check(many.length == 3, 'list(count: 3) yields three seeds');
@@ -764,6 +1047,8 @@ String _buildSeedProgram() {
       ZorphyFieldIr(name: 'dur', type: 'Duration'),
       ZorphyFieldIr(name: 'tags', type: 'List<String>'),
       ZorphyFieldIr(name: 'scores', type: 'Map<String, int>'),
+      ZorphyFieldIr(name: 'labels', type: 'Set<String>'),
+      ZorphyFieldIr(name: 'counts', type: 'Map<int, int>'),
     ],
   );
   final emitter = MockFixtureEmitter();
@@ -781,6 +1066,8 @@ final class Widget {
   final Duration dur;
   final List<String> tags;
   final Map<String, int> scores;
+  final Set<String> labels;
+  final Map<int, int> counts;
   const Widget.fromTrusted({
     required this.s,
     required this.i,
@@ -791,6 +1078,8 @@ final class Widget {
     required this.dur,
     required this.tags,
     required this.scores,
+    required this.labels,
+    required this.counts,
   });
 }
 
@@ -802,7 +1091,11 @@ $_seedChecks
 
 // ── Patch envelope (inline, real ZorphyPatchWire + emitter fixtures) ─────
 
-void _checkPatchMatrix() {
+/// Runs the patch-path assertions and returns a `COVERAGE:patch:<kind>` trace
+/// emitted only AFTER each real check, so the gate reads executed coverage.
+String _checkPatchMatrix() {
+  final covered = StringBuffer();
+  void coverage(String kind) => covered.writeln('COVERAGE:patch:$kind');
   List<FieldViolation> v() => <FieldViolation>[];
 
   // String / int / bool resolve by `is`-test; a mismatch is a violation.
@@ -812,11 +1105,16 @@ void _checkPatchMatrix() {
   final badString = v();
   expect(ZorphyPatchWire.as<String>(7, '/s', badString), isNull);
   expect(badString.single.path, '/s');
+  coverage('String');
+  coverage('int');
+  coverage('bool');
 
   // double widens a JSON int; num preserves it.
   expect(ZorphyPatchWire.asDouble(1, '/d', v()), 1.0);
   final asNum = ZorphyPatchWire.asNum(9007199254740993, '/n', v());
   expect(asNum, isA<int>());
+  coverage('double');
+  coverage('num');
 
   // DateTime resolves an ISO-8601 String; a corrupt value is a violation.
   expect(
@@ -826,6 +1124,7 @@ void _checkPatchMatrix() {
   final badDate = v();
   expect(ZorphyPatchWire.asDateTime('not-a-date', '/t', badDate), isNull);
   expect(badDate.single.path, '/t');
+  coverage('DateTime');
 
   // enum resolves by NAME (not index); a mismatch is a violation.
   expect(
@@ -838,16 +1137,24 @@ void _checkPatchMatrix() {
     isNull,
   );
   expect(badEnum.single.path, '/tier');
+  coverage('enum');
 
   // The patch EMITTER's real output (account fixture): enum encodes as its
   // name and the envelope jsonEncode-survives; nested/List/Map round-trip.
   final tierPatch = AccountPatch()..withTier(AccountTier.enterprise);
   final tierWire = tierPatch.toWire();
-  expect(tierWire['tier'], 'enterprise');
-  expect(() => jsonEncode(tierWire), returnsNormally);
+  _expectEnforcedCell(
+    _cellFor('enum', (r) => r.patch),
+    tierWire['tier'],
+    'patch/enum',
+  );
+  // A REAL transport hop: serialize and parse before decoding, not just a
+  // jsonEncode "returnsNormally" smoke check.
+  final tierAfterTransport = jsonDecode(jsonEncode(tierWire)) as Map;
+  expect(tierAfterTransport['tier'], 'enterprise');
   expect(
     AccountPatch.fromWire(
-      tierWire,
+      Map<String, Object?>.from(tierAfterTransport),
     ).getOrThrow().apply(const Account(id: 'a1', name: 'ada', score: 1)).tier,
     AccountTier.enterprise,
   );
@@ -858,8 +1165,124 @@ void _checkPatchMatrix() {
     ..withScores(<String, int>{'k': 1});
   final profileWire = profilePatch.toWire();
   expect(() => jsonEncode(profileWire), returnsNormally);
-  final decodedProfile = ProfilePatch.fromWire(profileWire).getOrThrow();
+  final profileAfterTransport =
+      jsonDecode(jsonEncode(profileWire)) as Map<String, Object?>;
+  final decodedProfile = ProfilePatch.fromWire(
+    profileAfterTransport,
+  ).getOrThrow();
   expect(decodedProfile.apply(_emptyProfile()).displayName, 'grace');
+  _expectEnforcedCell(
+    _cellFor('List<T>', (r) => r.patch),
+    profileWire['tags'],
+    'patch/List<T>',
+  );
+  _expectEnforcedCell(
+    _cellFor('Map<String, V>', (r) => r.patch),
+    profileWire['scores'],
+    'patch/Map<String, V>',
+  );
+  coverage('List<T>');
+  coverage('Map<String, V>');
+
+  // Nested entity patch: a real nested AddressPatch must be emitted, encoded,
+  // transported and applied — the matrix's `nested entity` row is no longer
+  // backed by a claim alone.
+  final addressPatch = AddressPatch()..patchMap[Address$.city] = 'oslo';
+  // PatchNested makes the nested delta self-describing on the wire (a Map),
+  // so a real jsonEncode/jsonDecode hop is possible. A bare whole-value
+  // replacement is a PatchWireReplacement carrying a live object — a different
+  // wire form, exercised by the fixture's own golden test.
+  final nestedPatch = ProfilePatch()
+    ..patchMap[Profile$.address] = PatchNested<Address, AddressPatch>(
+      addressPatch,
+    );
+  final nestedWire = nestedPatch.toWire();
+  expect(nestedWire['address'], isA<Map>());
+  final nestedAfterTransport =
+      jsonDecode(jsonEncode(nestedWire)) as Map<String, Object?>;
+  expect(
+    ProfilePatch.fromWire(
+      nestedAfterTransport,
+    ).getOrThrow().apply(_emptyProfile()).address.city,
+    'oslo',
+  );
+  coverage('nested entity');
+
+  // Non-String-key map: the patch path's dedicated MapPatchDelta<K,V> branch.
+  final intMapDelta = MapPatchDelta.diff<int, int>({1: 10}, {1: 11, 2: 20});
+  final intMapWire = intMapDelta.toWire();
+  expect(() => jsonEncode(intMapWire), returnsNormally);
+  expect(intMapDelta.apply({1: 10}), {1: 11, 2: 20});
+  coverage('Map<K, V> (non-String key)');
+
+  // ── Regressions for the over-broad collection JSON claim (#319) ────────
+  // `List<T>` / `Map<String,V>` are Enforced for JSON-safe elements, but the
+  // emitters do NOT recurse into enum ELEMENTS. Prove the documented omission
+  // is real (raw enums are not json-encodable) rather than a guessed contract.
+  final rawEnumList = <Object?>[AccountTier.enterprise];
+  expect(
+    () => jsonEncode(rawEnumList),
+    throwsA(isA<JsonUnsupportedObjectError>()),
+  );
+  final rawEnumMap = <String, Object?>{'tier': AccountTier.pro};
+  expect(
+    () => jsonEncode(rawEnumMap),
+    throwsA(isA<JsonUnsupportedObjectError>()),
+  );
+  // `List<num>` asymmetry: boundary decodes number elements through the double
+  // helper but emits integer elements unchanged. Pin both directions here.
+  expect(jsonDecode(jsonEncode(<num>[1, 2.5])), [1, 2.5]);
+  expect(ZorphyPatchWire.asDouble(1, '/n', v()), 1.0);
+  expect(ZorphyPatchWire.asNum(1, '/n', v()), isA<int>());
+
+  return covered.toString();
+}
+
+/// The [Cell] for [kind] on the path selected by [pick]; fails loudly when an
+/// Enforced row has no cell (the harness must never silently skip a contract).
+Cell _cellFor(String kind, Cell Function(WireRow) pick) {
+  final row = _matrix.firstWhere(
+    (r) => r.kind == kind,
+    orElse: () => throw StateError('no matrix row for $kind'),
+  );
+  return pick(row);
+}
+
+/// Runs the executable assertions a cell's `encode` / `jsonSurvives` /
+/// `decode` values prescribe against an actual wire value.
+void _expectEnforcedCell(Cell cell, Object? wire, String label) {
+  if (cell is! Enforced) {
+    throw StateError('$label is documented as omitted, not enforced');
+  }
+  final checks = _contractChecks(cell, 'wire', label);
+  // The generated form is validated at generation time; at runtime assert the
+  // same contract directly against the wire value the emitter produced.
+  expect(checks, isNotEmpty);
+  _expectWireForm(cell, wire, label);
+}
+
+void _expectWireForm(Enforced cell, Object? wire, String label) {
+  switch (cell.encode) {
+    case 'instance':
+      expect(wire, isNotNull, reason: '$label: encode=instance');
+    case 'ISO-8601 String':
+      expect(wire, isA<String>(), reason: '$label: encode=ISO-8601 String');
+      expect(DateTime.tryParse(wire as String), isNotNull);
+    case 'name':
+      expect(wire, isA<String>(), reason: '$label: encode=name');
+    case 'element-wise':
+      expect(wire, isA<List>(), reason: '$label: encode=element-wise');
+    case 'entry-wise':
+      expect(wire, isA<Map>(), reason: '$label: encode=entry-wise');
+    case 'nested toWire()':
+      expect(wire, isA<Map>(), reason: '$label: encode=nested toWire()');
+    case 'seeded':
+      expect(wire, isNotNull, reason: '$label: encode=seeded');
+    default:
+      throw StateError(
+        'unsupported encode contract "${cell.encode}" at $label',
+      );
+  }
 }
 
 Profile _emptyProfile() => const Profile(
