@@ -65,10 +65,12 @@ void main() {
       final formatJob = (ci['jobs'] as YamlMap)['format'] as YamlMap;
       final runs = _runSteps(formatJob);
 
-      final pubGetAt =
-          runs.indexWhere((s) => '${s['run']}'.contains('dart pub get'));
-      final formatAt =
-          runs.indexWhere((s) => '${s['run']}'.contains('dart format'));
+      final pubGetAt = runs.indexWhere(
+        (s) => '${s['run']}'.contains('dart pub get'),
+      );
+      final formatAt = runs.indexWhere(
+        (s) => '${s['run']}'.contains('dart format'),
+      );
 
       expect(
         formatAt,
@@ -113,13 +115,10 @@ void main() {
       );
       // Comments and `echo`s mention `dart pub get` too, so match command
       // lines only — a plain indexOf stays green when the resolve step is gone.
-      final commands = gate!
-          .split('\n')
-          .where((l) {
-            final t = l.trimLeft();
-            return !t.startsWith('#') && !t.startsWith('echo ');
-          })
-          .toList();
+      final commands = gate!.split('\n').where((l) {
+        final t = l.trimLeft();
+        return !t.startsWith('#') && !t.startsWith('echo ');
+      }).toList();
       final pubGetAt = commands.indexWhere((l) => l.contains('dart pub get'));
       final formatAt = commands.indexWhere((l) => l.contains('dart format'));
 
