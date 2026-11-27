@@ -12,7 +12,7 @@ analyzer:
     # pre-v3 `@ZorphySealed` / `@Zorphy(preset: ...)` surface the codemod
     # rewrites, which the v3 annotation package no longer defines.
     - "test/migration/fixtures/**"
-    # The #234 cost-guard fixtures + impl reference `build_runner`-generated v3
+    # The #234 cost-guard fixtures + runner reference `build_runner`-generated v3
     # classes (`_br_/benchmark/cost_guard_fixtures.part.dart`) that do not exist
     # on a fresh checkout — the `analyze` CI job runs `dart analyze` without a
     # benchmark codegen step. Like the migration fixtures, they are compiled at
@@ -20,7 +20,7 @@ analyzer:
     # static analysis; the launcher and the reliability primitives beside them
     # stay analyzed.
     - "benchmark/cost_guard_fixtures.dart"
-    - "benchmark/cost_guards_impl.dart"
+    - "benchmark/cost_guards_runner.dart"
     # The #252 structural probe imports the same build_runner-generated v3
     # fixtures (`benchmark/cost_guard_fixtures.dart` →
     # `_br_/benchmark/cost_guard_fixtures.part.dart`) that do not exist on a

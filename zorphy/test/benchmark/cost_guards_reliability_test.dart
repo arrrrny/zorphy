@@ -221,7 +221,7 @@ void main() {
   group('the suite aggregate outcome (#237)', () {
     // NOTE (#234): the live `evaluateCostGuards()` assertion moved to
     // `cost_guards_test.dart`, which drives the generated-code benchmark as a
-    // subprocess — `evaluateCostGuards` now lives in `cost_guards_impl.dart` and
+    // subprocess — `evaluateCostGuards` now lives in `cost_guards_runner.dart` and
     // needs the generated part, so it cannot be imported from this pure
     // reliability suite. The aggregate-outcome rules below stay here as pure
     // functions over hand-built reports.

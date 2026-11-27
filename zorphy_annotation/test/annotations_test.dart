@@ -98,13 +98,13 @@ void main() {
     // reachable from the public barrel, not that the annotations implement
     // them.
     test('archetype bases are exported and constrain a conforming type', () {
-      final entity = _EntityImpl();
+      final entity = _FakeEntity();
       expect(entity, isA<ZorphyEntityBase<Object>>());
       expect(entity, isA<ZorphyPolymorphicBase>());
-      expect(_StateImpl(), isA<ZorphyStateBase>());
-      expect(_UnionImpl(), isA<ZorphyUnionBase>());
-      expect(_IntentImpl(), isA<ZorphyIntentBase>());
-      expect(_ValueImpl(), isA<ZorphyValueBase>());
+      expect(_FakeState(), isA<ZorphyStateBase>());
+      expect(_FakeUnion(), isA<ZorphyUnionBase>());
+      expect(_FakeIntent(), isA<ZorphyIntentBase>());
+      expect(_FakeValue(), isA<ZorphyValueBase>());
     });
 
     // Guards the property this PR exists for: the archetypes must never grow a
@@ -149,12 +149,13 @@ void main() {
 /// Stand-ins for the GENERATED model classes the archetype bases bound: the
 /// canonical design has these interfaces carried by the emitted types (and by
 /// consumer types), not by the annotation instances.
-class _EntityImpl implements ZorphyEntityBase<Object> {}
+// Test doubles use the _Fake prefix to name their role.
+class _FakeEntity implements ZorphyEntityBase<Object> {}
 
-class _StateImpl implements ZorphyStateBase {}
+class _FakeState implements ZorphyStateBase {}
 
-class _UnionImpl implements ZorphyUnionBase {}
+class _FakeUnion implements ZorphyUnionBase {}
 
-class _IntentImpl implements ZorphyIntentBase {}
+class _FakeIntent implements ZorphyIntentBase {}
 
-class _ValueImpl implements ZorphyValueBase {}
+class _FakeValue implements ZorphyValueBase {}

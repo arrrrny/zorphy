@@ -10,7 +10,7 @@
 // `cost_guards.dart`, so the gate could stay green while the generated APIs the
 // acceptance criteria name (`<Entity>Patch.diff`, `changeTo*`, `resolvePath`,
 // polymorphic `fromWire`) were absent from real output. #234 moves the fixtures
-// onto the real pipeline: `cost_guards_impl.dart` imports the generated classes
+// onto the real pipeline: `cost_guards_runner.dart` imports the generated classes
 // below and measures THEM, and a deliberate removal of any of those surfaces
 // from the generator makes the benchmark fail to compile (build/analysis time).
 //
