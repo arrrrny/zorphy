@@ -90,10 +90,14 @@ class EntityTemplateGenerator {
   /// a committed mirror tree skews from its generator, and the deep
   /// `part of '../../../src/...'` chains break on any directory move.
   ///
-  /// build_runner writes the shared part wherever the consumer's `part`
-  /// directive names it (the builder emits through [BuildStep.librarySourceSink],
-  /// which follows the directive), so a colocated directive produces a
-  /// colocated file with no emitter change.
+  /// The path is fixed by the builder, NOT by this `part` directive:
+  /// `zorphySharedPartBuilder` is a plain `build_to: source` output builder
+  /// that writes `buildStep.inputId.changeExtension('.zorphy.dart')` beside
+  /// the source library. It deliberately does not use build_runner's
+  /// `adds_to_library` / `BuildStep.librarySourceSink`, which forces the
+  /// shared part under build_runner's reserved `_br_/` tree regardless of the
+  /// consumer's directive. Changing a `part` directive alone therefore does
+  /// not relocate the generated output.
   ///
   /// Because the generated file is colocated with the library, the `part` URI
   /// is always just the file name — it never embeds [EntityConfig.outputDir],
