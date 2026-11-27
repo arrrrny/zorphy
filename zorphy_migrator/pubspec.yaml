@@ -15,7 +15,7 @@ dependencies:
   path: ^1.9.1
   collection: ^1.19.1
   dart_style: ^3.1.1
-  zorphy_annotation: ^3.0.0-dev.4
+  zorphy_annotation: ^3.0.0-dev.5
 
 dev_dependencies:
   freezed_annotation: ^3.1.0
