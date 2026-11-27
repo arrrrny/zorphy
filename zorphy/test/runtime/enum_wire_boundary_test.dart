@@ -212,7 +212,8 @@ void main() {
         .split('\n')
         .where(
           (line) =>
-              (line.contains(' error ') || line.contains(' warning ') ||
+              (line.contains(' error ') ||
+                  line.contains(' warning ') ||
                   line.contains(' info ')) &&
               !line.contains('unused_element'),
         )
