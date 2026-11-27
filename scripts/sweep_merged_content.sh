@@ -60,9 +60,15 @@ fi
 # silent skip).
 cutoff="$(python3 -c 'import datetime,sys; print((datetime.date.today()-datetime.timedelta(days=int(sys.argv[1]))).isoformat())' "$DAYS")"
 
+# Scope the sweep to PRs whose base is the default branch (issue #328). A PR
+# merged into a stack/release branch is validated transitively by that branch's
+# own merge-to-master, not by its own merge commit being on master — checking it
+# here false-positives. A record with no baseRefName is kept (fail-safe toward
+# checking, never a silent skip).
 pr_pairs="$(printf '%s\n' "$pr_json" | python3 -c '
 import sys, json, datetime
 cutoff = datetime.date.fromisoformat(sys.argv[1])
+base = sys.argv[2]
 for line in sys.stdin:
     line = line.strip()
     if not line:
@@ -70,6 +76,9 @@ for line in sys.stdin:
     try:
         d = json.loads(line)
     except json.JSONDecodeError:
+        continue
+    base_ref = d.get("baseRefName") or ""
+    if base_ref and base_ref != base:
         continue
     merged = (d.get("mergedAt") or "")[:10]
     if merged:
@@ -81,7 +90,7 @@ for line in sys.stdin:
     oid = (d.get("mergeCommit") or {}).get("oid") or ""
     if oid:
         print("%s\t%s\t%s" % (d.get("number", "?"), oid, d.get("title", "")))
-' "$cutoff")"
+' "$cutoff" "$BASE")"
 
 if [ -z "$pr_pairs" ]; then
   echo "sweep_merged_content: no merged PRs carry a merge commit — OK"
