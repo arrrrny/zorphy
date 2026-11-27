@@ -203,3 +203,20 @@ jobs:
       - name: Run tests (zorphy_migrator)
         run: dart test
         working-directory: zorphy_migrator
+
+  # Stacked-PR integrity gate (issue #315): the same check the pre-push hook
+  # runs, exercised in CI so a force-push that orphans a merged PR's content is
+  # caught even when a contributor never installed the hook. The gate's own
+  # behaviour is covered by zorphy/test/release/stacked_pr_integrity_test.dart
+  # (run in the test job); here we assert the scripts parse and the hook is wired.
+  stacked_pr_integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scripts parse
+        run: |
+          bash -n scripts/check_stacked_pr_integrity.sh
+          bash -n scripts/sweep_merged_content.sh
+          bash -n scripts/git-hooks/pre-push
+      - name: Pre-push gate allows a clean tree (no orphaning refs on stdin)
+        run: bash scripts/check_stacked_pr_integrity.sh </dev/null

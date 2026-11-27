@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# pre-push hook — runs the stacked-PR integrity gate (issue #315).
+# The logic and tests live in scripts/check_stacked_pr_integrity.sh; this is the
+# thin git-hook wrapper. Install with scripts/install_hooks.sh.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/../check_stacked_pr_integrity.sh"

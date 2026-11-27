@@ -71,3 +71,44 @@ For detailed information, see:
 # From any directory (with full path)
 /Users/arrrrny/Developer/zorphy/scripts/publish.sh 1.0.0 "Release"
 ```
+
+---
+
+### `check_stacked_pr_integrity.sh`
+
+**Pre-push gate against orphaned stacked PRs (issue #315).**
+
+```bash
+./scripts/check_stacked_pr_integrity.sh   # reads git's pre-push ref lines on stdin
+```
+
+For every ref being pushed with a non-fast-forward (force) update, it lists
+merged PRs whose merge commit is an ancestor of the OLD (remote) tip but NOT of
+the NEW (local) tip — "this force-push orphans these merged PRs" — and refuses
+the push (exit 1). The push is allowed only with `STACK_REBASE_OK=1` exported,
+after the orphaned PRs are re-targeted / reopened (or the stack re-merged).
+
+- Wired as the `scripts/git-hooks/pre-push` hook — run `./scripts/install_hooks.sh`
+  once per clone to enable it (`core.hooksPath`).
+- Also run in CI by the `stacked_pr_integrity` job in `.github/workflows/ci.yaml`.
+- The merged-PR inventory comes from `gh pr list`; inject `GH_PR_LIST_JSON`
+  (JSON Lines) for offline / test runs.
+
+### `sweep_merged_content.sh`
+
+**Post-merge orphan sweep (issue #315).**
+
+```bash
+./scripts/sweep_merged_content.sh   # via gh; or GH_PR_LIST_JSON='…' for offline
+```
+
+For every PR closed-as-merged in the last 90 days, asserts its merge commit is
+an ancestor of `master` (`SWEEP_BASE`, `SWEEP_DAYS` override). Any orphan gets
+an `orphaned merge: #N content not on master` issue filed/reopened, and the
+script exits non-zero. Runs from the `Stacked-PR Integrity Sweep` workflow
+(weekly cron + on release) and as step 5 of `publish.sh`'s release gate.
+
+### `install_hooks.sh`
+
+Points `core.hooksPath` at the tracked `scripts/git-hooks` directory so the
+pre-push gate runs in every clone without per-clone setup.
