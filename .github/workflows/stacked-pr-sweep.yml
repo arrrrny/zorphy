@@ -1,0 +1,31 @@
+name: Stacked-PR Integrity Sweep
+
+# Post-merge orphan sweep (issue #315). For every PR closed-as-merged in the
+# last 90 days, assert its merge commit is an ancestor of master. Any orphan
+# (GitHub shows MERGED but the content never reached master — the 3.0.0-dev.4 /
+# #304 failure) gets an "orphaned merge: #N" issue filed/reopened automatically.
+#
+# Runs weekly, on release publication, and on demand.
+
+on:
+  schedule:
+    # Mondays 06:00 UTC — off the top of the hour to avoid the cron stampede.
+    - cron: '7 6 * * 1'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sweep merged PRs for orphaned content
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/sweep_merged_content.sh

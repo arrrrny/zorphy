@@ -104,6 +104,12 @@ release_gate() {
     echo "  == dart test test/release/"
     run bash -c "cd '$check_dir/zorphy' && dart test test/release/"
 
+    # 5. Stacked-PR orphan sweep (issue #315): no merged PR's content may have
+    #    evaporated before a release ships. A failing sweep aborts the release,
+    #    exactly like any other gate step (set -e).
+    echo "  == sweep_merged_content.sh"
+    run bash -c "cd '$check_dir' && bash scripts/sweep_merged_content.sh"
+
     if ! $DRY_RUN; then
         rm -rf "$check_dir"
     fi

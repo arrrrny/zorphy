@@ -75,6 +75,29 @@ zorphy/ (monorepo)
 
 ---
 
+## Stacked-PR integrity (hard rule)
+
+A branch that has had a PR merged INTO IT must never be force-pushed in a
+way that drops the merge commit (`git push --force-with-lease` + the
+stacked-integrity check, or rebase-and-remerge the stack explicitly). A PR
+shown as MERGED whose merge commit is not an ancestor of master is an
+orphaned merge and must be re-landed immediately — GitHub's state badge
+cannot be trusted as proof of content.
+
+Enforced mechanically by two gates (issue #315):
+
+- **Pre-push gate** — `scripts/check_stacked_pr_integrity.sh`, wired as the
+  `scripts/git-hooks/pre-push` hook (run `./scripts/install_hooks.sh` once per
+  clone) and as the `stacked_pr_integrity` CI job. It refuses a force-push
+  whose new tip drops a merged PR's merge commit unless `STACK_REBASE_OK=1` is
+  set after the orphaned PRs are re-targeted / reopened.
+- **Post-merge sweep** — `scripts/sweep_merged_content.sh`, run by the
+  `Stacked-PR Integrity Sweep` workflow (weekly cron + on release) and by
+  `publish.sh`. It asserts every merged PR's merge commit is an ancestor of
+  `master` and files/reopens an `orphaned merge: #N` issue for each orphan.
+
+---
+
 ## Release gate (hard rule)
 
 `publish.sh` MUST run the clean-checkout CI simulation (version sync,
