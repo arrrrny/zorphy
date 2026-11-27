@@ -110,7 +110,7 @@ void main() {
     });
   });
 
-  group('the part directive names the v3 shared part', () {
+  group('the part directive names the colocated <library>.zorphy.dart', () {
     String partDirective(EntityConfig config, {bool subtype = false}) {
       // EntityCreator resolves the on-disk output dir to a package-relative
       // one before generating; the generator itself stays filesystem-free.
@@ -134,10 +134,10 @@ void main() {
       ).firstMatch(source)!.group(1)!;
     }
 
-    test('the default location mirrors the library path under lib/_br_/', () {
+    test('the default location is colocated beside the library', () {
       expect(
         partDirective(const EntityConfig(name: 'Todo')),
-        '../../../../_br_/src/domain/entities/todo/todo.part.dart',
+        'todo.zorphy.dart',
       );
     });
 
@@ -146,16 +146,16 @@ void main() {
         partDirective(
           const EntityConfig(name: 'Money', outputDir: 'lib/src/core/params'),
         ),
-        '../../../../_br_/src/core/params/money/money.part.dart',
+        'money.zorphy.dart',
       );
     });
 
-    test('a library outside lib/ reads its part from the package root', () {
+    test('a library outside lib/ is colocated beside it', () {
       expect(
         partDirective(
           const EntityConfig(name: 'Sample', outputDir: 'test/fixtures'),
         ),
-        '../../../_br_/test/fixtures/sample/sample.part.dart',
+        'sample.zorphy.dart',
       );
     });
 
@@ -167,7 +167,7 @@ void main() {
             outputDir: '/tmp/proj/lib/src/domain/entities',
           ),
         ),
-        '../../../../_br_/src/domain/entities/todo/todo.part.dart',
+        'todo.zorphy.dart',
       );
     });
 
@@ -176,7 +176,7 @@ void main() {
         partDirective(
           const EntityConfig(name: 'Sample', outputDir: '/tmp/proj/src'),
         ),
-        '../_br_/sample/sample.part.dart',
+        'sample.zorphy.dart',
       );
     });
 
@@ -187,7 +187,7 @@ void main() {
         final inside = p.join(root.path, 'domain', 'entities');
         expect(
           partDirective(EntityConfig(name: 'Sample', outputDir: inside)),
-          '../../../_br_/domain/entities/sample/sample.part.dart',
+          'sample.zorphy.dart',
         );
       } finally {
         root.deleteSync(recursive: true);
@@ -207,29 +207,40 @@ void main() {
         final inside = p.join(packageRoot, 'domain', 'entities');
         expect(
           partDirective(EntityConfig(name: 'Sample', outputDir: inside)),
-          '../../../_br_/domain/entities/sample/sample.part.dart',
+          'sample.zorphy.dart',
         );
       } finally {
         root.deleteSync(recursive: true);
       }
     });
 
-    test('an apostrophe in the output dir is escaped in the part literal', () {
+    test('the part literal is the bare colocated file name', () {
+      // Colocation means the part URI never embeds the output dir, so no
+      // path segment (and no quote in one) can reach the single-quoted
+      // literal — the directive is always `<snakeName>.zorphy.dart`.
       final source = EntityTemplateGenerator.generate(
         const EntityConfig(name: 'Sample', outputDir: "lib/owner's_models"),
         const [],
       );
-      // The raw apostrophe must never reach the single-quoted literal
-      // unescaped; the escaped form must be present instead.
-      expect(source, contains(r"owner\'s_models"));
-      expect(source, isNot(contains("part '../../_br_/owner's_models")));
+      expect(source, contains("part 'sample.zorphy.dart';"));
+      expect(source, isNot(contains('_br_')));
     });
 
-    test('a subtype library points at its own shared part', () {
+    test('a subtype library points at its own colocated part', () {
       expect(
         partDirective(const EntityConfig(name: 'Circle'), subtype: true),
-        '../../../../_br_/src/domain/entities/circle/circle.part.dart',
+        'circle.zorphy.dart',
       );
     });
+
+    test(
+      'the part is named <library>.zorphy.dart, never a _br_ mirror path',
+      () {
+        final uri = partDirective(const EntityConfig(name: 'Todo'));
+        expect(uri, endsWith('.zorphy.dart'));
+        expect(uri, isNot(contains('_br_')));
+        expect(uri, isNot(endsWith('.part.dart')));
+      },
+    );
   });
 }

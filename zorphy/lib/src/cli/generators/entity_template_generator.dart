@@ -1,5 +1,3 @@
-import 'package:path/path.dart' as p;
-
 import '../models/entity_config.dart';
 
 /// Generates entity template code
@@ -80,44 +78,30 @@ class EntityTemplateGenerator {
     buffer.writeln();
   }
 
-  /// The `part` URI of the v3 shared part for [config]'s library (issue #297).
+  /// The `part` URI of the colocated generated file for [config]'s library
+  /// (issue #309).
   ///
-  /// The v3 builder contributes to a shared part: build_runner writes
-  /// `<library>.part.dart` in its reserved `_br_` namespace, mirroring the
-  /// library's own path (`lib/a/b.dart` gets `lib/_br_/a/b.part.dart`, and
-  /// a library outside `lib/` gets `_br_/a/b.part.dart` at the package
-  /// root). No standalone `<name>.zorphy.dart` is ever written, so a
-  /// scaffold pointing at the v2 filename never compiles.
+  /// The generated file is `<library>.zorphy.dart`, sitting BESIDE the source
+  /// library it extends (`lib/a/b.dart` gets `lib/a/b.zorphy.dart`, and a
+  /// library outside `lib/` gets `<name>.zorphy.dart` beside it at the same
+  /// path). This restores the v2-lineage colocated convention: the v3
+  /// `lib/_br_/` mirror tree (`<library>.part.dart` under a parallel `_br_/`
+  /// directory) is retired — `_br_` is not a recognized community convention,
+  /// a committed mirror tree skews from its generator, and the deep
+  /// `part of '../../../src/...'` chains break on any directory move.
   ///
-  /// [EntityConfig.outputDir] is read package-relative. The caller
-  /// (`EntityCreator`) resolves an on-disk output path to a package-relative
-  /// dir before generating, so this method stays a pure function of its
-  /// inputs — it never touches the filesystem. An absolute path handed to
-  /// this method directly is rebased on its last `lib` segment (the only
-  /// rebase that can be done without filesystem knowledge).
-  static String sharedPartUri(EntityConfig config) {
-    var output = (config.outputDir ?? config.defaultOutputDir).replaceAll(
-      r'\',
-      '/',
-    );
-    if (p.posix.isAbsolute(output) || RegExp(r'^[A-Za-z]:').hasMatch(output)) {
-      final segments = p.posix.split(p.posix.normalize(output));
-      final libIndex = segments.lastIndexOf('lib');
-      output = libIndex >= 0 ? p.posix.joinAll(segments.sublist(libIndex)) : '';
-    }
-    final library = p.posix.normalize(
-      p.posix.join(output, config.snakeName, '${config.snakeName}.dart'),
-    );
-    final segments = p.posix.split(library);
-    final isLib = segments.first == 'lib';
-    final dir = segments.sublist(0, segments.length - 1);
-    final part = p.posix.joinAll([
-      if (isLib) ...['lib', '_br_'] else '_br_',
-      ...dir.sublist(isLib ? 1 : 0),
-      '${config.snakeName}.part.dart',
-    ]);
-    return p.url.relative(part, from: p.posix.joinAll(dir));
-  }
+  /// build_runner writes the shared part wherever the consumer's `part`
+  /// directive names it (the builder emits through [BuildStep.librarySourceSink],
+  /// which follows the directive), so a colocated directive produces a
+  /// colocated file with no emitter change.
+  ///
+  /// Because the generated file is colocated with the library, the `part` URI
+  /// is always just the file name — it never embeds [EntityConfig.outputDir],
+  /// so there is no directory walk, no `../` chain, and no path segment that
+  /// could carry a quote into the single-quoted literal. The method stays a
+  /// pure function of its inputs and never touches the filesystem.
+  static String sharedPartUri(EntityConfig config) =>
+      '${config.snakeName}.zorphy.dart';
 
   static void _writeClassDefinition(StringBuffer buffer, EntityConfig config) {
     final annotation = _buildAnnotation(config);

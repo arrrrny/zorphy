@@ -9,8 +9,8 @@
 //   1. It runs the production generator scoped to the benchmark fixture
 //      (`dart run build_runner build --delete-conflicting-outputs
 //      --build-filter 'benchmark/**'` — the same flag CI uses, so a second run
-//      in a checkout with an existing `_br_` cannot abort on conflicting
-//      outputs), which writes `_br_/benchmark/cost_guard_fixtures.part.dart`.
+//      in a checkout with an existing generated part cannot abort on conflicting
+//      outputs), which writes `benchmark/cost_guard_fixtures.zorphy.dart`.
 //      If generation fails, the launcher exits non-zero BEFORE any guard runs
 //      — the loud failure the acceptance gate names.
 //   2. It then spawns `benchmark/cost_guards_impl.dart`, which imports the

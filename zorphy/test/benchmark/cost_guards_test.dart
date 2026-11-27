@@ -4,7 +4,7 @@
 // #234 requires the guards to measure the REAL `build_runner`-generated v3
 // classes, with generation as a prerequisite so a missing generated API fails
 // loudly. This suite therefore does NOT import generated code itself (a fresh
-// CI checkout has no generated `_br_` part until the build runs); instead it
+// CI checkout has no generated `.zorphy.dart` part until the build runs); instead it
 // drives the standalone benchmark as a subprocess:
 //
 //   * the benchmark launcher runs generation first (a missing/broken generator
@@ -196,45 +196,49 @@ Future<int?> _resolvedAnalyzerMajor(Directory root) async {
 
 void main() {
   group('Chord v2 cost guards (ISSUE-018 / #234)', () {
-    test('the generated-code benchmark passes all four guards (exit 0, green)', () async {
-      final root = _packageRoot();
-      final analyzerMajor = await _resolvedAnalyzerMajor(root);
-      if (analyzerMajor != null && analyzerMajor < 14) {
-        markTestSkipped(
-          'build_runner 2.17.x requires analyzer 14+ (AnalysisOptionsBuilder); '
-          'codegen cannot run under the analyzer-$analyzerMajor compat leg. '
-          'The default test job and the analyzer-14 leg cover this benchmark.',
+    test(
+      'the generated-code benchmark passes all four guards (exit 0, green)',
+      () async {
+        final root = _packageRoot();
+        final analyzerMajor = await _resolvedAnalyzerMajor(root);
+        if (analyzerMajor != null && analyzerMajor < 14) {
+          markTestSkipped(
+            'build_runner 2.17.x requires analyzer 14+ (AnalysisOptionsBuilder); '
+            'codegen cannot run under the analyzer-$analyzerMajor compat leg. '
+            'The default test job and the analyzer-14 leg cover this benchmark.',
+          );
+          return;
+        }
+        final dart = Platform.resolvedExecutable;
+        // The internal deadline is shorter than the test's timeout so a stalled
+        // generation is killed and reported here, rather than leaving package:test
+        // to tear down an isolate whose child processes are still alive.
+        final result = await runWithDeadline(
+          dart,
+          <String>['run', 'benchmark/cost_guards_benchmark.dart'],
+          cwd: root.path,
+          deadline: const Duration(minutes: 4),
         );
-        return;
-      }
-      final dart = Platform.resolvedExecutable;
-      // The internal deadline is shorter than the test's timeout so a stalled
-      // generation is killed and reported here, rather than leaving package:test
-      // to tear down an isolate whose child processes are still alive.
-      final result = await runWithDeadline(
-        dart,
-        <String>['run', 'benchmark/cost_guards_benchmark.dart'],
-        cwd: root.path,
-        deadline: const Duration(minutes: 4),
-      );
 
-      final out = '${result.stdout}\n${result.stderr}';
-      expect(
-        result.exitCode,
-        0,
-        reason:
-            'benchmark exited ${result.exitCode} (-1=TIMEOUT, 1=RED, '
-            '2=INCONCLUSIVE; a compile failure here means a generated surface '
-            'the guards name — diff / changeTo* / resolvePath / fromWire — is '
-            'missing):\n$out',
-      );
-      expect(
-        result.stdout,
-        contains('ALL 4 COST GUARDS GREEN'),
-        reason:
-            'the benchmark must exercise generated output and pass all '
-            'four guards:\n$out',
-      );
-    }, timeout: const Timeout(Duration(minutes: 5)));
+        final out = '${result.stdout}\n${result.stderr}';
+        expect(
+          result.exitCode,
+          0,
+          reason:
+              'benchmark exited ${result.exitCode} (-1=TIMEOUT, 1=RED, '
+              '2=INCONCLUSIVE; a compile failure here means a generated surface '
+              'the guards name — diff / changeTo* / resolvePath / fromWire — is '
+              'missing):\n$out',
+        );
+        expect(
+          result.stdout,
+          contains('ALL 4 COST GUARDS GREEN'),
+          reason:
+              'the benchmark must exercise generated output and pass all '
+              'four guards:\n$out',
+        );
+      },
+      timeout: const Timeout(Duration(minutes: 5)),
+    );
   });
 }
