@@ -92,6 +92,11 @@ jobs:
           name: prepared-workspace
       - name: Restore prepared workspace
         run: tar -xzf prepared-workspace.tar.gz
+      - name: Pin local zorphy_annotation
+        working-directory: zorphy
+        run: |
+          printf 'dependency_overrides:\n  zorphy_annotation:\n    path: ../zorphy_annotation\n' > pubspec_overrides.yaml
+          cat pubspec_overrides.yaml
       - name: Install dependencies (zorphy_annotation)
         run: dart pub get
         working-directory: zorphy_annotation
@@ -121,6 +126,11 @@ jobs:
           name: prepared-workspace
       - name: Restore prepared workspace
         run: tar -xzf prepared-workspace.tar.gz
+      - name: Pin local zorphy_annotation
+        working-directory: zorphy
+        run: |
+          printf 'dependency_overrides:\n  zorphy_annotation:\n    path: ../zorphy_annotation\n' > pubspec_overrides.yaml
+          cat pubspec_overrides.yaml
       - name: Install dependencies (zorphy)
         run: dart pub get
         working-directory: zorphy
