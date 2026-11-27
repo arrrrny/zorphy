@@ -27,7 +27,6 @@ import 'package:zorphy/src/emission/emitter.dart';
 import 'package:zorphy/src/emission/polymorphic_patch_emitter.dart';
 import 'package:zorphy/src/emitters/mock_fixture_emitter.dart';
 import 'package:zorphy/src/parser/polymorphic_ir.dart';
-import 'package:code_builder/code_builder.dart';
 
 const _annotationImport =
     "import 'package:zorphy_annotation/zorphy_annotation.dart';\n";
@@ -71,11 +70,9 @@ String _indent(String source) =>
 
 String _codecSource() {
   const emitter = BoundaryCodecEmitter();
-  final methods = <Method>[
-    emitter.fromWire(_account(), _fields),
-    emitter.toWire(_account(), _fields),
-  ];
-  return ZorphyEmitter().emitSpecs(methods);
+  return ZorphyEmitter().emitSpecs(
+    emitter.emitJsonAliases(_account(), _fields),
+  );
 }
 
 String _mockSource() => MockFixtureEmitter().emitForNode(_account());
@@ -88,8 +85,9 @@ String _patchSource() => PolymorphicPatchEmitter().emitStandalone(
   ],
 );
 
-String _helperSource() =>
-    ZorphyEmitter().emitSpecs(BoundaryCodecEmitter.helperSpecs());
+String _helperSource() => ZorphyEmitter().emitSpecs(
+  BoundaryCodecEmitter.usedHelperSpecs([_account()], _fields),
+);
 
 const _checks = r'''
 void check(bool condition, String message) {
@@ -101,6 +99,8 @@ void main() {
   final account = Account.fromTrusted(id: 'a1', tier: AccountTier.pro);
   final wire = account.toWire();
   check(wire['tier'] == 'pro', 'toWire writes the enum name (got ' + wire['tier'].toString() + ')');
+  final json = account.toJson();
+  check(json['tier'] == 'pro', 'toJson aliases the enum name (got ' + json['tier'].toString() + ')');
   final encoded = jsonEncode(wire);
   check(encoded.contains('"tier":"pro"'), 'jsonEncode survives (got ' + encoded + ')');
 
@@ -188,6 +188,52 @@ void main() {
 
     final file = File('${directory.path}/enum_wire_program.dart')
       ..writeAsStringSync(program);
+
+    final analyze = Process.runSync(
+      Platform.resolvedExecutable,
+      ['analyze', '--fatal-infos', file.path],
+      workingDirectory: 'example',
+      stdoutEncoding: const SystemEncoding(),
+      stderrEncoding: const SystemEncoding(),
+    );
+    final analyzeOutput = '${analyze.stdout}\n${analyze.stderr}';
+    // Reject an analyzer that never ran (startup failure, crash, bad flag):
+    // a non-zero exit with no diagnostic lines is not "clean", and a zero
+    // exit with no completion marker proves nothing was analyzed. Require the
+    // analyzer's own completion signal before trusting the diagnostic set.
+    expect(
+      analyzeOutput,
+      contains('No issues found!'),
+      reason:
+          'analyzer did not complete successfully (no "No issues found!" '
+          'marker — startup failure or unexpected error):\n$analyzeOutput',
+    );
+    // The fixture intentionally leaves an unused element behind, so permit
+    // `unused_element` infos explicitly; any OTHER diagnostic is unexpected
+    // and fails the test even if the process exit code were somehow 0.
+    final unexpected = analyzeOutput
+        .split('\n')
+        .where(
+          (line) =>
+              (line.contains(' error ') ||
+                  line.contains(' warning ') ||
+                  line.contains(' info ')) &&
+              !line.contains('unused_element'),
+        )
+        .join('\n');
+    expect(
+      unexpected,
+      isEmpty,
+      reason:
+          'analyzer reported unexpected diagnostics (only unused_element is '
+          'permitted for this fixture):\n$unexpected\n---full---\n'
+          '$analyzeOutput',
+    );
+    expect(
+      analyze.exitCode,
+      0,
+      reason: 'generated enum-wire program failed to analyze:\n$analyzeOutput',
+    );
 
     final result = Process.runSync(
       Platform.resolvedExecutable,

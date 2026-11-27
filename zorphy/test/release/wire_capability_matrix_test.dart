@@ -302,24 +302,17 @@ const _matrix = <WireRow>[
     // #313 Gap 1: the boundary codec emits the raw instance (breaks
     // jsonEncode) and decodes by `is`-test, no name resolution. The patch path
     // (#215) already does `.name` + `enumByName`.
-    boundary: Omitted(
-      issue: '#313',
-      reason:
-          'boundary codec emits raw enum instance and is-tests decode; '
-          'no `.name` encode / `enumByName` decode yet (#313 Gap 1)',
+    boundary: Enforced(
+      encode: 'name',
+      jsonSurvives: true,
+      decode: 'enumByName (violation on mismatch)',
     ),
     patch: Enforced(
       encode: 'name',
       jsonSurvives: true,
       decode: 'enumByName (violation on mismatch)',
     ),
-    // #313 Gap 2: a required enum field throws UnsupportedError in the seeder.
-    seed: Omitted(
-      issue: '#313',
-      reason:
-          'required enum field throws UnsupportedError in MockData; '
-          'no `.values[seed % length]` seed yet (#313 Gap 2)',
-    ),
+    seed: Enforced(encode: 'seeded', jsonSurvives: true, decode: 'n/a'),
   ),
   WireRow(
     kind: 'Uint8List',
@@ -472,19 +465,15 @@ const _matrix = <WireRow>[
   WireRow(
     kind: 'List<enum>',
     responsible: 'BoundaryCodecEmitter / PolymorphicPatchEmitter',
-    // Regression for the over-broad `List<T>` JSON-survival claim: neither
-    // path recurses into enum ELEMENTS, so `List<PatchProbeStatus>` still holds raw
-    // enum instances and `jsonEncode` throws. Tracked with the #313 enum gaps.
-    boundary: Omitted(
-      issue: '#313',
-      reason:
-          'element-wise conversion does not recurse into enum elements; '
-          'List<PatchProbeStatus> still contains raw enums and jsonEncode throws',
+    boundary: Enforced(
+      encode: 'element-wise',
+      jsonSurvives: true,
+      decode: 'element-wise (re-pathed violations)',
     ),
     patch: Omitted(
       issue: '#313',
       reason:
-          'element-wise conversion does not recurse into enum elements; '
+          'patch element-wise conversion does not recurse into enum elements; '
           'List<PatchProbeStatus> still contains raw enums and jsonEncode throws',
     ),
     seed: Omitted(reason: 'an enum collection element is not seeded'),
@@ -492,16 +481,15 @@ const _matrix = <WireRow>[
   WireRow(
     kind: 'Map<String, enum>',
     responsible: 'BoundaryCodecEmitter / PolymorphicPatchEmitter',
-    boundary: Omitted(
-      issue: '#313',
-      reason:
-          'entry-wise conversion does not recurse into enum values; '
-          'Map<String, PatchProbeStatus> still contains raw enums and jsonEncode throws',
+    boundary: Enforced(
+      encode: 'entry-wise',
+      jsonSurvives: true,
+      decode: 'entry-wise (re-pathed violations)',
     ),
     patch: Omitted(
       issue: '#313',
       reason:
-          'entry-wise conversion does not recurse into enum values; '
+          'patch entry-wise conversion does not recurse into enum values; '
           'Map<String, PatchProbeStatus> still contains raw enums and jsonEncode throws',
     ),
     seed: Omitted(reason: 'an enum map value is not seeded'),
@@ -634,12 +622,12 @@ void main() {
             }
           }
         }
-        // The #313 enum gaps are the omissions that carry a tracking issue; a
-        // NEW omission with no issue is allowed but these two must keep theirs
-        // until #313 migrates them into Enforced rows.
-        final enumRow = _matrix.firstWhere((r) => r.kind == 'enum');
-        expect((enumRow.boundary as Omitted).issue, '#313');
-        expect((enumRow.seed as Omitted).issue, '#313');
+        // The patch path still does not recurse into enum collection elements;
+        // those omissions keep their tracking issue until that path converges.
+        for (final kind in ['List<enum>', 'Map<String, enum>']) {
+          final row = _matrix.firstWhere((r) => r.kind == kind);
+          expect((row.patch as Omitted).issue, '#313');
+        }
       },
     );
   });
@@ -744,10 +732,13 @@ String _boundaryContractChecks() {
     'bool': 'v.b',
     'double': 'v.d',
     'DateTime': "encoded['t']",
+    'enum': "encoded['tier']",
     'nested entity': "encoded['child']",
     'generic type param (T)': "boxEncoded['item']",
     'List<T>': 'v.tags',
+    'List<enum>': "encoded['tiers']",
     'Map<String, V>': 'v.scores',
+    'Map<String, enum>': "encoded['labels']",
   };
   final checks = <String>[];
   var i = 0;
@@ -797,7 +788,7 @@ String _codecFor(
   Map<String, List<BoundaryField>> fields, {
   Set<String> additionalNodes = const {},
 }) => ZorphyEmitter().emitSpecs(
-  const BoundaryCodecEmitter().emitCodec(
+  const BoundaryCodecEmitter().emitJsonAliases(
     node,
     fields,
     additionalNodes: additionalNodes,
@@ -815,9 +806,20 @@ const _boundaryFields = <String, List<BoundaryField>>{
     BoundaryField(name: 'b', type: 'bool'),
     BoundaryField(name: 'd', type: 'double'),
     BoundaryField(name: 't', type: 'DateTime'),
+    BoundaryField(name: 'tier', type: 'AccountTier', isEnum: true),
     BoundaryField(name: 'tags', type: 'List<String>'),
     BoundaryField(name: 'stamps', type: 'List<DateTime>'),
+    BoundaryField(
+      name: 'tiers',
+      type: 'List<AccountTier>',
+      enumElementTypes: {'AccountTier'},
+    ),
     BoundaryField(name: 'scores', type: 'Map<String, int>'),
+    BoundaryField(
+      name: 'labels',
+      type: 'Map<String, AccountTier>',
+      enumElementTypes: {'AccountTier'},
+    ),
     BoundaryField(name: 'child', type: 'Child'),
   ],
   r'$Box': [BoundaryField(name: 'item', type: 'T')],
@@ -837,9 +839,12 @@ void main() {
     'b': true,
     'd': 1, // a JSON int is a legal double
     't': '2026-11-23T00:00:00.000Z',
+    'tier': 'pro',
     'tags': <Object?>['a', 'b'],
     'stamps': <Object?>['2026-11-23T00:00:00.000Z'],
+    'tiers': <Object?>['free', 'enterprise'],
     'scores': <String, Object?>{'x': 1, 'y': 2},
+    'labels': <String, Object?>{'primary': 'pro'},
     'child': <String, Object?>{'sku': 'sku-1', 'price': 9.5},
   };
 
@@ -851,22 +856,37 @@ void main() {
   check(v.b, 'bool decoded');
   check(v.d == 1.0, 'double decoded (int widened)');
   check(v.t.isUtc, 'DateTime decoded from ISO-8601');
+  check(v.tier == AccountTier.pro, 'enum decoded by name');
   check(v.tags.length == 2, 'List<String> decoded');
   check(v.stamps.single.isUtc, 'List<DateTime> decoded element-wise');
+  check(v.tiers[1] == AccountTier.enterprise, 'enum list decoded by name');
   check(v.scores['x'] == 1, 'Map<String,int> decoded');
+  check(v.labels['primary'] == AccountTier.pro, 'enum map decoded by name');
   check(v.child.sku == 'sku-1', 'nested entity decoded');
   coverage('String');
   coverage('int');
   coverage('bool');
   coverage('double');
   coverage('DateTime');
+  coverage('enum');
   coverage('List<T>');
+  coverage('List<enum>');
   coverage('Map<String, V>');
+  coverage('Map<String, enum>');
   coverage('nested entity');
 
   // encode: exact wire forms + jsonEncode survives a transport hop.
-  final encoded = v.toWire();
+  final encoded = v.toJson();
   check(encoded['t'] is String, 'DateTime encodes as an ISO-8601 String');
+  check(encoded['tier'] == 'pro', 'enum encodes as its name');
+  check(
+    (encoded['tiers'] as List).last == 'enterprise',
+    'enum list elements encode as names',
+  );
+  check(
+    (encoded['labels'] as Map)['primary'] == 'pro',
+    'enum map values encode as names',
+  );
   check((encoded['child'] as Map)['sku'] == 'sku-1', 'nested encodes as a map');
   check(
     (encoded['stamps'] as List).single is String,
@@ -883,9 +903,12 @@ void main() {
     'b': 'no',
     'd': 'free',
     't': 'not-a-date',
+    'tier': 'nope',
     'tags': <Object?>[1],
     'stamps': <Object?>[123],
+    'tiers': <Object?>['free', 'nope'],
     'scores': <String, Object?>{'x': 'y'},
+    'labels': <String, Object?>{'primary': 'nope'},
     'child': <String, Object?>{'sku': 7, 'price': 'x'},
   });
   check(!corrupt.isOk, 'a fully corrupt payload is an error, not a throw');
@@ -898,9 +921,12 @@ void main() {
     '/b',
     '/d',
     '/t',
+    '/tier',
     '/tags[0]',
     '/stamps[0]',
+    '/tiers[1]',
     '/scores/x',
+    '/labels/primary',
     '/child/sku',
   ]) {
     check(paths.contains(p), 'violation pointer $p is present (got $paths)');
@@ -943,6 +969,8 @@ String _buildBoundaryProgram() {
 import 'dart:convert';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
+enum AccountTier { free, pro, enterprise }
+
 final class Child {
   final String sku;
   final double price;
@@ -957,9 +985,12 @@ final class Scalars {
   final bool b;
   final double d;
   final DateTime t;
+  final AccountTier tier;
   final List<String> tags;
   final List<DateTime> stamps;
+  final List<AccountTier> tiers;
   final Map<String, int> scores;
+  final Map<String, AccountTier> labels;
   final Child child;
   const Scalars.fromTrusted({
     required this.s,
@@ -967,9 +998,12 @@ final class Scalars {
     required this.b,
     required this.d,
     required this.t,
+    required this.tier,
     required this.tags,
     required this.stamps,
+    required this.tiers,
     required this.scores,
+    required this.labels,
     required this.child,
   });
 
@@ -1021,6 +1055,7 @@ void main() {
   check(w.d is double, 'double seeded');
   check(w.n is num, 'num seeded');
   check(w.t is DateTime, 'DateTime seeded');
+  check(w.tier is AccountTier, 'enum seeded');
   check(w.dur is Duration, 'Duration seeded');
   check(w.tags is List<String>, 'List<String> seeded');
   check(w.scores is Map<String, int>, 'Map<String,int> seeded');
@@ -1032,6 +1067,7 @@ void main() {
   coverage('double');
   coverage('num');
   coverage('DateTime');
+  coverage('enum');
   coverage('Duration');
   coverage('List<T>');
   coverage('Map<String, V>');
@@ -1055,6 +1091,12 @@ String _buildSeedProgram() {
       ZorphyFieldIr(name: 'd', type: 'double'),
       ZorphyFieldIr(name: 'n', type: 'num'),
       ZorphyFieldIr(name: 't', type: 'DateTime'),
+      ZorphyFieldIr(
+        name: 'tier',
+        type: 'AccountTier',
+        isEnum: true,
+        enumValues: ['free', 'pro', 'enterprise'],
+      ),
       ZorphyFieldIr(name: 'dur', type: 'Duration'),
       ZorphyFieldIr(name: 'tags', type: 'List<String>'),
       ZorphyFieldIr(name: 'scores', type: 'Map<String, int>'),
@@ -1067,6 +1109,8 @@ String _buildSeedProgram() {
 // GENERATED BY test/release/wire_capability_matrix_test.dart — do not edit.
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
+enum AccountTier { free, pro, enterprise }
+
 final class Widget {
   final String s;
   final int i;
@@ -1074,6 +1118,7 @@ final class Widget {
   final double d;
   final num n;
   final DateTime t;
+  final AccountTier tier;
   final Duration dur;
   final List<String> tags;
   final Map<String, int> scores;
@@ -1086,6 +1131,7 @@ final class Widget {
     required this.d,
     required this.n,
     required this.t,
+    required this.tier,
     required this.dur,
     required this.tags,
     required this.scores,
