@@ -152,9 +152,7 @@ void main() {
     });
 
     test('round-trips a nested predicate inside and / or / not', () {
-      final age = UserFields.profile.nested(
-        ProfileFields.age.greaterThan(18),
-      );
+      final age = UserFields.profile.nested(ProfileFields.age.greaterThan(18));
       final tag = UserFields.tags.nested(
         const ZorphyEquals<dynamic, Object?>(
           ZorphyField<dynamic, Object?>(
