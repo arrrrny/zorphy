@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
+import 'package:meta/meta.dart';
 import 'package:source_gen/source_gen.dart';
 
 import 'emission/archetype_composer.dart';
@@ -53,7 +54,7 @@ class _ZorphySharedPartBuilder extends Builder {
     // Resolve the same-package import closure so transitive bases are visible.
     final libraries = _samePackageClosure(inputLibrary);
 
-    final ir = await _resolveWithCache(buildStep, libraries, inputLibrary);
+    final ir = await resolveWithCache(buildStep, libraries, inputLibrary);
     if (ir.hasErrors) {
       throw InvalidGenerationSourceError(
         'Zorphy v3 archetype diagnostics:\n'
@@ -145,25 +146,36 @@ class _ZorphySharedPartBuilder extends Builder {
   }
 
   /// Final root graphs retained for incremental rebuilds.
+  ///
+  /// The cached [PolymorphicIr] graph is shared READ-ONLY across build steps:
+  /// [build] wraps `ir.nodes` in a fresh `localIr` and never mutates the cached
+  /// nodes or node map, so a future consumer must treat cached entries as
+  /// immutable to avoid leaking mutations across libraries.
   static final Map<String, _CachedIr> _irCache = {};
+
   /// Parsed declarations reused across libraries that import the same base.
   static final Map<String, ArchetypeLibraryIr> _libraryIrCache = {};
   static Object? _irCacheSession;
+  static LibraryElement? _irCacheRoot;
 
   /// Bound retained graphs; clearing only sacrifices a cache hit.
   static const int _irCacheLimit = 128;
   static const int _libraryIrCacheLimit = 512;
 
-  Future<PolymorphicIr> _resolveWithCache(
+  @visibleForTesting
+  Future<PolymorphicIr> resolveWithCache(
     BuildStep buildStep,
     List<LibraryElement> libraries,
     LibraryElement root,
   ) async {
     final Object? session = root.session;
     if (session == null) {
-      return HierarchyResolver.resolveLibraries(libraries);
-    }
-    if (!identical(session, _irCacheSession)) {
+      if (!identical(root, _irCacheRoot)) {
+        _irCacheRoot = root;
+        _irCache.clear();
+        _libraryIrCache.clear();
+      }
+    } else if (!identical(session, _irCacheSession)) {
       _irCacheSession = session;
       _irCache.clear();
       _libraryIrCache.clear();
@@ -257,3 +269,10 @@ String _withLintHeader(String output) =>
     '// ignore_for_file: UNNECESSARY_CAST\n'
     '// ignore_for_file: type=lint\n'
     '$output';
+
+@visibleForTesting
+Future<PolymorphicIr> resolveSharedPartIrWithCacheForTest(
+  BuildStep buildStep,
+  List<LibraryElement> libraries,
+  LibraryElement root,
+) => _ZorphySharedPartBuilder().resolveWithCache(buildStep, libraries, root);
