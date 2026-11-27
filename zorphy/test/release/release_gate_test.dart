@@ -72,13 +72,15 @@ void main() {
         // The gate is announced and planned as a dry-run step.
         expect(
           out,
-          contains('Running release gate'),
-          reason: 'publish.sh must announce the release gate',
+          contains('Running pre-publish gate'),
+          reason: 'publish.sh must announce the pre-publish gate',
         );
 
-        // The gate simulates CI against a pristine clone of the release commit:
-        // a fresh `git clone`, version sync, the 4-package --enforce-lockfile
-        // loop, the format check from zorphy/, and the release guard suite.
+        // The pre-publish gate simulates the satisfiability checks against a
+        // pristine clone of the release commit: a fresh `git clone`, version
+        // sync, a resolve-allowed `dart pub get` per package (NOT
+        // --enforce-lockfile, which is unpassable for a version bump — issue
+        // #325), the format check from zorphy/, and the release guard suite.
         final dryRunSteps = RegExp(r'\[dry-run\] (.*)').allMatches(out);
         final commands = dryRunSteps.map((m) => m.group(1)!).toList();
         expect(
@@ -86,34 +88,58 @@ void main() {
           containsAll(<Matcher>[
             contains('git clone file://'),
             contains('scripts/check_version_sync.sh'),
-            contains('dart pub get --enforce-lockfile'),
             contains('dart format --output=none --set-exit-if-changed'),
             contains('dart test test/release/'),
           ]),
           reason: out,
         );
 
-        // --enforce-lockfile runs for each of the four packages CI checks.
+        // The pre-publish gate resolves (resolve-allowed) but never enforces a
+        // lock against the unpublished version; the enforce-lockfile gate lives
+        // in the post-publish phase, which is planned AFTER the publish step.
+        final prePublishIndex = out.indexOf('Running pre-publish gate');
+        final postPublishIndex = out.indexOf(
+          'Running post-publish verification',
+        );
+        final publishIndex = out.indexOf('dart pub publish --force');
+        final prePublishSection = out.substring(
+          prePublishIndex,
+          postPublishIndex,
+        );
         expect(
-          commands.where((c) => c.contains('dart pub get --enforce-lockfile')),
-          hasLength(4),
-          reason: out,
+          prePublishSection,
+          isNot(contains('--enforce-lockfile')),
+          reason: 'the pre-publish gate must not enforce a lock (issue #325)',
+        );
+        expect(
+          prePublishSection,
+          contains('dart pub get'),
+          reason: 'the pre-publish gate resolves per package',
+        );
+        expect(
+          out.substring(postPublishIndex),
+          contains('--enforce-lockfile'),
+          reason: 'the post-publish phase runs the enforce-lockfile gate',
         );
 
         // The gate must abort the release BEFORE anything is published: its
         // planned steps precede the first `dart pub publish --force`.
-        final gateIndex = out.indexOf('Running release gate');
-        final publishIndex = out.indexOf('dart pub publish --force');
         expect(publishIndex, isNonNegative, reason: out);
         expect(
-          gateIndex,
+          prePublishIndex,
           isNonNegative,
           reason: 'the gate must run before the publish step',
         );
         expect(
-          gateIndex < publishIndex,
+          prePublishIndex < publishIndex,
           isTrue,
-          reason: 'the release gate must be planned before the first publish',
+          reason:
+              'the pre-publish gate must be planned before the first publish',
+        );
+        expect(
+          postPublishIndex > publishIndex,
+          isTrue,
+          reason: 'the post-publish phase must be planned after publishing',
         );
       },
     );
@@ -122,23 +148,24 @@ void main() {
       final script = _read('scripts/publish.sh');
 
       // The gate is a defined step that the main flow actually calls.
-      expect(script, contains('release_gate'));
+      expect(script, contains('pre_publish_gate'));
 
-      final callIndex = script.indexOf('release_gate');
+      final callIndex = script.indexOf('\npre_publish_gate\n');
       final publishIndex = script.indexOf('dart pub publish --force');
       final pushIndex = script.indexOf('git push origin');
 
+      expect(callIndex, isNonNegative, reason: 'pre_publish_gate is invoked');
       expect(publishIndex, isNonNegative, reason: 'publish step present');
       expect(pushIndex, isNonNegative, reason: 'push step present');
       expect(
         callIndex < publishIndex,
         isTrue,
-        reason: 'release_gate must be invoked before the publish step',
+        reason: 'pre_publish_gate must be invoked before the publish step',
       );
       expect(
         callIndex < pushIndex,
         isTrue,
-        reason: 'release_gate must be invoked before the push step',
+        reason: 'pre_publish_gate must be invoked before the push step',
       );
     });
   });
