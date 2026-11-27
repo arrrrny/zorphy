@@ -281,6 +281,76 @@ class BoundaryCodecEmitter {
     toWire(node, fields, additionalNodes: additionalNodes),
   ];
 
+  /// The `dart:convert` / ecosystem-compat `toJson` alias over [toWire] (#310).
+  ///
+  /// Emitted ONLY where a zero-arg `toJson() => toWire()` typechecks: a
+  /// non-generic node, whose [toWire] takes no codec parameter. A generic node's
+  /// [toWire] is codec-parameterized (ZRP-009, #272), so a zero-arg `toJson`
+  /// would not compile — there the alias is skipped and this returns `null`.
+  ///
+  /// The alias is pure compat sugar: it projects the boundary codec, it does
+  /// not move serialization policy onto the entity.
+  Method? toJson(
+    ZorphyNodeIr node,
+    Map<String, List<BoundaryField>> fields, {
+    Set<String> additionalNodes = const {},
+  }) {
+    if (node.typeParameters.isNotEmpty) return null;
+    return Method((m) {
+      m
+        ..name = 'toJson'
+        ..returns = referType('Map<String, dynamic>')
+        ..body = const Code('return toWire();');
+    });
+  }
+
+  /// The `dart:convert` / ecosystem-compat `fromJson` alias over [fromWire]
+  /// (#310).
+  ///
+  /// Emitted ONLY where the zero-arg shape typechecks (a non-generic node); a
+  /// generic node's [fromWire] re-declares its type parameters and takes a
+  /// decoder per parameter, so the alias is skipped and this returns `null`.
+  ///
+  /// It aliases the STRICT validating [fromWire], never `fromTrusted`: the
+  /// trust boundary is unchanged, this is only the ecosystem-compat name.
+  Method? fromJson(
+    ZorphyNodeIr node,
+    Map<String, List<BoundaryField>> fields, {
+    Set<String> additionalNodes = const {},
+  }) {
+    if (node.typeParameters.isNotEmpty) return null;
+    return Method((m) {
+      m
+        ..name = 'fromJson'
+        ..static = true
+        ..returns = referType(
+          'ZorphyBoundaryResult<${_resultType(node, const [])}>',
+        )
+        ..requiredParameters.add(
+          Parameter((p) {
+            p
+              ..name = 'json'
+              ..type = referType('Map<String, dynamic>');
+          }),
+        )
+        ..body = Code('return ${node.cleanName}.fromWire(json);');
+    });
+  }
+
+  /// The codec members for [node] WITH the #310 compat aliases appended when
+  /// they typecheck: `fromWire`, `toWire`, then `fromJson`, `toJson` for a
+  /// non-generic node, or just `fromWire`, `toWire` for a generic one.
+  List<Method> emitJsonAliases(
+    ZorphyNodeIr node,
+    Map<String, List<BoundaryField>> fields, {
+    Set<String> additionalNodes = const {},
+  }) => [
+    ...emitCodec(node, fields, additionalNodes: additionalNodes),
+    if (fromJson(node, fields, additionalNodes: additionalNodes) case final f?)
+      f,
+    if (toJson(node, fields, additionalNodes: additionalNodes) case final t?) t,
+  ];
+
   /// The library-level helpers every emitted codec calls.
   ///
   /// Emit these ONCE per library — they are shared by every hierarchy in it

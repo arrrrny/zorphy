@@ -240,7 +240,7 @@ final class ArchetypeComposer {
       // are added for one.
       for (final node in _walkCodec(root)) {
         final methods = <Method>[
-          ...codec.emitCodec(node, payloads, additionalNodes: knownNodes),
+          ...codec.emitJsonAliases(node, payloads, additionalNodes: knownNodes),
         ];
         final resolvePath = resolvePaths[node.className];
         if (resolvePath != null) methods.add(resolvePath);
