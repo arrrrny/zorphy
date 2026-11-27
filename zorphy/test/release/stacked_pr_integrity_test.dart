@@ -293,52 +293,56 @@ void main() {
       expect(result.stdout, contains('OK'));
     });
 
-    test('ignores merges into non-default (stack/release) base branches',
-        () async {
-      // A PR merged into a stack/release branch is validated transitively by
-      // that branch's own merge-to-master, not by its own merge commit being on
-      // master (#328). Its merge commit is not an ancestor of master here, but
-      // because its base is not the default branch it must be skipped.
-      final prs = [
-        _pr(2, orphaned, 'release/2.5.0'),
-        _pr(3, orphaned, 'fix/issue-301-field-registry-erasure'),
-      ].join('\n');
+    test(
+      'ignores merges into non-default (stack/release) base branches',
+      () async {
+        // A PR merged into a stack/release branch is validated transitively by
+        // that branch's own merge-to-master, not by its own merge commit being on
+        // master (#328). Its merge commit is not an ancestor of master here, but
+        // because its base is not the default branch it must be skipped.
+        final prs = [
+          _pr(2, orphaned, 'release/2.5.0'),
+          _pr(3, orphaned, 'fix/issue-301-field-registry-erasure'),
+        ].join('\n');
 
-      final result = await Process.run(
-        'bash',
-        ['scripts/sweep_merged_content.sh'],
-        workingDirectory: root.path,
-        environment: {...Platform.environment, 'GH_PR_LIST_JSON': prs},
-      );
+        final result = await Process.run(
+          'bash',
+          ['scripts/sweep_merged_content.sh'],
+          workingDirectory: root.path,
+          environment: {...Platform.environment, 'GH_PR_LIST_JSON': prs},
+        );
 
-      final out = '${result.stdout}${result.stderr}';
-      expect(result.exitCode, 0, reason: out);
-      expect(out, isNot(contains('orphaned merge: #2')), reason: out);
-      expect(out, isNot(contains('orphaned merge: #3')), reason: out);
-    });
+        final out = '${result.stdout}${result.stderr}';
+        expect(result.exitCode, 0, reason: out);
+        expect(out, isNot(contains('orphaned merge: #2')), reason: out);
+        expect(out, isNot(contains('orphaned merge: #3')), reason: out);
+      },
+    );
 
-    test('still reports a master-base orphan alongside a non-master-base merge',
-        () async {
-      // Scoping the sweep to the default branch must not blind it: a genuine
-      // master-targeting orphan is still caught even when a non-master merge is
-      // present in the same inventory (#328).
-      final prs = [
-        _pr(2, orphaned, 'release/2.5.0'),
-        _pr(4, orphaned, 'master'),
-      ].join('\n');
+    test(
+      'still reports a master-base orphan alongside a non-master-base merge',
+      () async {
+        // Scoping the sweep to the default branch must not blind it: a genuine
+        // master-targeting orphan is still caught even when a non-master merge is
+        // present in the same inventory (#328).
+        final prs = [
+          _pr(2, orphaned, 'release/2.5.0'),
+          _pr(4, orphaned, 'master'),
+        ].join('\n');
 
-      final result = await Process.run(
-        'bash',
-        ['scripts/sweep_merged_content.sh'],
-        workingDirectory: root.path,
-        environment: {...Platform.environment, 'GH_PR_LIST_JSON': prs},
-      );
+        final result = await Process.run(
+          'bash',
+          ['scripts/sweep_merged_content.sh'],
+          workingDirectory: root.path,
+          environment: {...Platform.environment, 'GH_PR_LIST_JSON': prs},
+        );
 
-      final out = '${result.stdout}${result.stderr}';
-      expect(result.exitCode, 1, reason: out);
-      expect(out, contains('orphaned merge: #4'), reason: out);
-      expect(out, isNot(contains('orphaned merge: #2')), reason: out);
-    });
+        final out = '${result.stdout}${result.stderr}';
+        expect(result.exitCode, 1, reason: out);
+        expect(out, contains('orphaned merge: #4'), reason: out);
+        expect(out, isNot(contains('orphaned merge: #2')), reason: out);
+      },
+    );
 
     test(
       'fails closed when gh is unavailable and no offline inventory is set',
