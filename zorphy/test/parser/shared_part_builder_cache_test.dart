@@ -21,15 +21,7 @@ void main() {
     late Directory tempDir;
 
     setUp(() async {
-      tempDir = Directory.systemTemp.createTempSync('zorphy_cache_');
-      // The fixture lives outside the package tree, so it needs its own
-      // package_config.json or `package:zorphy_annotation` is unresolved.
-      final packageConfig = File(
-        '${Directory.current.absolute.path}/.dart_tool/package_config.json',
-      );
-      File('${tempDir.path}/.dart_tool/package_config.json')
-        ..parent.createSync(recursive: true)
-        ..writeAsStringSync(packageConfig.readAsStringSync());
+      tempDir = _makeFixtureDir();
       File(
         '${tempDir.path}/nodes.zorphy.dart',
       ).writeAsStringSync('part of \'nodes.dart\';\n');
@@ -89,14 +81,7 @@ void main() {
       ], root);
       expect(first.roots, hasLength(1));
 
-      final nextDir = Directory.systemTemp.createTempSync('zorphy_cache_');
-      File('${nextDir.path}/.dart_tool/package_config.json')
-        ..parent.createSync(recursive: true)
-        ..writeAsStringSync(
-          File(
-            '${Directory.current.absolute.path}/.dart_tool/package_config.json',
-          ).readAsStringSync(),
-        );
+      final nextDir = _makeFixtureDir();
       File(
         '${nextDir.path}/nodes.zorphy.dart',
       ).writeAsStringSync('part of \'nodes.dart\';\n');
@@ -119,6 +104,21 @@ void main() {
       nextDir.deleteSync(recursive: true);
     });
   });
+}
+
+/// Creates a fixture directory INSIDE the package tree so
+/// `package:zorphy_annotation` resolves through the package's own
+/// `.dart_tool/package_config.json`.
+///
+/// A copied `package_config.json` under the system temp breaks under every
+/// analyzer version (analyzer_compat 13/14 red): its `rootUri` entries are
+/// relative to `.dart_tool/`, so the copy points `zorphy_annotation` at a
+/// non-existent sibling and `@ZorphyValue()` fails to resolve. This mirrors
+/// the in-tree fixture pattern `test/parser/polymorphic_ir_test.dart` uses.
+Directory _makeFixtureDir() {
+  final root = Directory('test/.shared_part_cache_tmp').absolute;
+  root.createSync(recursive: true);
+  return root.createTempSync('fixture_');
 }
 
 Future<LibraryElement> _resolveRoot(String dirPath) async {
