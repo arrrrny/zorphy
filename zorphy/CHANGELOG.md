@@ -1,4 +1,4 @@
-## [Unreleased]
+## [3.0.0-dev.4] - 2026-11-27
 
 ### Changed (BREAKING — v3.0.0)
 
