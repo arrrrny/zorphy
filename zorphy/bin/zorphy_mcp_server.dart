@@ -23,7 +23,7 @@ class SharedResources {
     if (_instance != null) return _instance!;
 
     while (_initializing) {
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
     }
 
     if (_instance != null) return _instance!;
@@ -94,12 +94,12 @@ Future<Map<String, dynamic>> _handleRequest(Map<String, dynamic> req) async {
       return _success(id, {
         'protocolVersion': '2024-11-05',
         'serverInfo': {'name': 'zorphy', 'version': _version},
-        'capabilities': {'tools': {}},
+        'capabilities': {'tools': <String, dynamic>{}},
       });
 
     case 'notifications/initialized':
       // Just ignore this notification
-      return {};
+      return <String, dynamic>{};
 
     case 'tools/list':
       return _success(id, {'tools': _getTools()});
@@ -190,7 +190,7 @@ List<Map<String, dynamic>> _getTools() {
     {
       'name': 'list_entities',
       'description': 'List all Zorphy entities and enums',
-      'inputSchema': {'type': 'object', 'properties': {}},
+      'inputSchema': {'type': 'object', 'properties': <String, dynamic>{}},
     },
   ];
 }

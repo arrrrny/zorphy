@@ -52,13 +52,17 @@ final class HierarchyResolver {
   /// Resolves a set of libraries as ONE graph, so a subtype declared in a
   /// second library joins the root declared in the first (the cross-library
   /// shape issue #142 established must keep working).
-  static PolymorphicIr resolveLibraries(Iterable<LibraryElement> libraries) {
+  static PolymorphicIr resolveLibraries(
+    Iterable<LibraryElement> libraries, {
+    Map<LibraryElement, ArchetypeLibraryIr>? parsedLibraries,
+  }) {
     final declarations = <ClassElement, _Declaration>{};
     final unionVariants = <ClassElement, ClassElement>{};
 
     for (final library in libraries) {
-      for (final (element, declaration)
-          in ArchetypeParser.annotatedDeclarations(library)) {
+      final parsed =
+          parsedLibraries?[library] ?? ArchetypeParser.parseLibrary(library);
+      for (final (element, declaration) in parsed.declarations) {
         declarations.putIfAbsent(
           element,
           () => _Declaration(

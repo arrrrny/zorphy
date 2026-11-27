@@ -205,7 +205,7 @@ dev_dependencies:
       File('$libPath/item.g.dart').createSync();
 
       // Wait to ensure different filesystem timestamps (1s minimum for ext4)
-      await Future.delayed(const Duration(seconds: 2));
+      await Future<void>.delayed(const Duration(seconds: 2));
 
       // Create source file after generated files (newer)
       final source = '''

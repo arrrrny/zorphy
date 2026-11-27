@@ -5,8 +5,16 @@ import 'package:build/build.dart';
 import 'package:source_gen/source_gen.dart';
 
 import 'emission/archetype_composer.dart';
+import 'parser/archetype_parser.dart';
 import 'parser/hierarchy_resolver.dart';
 import 'parser/polymorphic_ir.dart';
+
+final class _CachedIr {
+  const _CachedIr(this.ir, this.libraries);
+
+  final PolymorphicIr ir;
+  final List<LibraryElement> libraries;
+}
 
 /// A [Builder] that emits generated source into a single colocated part file
 /// per library (`<library>.zorphy.dart` beside the input), rather than one
@@ -42,26 +50,8 @@ class _ZorphySharedPartBuilder extends Builder {
       buildStep.inputId,
       allowSyntaxErrors: true,
     );
-    // Issue #278: resolve the input library TOGETHER with the same-package
-    // libraries it imports that also carry archetype annotations, so a leaf
-    // whose base lives in another library sees the cross-library `implements`
-    // edge and merges the base's fields. The single-library path emitted each
-    // library standalone — the leaf neither extended its base nor took the
-    // inherited field — breaking every construction site that passed it.
-    final libraries = <LibraryElement>[inputLibrary];
-    for (final fragment in inputLibrary.fragments) {
-      for (final imported in fragment.libraryImports) {
-        final importedLibrary = imported.importedLibrary;
-        if (importedLibrary == null) continue;
-        // Same package only: a cross-package base is a different build's
-        // output and cannot be emitted into this library's part.
-        if (importedLibrary.uri.pathSegments.first !=
-            inputLibrary.uri.pathSegments.first) {
-          continue;
-        }
-        libraries.add(importedLibrary);
-      }
-    }
+    // Resolve the same-package import closure so transitive bases are visible.
+    final libraries = _samePackageClosure(inputLibrary);
 
     final ir = await _resolveWithCache(buildStep, libraries, inputLibrary);
     if (ir.hasErrors) {
@@ -133,53 +123,113 @@ class _ZorphySharedPartBuilder extends Builder {
     );
   }
 
-  /// Resolves [libraries] once per transitive same-package content closure.
-  static final Map<String, PolymorphicIr> _irCache = {};
-  static Resolver? _irCacheResolver;
+  List<LibraryElement> _samePackageClosure(LibraryElement root) {
+    final rootPackage = root.uri.pathSegments.first;
+    final seen = <LibraryElement>{root};
+    final pending = <LibraryElement>[root];
+    final result = <LibraryElement>[];
+
+    while (pending.isNotEmpty) {
+      final library = pending.removeLast();
+      result.add(library);
+      for (final fragment in library.fragments) {
+        for (final imported in fragment.libraryImports) {
+          final importedLibrary = imported.importedLibrary;
+          if (importedLibrary == null) continue;
+          if (importedLibrary.uri.pathSegments.first != rootPackage) continue;
+          if (seen.add(importedLibrary)) pending.add(importedLibrary);
+        }
+      }
+    }
+    return result;
+  }
+
+  /// Final root graphs retained for incremental rebuilds.
+  static final Map<String, _CachedIr> _irCache = {};
+  /// Parsed declarations reused across libraries that import the same base.
+  static final Map<String, ArchetypeLibraryIr> _libraryIrCache = {};
+  static Object? _irCacheSession;
 
   /// Bound retained graphs; clearing only sacrifices a cache hit.
   static const int _irCacheLimit = 128;
+  static const int _libraryIrCacheLimit = 512;
 
   Future<PolymorphicIr> _resolveWithCache(
     BuildStep buildStep,
     List<LibraryElement> libraries,
     LibraryElement root,
   ) async {
-    final resolver = buildStep.resolver;
-    if (!identical(resolver, _irCacheResolver)) {
-      _irCacheResolver = resolver;
+    final Object? session = root.session;
+    if (session == null) {
+      return HierarchyResolver.resolveLibraries(libraries);
+    }
+    if (!identical(session, _irCacheSession)) {
+      _irCacheSession = session;
       _irCache.clear();
+      _libraryIrCache.clear();
     }
 
-    final key = await _closureDigestKey(buildStep, root);
+    final libraryKeys = <String, LibraryElement>{};
+    final key = await _closureDigestKey(buildStep, libraries, libraryKeys);
     if (key != null) {
       final cached = _irCache[key];
-      if (cached != null) return cached;
+      if (cached != null &&
+          _sameLibraryIdentities(cached.libraries, libraries)) {
+        return cached.ir;
+      }
     }
 
-    final ir = HierarchyResolver.resolveLibraries(libraries);
+    final parsed = key == null ? null : _parsedLibraries(libraryKeys);
+    final ir = HierarchyResolver.resolveLibraries(
+      libraries,
+      parsedLibraries: parsed,
+    );
     if (key != null) {
       if (_irCache.length >= _irCacheLimit) _irCache.clear();
-      _irCache[key] = ir;
+      _irCache[key] = _CachedIr(ir, List.unmodifiable(libraries));
     }
     return ir;
   }
 
-  /// Digest key for [root]'s transitive same-package imports, or null.
+  bool _sameLibraryIdentities(
+    List<LibraryElement> cached,
+    List<LibraryElement> current,
+  ) {
+    if (cached.length != current.length) return false;
+    final identities = Set<LibraryElement>.identity()..addAll(cached);
+    return current.every(identities.contains);
+  }
+
+  Map<LibraryElement, ArchetypeLibraryIr> _parsedLibraries(
+    Map<String, LibraryElement> libraryKeys,
+  ) {
+    final parsed = <LibraryElement, ArchetypeLibraryIr>{};
+    for (final entry in libraryKeys.entries) {
+      final cached = _libraryIrCache[entry.key];
+      if (cached != null && identical(cached.library, entry.value)) {
+        parsed[entry.value] = cached;
+        continue;
+      }
+      final value = ArchetypeParser.parseLibrary(entry.value);
+      if (_libraryIrCache.length >= _libraryIrCacheLimit) {
+        _libraryIrCache.clear();
+      }
+      _libraryIrCache[entry.key] = value;
+      parsed[entry.value] = value;
+    }
+    return parsed;
+  }
+
+  /// Digest key for the resolved same-package closure, or null if unavailable.
   Future<String?> _closureDigestKey(
     BuildStep buildStep,
-    LibraryElement root,
+    List<LibraryElement> libraries,
+    Map<String, LibraryElement> libraryKeys,
   ) async {
     final resolver = buildStep.resolver;
-    final rootPackage = root.uri.pathSegments.first;
-    final seen = <LibraryElement>{};
-    final pending = <LibraryElement>[root];
     final parts = <String>[];
 
-    while (pending.isNotEmpty) {
-      final library = pending.removeLast();
-      if (!seen.add(library)) continue;
-
+    for (final library in libraries) {
       final AssetId assetId;
       try {
         assetId = await resolver.assetIdForElement(library);
@@ -188,16 +238,9 @@ class _ZorphySharedPartBuilder extends Builder {
         return null;
       }
       final digest = await buildStep.digest(assetId);
-      parts.add('${assetId.path}=$digest');
-
-      for (final fragment in library.fragments) {
-        for (final imported in fragment.libraryImports) {
-          final importedLibrary = imported.importedLibrary;
-          if (importedLibrary == null) continue;
-          if (importedLibrary.uri.pathSegments.first != rootPackage) continue;
-          pending.add(importedLibrary);
-        }
-      }
+      final key = '${assetId.path}=$digest';
+      libraryKeys[key] = library;
+      parts.add(key);
     }
 
     parts.sort();

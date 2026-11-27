@@ -1,10 +1,10 @@
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-import 'base_shape.dart';
+import 'intermediate.dart';
 
 part 'circle.zorphy.dart';
 
 @ZorphyValue()
-abstract class $Circle implements $Shape {
+abstract class $Circle implements $Intermediate {
   double get radius;
 }

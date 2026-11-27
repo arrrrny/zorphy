@@ -130,6 +130,14 @@ final class ArchetypeDeclaration {
   ArchetypeKind get kind => archetype.kind;
 }
 
+/// Parsed archetype declarations for one library.
+final class ArchetypeLibraryIr {
+  const ArchetypeLibraryIr({required this.library, required this.declarations});
+
+  final LibraryElement library;
+  final List<(ClassElement, ArchetypeDeclaration)> declarations;
+}
+
 /// Reads archetype declarations off class elements.
 final class ArchetypeParser {
   const ArchetypeParser._();
@@ -155,6 +163,14 @@ final class ArchetypeParser {
       if (declaration != null) annotated.add((element, declaration));
     }
     return annotated;
+  }
+
+  /// Parses one library into the immutable declaration bundle shared by roots.
+  static ArchetypeLibraryIr parseLibrary(LibraryElement library) {
+    return ArchetypeLibraryIr(
+      library: library,
+      declarations: List.unmodifiable(annotatedDeclarations(library)),
+    );
   }
 
   static ArchetypeDeclaration _read(

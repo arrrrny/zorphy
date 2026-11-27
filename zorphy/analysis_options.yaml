@@ -1,4 +1,9 @@
+# Type-safety floor for downstream ecosystem consumers.
 analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+    strict-inference: true
   exclude:
     - "**/*.g.dart"
     - "**/*.zorphy.dart"
@@ -25,12 +30,6 @@ analyzer:
     # launcher (`deterministic_structural_guards_test.dart`, which runs
     # generation first and stays analyzed), not by static analysis.
     - "test/audit/_structural_probe.dart"
-
-# Type-safety floor for downstream ecosystem consumers.
-language:
-  strict-casts: true
-  strict-raw-types: true
-  strict-inference: true
 
 linter:
   rules:
