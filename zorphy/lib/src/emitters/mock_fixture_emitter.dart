@@ -589,6 +589,16 @@ final class MockFixtureEmitter {
   Expression? _defaultSeedValue(ZorphyFieldIr field, Expression seed) {
     final bare = _bareType(field.type);
 
+    // An enum field seeds by INDEX (issue #313's v2-parity directive):
+    // `EnumType.values[seed % EnumType.values.length]` cycles through every
+    // member across `list(count:)`, so a `count >= values.length` exercises
+    // every case and `corruptMaps()` fuzzes every branch. The leading
+    // `EnumType.values` reference is the declared type — always valid, never
+    // guessed.
+    if (field.isEnum && field.enumValues.isNotEmpty) {
+      return _code('$bare.values[${_render(seed)} % $bare.values.length]');
+    }
+
     return switch (bare) {
       'String' => _stringSeed(field.name, seed),
       'int' ||

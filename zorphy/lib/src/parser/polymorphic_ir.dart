@@ -161,6 +161,36 @@ final class ZorphyFieldIr {
   /// the body-factory fallback instead of emitting a call that cannot compile.
   final String? constructorDefault;
 
+  /// Whether the declared type is an `enum` (issue #313).
+  ///
+  /// An enum is a leaf the wire carries by NAME and the mock seeder can
+  /// enumerate: the boundary codec encodes `value.name` / decodes by name, and
+  /// `MockData` seeds `EnumType.values[seed % length]`. Without this flag the
+  /// codec treated the field as a plain scalar (a reified `is` test that
+  /// records a TYPE violation for a wire string) and the seeder refused it as
+  /// unseedable (throwing for a required field).
+  final bool isEnum;
+
+  /// The enum's member names, in declaration order, when [isEnum] is `true`
+  /// (`['free', 'pro', 'enterprise']`), or `const []` otherwise.
+  ///
+  /// Carried from the analyzer `EnumElement` so the mock seeder enumerates real
+  /// members without guessing and a `list(count:)` can cycle through every
+  /// case (issue #313's v2-parity directive).
+  final List<String> enumValues;
+
+  /// The names of enum types used as an element/value of this field's
+  /// collection type (`{'AccountTier'}` for a `List<AccountTier>` or a
+  /// `Map<String, AccountTier>`), or the empty set otherwise.
+  ///
+  /// [isEnum] describes only a field typed directly by an enum. A collection
+  /// element is a different type from the field itself, so the resolver walks
+  /// the type arguments separately and records the enum names here. The
+  /// boundary codec needs them to classify a collection element as an enum
+  /// (issue #313 review: the element-level `enumValue` branches were otherwise
+  /// unreachable and a `List<Enum>` reproduced the top-level Gap-1 bug).
+  final Set<String> enumElementTypes;
+
   const ZorphyFieldIr({
     required this.name,
     required this.type,
@@ -168,6 +198,9 @@ final class ZorphyFieldIr {
     this.suppressQuestionMark = false,
     this.isDomainBool = false,
     this.constructorDefault,
+    this.isEnum = false,
+    this.enumValues = const [],
+    this.enumElementTypes = const {},
   });
 
   /// Whether the emitted type text carries a `?`.

@@ -378,6 +378,7 @@ final class HierarchyResolver {
       final name = getter.name ?? '';
       if (name.isEmpty || !seen.add(name)) continue;
       final type = getter.returnType;
+      final enumValues = _enumValues(type);
       fields.add(
         ZorphyFieldIr(
           name: name,
@@ -388,6 +389,9 @@ final class HierarchyResolver {
               _isDomainBool(getter) ||
               _isDomainBool(_declaringField(declaredByName, name)),
           constructorDefault: constructorDefaults[name],
+          isEnum: enumValues.isNotEmpty,
+          enumValues: enumValues,
+          enumElementTypes: _enumElementTypes(type),
         ),
       );
     }
@@ -396,6 +400,7 @@ final class HierarchyResolver {
       final name = field.name ?? '';
       if (name.isEmpty || !seen.add(name)) continue;
       final type = field.type;
+      final enumValues = _enumValues(type);
       fields.add(
         ZorphyFieldIr(
           name: name,
@@ -404,10 +409,53 @@ final class HierarchyResolver {
           suppressQuestionMark: _hasNullableBound(type),
           isDomainBool: _isDomainBool(field),
           constructorDefault: constructorDefaults[name],
+          isEnum: enumValues.isNotEmpty,
+          enumValues: enumValues,
+          enumElementTypes: _enumElementTypes(type),
         ),
       );
     }
     return List.unmodifiable(fields);
+  }
+
+  /// The member names of [type] when it is an `enum`, in declaration order, or
+  /// `const []` for any other type (issue #313).
+  ///
+  /// The seeder enumerates these to seed an enum field by index, and the codec
+  /// uses the non-empty result as the "this field is an enum" signal — so a
+  /// field typed by a NON-enum class is never mistaken for one.
+  static List<String> _enumValues(DartType type) {
+    final element = type.element;
+    if (element is! EnumElement) return const [];
+    return [
+      for (final member in element.children)
+        if (member is FieldElement && member.isEnumConstant)
+          if ((member.name ?? '').isNotEmpty) member.name!,
+    ];
+  }
+
+  /// The names of enum types appearing as a type argument of [type] — the
+  /// element of a `List<T>`/Set or the value of a `Map<K, V>` (issue #313
+  /// review). A collection's own `type.element` is the collection class, so
+  /// [_enumValues] sees no enum for `List<AccountTier>`; the codec needs the
+  /// element's name to take its enum decode/encode path. Nested collections are
+  /// walked so `List<List<AccountTier>>` does not lose the inner enum either.
+  static Set<String> _enumElementTypes(DartType type) {
+    final names = <String>{};
+    void walk(DartType current) {
+      if (current is! InterfaceType) return;
+      for (final argument in current.typeArguments) {
+        if (argument.element is EnumElement) {
+          final name = _typeText(argument);
+          if (name.isNotEmpty) names.add(name);
+        } else {
+          walk(argument);
+        }
+      }
+    }
+
+    walk(type);
+    return Set.unmodifiable(names);
   }
 
   /// The statically declared field called [name] in [declaredByName], or `null`.
