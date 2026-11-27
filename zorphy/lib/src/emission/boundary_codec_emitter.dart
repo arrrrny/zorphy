@@ -1042,7 +1042,7 @@ class BoundaryCodecEmitter {
           _Shape.node => '$name.map((e) => e.toWire()).toList()',
           _Shape.dateTime => '$name.map((e) => e.toIso8601String()).toList()',
           _Shape.enumValue =>
-            '$name.map((e) => e is Enum ? e.name : e).toList()',
+            '$name.map((e) => ${_enumNameExpression('e', type.inner)}).toList()',
           _ => name,
         };
       case _Shape.map:
@@ -1053,7 +1053,7 @@ class BoundaryCodecEmitter {
           _Shape.dateTime =>
             '$name.map((key, e) => MapEntry(key, e.toIso8601String()))',
           _Shape.enumValue =>
-            '$name.map((key, e) => MapEntry(key, e is Enum ? e.name : e))',
+            '$name.map((key, e) => MapEntry(key, ${_enumNameExpression('e', type.inner)}))',
           _ => name,
         };
       case _Shape.dateTime:
@@ -1069,10 +1069,38 @@ class BoundaryCodecEmitter {
       case _Shape.enumValue:
         // An `Enum` instance is not JSON-encodable: write its NAME so
         // `jsonEncode(toWire())` survives a transport hop (#215's fix, here for
-        // the entity boundary codec). A same-process value already decoded in
-        // flight is still an `Enum`, so the `is Enum` guard is total.
-        return '$name is Enum ? $name.name : $name';
+        // the entity boundary codec). When the field's static type IS the
+        // concrete enum (the common case — `isEnum`/`enumElementTypes` are set
+        // from the analyzer's `EnumElement` detection), the value is always an
+        // `Enum`, so a direct `.name` write is emitted: an `is Enum` guard
+        // there is always-true and its `: value` branch is dead code, two
+        // analyzer findings per field (#335). The guard survives only where the
+        // static type can actually be something else — a type variable or a
+        // dynamic wire value — which `_enumNameExpression` detects from the
+        // inner type name.
+        return _enumNameExpression(name, type.inner);
     }
+  }
+
+  /// The encode expression for an enum value read from [name], where [innerType]
+  /// is the static type name the value is classified against.
+  ///
+  /// A CONCRETE enum type (the field's declared type IS the enum, so the value
+  /// is always an `Enum`) emits a direct `.name` write — an `is Enum` guard
+  /// there is always-true and its `: value` branch is dead code (#335). The
+  /// guard survives only where the static type can actually hold something
+  /// else: a type variable (`T`, possibly bounded to `Object?`) or a
+  /// `dynamic`/`Object?` wire value. Those keep the total
+  /// `is Enum ? .name : value` form, which is not always-true and not dead.
+  static String _enumNameExpression(String name, String innerType) {
+    final base = _strip(innerType);
+    final isConcreteEnum =
+        base.isNotEmpty &&
+        base != 'dynamic' &&
+        base != 'Object?' &&
+        base != 'Object' &&
+        !base.endsWith('?');
+    return isConcreteEnum ? '$name.name' : '$name is Enum ? $name.name : $name';
   }
 
   // ── Type classification ──────────────────────────────────────────

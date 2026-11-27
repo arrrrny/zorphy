@@ -292,14 +292,14 @@ const _matrix = <WireRow>[
   WireRow(
     kind: 'enum',
     responsible: 'BoundaryCodecEmitter / PatchEmitter / MockFixtureEmitter',
-    // #313 Gap 1: the boundary codec emits the raw instance (breaks
-    // jsonEncode) and decodes by `is`-test, no name resolution. The patch path
-    // (#215) already does `.name` + `enumByName`.
-    boundary: Omitted(
-      issue: '#313',
-      reason:
-          'boundary codec emits raw enum instance and is-tests decode; '
-          'no `.name` encode / `enumByName` decode yet (#313 Gap 1)',
+    // #313 Gap 1 landed: the boundary codec encodes a concrete-enum field as a
+    // direct `.name` write (#335 — no always-true `is Enum` guard / dead branch)
+    // and decodes by name through `enumByName`, so the envelope jsonEncode-
+    // survives and an unknown name is a violation at the field pointer.
+    boundary: Enforced(
+      encode: 'name',
+      jsonSurvives: true,
+      decode: 'enumByName (violation on mismatch)',
     ),
     patch: Enforced(
       encode: 'name',
@@ -624,10 +624,11 @@ void main() {
           }
         }
         // The #313 enum gaps are the omissions that carry a tracking issue; a
-        // NEW omission with no issue is allowed but these two must keep theirs
-        // until #313 migrates them into Enforced rows.
+        // NEW omission with no issue is allowed but the seed one must keep its
+        // #313 issue until it migrates into an Enforced row. The boundary cell
+        // migrated to Enforced in #335 (direct `.name` encode, analyze-clean).
         final enumRow = _matrix.firstWhere((r) => r.kind == 'enum');
-        expect((enumRow.boundary as Omitted).issue, '#313');
+        expect(enumRow.boundary, isA<Enforced>());
         expect((enumRow.seed as Omitted).issue, '#313');
       },
     );
@@ -737,6 +738,7 @@ String _boundaryContractChecks() {
     'generic type param (T)': "boxEncoded['item']",
     'List<T>': 'v.tags',
     'Map<String, V>': 'v.scores',
+    'enum': "encoded['tier']",
   };
   final checks = <String>[];
   var i = 0;
@@ -808,6 +810,7 @@ const _boundaryFields = <String, List<BoundaryField>>{
     BoundaryField(name: 'stamps', type: 'List<DateTime>'),
     BoundaryField(name: 'scores', type: 'Map<String, int>'),
     BoundaryField(name: 'child', type: 'Child'),
+    BoundaryField(name: 'tier', type: 'AccountTier', isEnum: true),
   ],
   r'$Box': [BoundaryField(name: 'item', type: 'T')],
 };
@@ -830,6 +833,7 @@ void main() {
     'stamps': <Object?>['2026-11-23T00:00:00.000Z'],
     'scores': <String, Object?>{'x': 1, 'y': 2},
     'child': <String, Object?>{'sku': 'sku-1', 'price': 9.5},
+    'tier': 'pro',
   };
 
   final ok = Scalars.fromWire(wire);
@@ -844,6 +848,7 @@ void main() {
   check(v.stamps.single.isUtc, 'List<DateTime> decoded element-wise');
   check(v.scores['x'] == 1, 'Map<String,int> decoded');
   check(v.child.sku == 'sku-1', 'nested entity decoded');
+  check(v.tier == AccountTier.pro, 'enum decoded by name');
   coverage('String');
   coverage('int');
   coverage('bool');
@@ -852,6 +857,7 @@ void main() {
   coverage('List<T>');
   coverage('Map<String, V>');
   coverage('nested entity');
+  coverage('enum');
 
   // encode: exact wire forms + jsonEncode survives a transport hop.
   final encoded = v.toWire();
@@ -861,6 +867,7 @@ void main() {
     (encoded['stamps'] as List).single is String,
     'List<DateTime> encodes element-wise to ISO strings',
   );
+  check(encoded['tier'] == 'pro', 'enum encodes as its NAME (#335)');
   final json = jsonEncode(encoded);
   check(json.contains('2026-11-23'), 'jsonEncode(toWire()) survives');
 
@@ -932,6 +939,8 @@ String _buildBoundaryProgram() {
 import 'dart:convert';
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
+enum AccountTier { free, pro, enterprise }
+
 final class Child {
   final String sku;
   final double price;
@@ -950,6 +959,7 @@ final class Scalars {
   final List<DateTime> stamps;
   final Map<String, int> scores;
   final Child child;
+  final AccountTier tier;
   const Scalars.fromTrusted({
     required this.s,
     required this.i,
@@ -960,6 +970,7 @@ final class Scalars {
     required this.stamps,
     required this.scores,
     required this.child,
+    required this.tier,
   });
 
 ${_indent(_codecFor(scalars, _boundaryFields, additionalNodes: {'Child'}))}

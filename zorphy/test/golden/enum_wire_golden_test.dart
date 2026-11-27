@@ -84,9 +84,12 @@ void main() {
       compact = _compact(source);
     });
 
-    test('encode writes the enum NAME, not the raw instance', () {
-      // `this.tier is Enum ? this.tier.name : this.tier` — a JSON hop survives.
-      expect(compact, contains('this.tierisEnum?this.tier.name:this.tier'));
+    test('encode writes the enum NAME directly, not the raw instance', () {
+      // #335: a concrete-enum field's static type IS the enum, so the value is
+      // always an `Enum` — a direct `.name` write, with no always-true `is Enum`
+      // guard and no dead `: value` branch (both were analyzer findings).
+      expect(compact, contains('this.tier.name'));
+      expect(compact, isNot(contains('this.tierisEnum')));
     });
 
     test('decode resolves by name through enumByName', () {
@@ -144,18 +147,19 @@ void main() {
       );
     });
 
-    test('a list element encodes by name, not as a raw Enum', () {
-      expect(
-        compact,
-        contains('this.tiers.map((e)=>eisEnum?e.name:e).toList()'),
-      );
+    test('a list element encodes by name directly, not as a raw Enum', () {
+      // #335: the element type is a concrete enum, so each element is always an
+      // `Enum` — a direct `.name` write, no always-true `is Enum` guard.
+      expect(compact, contains('this.tiers.map((e)=>e.name).toList()'));
+      expect(compact, isNot(contains('eisEnum')));
     });
 
-    test('a map value encodes by name, not as a raw Enum', () {
+    test('a map value encodes by name directly, not as a raw Enum', () {
       expect(
         compact,
-        contains('this.labels.map((key,e)=>MapEntry(key,eisEnum?e.name:e))'),
+        contains('this.labels.map((key,e)=>MapEntry(key,e.name))'),
       );
+      expect(compact, isNot(contains('eisEnum')));
     });
 
     test('collection elements decode by name through enumByName', () {

@@ -203,4 +203,53 @@ void main() {
     );
     expect(output, contains('ALL ENUM WIRE CHECKS PASSED'));
   });
+
+  test('concrete-enum toJson/toWire analyzes clean under --fatal-infos (#335)', () {
+    // The dev.5 colocated emitter wrote `tier is Enum ? tier.name : tier` for a
+    // concrete-enum field — an always-true `is Enum` check plus a dead `: tier`
+    // branch, two analyzer findings per field. A concrete enum's static type IS
+    // the enum, so the value is always an `Enum`: the direct `.name` write must
+    // produce ZERO `unnecessary_type_check` / `dead_code` under the repo's
+    // fatal-infos posture.
+    final program = _buildProgram();
+
+    final directory = Directory(
+      'example/.dart_tool/zorphy_335_analyze',
+    ).absolute..createSync(recursive: true);
+    addTearDown(() {
+      if (directory.existsSync()) directory.deleteSync(recursive: true);
+    });
+
+    final file = File('${directory.path}/enum_wire_program.dart')
+      ..writeAsStringSync(program);
+
+    final analyze = Process.runSync(
+      Platform.resolvedExecutable,
+      ['analyze', '--fatal-infos', file.path],
+      workingDirectory: 'example',
+      stdoutEncoding: const SystemEncoding(),
+      stderrEncoding: const SystemEncoding(),
+    );
+    final output = '${analyze.stdout}\n${analyze.stderr}';
+    // The bug is exactly these two findings on the concrete-enum field; the
+    // program's full helper set also trips unrelated `unused_element` warnings,
+    // so scope the gate to the regression the issue names.
+    expect(
+      output,
+      isNot(contains('unnecessary_type_check')),
+      reason:
+          'concrete-enum field emitted an always-true `is Enum` check:\n$output'
+          '\n---program---\n$program',
+    );
+    expect(
+      output,
+      isNot(contains('dead_code')),
+      reason:
+          'concrete-enum field emitted a dead `: value` branch:\n$output'
+          '\n---program---\n$program',
+    );
+    // And the direct write is what replaced the guard.
+    expect(program, contains('this.tier.name'));
+    expect(program, isNot(contains('this.tier is Enum')));
+  });
 }
