@@ -37,6 +37,30 @@ ZorphyNodeIr _node({
   );
 }
 
+/// A user-declared static member as the IR carries it (issue #310).
+ZorphyUserMemberIr _staticMember(
+  String name,
+  String returnType,
+  String body,
+) => ZorphyUserMemberIr(
+  name: name,
+  isFactory: false,
+  returnType: returnType,
+  typeParameters: const [],
+  parameters: const [
+    ZorphyUserParamIr(
+      name: 'json',
+      type: 'Map<String, dynamic>',
+      isNamed: false,
+      isRequired: false,
+      isOptionalPositional: false,
+      defaultValue: null,
+    ),
+  ],
+  bodySource: body,
+  bodyIsLambda: true,
+);
+
 void main() {
   group('ArchetypeComposer — review findings on #226', () {
     test(
@@ -384,6 +408,71 @@ void main() {
       // named `Leaf` as a nested node would emit a `fromWire` that does not
       // exist. The field must refuse the generation (see the guard above).
       expect(() => const ArchetypeComposer().compose(ir), throwsArgumentError);
+    });
+  });
+
+  group('ArchetypeComposer — issue #310 compat-alias collisions', () {
+    // The compat aliases `fromJson`/`toJson` must not collide with a user
+    // member of the same name forwarded onto a non-generic union root: two
+    // statics give `duplicate_definition`, a user static `toJson` against the
+    // generated instance `toJson()` gives `conflicting_static_and_instance`.
+    // The author's member wins (issue #271 §3.4) and the generated alias
+    // yields — for BOTH aliases — so libraries that compile today keep doing
+    // so. `fromWire`/`toWire` stay reserved and are emitted as usual.
+    String _unionWithJsonMembers() {
+      final leaf = _node(name: 'NetworkFailure');
+      final root = _node(
+        name: 'AppFailure',
+        isRoot: true,
+        isUnion: true,
+        archetype: ArchetypeKind.value,
+      );
+      // Return the concrete leaf from `fromJson`: the union root is sealed.
+      final userRoot = root.copyWith(
+        userMembers: [
+          _staticMember('fromJson', 'AppFailure', 'NetworkFailure()'),
+          _staticMember('toJson', 'String', "'custom'"),
+        ],
+      );
+      final wiredLeaf = leaf.copyWith(
+        superTypes: [userRoot],
+        isConcreteLeaf: true,
+      );
+      final wiredRoot = userRoot.copyWith(
+        directSubTypes: [wiredLeaf],
+        isConcreteLeaf: false,
+      );
+      final ir = PolymorphicIr(
+        nodes: {'\$AppFailure': wiredRoot, '\$NetworkFailure': wiredLeaf},
+        roots: [wiredRoot],
+        diagnostics: const [],
+      );
+      return const ArchetypeComposer().compose(ir);
+    }
+
+    test('a user fromJson/toJson wins and the generated aliases yield', () {
+      final out = _unionWithJsonMembers();
+      // Isolate the root class: its leaf still carries the generated aliases,
+      // which is correct (it forwards no user members).
+      final root = out.substring(
+        out.indexOf('sealed class AppFailure'),
+        out.indexOf('final class NetworkFailure'),
+      );
+      expect(root, contains('static AppFailure fromJson('));
+      expect(root, contains('static String toJson('));
+      expect(
+        root,
+        isNot(contains('static ZorphyBoundaryResult<AppFailure> fromJson(')),
+        reason: 'the generated fromJson alias yields to the user member',
+      );
+      expect(
+        root,
+        isNot(contains('Map<String, dynamic> toJson()')),
+        reason: 'the generated toJson alias yields to the user member',
+      );
+      // The canonical wire pair is untouched.
+      expect(root, contains('static ZorphyBoundaryResult<AppFailure> fromWire('));
+      expect(root, contains('Map<String, Object?> toWire()'));
     });
   });
 }

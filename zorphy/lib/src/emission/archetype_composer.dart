@@ -239,8 +239,27 @@ final class ArchetypeComposer {
       // surfaces are still fail-closed on generics), so only the codec methods
       // are added for one.
       for (final node in _walkCodec(root)) {
+        // Issue #310 (review finding): the compat aliases `fromJson`/`toJson`
+        // must not collide with a user member of the same name forwarded by
+        // `PolymorphicClassEmitter._emitUserMembers` onto a union root. A
+        // collision is either `duplicate_definition` (two statics) or
+        // `conflicting_static_and_instance` (a user static `toJson` against
+        // the generated instance `toJson()`), breaking libraries that compile
+        // today. Follow the #271 §3.4 convention — the author's own member
+        // always survives — so the GENERATED alias yields here. Apply the same
+        // rule to both aliases; `fromWire`/`toWire` are reserved names and are
+        // deliberately left untouched.
+        final userMemberNames = {
+          for (final member in node.userMembers) member.name,
+        };
         final methods = <Method>[
-          ...codec.emitJsonAliases(node, payloads, additionalNodes: knownNodes),
+          ...codec
+              .emitJsonAliases(node, payloads, additionalNodes: knownNodes)
+              .where(
+                (m) =>
+                    (m.name != 'fromJson' && m.name != 'toJson') ||
+                    !userMemberNames.contains(m.name),
+              ),
         ];
         final resolvePath = resolvePaths[node.className];
         if (resolvePath != null) methods.add(resolvePath);

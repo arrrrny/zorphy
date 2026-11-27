@@ -730,6 +730,101 @@ class $Wrapped<T> implements $Envelope<T> {
       timeout: const Timeout(Duration(minutes: 6)),
     );
   });
+
+  // Issue #310 (review finding): the generated `fromJson`/`toJson` compat
+  // aliases must not collide with a user member of the same name on a
+  // non-generic union root. The user's own member wins and the alias yields.
+  group('#310 — compat aliases yield to same-named user members', () {
+    const withJsonMembers =
+        '$_annotationImport'
+        r'''
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class $AppFailure {
+  factory $AppFailure.network({required String message}) = $NetworkFailure;
+
+  // User statics that collide with the #310 compat aliases. Before the fix
+  // these produced duplicate_definition (fromJson) and
+  // conflicting_static_and_instance (toJson), so the library stopped compiling.
+  static $AppFailure fromJson(Map<String, dynamic> json) =>
+      $NetworkFailure(message: json['message'] as String);
+  static String toJson($AppFailure failure) => 'custom';
+}
+
+@ZorphyValue()
+class $NetworkFailure implements $AppFailure {
+  @override
+  final String message;
+
+  const $NetworkFailure({required this.message});
+}
+''';
+
+    test('the emitted union root compiles with user fromJson/toJson', () async {
+      final (_, body) = await _compose({'nodes.dart': withJsonMembers});
+      final flat = body.replaceAll(RegExp(r'\s+'), ' ');
+
+      // The user members survive verbatim...
+      expect(flat, contains('static AppFailure fromJson('));
+      expect(flat, contains('static String toJson('));
+      // ...and the generated aliases yield, for BOTH names. (The leaf still
+      // carries its own aliases — it forwards no user members.)
+      expect(
+        flat,
+        isNot(contains('static ZorphyBoundaryResult<AppFailure> fromJson(')),
+      );
+      final root = body.substring(
+        body.indexOf('sealed class AppFailure'),
+        body.indexOf('final class NetworkFailure'),
+      );
+      expect(
+        root.replaceAll(RegExp(r'\s+'), ''),
+        isNot(contains('Map<String,dynamic>toJson()')),
+      );
+      // The canonical wire pair is untouched.
+      expect(
+        flat,
+        contains('static ZorphyBoundaryResult<AppFailure> fromWire('),
+      );
+
+      final probeParent = Directory('test/.issue_310_$pid')
+        ..createSync(recursive: true);
+      final probe = probeParent.createTempSync('issue_310_').absolute;
+      addTearDown(() => probe.deleteSync(recursive: true));
+
+      File('${probe.path}/pubspec.yaml').writeAsStringSync(
+        'name: issue_310_probe\n'
+        'environment:\n'
+        '  sdk: ">=3.11.0 <4.0.0"\n'
+        'dependencies:\n'
+        '  zorphy_annotation:\n'
+        '    path: ${Directory.current.parent.uri.resolve('zorphy_annotation/').toFilePath()}\n',
+      );
+      Directory('${probe.path}/lib').createSync();
+      File('${probe.path}/lib/generated.dart').writeAsStringSync(
+        "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$body",
+      );
+
+      final pubGet = Process.runSync('dart', [
+        'pub',
+        'get',
+      ], workingDirectory: probe.path);
+      expect(pubGet.exitCode, 0, reason: '${pubGet.stdout}${pubGet.stderr}');
+
+      final analyze = Process.runSync('dart', [
+        'analyze',
+        '--fatal-infos',
+        'lib/generated.dart',
+      ], workingDirectory: probe.path);
+      expect(
+        analyze.exitCode,
+        0,
+        reason: 'generated union surface does not compile:\n'
+            '${analyze.stdout}\n${analyze.stderr}',
+      );
+    }, timeout: const Timeout(Duration(minutes: 6)));
+  });
 }
 
 /// Exercises the generated surface exactly as a consumer would: the
