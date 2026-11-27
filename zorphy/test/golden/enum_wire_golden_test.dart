@@ -139,10 +139,9 @@ void main() {
         ],
       };
       const emitter = BoundaryCodecEmitter();
-      compact = _compact(_emit([
-        emitter.fromWire(node, fields),
-        emitter.toWire(node, fields),
-      ]));
+      compact = _compact(
+        _emit([emitter.fromWire(node, fields), emitter.toWire(node, fields)]),
+      );
     });
 
     test('a list element encodes by name, not as a raw Enum', () {
@@ -162,9 +161,7 @@ void main() {
     test('collection elements decode by name through enumByName', () {
       expect(
         compact,
-        contains(
-          'ZorphyPatchWire.enumByName<AccountTier>(AccountTier.values,',
-        ),
+        contains('ZorphyPatchWire.enumByName<AccountTier>(AccountTier.values,'),
       );
     });
 

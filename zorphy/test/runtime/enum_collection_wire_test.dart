@@ -133,7 +133,8 @@ void main() {
 }
 ''';
 
-String _buildProgram() => '''
+String _buildProgram() =>
+    '''
 $_annotationImport
 import 'dart:convert';
 
