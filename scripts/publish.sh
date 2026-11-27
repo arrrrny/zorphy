@@ -64,14 +64,26 @@ run() {
     fi
 }
 
-# Release gate (issue #314): run the SAME clean-checkout CI simulation CI runs,
-# against a pristine clone of the release commit, BEFORE anything is published
-# or pushed. A maintainer machine never proves the release — local locks, a
-# gitignored pubspec_overrides.yaml and local package resolution all differ from
-# CI's pristine checkout, and 3.0.0-dev.4 shipped base-red exactly that way.
+# Pre-publish gate (issue #325, split from the old monolithic release gate):
+# run the satisfiability checks against a pristine clone of the release commit
+# BEFORE anything is published or pushed. A maintainer machine never proves the
+# release — local locks, a gitignored pubspec_overrides.yaml and local package
+# resolution all differ from CI's pristine checkout, and 3.0.0-dev.4 shipped
+# base-red exactly that way.
+#
+# It MUST NOT run `dart pub get --enforce-lockfile` here (issue #325): at this
+# point the release commit's internal constraints already point at the version
+# being released (`^3.0.0-dev.5`) while the committed lockfiles still pin the
+# previous line (`dev.4`), and they CANNOT pin the new version because it does
+# not exist on pub.dev yet — so an enforce-lockfile step is unresolvable
+# pre-publish, forever. The lockfile gate moves to `post_publish_verify`, which
+# runs after the new version is published. Here we only prove the constraints
+# are *satisfiable*: a resolve-allowed `dart pub get` per package (internal
+# deps resolved from the pristine clone via a throwaway override) plus a check
+# that the internal constraints stay on the previously published base line.
 # Any failing step aborts the whole release (set -e), naming the step.
-release_gate() {
-    echo "🧪 Running release gate (clean-checkout CI simulation)…"
+pre_publish_gate() {
+    echo "🧪 Running pre-publish gate (constraint satisfiability)…"
 
     local check_dir
     if $DRY_RUN; then
@@ -87,28 +99,45 @@ release_gate() {
     # the release (issue #322).
     run git clone "file://$REPO_ROOT" "$check_dir"
 
-    # 1. Version sync across the 3 packages.
+    # 1. Version sync across the 3 packages (also enforces the internal
+    #    zorphy_annotation constraint is exactly ^<version>, i.e. on the
+    #    release's own base line).
     echo "  == check_version_sync.sh"
     run bash -c "cd '$check_dir' && bash scripts/check_version_sync.sh"
 
-    # 2. Each committed pubspec.lock must match its pubspec.yaml (the same
-    #    4-package --enforce-lockfile loop the CI version_sync job runs).
+    # 2. Internal constraints must stay on the previously published base line
+    #    (major.minor.patch): a prerelease bump advances -dev.N but must not
+    #    jump to a base no published version anchors (issue #325).
+    echo "  == internal-constraint base-line check"
+    run bash -c "cd '$check_dir' && v='$VERSION'; base() { echo \"\$1\" | sed -E 's/^([0-9]+[.][0-9]+[.][0-9]+).*/\\1/'; }; b=\$(base \"\$v\"); for p in zorphy zorphy_migrator; do c=\$(awk '/^  zorphy_annotation:/ {print \$2; exit}' \"\$p/pubspec.yaml\"); if [ \"\$(base \"\$c\")\" != \"\$b\" ]; then echo \"ERROR: \$p internal constraint \$c is not on the published base line \$b\"; exit 1; fi; done; echo \"OK: internal constraints on published base line \$b\""
+
+    # 3. Resolve-allowed `dart pub get` per package — proves the EXTERNAL
+    #    constraints are satisfiable against *published* versions. The one
+    #    dependency that cannot resolve against pub.dev yet is the internal
+    #    zorphy_annotation at the new version, so a throwaway
+    #    pubspec_overrides.yaml points it (and zorphy, for the example) at the
+    #    pristine clone's local packages. The clone is discarded below, so the
+    #    override never reaches the release commit.
+    echo "  == dart pub get (resolve-allowed, internal deps overridden locally)"
+    run bash -c "printf 'dependency_overrides:\n  zorphy_annotation:\n    path: ../zorphy_annotation\n' > '$check_dir/zorphy/pubspec_overrides.yaml'"
+    run bash -c "printf 'dependency_overrides:\n  zorphy_annotation:\n    path: ../zorphy_annotation\n' > '$check_dir/zorphy_migrator/pubspec_overrides.yaml'"
+    run bash -c "printf 'dependency_overrides:\n  zorphy:\n    path: ..\n  zorphy_annotation:\n    path: ../../zorphy_annotation\n' > '$check_dir/zorphy/example/pubspec_overrides.yaml'"
     local pkg
     for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
-        echo "  == $pkg (enforce-lockfile)"
-        run bash -c "cd '$check_dir/$pkg' && dart pub get --enforce-lockfile"
+        echo "  == $pkg (resolve)"
+        run bash -c "cd '$check_dir/$pkg' && dart pub get"
     done
 
-    # 3. Format from zorphy/ with NO pub get — an unresolved include is CI's
+    # 4. Format from zorphy/ with NO pub get — an unresolved include is CI's
     #    own format-job environment; the formatter must still succeed.
     echo "  == dart format (zorphy/)"
     run bash -c "cd '$check_dir/zorphy' && dart format --output=none --set-exit-if-changed ."
 
-    # 4. The release guard test suite.
+    # 5. The release guard test suite.
     echo "  == dart test test/release/"
     run bash -c "cd '$check_dir/zorphy' && dart test test/release/"
 
-    # 5. Stacked-PR orphan sweep (issue #315): no merged PR's content may have
+    # 6. Stacked-PR orphan sweep (issue #315): no merged PR's content may have
     #    evaporated before a release ships. A failing sweep aborts the release,
     #    exactly like any other gate step (set -e).
     echo "  == sweep_merged_content.sh"
@@ -117,7 +146,68 @@ release_gate() {
     if ! $DRY_RUN; then
         rm -rf "$check_dir"
     fi
-    echo "✅ Release gate passed."
+    echo "✅ Pre-publish gate passed."
+}
+
+# Post-publish verification (issue #325): run AFTER `dart pub publish` succeeds
+# for all 3 packages — the new version now exists on pub.dev — and BEFORE the
+# git tag is considered complete. This is the CI-equivalent lockfile gate that
+# the pre-publish phase cannot run: a fresh clone regenerates each lock against
+# the now-published version, proves it stable under --enforce-lockfile, runs the
+# release guard tests, then commits the lock refresh (and the already-bumped
+# internal constraint) and pushes it as the release's final base-green commit.
+# This automates exactly what #308 did by hand after 3.0.0-dev.4.
+post_publish_verify() {
+    echo "🔒 Running post-publish verification (regenerate + enforce locks)…"
+
+    local check_dir
+    if $DRY_RUN; then
+        check_dir="<pristine-clone>"
+    else
+        check_dir="$(mktemp -d "${TMPDIR:-/tmp}/zorphy-post-publish.XXXXXX")"
+    fi
+
+    run git clone "file://$REPO_ROOT" "$check_dir"
+
+    local pkg
+    # 1. Regenerate each lock against the now-published version (resolve-allowed;
+    #    the internal ^<version> constraint resolves from pub.dev now).
+    for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
+        echo "  == $pkg (regenerate lock)"
+        run bash -c "cd '$check_dir/$pkg' && dart pub get"
+    done
+
+    # 2. Prove each regenerated lock is stable under --enforce-lockfile — the
+    #    exact gate CI runs, now green because the version is published.
+    for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
+        echo "  == $pkg (enforce-lockfile)"
+        run bash -c "cd '$check_dir/$pkg' && dart pub get --enforce-lockfile"
+    done
+
+    # 3. Release guard tests against the regenerated tree.
+    echo "  == dart test test/release/"
+    run bash -c "cd '$check_dir/zorphy' && dart test test/release/"
+
+    if ! $DRY_RUN; then
+        rm -rf "$check_dir"
+    fi
+
+    # 4. Apply the same regeneration to the real worktree and commit the lock
+    #    refresh as the release's final base-green commit, then push it.
+    for pkg in zorphy_annotation zorphy zorphy_migrator zorphy/example; do
+        echo "  == $pkg (regenerate lock in worktree)"
+        run bash -c "cd '$REPO_ROOT/$pkg' && dart pub get"
+    done
+    echo "  == commit + push lock refresh"
+    run git -C "$REPO_ROOT" add .
+    run git -C "$REPO_ROOT" commit -m "chore: refresh lockfiles for v$VERSION"
+    if $DRY_RUN; then
+        echo "  [dry-run] git -C $REPO_ROOT push origin <current branch>"
+    else
+        git -C "$REPO_ROOT" push origin "$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)"
+    fi
+
+    echo "✅ Post-publish verification passed — locks refreshed and pushed."
 }
 
 echo "🚀 Streamlining release for zorphy version $VERSION..."
@@ -200,9 +290,9 @@ echo "🔨 Committing changes..."
 run git add .
 run git commit -m "chore: release v$VERSION" || echo "  ⚠️ No changes to commit"
 
-# 5b. Release gate — abort BEFORE any push or publish unless the release commit
-# passes the clean-checkout CI simulation (issue #314).
-release_gate
+# 5b. Pre-publish gate — abort BEFORE any push or publish unless the release
+# commit's constraints are satisfiable against published versions (issue #325).
+pre_publish_gate
 
 # 6. Create PR (if gh CLI available)
 if $DRY_RUN; then
@@ -251,6 +341,13 @@ publish_after_indexing() {
 
 publish_after_indexing "zorphy" "zorphy"
 publish_after_indexing "zorphy_migrator" "zorphy_migrator"
+
+# 7b. Post-publish verification (issue #325) — now that all 3 packages are
+# published, regenerate + enforce the locks in a fresh clone, run the release
+# guard tests, and push the lock refresh as the release's final base-green
+# commit. This is the CI-equivalent lockfile gate the pre-publish phase cannot
+# run, and it must land BEFORE the tag is created.
+post_publish_verify
 
 echo "🏷️ Creating and pushing git tags..."
 cd "$REPO_ROOT"

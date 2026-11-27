@@ -100,10 +100,29 @@ Enforced mechanically by two gates (issue #315):
 
 ## Release gate (hard rule)
 
-`publish.sh` MUST run the clean-checkout CI simulation (version sync,
-enforce-lockfile ×4 packages, format from `zorphy/` with no package
-resolution, release guard tests) against a pristine clone of the release
-commit and abort on any failure BEFORE publishing or pushing. A maintainer
-machine never proves the release: local locks, local overrides files, and
-local package resolution all differ from CI's clean checkout. Releasing
-base-red is a process failure even when the code is correct.
+`publish.sh` runs the clean-checkout CI simulation against a pristine clone of
+the release commit, split into **two phases** around the publish (issue #325):
+
+1. **Pre-publish gate** — before anything is published or pushed: version sync
+   (`check_version_sync.sh`), a check that the internal `zorphy_annotation`
+   constraints stay on the previously published base line, a resolve-allowed
+   `dart pub get` per package (proves the constraints are satisfiable against
+   *published* versions), format from `zorphy/` with no package resolution,
+   the release guard tests, and the stacked-PR orphan sweep. It MUST NOT run
+   `dart pub get --enforce-lockfile`: at this point the release commit's
+   internal constraints already point at the version being released while the
+   committed lockfiles still pin the previous line, and they cannot pin the new
+   version because it does not exist on pub.dev yet — an enforce-lockfile step
+   here is unresolvable forever (this is why the old monolithic gate could not
+   pass a real version bump, and why `3.0.0-dev.4` needed the #308 manual lock
+   repair).
+2. **Post-publish verification** — after `dart pub publish` succeeds for all 3
+   packages (the new version now exists) and before the git tag is created: a
+   fresh clone regenerates each lock, proves it stable under
+   `dart pub get --enforce-lockfile` (the exact gate CI runs), runs the release
+   guard tests, then commits the lock refresh and pushes it as the release's
+   final base-green commit.
+
+A maintainer machine never proves the release: local locks, local overrides
+files, and local package resolution all differ from CI's clean checkout.
+Releasing base-red is a process failure even when the code is correct.
