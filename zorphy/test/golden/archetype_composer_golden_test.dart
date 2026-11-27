@@ -38,28 +38,25 @@ ZorphyNodeIr _node({
 }
 
 /// A user-declared static member as the IR carries it (issue #310).
-ZorphyUserMemberIr _staticMember(
-  String name,
-  String returnType,
-  String body,
-) => ZorphyUserMemberIr(
-  name: name,
-  isFactory: false,
-  returnType: returnType,
-  typeParameters: const [],
-  parameters: const [
-    ZorphyUserParamIr(
-      name: 'json',
-      type: 'Map<String, dynamic>',
-      isNamed: false,
-      isRequired: false,
-      isOptionalPositional: false,
-      defaultValue: null,
-    ),
-  ],
-  bodySource: body,
-  bodyIsLambda: true,
-);
+ZorphyUserMemberIr _staticMember(String name, String returnType, String body) =>
+    ZorphyUserMemberIr(
+      name: name,
+      isFactory: false,
+      returnType: returnType,
+      typeParameters: const [],
+      parameters: const [
+        ZorphyUserParamIr(
+          name: 'json',
+          type: 'Map<String, dynamic>',
+          isNamed: false,
+          isRequired: false,
+          isOptionalPositional: false,
+          defaultValue: null,
+        ),
+      ],
+      bodySource: body,
+      bodyIsLambda: true,
+    );
 
 void main() {
   group('ArchetypeComposer — review findings on #226', () {
@@ -471,7 +468,10 @@ void main() {
         reason: 'the generated toJson alias yields to the user member',
       );
       // The canonical wire pair is untouched.
-      expect(root, contains('static ZorphyBoundaryResult<AppFailure> fromWire('));
+      expect(
+        root,
+        contains('static ZorphyBoundaryResult<AppFailure> fromWire('),
+      );
       expect(root, contains('Map<String, Object?> toWire()'));
     });
   });

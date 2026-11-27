@@ -820,7 +820,8 @@ class $NetworkFailure implements $AppFailure {
       expect(
         analyze.exitCode,
         0,
-        reason: 'generated union surface does not compile:\n'
+        reason:
+            'generated union surface does not compile:\n'
             '${analyze.stdout}\n${analyze.stderr}',
       );
     }, timeout: const Timeout(Duration(minutes: 6)));
