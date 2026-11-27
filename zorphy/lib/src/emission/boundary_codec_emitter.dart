@@ -68,7 +68,18 @@ final class BoundaryField {
   /// The declared type, e.g. `String`, `DateTime?`, `List<OrderLine>`.
   final String type;
 
-  const BoundaryField({required this.name, required this.type});
+  /// Whether the declared type is an `enum` (issue #313).
+  ///
+  /// An enum field encodes as its `.name` and decodes by name (mirroring the
+  /// patch wire path's `ZorphyPatchWire.enumByName`), instead of the plain
+  /// scalar reified `is` test that records a TYPE violation for a wire string.
+  final bool isEnum;
+
+  const BoundaryField({
+    required this.name,
+    required this.type,
+    this.isEnum = false,
+  });
 
   /// Whether the declaration is nullable (`String?`).
   bool get isNullable => type.trim().endsWith('?');
@@ -115,6 +126,12 @@ enum _Shape {
   /// reified `is` test against the declared type, which is total for every
   /// type and throws for none.
   scalar,
+
+  /// An `enum` field (issue #313): encoded as its `.name` and decoded by name
+  /// through `ZorphyPatchWire.enumByName`, mirroring the patch wire path so a
+  /// wire string resolves to the enum constant (a `FieldViolation` at the
+  /// field pointer when no name matches) instead of a TYPE violation.
+  enumValue,
 }
 
 /// Emits `fromWire` / `toWire` members for the nodes of a polymorphic
@@ -580,6 +597,16 @@ class BoundaryCodecEmitter {
           Code('$local = _boundaryAs<$base>($rawVar, $path, violations);'),
         ];
 
+      case _Shape.enumValue:
+        // Decode by NAME (mirrors the patch wire path), recording a
+        // `FieldViolation` at the field pointer when no constant matches.
+        return [
+          Code(
+            '$local = ZorphyPatchWire.enumByName<$base>('
+            '$base.values, $rawVar, $path, violations);',
+          ),
+        ];
+
       case _Shape.typeParam:
         // A field that mentions a type parameter decodes through that
         // parameter's decoder, which consumes the field's raw map and whose
@@ -792,6 +819,17 @@ class BoundaryCodecEmitter {
           ),
           Code('    if ($variable != null) { $assign }'),
         ];
+      case _Shape.enumValue:
+        // A collection element that is an enum decodes by name, mirroring the
+        // scalar enum field (issue #313).
+        body = [
+          Code(
+            '    final $variable = '
+            'ZorphyPatchWire.enumByName<$elementType>('
+            '$elementType.values, $element, $pathVar, violations);',
+          ),
+          Code('    if ($variable != null) { $assign }'),
+        ];
     }
 
     // A nullable element/value type accepts a wire `null` as a genuine
@@ -897,6 +935,8 @@ class BoundaryCodecEmitter {
           _Shape.typeParam => '$name.map(${_encoderName(type.inner)}).toList()',
           _Shape.node => '$name.map((e) => e.toWire()).toList()',
           _Shape.dateTime => '$name.map((e) => e.toIso8601String()).toList()',
+          _Shape.enumValue =>
+            '$name.map((e) => e is Enum ? e.name : e).toList()',
           _ => name,
         };
       case _Shape.map:
@@ -906,6 +946,8 @@ class BoundaryCodecEmitter {
           _Shape.node => '$name.map((key, e) => MapEntry(key, e.toWire()))',
           _Shape.dateTime =>
             '$name.map((key, e) => MapEntry(key, e.toIso8601String()))',
+          _Shape.enumValue =>
+            '$name.map((key, e) => MapEntry(key, e is Enum ? e.name : e))',
           _ => name,
         };
       case _Shape.dateTime:
@@ -918,6 +960,12 @@ class BoundaryCodecEmitter {
         return _strip(type.inner) == 'num' ? '$name.toDouble()' : name;
       case _Shape.scalar:
         return name;
+      case _Shape.enumValue:
+        // An `Enum` instance is not JSON-encodable: write its NAME so
+        // `jsonEncode(toWire())` survives a transport hop (#215's fix, here for
+        // the entity boundary codec). A same-process value already decoded in
+        // flight is still an `Enum`, so the `is Enum` guard is total.
+        return '$name is Enum ? $name.name : $name';
     }
   }
 
@@ -977,6 +1025,13 @@ class BoundaryCodecEmitter {
         inner: value,
         elementShape: _shapeOfType(value, known: known, typeParams: typeParams),
       );
+    }
+    // A top-level enum field (issue #313) is its own shape: the wire carries
+    // the constant's NAME, so encode writes `.name` and decode resolves by name
+    // through `ZorphyPatchWire.enumByName`. `field.isEnum` is set from the IR's
+    // analyzer `EnumElement` detection, so a non-enum class is never matched.
+    if (field.isEnum) {
+      return _FieldType(_Shape.enumValue, inner: base);
     }
     return _FieldType(
       _shapeOfType(base, known: known, typeParams: typeParams),

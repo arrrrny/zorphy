@@ -627,6 +627,7 @@ final class ArchetypeComposer {
               BoundaryField(
                 name: field.name,
                 type: field.emitsQuestionMark ? '${field.type}?' : field.type,
+                isEnum: field.isEnum,
               ),
             );
           }
