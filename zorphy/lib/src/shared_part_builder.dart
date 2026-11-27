@@ -8,20 +8,21 @@ import 'emission/archetype_composer.dart';
 import 'parser/hierarchy_resolver.dart';
 import 'parser/polymorphic_ir.dart';
 
-/// A [Builder] that emits generated source into a single shared part file
-/// per library via [BuildStep.librarySourceSink], rather than one output
-/// file per input.
+/// A [Builder] that emits generated source into a single colocated part file
+/// per library (`<library>.zorphy.dart` beside the input), rather than one
+/// output file per annotated class.
 ///
-/// Zorphy 3.0.0: replaces the per-class `.zorphy.dart` `PartBuilder` output
-/// with one `<library>.part.dart` per library under `lib/_br_/`. All entities
-/// in a library share a single part, making cross-entity polymorphic dispatch
-/// a single compilation unit and collapsing N files into one.
+/// Zorphy 3.0.0 (issue #309): one colocated `<library>.zorphy.dart` per
+/// library, written as a plain `build_to: source` output. All entities in a
+/// library share a single part, making cross-entity polymorphic dispatch a
+/// single compilation unit and collapsing N files into one.
 ///
-/// [BuildStep.librarySourceSink] has no "unavailable" branch here: it answers
-/// `null` only when the primary input is not a library (the guard below has
-/// already returned on that), and it throws `UnsupportedError` when the
-/// builder is applied without `adds_to_library: true` — which `zorphy/build.yaml`
-/// declares. Output is therefore never dropped for want of a sink.
+/// This is deliberately NOT build_runner's `adds_to_library` /
+/// [BuildStep.librarySourceSink] shared part: build_runner forces that output
+/// under its reserved `_br_/` tree (`build_runner`'s `br_outputs.dart`)
+/// regardless of the consumer's `part` directive, which is exactly the mirror
+/// tree #309 retires. A plain output builder writing `<library>.zorphy.dart`
+/// colocated with the source is the v2 shape, carrying the v3 content.
 Builder zorphySharedPartBuilder(BuilderOptions options) {
   return _ZorphySharedPartBuilder();
 }
@@ -29,7 +30,7 @@ Builder zorphySharedPartBuilder(BuilderOptions options) {
 class _ZorphySharedPartBuilder extends Builder {
   @override
   Map<String, List<String>> get buildExtensions => {
-    '.dart': ['.zorphy.part'],
+    '.dart': ['.zorphy.dart'],
   };
 
   @override
@@ -117,22 +118,27 @@ class _ZorphySharedPartBuilder extends Builder {
     );
     if (output.isEmpty) return;
 
-    final sink = await buildStep.librarySourceSink;
-    // Non-null by contract: the input is a library (returned on above) and the
-    // builder opts into `adds_to_library` in build.yaml. `librarySourceSink`
-    // answers `null` only for a non-library input and throws
-    // `UnsupportedError` when that opt-in is missing, so there is no null
-    // branch to write and no standalone-part fallback to take.
-    sink!.add(_withLintHeader(output));
+    // Issue #309: emit a colocated `<library>.zorphy.dart` part file beside the
+    // input library (the v2 shape, carrying the v3 shared-part content). This
+    // is a plain `build_to: source` output — NOT build_runner's `adds_to_library`
+    // shared part, which build_runner forces under its reserved `_br_/` tree
+    // (`build_runner/lib/src/build/br_outputs.dart`) regardless of the consumer's
+    // `part` directive. A colocated file is the only way to retire `_br_/`.
+    final outputId = buildStep.inputId.changeExtension('.zorphy.dart');
+    final libraryName = buildStep.inputId.pathSegments.last;
+    final partOf = "part of '$libraryName';\n\n";
+    await buildStep.writeAsString(
+      outputId,
+      '$partOf${_withLintHeader(output)}',
+    );
   }
 }
 
 /// The `// ignore_for_file` header `PartBuilder` used to prepend.
 ///
-/// The sink writes the generator's output verbatim, so without this every
-/// consumer would lint generated code it cannot edit, under its own
-/// `analysis_options.yaml`. A comment is not a directive, so the sink's
-/// "no directives in the source" contract still holds.
+/// Without this every consumer would lint generated code it cannot edit, under
+/// its own `analysis_options.yaml`. A comment is not a directive, so it does
+/// not disturb the `part of` header the file carries.
 String _withLintHeader(String output) =>
     '// ignore_for_file: UNNECESSARY_CAST\n'
     '// ignore_for_file: type=lint\n'

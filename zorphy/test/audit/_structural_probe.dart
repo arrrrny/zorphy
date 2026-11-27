@@ -19,7 +19,7 @@
 //     reflective lookup.
 //
 // It imports the REAL `build_runner`-generated fixtures
-// (`benchmark/cost_guard_fixtures.dart` → `_br_/benchmark/…part.dart`), so a
+// ( `benchmark/cost_guard_fixtures.dart` → `benchmark/cost_guard_fixtures.zorphy.dart` ), so a
 // removed surface fails to COMPILE here — the same loud failure #234 names.
 // The launcher (`deterministic_structural_guards_test.dart`) runs generation
 // first, then spawns this file's `main`.
@@ -160,7 +160,7 @@ void main() {
   // Structural: the generated resolvePath is a switch table, not a regex or a
   // reflective lookup. Read the generated part and assert the shape.
   final partFile = File(
-    '${_packageRoot.toFilePath()}_br_/benchmark/cost_guard_fixtures.part.dart',
+    '${_packageRoot.toFilePath()}benchmark/cost_guard_fixtures.zorphy.dart',
   );
   if (partFile.existsSync()) {
     final src = partFile.readAsStringSync();

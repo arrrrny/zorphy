@@ -1,7 +1,7 @@
 // V3-annotated sources for the Chord cost guards (arrrrny/zorphy#234).
 //
 // These declarations are the REAL fixtures the four cost guards measure. The
-// shared part beside this file (`_br_/benchmark/cost_guard_fixtures.part.dart`)
+// shared part beside this file (`cost_guard_fixtures.zorphy.dart`)
 // is produced by the production `build_runner` pipeline from these
 // `@Zorphy*` annotations — it is NOT hand-written and must never be edited
 // (see AGENTS.md "ZORPHY CODE GENERATION — STRICT HANDLING").
@@ -39,7 +39,7 @@
 
 import 'package:zorphy_annotation/zorphy_annotation.dart';
 
-part '../_br_/benchmark/cost_guard_fixtures.part.dart';
+part 'cost_guard_fixtures.zorphy.dart';
 
 // ── Guard 1 + Guard 4: an entity hierarchy with identity + reference fields ──
 //

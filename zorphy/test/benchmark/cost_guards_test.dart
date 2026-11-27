@@ -4,7 +4,7 @@
 // #234 requires the guards to measure the REAL `build_runner`-generated v3
 // classes, with generation as a prerequisite so a missing generated API fails
 // loudly. This suite therefore does NOT import generated code itself (a fresh
-// CI checkout has no generated `_br_` part until the build runs); instead it
+// CI checkout has no generated `.zorphy.dart` part until the build runs); instead it
 // drives the standalone benchmark as a subprocess:
 //
 //   * the benchmark launcher runs generation first (a missing/broken generator

@@ -14,8 +14,8 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 void main() {
-  final basePart = File('example/lib/_br_/crosslib/base_shape.part.dart');
-  final circlePart = File('example/lib/_br_/crosslib/circle.part.dart');
+  final basePart = File('example/lib/crosslib/base_shape.zorphy.dart');
+  final circlePart = File('example/lib/crosslib/circle.zorphy.dart');
 
   late String base;
   late String circle;

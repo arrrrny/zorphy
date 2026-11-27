@@ -8,7 +8,7 @@
 // gap: it imports the classes the production `build_runner` pipeline emits from
 // `benchmark/cost_guard_fixtures.dart` and measures THEM.
 //
-// Because the fixture's shared part (`_br_/benchmark/cost_guard_fixtures.part.dart`)
+// Because the fixture's shared part (`benchmark/cost_guard_fixtures.zorphy.dart`)
 // is generated, this library only COMPILES once generation has run — a
 // deliberate removal of `diff` / `changeTo*` / `resolvePath` / `fromWire` from
 // the generator makes this file fail to compile (build/analysis time), which is

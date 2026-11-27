@@ -2,9 +2,9 @@
 // fixture on demand (issue #287).
 //
 // The e2e suites under test/emission and test/generation read the REAL
-// build_runner output (`example/lib/_br_/v3_archetypes/v3_archetypes.part.dart`)
+// build_runner output (`example/lib/v3_archetypes/v3_archetypes.zorphy.dart`)
 // rather than a hand-written stand-in. That part is `build_to: source` output
-// and is gitignored (`_br_/`, `*.g.dart`), so a fresh clone has no fixture and
+// and is gitignored (`*.zorphy.dart`, `*.g.dart`), so a fresh clone has no fixture and
 // every suite's `setUpAll` used to `fail()` with "Run: cd example && dart run
 // build_runner build" — a provisioning gap, not a code defect.
 //
@@ -22,7 +22,7 @@ import 'package:test/test.dart';
 /// Path (relative to the `zorphy` package root, the test cwd) of the generated
 /// fixture every e2e suite reads.
 final String kExampleFixturePath =
-    'example/lib/_br_/v3_archetypes/v3_archetypes.part.dart';
+    'example/lib/v3_archetypes/v3_archetypes.zorphy.dart';
 
 /// Ensures [kExampleFixturePath] exists, building it via `build_runner` in
 /// `example/` when it does not.

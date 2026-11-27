@@ -75,36 +75,40 @@ dependency_overrides:
       expect(report, contains('Converted classes (11)'));
       expect(report, contains('Needs manual attention (0)'));
 
-      // 3. Post-migration step a user would do: swap the import. The zorphy
-      //    part directive is not hand-written — the shared-part builder inserts
-      //    it — and no `.g.dart` part is needed: the v3 wire codecs are
-      //    generated unconditionally.
+      // 3. Post-migration step a user would do: swap the import and repoint
+      //    the part directive to the colocated `<library>.zorphy.dart` the
+      //    consumer authors (issue #309 retired the `_br_` mirror tree, so the
+      //    builder no longer inserts a shared-part directive). No `.g.dart`
+      //    part is needed: the v3 wire codecs are generated unconditionally.
       final finalized = migrated
           .replaceAll(
             "import 'package:freezed_annotation/freezed_annotation.dart';",
             "import 'package:zorphy_annotation/zorphy_annotation.dart';",
           )
-          .replaceAll("part 'input.freezed.dart';", '');
+          .replaceAll(
+            "part 'input.freezed.dart';",
+            "part 'models.zorphy.dart';",
+          );
       File(p.join(libDir, 'models.dart')).writeAsStringSync(finalized);
 
-      // 4. Generate with zorphy 3.0 and analyze. `--delete-conflicting-outputs`
-      //    is deliberately absent: build_runner 2.17 removed it and only warns,
-      //    so it would not delete a stale `.zorphy.dart` if one were there.
+      // 4. Generate with zorphy 3.0 and analyze. The builder emits a colocated
+      //    `<library>.zorphy.dart` beside the input (issue #309); the `_br_`
+      //    mirror tree is gone.
       _run('dart', ['run', 'build_runner', 'build'], root.path);
       expect(
-        File(p.join(libDir, '_br_', 'models.part.dart')).existsSync(),
+        File(p.join(libDir, 'models.zorphy.dart')).existsSync(),
         isTrue,
-        reason: 'zorphy 3.0 should generate lib/_br_/models.part.dart',
+        reason: 'zorphy 3.0 should generate a colocated lib/models.zorphy.dart',
       );
       expect(
-        File(p.join(libDir, 'models.zorphy.dart')).existsSync(),
+        File(p.join(libDir, '_br_', 'models.part.dart')).existsSync(),
         isFalse,
-        reason: 'zorphy 3.0 must not emit a per-file .zorphy.dart',
+        reason: 'zorphy 3.0 must not emit the retired lib/_br_/ mirror tree',
       );
       expect(
         File(p.join(libDir, 'models.dart')).readAsStringSync(),
-        contains("_br_/models.part.dart'"),
-        reason: 'build_runner should insert the shared-part directive',
+        contains("part 'models.zorphy.dart';"),
+        reason: 'the consumer-authored colocated part directive is preserved',
       );
       _run('dart', ['analyze'], root.path);
     },
