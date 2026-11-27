@@ -516,7 +516,7 @@ abstract final class ZorphyPatchWire {
     final before = violations.length;
     final out = <K, V>{};
     for (final entry in raw.entries) {
-      final entryPath = '$path/${entry.key}';
+      final entryPath = '$path/${pointerToken(entry.key)}';
       final key = decodeKey(entry.key, entryPath, violations);
       final value = decodeValue(entry.value, entryPath, violations);
       if (violations.length == before) {

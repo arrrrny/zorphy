@@ -1456,7 +1456,7 @@ final class PolymorphicClassEmitter {
         // those fields compare their contents instead (#285 review).
         for (final field in fields)
           _comparesByContent(node, field)
-              ? 'zorphyCollectionEquals('
+              ? 'ZorphyCollections.equals('
                     'this.${field.name}, other.${field.name})'
               : 'this.${field.name} == other.${field.name}',
       ];
@@ -1488,7 +1488,7 @@ final class PolymorphicClassEmitter {
         // `Object.hashAll` accepts any nonempty iterable, covering both ends.
         fields.isEmpty
             ? 'runtimeType.hashCode'
-            : 'Object.hashAll([${[for (final f in fields) _comparesByContent(node, f) ? 'zorphyCollectionHash(${f.name})' : f.name].join(', ')}])',
+            : 'Object.hashAll([${[for (final f in fields) _comparesByContent(node, f) ? 'ZorphyCollections.hash(${f.name})' : f.name].join(', ')}])',
       );
     });
   }

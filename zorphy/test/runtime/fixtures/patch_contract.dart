@@ -357,10 +357,11 @@ final class PatchProbePatch implements ZorphyPatch<PatchProbe> {
     var changes = PatchProbePatch();
     if (previous.id != next.id) changes = changes.withId(next.id);
     if (previous.title != next.title) changes = changes.withTitle(next.title);
-    if (previous.tags != next.tags) changes = changes.withTags(next.tags);
-    if (previous.scores != next.scores)
+    if (!zorphyCollectionEquals(previous.tags, next.tags))
+      changes = changes.withTags(next.tags);
+    if (!zorphyCollectionEquals(previous.scores, next.scores))
       changes = changes.withScores(next.scores);
-    if (previous.counts != next.counts)
+    if (!zorphyCollectionEquals(previous.counts, next.counts))
       changes = changes.withCounts(next.counts);
     if (previous.status != next.status)
       changes = changes.withStatus(next.status);

@@ -118,6 +118,18 @@ int zorphyCollectionHash(Object? value) {
   return value.hashCode;
 }
 
+/// Shadow-proof static access to the collection equality/hash helpers.
+///
+/// Generated `operator ==` / `hashCode` reference these through the class
+/// name so an entity field literally named `zorphyCollectionEquals` or
+/// `zorphyCollectionHash` cannot shadow the top-level helper and break the
+/// build (the bare identifier would resolve to the instance field).
+abstract final class ZorphyCollections {
+  static bool equals(Object? a, Object? b) => zorphyCollectionEquals(a, b);
+
+  static int hash(Object? value) => zorphyCollectionHash(value);
+}
+
 bool _deepEquals(Object? a, Object? b) {
   if (identical(a, b)) return true;
   if (a is List && b is List) return _listEquality.equals(a, b);

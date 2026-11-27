@@ -615,6 +615,17 @@ class PolymorphicPatchEmitter {
   static String _concreteType(String? type) =>
       helpers.replaceDollarTypesWithConcrete(type ?? '');
 
+  /// Whether a declared field type is a collection compared by content
+  /// (`List`/`Map`/`Set`). Dart compares collections by identity, so a
+  /// content-equal copy with fresh allocations would otherwise record a
+  /// spurious change and conflict with a concurrent genuine edit (#215).
+  static bool _isCollectionType(String type) {
+    final bare = type.replaceAll('?', '').trim();
+    return bare.startsWith('List<') ||
+        bare.startsWith('Map<') ||
+        bare.startsWith('Set<');
+  }
+
   Method _patchValueGetter(NameTypeClassComment field) => Method((m) {
     m
       ..name = _memberName(field.name)
@@ -863,8 +874,11 @@ class PolymorphicPatchEmitter {
         for (final field in fields) {
           final member = _memberName(field.name);
           final type = _concreteType(field.type);
+          final changed = _isCollectionType(type)
+              ? '!zorphyCollectionEquals(previous.$member, next.$member)'
+              : 'previous.$member != next.$member';
           lines.add(
-            'final $member = previous.$member != next.$member '
+            'final $member = $changed '
             '? PatchValue<$type>.set(next.$member) '
             ': const PatchValue<$type>.unchanged();',
           );
@@ -909,8 +923,12 @@ class PolymorphicPatchEmitter {
         ];
         for (final field in fields) {
           final member = _memberName(field.name);
+          final type = _concreteType(field.type);
+          final changed = _isCollectionType(type)
+              ? '!zorphyCollectionEquals(previous.$member, next.$member)'
+              : 'previous.$member != next.$member';
           lines.add(
-            'if (previous.$member != next.$member) '
+            'if ($changed) '
             'changes = changes.with${_capitalize(member)}(next.$member);',
           );
         }
@@ -1347,7 +1365,13 @@ class PolymorphicPatchEmitter {
     required String nome,
   }) {
     final declared = _concreteType(field.type);
-    final bare = declared.replaceAll('?', '').trim();
+    // Strip only the OUTER nullable suffix: `List<int?>` / `Map<String, int?>`
+    // must keep their nullable element/value types so a valid `[null]` patch
+    // decodes instead of failing the `as<int>` cast. A deliberate field clear
+    // is still handled by the outer-null branch below (#215).
+    final bare = declared.endsWith('?')
+        ? declared.substring(0, declared.length - 1).trim()
+        : declared;
     // The read path carries the envelope prefix (`$prefix/<field>`), so an
     // envelope decode reports `/ops/<field>` and a bare patch `/<field>` (#284).
     final path = _literal('\$prefix/$nome');
