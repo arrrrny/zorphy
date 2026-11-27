@@ -140,9 +140,11 @@ void main() {
         readAt: readAt,
       );
 
-      final applied = NotificationPatch.shared(
-        id: const PatchValue.set('o2'),
-      ).apply(original) as OrderNotification;
+      final applied =
+          NotificationPatch.shared(
+                id: const PatchValue.set('o2'),
+              ).apply(original)
+              as OrderNotification;
 
       expect(applied.id, 'o2');
       expect(

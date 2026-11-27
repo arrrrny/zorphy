@@ -182,8 +182,9 @@ class MergeStrategy {
       declNames.add(extMatch.group(1)!);
     }
 
-    final enumMatch = RegExp(r'enum\s+([A-Za-z_][A-Za-z0-9_]*)')
-        .firstMatch(regionContent);
+    final enumMatch = RegExp(
+      r'enum\s+([A-Za-z_][A-Za-z0-9_]*)',
+    ).firstMatch(regionContent);
     if (enumMatch != null && !declNames.contains(enumMatch.group(1))) {
       declNames.add(enumMatch.group(1)!);
     }

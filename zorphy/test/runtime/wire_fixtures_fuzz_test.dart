@@ -392,34 +392,37 @@ void main() {
     },
   );
 
-  test('runtime wire fixtures fuzz execution verifies 100% BoundaryErr and exact paths', () {
-    final program = _buildProgram();
+  test(
+    'runtime wire fixtures fuzz execution verifies 100% BoundaryErr and exact paths',
+    () {
+      final program = _buildProgram();
 
-    final directory = Directory(
-      'example/.dart_tool/zorphy_191_runtime',
-    ).absolute..createSync(recursive: true);
-    addTearDown(() {
-      if (directory.existsSync()) directory.deleteSync(recursive: true);
-    });
+      final directory = Directory(
+        'example/.dart_tool/zorphy_191_runtime',
+      ).absolute..createSync(recursive: true);
+      addTearDown(() {
+        if (directory.existsSync()) directory.deleteSync(recursive: true);
+      });
 
-    final file = File('${directory.path}/wire_fixtures_fuzz_program.dart')
-      ..writeAsStringSync(program);
+      final file = File('${directory.path}/wire_fixtures_fuzz_program.dart')
+        ..writeAsStringSync(program);
 
-    final result = Process.runSync(
-      Platform.resolvedExecutable,
-      ['run', file.path],
-      workingDirectory: 'example',
-      stdoutEncoding: const SystemEncoding(),
-      stderrEncoding: const SystemEncoding(),
-    );
+      final result = Process.runSync(
+        Platform.resolvedExecutable,
+        ['run', file.path],
+        workingDirectory: 'example',
+        stdoutEncoding: const SystemEncoding(),
+        stderrEncoding: const SystemEncoding(),
+      );
 
-    final output = '${result.stdout}\n${result.stderr}';
-    expect(
-      result.exitCode,
-      0,
-      reason:
-          'generated wire-fixtures fuzz program failed:\n$output\n---program---\n$program',
-    );
-    expect(output, contains('ALL WIRE FIXTURES FUZZ CHECKS PASSED'));
-  });
+      final output = '${result.stdout}\n${result.stderr}';
+      expect(
+        result.exitCode,
+        0,
+        reason:
+            'generated wire-fixtures fuzz program failed:\n$output\n---program---\n$program',
+      );
+      expect(output, contains('ALL WIRE FIXTURES FUZZ CHECKS PASSED'));
+    },
+  );
 }

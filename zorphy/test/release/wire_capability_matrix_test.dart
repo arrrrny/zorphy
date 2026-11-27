@@ -700,9 +700,9 @@ Set<String> _coverage(String output, String path) => output
 String _runProgram(String program, String dirName) {
   // Unique child dir under example/.dart_tool so package: URIs still resolve,
   // but two concurrent `dart test` processes never share (or delete) it.
-  final directory = Directory('example/.dart_tool')
-      .createTempSync(dirName)
-      .absolute;
+  final directory = Directory(
+    'example/.dart_tool',
+  ).createTempSync(dirName).absolute;
   addTearDown(() {
     if (directory.existsSync()) directory.deleteSync(recursive: true);
   });
@@ -1153,10 +1153,9 @@ String _checkPatchMatrix() {
   final tierAfterTransport = jsonDecode(jsonEncode(tierWire)) as Map;
   expect(tierAfterTransport['tier'], 'enterprise');
   expect(
-    AccountPatch.fromWire(Map<String, Object?>.from(tierAfterTransport))
-        .getOrThrow()
-        .apply(const Account(id: 'a1', name: 'ada', score: 1))
-        .tier,
+    AccountPatch.fromWire(
+      Map<String, Object?>.from(tierAfterTransport),
+    ).getOrThrow().apply(const Account(id: 'a1', name: 'ada', score: 1)).tier,
     AccountTier.enterprise,
   );
 
@@ -1168,8 +1167,9 @@ String _checkPatchMatrix() {
   expect(() => jsonEncode(profileWire), returnsNormally);
   final profileAfterTransport =
       jsonDecode(jsonEncode(profileWire)) as Map<String, Object?>;
-  final decodedProfile = ProfilePatch.fromWire(profileAfterTransport)
-      .getOrThrow();
+  final decodedProfile = ProfilePatch.fromWire(
+    profileAfterTransport,
+  ).getOrThrow();
   expect(decodedProfile.apply(_emptyProfile()).displayName, 'grace');
   _expectEnforcedCell(
     _cellFor('List<T>', (r) => r.patch),
@@ -1201,11 +1201,9 @@ String _checkPatchMatrix() {
   final nestedAfterTransport =
       jsonDecode(jsonEncode(nestedWire)) as Map<String, Object?>;
   expect(
-    ProfilePatch.fromWire(nestedAfterTransport)
-        .getOrThrow()
-        .apply(_emptyProfile())
-        .address
-        .city,
+    ProfilePatch.fromWire(
+      nestedAfterTransport,
+    ).getOrThrow().apply(_emptyProfile()).address.city,
     'oslo',
   );
   coverage('nested entity');

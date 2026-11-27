@@ -340,28 +340,31 @@ void main() {
       expect(out, isNot(contains('orphaned merge: #2')), reason: out);
     });
 
-    test('fails closed when gh is unavailable and no offline inventory is set', () async {
-      // gh stubbed to fail, no GH_PR_LIST_JSON: the lookup error must fail the
-      // sweep (non-zero) instead of being read as "no merged PRs — OK" (the
-      // #322 fail-open bug that silently skipped the release backstop).
-      final environment = {
-        ...Platform.environment,
-        'PATH': _failingGhPath(root),
-      }..remove('GH_PR_LIST_JSON');
-      final result = await Process.run(
-        'bash',
-        ['scripts/sweep_merged_content.sh'],
-        workingDirectory: root.path,
-        environment: environment,
-        includeParentEnvironment: false,
-      );
+    test(
+      'fails closed when gh is unavailable and no offline inventory is set',
+      () async {
+        // gh stubbed to fail, no GH_PR_LIST_JSON: the lookup error must fail the
+        // sweep (non-zero) instead of being read as "no merged PRs — OK" (the
+        // #322 fail-open bug that silently skipped the release backstop).
+        final environment = {
+          ...Platform.environment,
+          'PATH': _failingGhPath(root),
+        }..remove('GH_PR_LIST_JSON');
+        final result = await Process.run(
+          'bash',
+          ['scripts/sweep_merged_content.sh'],
+          workingDirectory: root.path,
+          environment: environment,
+          includeParentEnvironment: false,
+        );
 
-      expect(
-        result.exitCode,
-        isNot(0),
-        reason: 'a gh lookup failure must fail the sweep, not pass it',
-      );
-    });
+        expect(
+          result.exitCode,
+          isNot(0),
+          reason: 'a gh lookup failure must fail the sweep, not pass it',
+        );
+      },
+    );
 
     test(
       'keeps orphan issue identity when only origin/master exists',

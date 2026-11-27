@@ -1,3 +1,8 @@
+## [3.0.0-dev.5] - 2026-11-27
+
+### Change
+- ZorphyNested, fromJson/toJson aliases, enum boundary wire, colocated .zorphy.dart (retires _br_), wire-capability matrix, stacked-PR integrity, clean-checkout release gate
+
 ## [3.0.0-dev.4] - 2026-11-27
 
 ### Change

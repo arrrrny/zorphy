@@ -29,8 +29,9 @@ import 'package:test/test.dart';
 
 /// The repository root: this test runs with the `zorphy` package as cwd (the
 /// documented `dart test` invocation) and the package sits directly under it.
-final String _repoRoot = Directory('${Directory.current.path}/..')
-    .resolveSymbolicLinksSync();
+final String _repoRoot = Directory(
+  '${Directory.current.path}/..',
+).resolveSymbolicLinksSync();
 
 String _read(String relative) =>
     File('$_repoRoot/$relative').readAsStringSync();
@@ -280,8 +281,9 @@ void main() {
       for (final pkg in ['zorphy', 'zorphy_migrator']) {
         Directory('${root.path}/$pkg').createSync(recursive: true);
       }
-      File('${root.path}/scripts/check_internal_constraints.sh')
-          .writeAsStringSync(_read('scripts/check_internal_constraints.sh'));
+      File(
+        '${root.path}/scripts/check_internal_constraints.sh',
+      ).writeAsStringSync(_read('scripts/check_internal_constraints.sh'));
 
       await Process.run('git', ['init', '-q'], workingDirectory: root.path);
       await git([
