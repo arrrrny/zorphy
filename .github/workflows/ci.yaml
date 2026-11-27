@@ -218,5 +218,13 @@ jobs:
           bash -n scripts/check_stacked_pr_integrity.sh
           bash -n scripts/sweep_merged_content.sh
           bash -n scripts/git-hooks/pre-push
+      - name: Hook and installer are executable in git
+        # The pre-push gate only runs if git records the hook as executable;
+        # a 100644 mode makes `git hook run pre-push` ignore it (issue #322).
+        run: |
+          for f in scripts/git-hooks/pre-push scripts/install_hooks.sh; do
+            mode="$(git ls-tree HEAD -- "$f" | awk '{print $1}')"
+            test "$mode" = "100755" || { echo "$f has mode $mode (expected 100755)"; exit 1; }
+          done
       - name: Pre-push gate allows a clean tree (no orphaning refs on stdin)
         run: bash scripts/check_stacked_pr_integrity.sh </dev/null

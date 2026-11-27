@@ -29,14 +29,34 @@
 
 set -euo pipefail
 
-# The merged-PR inventory: injected JSON Lines, or `gh` as a fallback. Using
-# --jq '.[]' keeps it JSON Lines (one object per line) so the parser below is
-# identical for both sources.
-pr_json="${GH_PR_LIST_JSON:-$(gh pr list --state merged --limit 200 \
-  --json number,mergeCommit,baseRefName --jq '.[]' 2>/dev/null || true)}"
+# Read the git pre-push protocol from stdin up front: one line per ref
+#   <local_ref> <local_sha> <remote_ref> <remote_sha>
+# An empty stdin means nothing is being pushed, so there is nothing to check —
+# allow before any inventory lookup (this is not the fail-open bug: a real push
+# with refs still requires a successful inventory below).
+stdin_data="$(cat)"
+if [ -z "$stdin_data" ]; then
+  echo "check_stacked_pr_integrity: no refs on stdin — allowing push"
+  exit 0
+fi
+
+# The merged-PR inventory: injected JSON Lines (the explicit offline path, used
+# verbatim — an empty value is a legitimate "no merged PRs"), or `gh` as the
+# fallback. A gh lookup failure FAILS CLOSED (non-zero): a network/auth error
+# must never be read as an empty inventory that allows an orphaning force-push
+# (issue #322). Using --jq '.[]' keeps it JSON Lines for the parser below.
+if [ "${GH_PR_LIST_JSON+x}" = x ]; then
+  pr_json="$GH_PR_LIST_JSON"
+else
+  if ! pr_json="$(gh pr list --state merged --limit 200 \
+      --json number,mergeCommit,baseRefName --jq '.[]')"; then
+    echo "check_stacked_pr_integrity: gh pr list failed (network/auth) — refusing push (fail closed)" >&2
+    exit 1
+  fi
+fi
 
 if [ -z "$pr_json" ]; then
-  echo "check_stacked_pr_integrity: no merged PRs found (gh unavailable or none) — allowing push"
+  echo "check_stacked_pr_integrity: no merged PRs found — allowing push"
   exit 0
 fi
 
@@ -94,7 +114,7 @@ while read -r line; do
       orphaned+=("#$number")
     fi
   done <<< "$pr_pairs"
-done
+done <<< "$stdin_data"
 
 if [ "${#orphaned[@]}" -eq 0 ]; then
   echo "check_stacked_pr_integrity: OK — no merged PR content is orphaned by this push"

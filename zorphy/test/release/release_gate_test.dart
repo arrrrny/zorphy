@@ -84,7 +84,7 @@ void main() {
         expect(
           commands,
           containsAll(<Matcher>[
-            contains('git clone --depth 1 file://'),
+            contains('git clone file://'),
             contains('scripts/check_version_sync.sh'),
             contains('dart pub get --enforce-lockfile'),
             contains('dart format --output=none --set-exit-if-changed'),

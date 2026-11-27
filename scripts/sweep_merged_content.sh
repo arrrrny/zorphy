@@ -21,18 +21,48 @@
 set -euo pipefail
 
 BASE="${SWEEP_BASE:-master}"
+BASE_REF="$BASE"
 DAYS="${SWEEP_DAYS:-90}"
 
-pr_json="${GH_PR_LIST_JSON:-$(gh pr list --state merged --limit 300 \
-  --json number,title,mergeCommit,baseRefName --jq '.[]' 2>/dev/null || true)}"
+# Resolve the base ref: a tag / release checkout may have no local `master`,
+# only `origin/master`. Prefer a local base, fall back to the remote-tracking
+# ref so the ancestry sweep still has a base to compare against (issue #322).
+# Keep BASE as the display name so orphan issue identities stay checkout-independent.
+if ! git rev-parse --verify --quiet "$BASE_REF" >/dev/null; then
+  if git rev-parse --verify --quiet "origin/$BASE_REF" >/dev/null; then
+    BASE_REF="origin/$BASE_REF"
+  fi
+fi
+
+# The merged-PR inventory. An explicitly provided GH_PR_LIST_JSON is the offline
+# path and is used verbatim (an empty value is a legitimate "no merged PRs").
+# Otherwise the inventory comes from `gh`, and a lookup failure FAILS CLOSED
+# (non-zero): a network/auth error must never be read as an empty inventory that
+# lets orphaned content pass the backstop (issue #322).
+if [ "${GH_PR_LIST_JSON+x}" = x ]; then
+  pr_json="$GH_PR_LIST_JSON"
+else
+  if ! pr_json="$(gh pr list --state merged --limit 300 \
+      --json number,title,mergeCommit,baseRefName,mergedAt --jq '.[]')"; then
+    echo "sweep_merged_content: gh pr list failed (network/auth) — failing closed" >&2
+    exit 1
+  fi
+fi
 
 if [ -z "$pr_json" ]; then
-  echo "sweep_merged_content: no merged PRs found (gh unavailable or none) — OK"
+  echo "sweep_merged_content: no merged PRs found — OK"
   exit 0
 fi
 
+# The SWEEP_DAYS window: a merged PR older than this many days is outside the
+# sweep. Computed with python3 (portable across GNU/BSD `date`). Records with a
+# missing/unparseable mergedAt are kept (fail-safe toward checking, never a
+# silent skip).
+cutoff="$(python3 -c 'import datetime,sys; print((datetime.date.today()-datetime.timedelta(days=int(sys.argv[1]))).isoformat())' "$DAYS")"
+
 pr_pairs="$(printf '%s\n' "$pr_json" | python3 -c '
-import sys, json
+import sys, json, datetime
+cutoff = datetime.date.fromisoformat(sys.argv[1])
 for line in sys.stdin:
     line = line.strip()
     if not line:
@@ -41,10 +71,17 @@ for line in sys.stdin:
         d = json.loads(line)
     except json.JSONDecodeError:
         continue
+    merged = (d.get("mergedAt") or "")[:10]
+    if merged:
+        try:
+            if datetime.date.fromisoformat(merged) < cutoff:
+                continue
+        except ValueError:
+            pass
     oid = (d.get("mergeCommit") or {}).get("oid") or ""
     if oid:
         print("%s\t%s\t%s" % (d.get("number", "?"), oid, d.get("title", "")))
-')"
+' "$cutoff")"
 
 if [ -z "$pr_pairs" ]; then
   echo "sweep_merged_content: no merged PRs carry a merge commit — OK"
@@ -52,7 +89,7 @@ if [ -z "$pr_pairs" ]; then
 fi
 
 is_ancestor() {
-  git merge-base --is-ancestor "$1" "$BASE" 2>/dev/null
+  git merge-base --is-ancestor "$1" "$BASE_REF" 2>/dev/null
 }
 
 # file_orphan_issue <number> <title> — file a new issue, or reopen the existing
@@ -61,7 +98,7 @@ is_ancestor() {
 file_orphan_issue() {
   local number="$1" title="$2"
   local issue_title="orphaned merge: #$number content not on $BASE"
-  if [ -z "${GH_PR_LIST_JSON:-}" ] && command -v gh >/dev/null 2>&1; then
+  if [ "${GH_PR_LIST_JSON+x}" != x ] && command -v gh >/dev/null 2>&1; then
     if gh issue list --search "$issue_title" --state all --limit 1 \
         --json number --jq '.[0].number' 2>/dev/null | grep -q .; then
       echo "  issue already exists for #$number — leaving it"

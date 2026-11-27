@@ -81,7 +81,11 @@ release_gate() {
     fi
 
     # A pristine clone of the release commit — exactly what CI checks out.
-    run git clone --depth 1 "file://$REPO_ROOT" "$check_dir"
+    # Full history (no --depth 1): the stacked-PR orphan sweep below runs
+    # `git merge-base --is-ancestor` against master, which a depth-1 clone
+    # cannot satisfy — it would report every healthy PR as orphaned and block
+    # the release (issue #322).
+    run git clone "file://$REPO_ROOT" "$check_dir"
 
     # 1. Version sync across the 3 packages.
     echo "  == check_version_sync.sh"
