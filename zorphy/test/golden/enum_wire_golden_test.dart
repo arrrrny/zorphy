@@ -84,9 +84,9 @@ void main() {
       compact = _compact(source);
     });
 
-    test('encode writes the enum NAME, not the raw instance', () {
-      // `this.tier is Enum ? this.tier.name : this.tier` — a JSON hop survives.
-      expect(compact, contains('this.tierisEnum?this.tier.name:this.tier'));
+    test('encode writes the concrete enum NAME without a runtime guard', () {
+      expect(compact, contains('map[\'tier\']=this.tier.name;'));
+      expect(compact, isNot(contains('this.tierisEnum')));
     });
 
     test('decode resolves by name through enumByName', () {
@@ -144,18 +144,17 @@ void main() {
       );
     });
 
-    test('a list element encodes by name, not as a raw Enum', () {
-      expect(
-        compact,
-        contains('this.tiers.map((e)=>eisEnum?e.name:e).toList()'),
-      );
+    test('a concrete list element encodes by name without a runtime guard', () {
+      expect(compact, contains('this.tiers.map((e)=>e.name).toList()'));
+      expect(compact, isNot(contains('eisEnum?e.name:e')));
     });
 
-    test('a map value encodes by name, not as a raw Enum', () {
+    test('a concrete map value encodes by name without a runtime guard', () {
       expect(
         compact,
-        contains('this.labels.map((key,e)=>MapEntry(key,eisEnum?e.name:e))'),
+        contains('this.labels.map((key,e)=>MapEntry(key,e.name))'),
       );
+      expect(compact, isNot(contains('eisEnum?e.name:e')));
     });
 
     test('collection elements decode by name through enumByName', () {
