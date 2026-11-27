@@ -4,6 +4,7 @@ import 'package:zorphy_annotation/zorphy.dart' show ZorphyPatchWire;
 import '../ast/ast.dart';
 import '../common/NameType.dart';
 import '../emission/emitter.dart';
+import '../emission/wire_kind.dart';
 import '../helpers.dart' as helpers;
 
 /// Emits the concrete `<Name>Patch` class for one entity (ISSUE-007).
@@ -27,6 +28,12 @@ import '../helpers.dart' as helpers;
 /// [ZorphyEmitter]: this class assembles no source text of its own, and it
 /// introduces no preset or generation toggle.
 class PatchEmitter {
+  /// The field kinds this emitter / `ZorphyPatchWire`'s helpers handle.
+  ///
+  /// Exposed so the wire-capability matrix's drift gate can derive its
+  /// expected kind set from the emitters instead of a duplicate literal.
+  static Set<WireKind> get classifiedKinds => patchClassifiedKinds;
+
   /// Creates an emitter. Stateless: one instance serves every entity.
   const PatchEmitter();
 
