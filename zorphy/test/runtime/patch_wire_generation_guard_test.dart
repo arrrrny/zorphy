@@ -63,5 +63,22 @@ void main() {
       expect(source, contains('PatchValue<List<List<int>>>'));
       expect(source, isNot(contains('PatchValue<List>')));
     });
+
+    test('a nullable element type survives the recursive decode (#339)', () {
+      final listSource = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Doc',
+        fields: [NameTypeClassComment('items', 'List<int?>', '')],
+      );
+      // The element read must keep its `?`, or a valid `[null]` element fails.
+      expect(listSource, contains('listValue<int?>'));
+      expect(listSource, isNot(contains('listValue<int>')));
+
+      final mapSource = PolymorphicPatchEmitter().emitStandalone(
+        name: 'Doc',
+        fields: [NameTypeClassComment('scores', 'Map<String, int?>', '')],
+      );
+      expect(mapSource, contains('mapValue<String, int?>'));
+      expect(mapSource, isNot(contains('mapValue<String, int>')));
+    });
   });
 }

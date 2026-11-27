@@ -284,5 +284,37 @@ void main() {
         expect(identical(patch.apply(probe), probe), isTrue);
       }
     });
+
+    test('content-equal collections with fresh allocations are empty', () {
+      final previous = _base();
+      // Same contents, independently allocated collections (not identical).
+      final next = previous.copyWith(
+        tags: <String>['a', 'b'],
+        scores: <String, int>{'a': 1, 'b': 2},
+        counts: <int, int>{1: 1},
+      );
+      expect(identical(next.tags, previous.tags), isFalse);
+      expect(identical(next.scores, previous.scores), isFalse);
+      expect(identical(next.counts, previous.counts), isFalse);
+
+      final patch = PatchProbePatch.diff(previous, next);
+      expect(patch.isEmpty, isTrue);
+    });
+
+    test('genuinely different collections are still recorded', () {
+      final previous = _base();
+      final next = previous.copyWith(
+        tags: <String>['a', 'b', 'c'],
+        scores: <String, int>{'a': 1, 'b': 99},
+        counts: <int, int>{1: 1, 2: 2},
+      );
+
+      final patch = PatchProbePatch.diff(previous, next);
+      expect(patch.isEmpty, isFalse);
+      final applied = patch.apply(previous);
+      expect(applied.tags, next.tags);
+      expect(applied.scores, next.scores);
+      expect(applied.counts, next.counts);
+    });
   });
 }
