@@ -21,14 +21,16 @@
 set -euo pipefail
 
 BASE="${SWEEP_BASE:-master}"
+BASE_REF="$BASE"
 DAYS="${SWEEP_DAYS:-90}"
 
 # Resolve the base ref: a tag / release checkout may have no local `master`,
 # only `origin/master`. Prefer a local base, fall back to the remote-tracking
 # ref so the ancestry sweep still has a base to compare against (issue #322).
-if ! git rev-parse --verify --quiet "$BASE" >/dev/null; then
-  if git rev-parse --verify --quiet "origin/$BASE" >/dev/null; then
-    BASE="origin/$BASE"
+# Keep BASE as the display name so orphan issue identities stay checkout-independent.
+if ! git rev-parse --verify --quiet "$BASE_REF" >/dev/null; then
+  if git rev-parse --verify --quiet "origin/$BASE_REF" >/dev/null; then
+    BASE_REF="origin/$BASE_REF"
   fi
 fi
 
@@ -87,7 +89,7 @@ if [ -z "$pr_pairs" ]; then
 fi
 
 is_ancestor() {
-  git merge-base --is-ancestor "$1" "$BASE" 2>/dev/null
+  git merge-base --is-ancestor "$1" "$BASE_REF" 2>/dev/null
 }
 
 # file_orphan_issue <number> <title> — file a new issue, or reopen the existing

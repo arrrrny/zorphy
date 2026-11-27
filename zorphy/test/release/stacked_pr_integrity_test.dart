@@ -47,12 +47,18 @@ Future<String> _runWithStdin(
   List<String> command,
   String stdin, {
   Map<String, String>? env,
+  Set<String> unset = const {},
 }) async {
+  final childEnvironment = {...Platform.environment, ...?env};
+  for (final key in unset) {
+    childEnvironment.remove(key);
+  }
   final process = await Process.start(
     command.first,
     command.sublist(1),
     workingDirectory: root.path,
-    environment: {...Platform.environment, ...?env},
+    environment: childEnvironment,
+    includeParentEnvironment: false,
   );
   process.stdin.write(stdin);
   await process.stdin.close();
@@ -193,6 +199,7 @@ void main() {
         ['bash', 'scripts/check_stacked_pr_integrity.sh'],
         stdin,
         env: {'PATH': _failingGhPath(root)},
+        unset: {'GH_PR_LIST_JSON'},
       );
 
       expect(out, contains('exit=1'), reason: out);
@@ -292,11 +299,16 @@ void main() {
         // gh stubbed to fail, no GH_PR_LIST_JSON: the lookup error must fail the
         // sweep (non-zero) instead of being read as "no merged PRs — OK" (the
         // #322 fail-open bug that silently skipped the release backstop).
+        final environment = {
+          ...Platform.environment,
+          'PATH': _failingGhPath(root),
+        }..remove('GH_PR_LIST_JSON');
         final result = await Process.run(
           'bash',
           ['scripts/sweep_merged_content.sh'],
           workingDirectory: root.path,
-          environment: {...Platform.environment, 'PATH': _failingGhPath(root)},
+          environment: environment,
+          includeParentEnvironment: false,
         );
 
         expect(
@@ -304,6 +316,53 @@ void main() {
           isNot(0),
           reason: 'a gh lookup failure must fail the sweep, not pass it',
         );
+      },
+    );
+
+    test(
+      'keeps orphan issue identity when only origin/master exists',
+      () async {
+        final bin = Directory('${root.path}/fakebin')
+          ..createSync(recursive: true);
+        final gh = File('${bin.path}/gh')
+          ..writeAsStringSync(r'''#!/bin/sh
+if [ "$1" = "pr" ] && [ "$2" = "list" ]; then
+  cat "$GH_INVENTORY_FILE"
+elif [ "$1" = "issue" ] && [ "$2" = "list" ]; then
+  exit 0
+elif [ "$1" = "issue" ] && [ "$2" = "create" ]; then
+  printf '%s\n' "$@" > "$GH_CAPTURE_FILE"
+fi
+''');
+        Process.runSync('chmod', ['+x', gh.path]);
+
+        final inventory = File('${root.path}/inventory.jsonl')
+          ..writeAsStringSync('${_pr(2, orphaned, 'master')}\n');
+        final capture = File('${root.path}/issue-create.txt');
+        _git(root, ['update-ref', 'refs/remotes/origin/master', 'master']);
+        _git(root, ['checkout', '-q', '--detach', 'master']);
+        _git(root, ['update-ref', '-d', 'refs/heads/master']);
+
+        final environment = {
+          ...Platform.environment,
+          'PATH': '${bin.path}:${Platform.environment['PATH'] ?? ''}',
+          'GH_INVENTORY_FILE': inventory.path,
+          'GH_CAPTURE_FILE': capture.path,
+        }..remove('GH_PR_LIST_JSON');
+        final result = await Process.run(
+          'bash',
+          ['scripts/sweep_merged_content.sh'],
+          workingDirectory: root.path,
+          environment: environment,
+          includeParentEnvironment: false,
+        );
+
+        final out = '${result.stdout}${result.stderr}';
+        expect(result.exitCode, 1, reason: out);
+        final args = capture.readAsStringSync();
+        expect(args, contains('orphaned merge: #2 content not on master'));
+        expect(args, contains('not an ancestor of `master`'));
+        expect(args, isNot(contains('origin/master')));
       },
     );
 
