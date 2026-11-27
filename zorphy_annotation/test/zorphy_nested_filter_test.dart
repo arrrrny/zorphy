@@ -150,8 +150,67 @@ void main() {
       );
       expect(adult.not().matches(child), isTrue);
     });
+
+    test('round-trips a nested predicate inside and / or / not', () {
+      final age = UserFields.profile.nested(
+        ProfileFields.age.greaterThan(18),
+      );
+      final tag = UserFields.tags.nested(
+        const ZorphyEquals<dynamic, Object?>(
+          ZorphyField<dynamic, Object?>(
+            name: 'itself',
+            jsonKey: 'itself',
+            pointer: '/',
+            get: _self,
+            set: _selfSet,
+          ),
+          'admin',
+        ),
+      );
+      for (final source in <ZorphyFilter<User>>[
+        age.and(tag),
+        age.or(tag),
+        age.not(),
+      ]) {
+        final back = ZorphyFilter.fromWire<User>(
+          source.toWire(),
+          UserFields.byPointer,
+          resolveNested: _resolveNested,
+        );
+        for (final user in <User>[adult, child, noProfile]) {
+          expect(
+            back.matches(user),
+            source.matches(user),
+            reason: '${source.toWire()} round-trip for $user',
+          );
+        }
+      }
+    });
   });
 }
 
 dynamic _self(dynamic v) => v;
 dynamic _selfSet(dynamic root, dynamic v) => v;
+
+ZorphyFilter<dynamic> _resolveNested(Map<String, dynamic> wire) {
+  if (wire['field'] == '/age') {
+    return ZorphyFilter.fromWire<Profile>(
+      wire,
+      (pointer) => pointer == '/age' ? ProfileFields.age.asObject : null,
+    );
+  }
+  // The tags' inner predicate is over the element itself, so its field is
+  // the identity descriptor over `dynamic` (see `_self`).
+  return ZorphyFilter.fromWire<dynamic>(
+    wire,
+    (pointer) => pointer == '/'
+        ? const ZorphyField<dynamic, Object?>(
+            name: 'itself',
+            jsonKey: 'itself',
+            pointer: '/',
+            get: _self,
+            set: _selfSet,
+          )
+        : null,
+  );
+}
