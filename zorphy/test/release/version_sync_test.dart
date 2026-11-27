@@ -76,7 +76,11 @@ void main() {
         ),
         'zorphy/pubspec.yaml': _read('zorphy/pubspec.yaml'),
         'zorphy/CHANGELOG.md': _read('zorphy/CHANGELOG.md'),
-        'zorphy/pubspec_overrides.yaml': _read('zorphy/pubspec_overrides.yaml'),
+        // Synthetic overrides file: the fixture asserts the dry-run cleans
+        // it, but the file itself is local-only (to_path.sh, gitignored) —
+        // synthesize it so the test runs on any clean checkout.
+        'zorphy/pubspec_overrides.yaml':
+            'dependency_overrides:\n  zorphy_annotation:\n    path: ../zorphy_annotation\n',
         'zorphy_migrator/pubspec.yaml': _read('zorphy_migrator/pubspec.yaml'),
         // No release heading: the note the script would insert carries the
         // description, which is what these tests read back.
