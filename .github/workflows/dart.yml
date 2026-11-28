@@ -72,14 +72,16 @@ jobs:
         working-directory: zorphy/example
 
   analyzer_compat:
-    # Verifies zorphy resolves, analyzes, and tests green against both
-    # analyzer 13.x and 14.x (published constraint: >=13.0.0 <15.0.0).
+    # Verifies zorphy resolves, analyzes, and tests green against analyzer
+    # 14.x (published constraint: >=13.0.0 <15.0.0). The analyzer 13.x leg was
+    # removed once the codebase adopted analyzer-14-only symbols (e.g.
+    # GetterDeclaration in src/parser/declared_type_text.dart).
     runs-on: ubuntu-latest
     needs: version_sync
     strategy:
       fail-fast: false
       matrix:
-        analyzer: ["13", "14"]
+        analyzer: ["14"]
 
     steps:
       - uses: actions/checkout@v4

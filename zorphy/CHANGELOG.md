@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Fix
+
+- Preserve cross-library union field and factory types, and keep nullable generic field `?` suffixes in generated constructors (#351). The source-declared type is now recovered whenever an `InvalidType` appears anywhere in the type — including nested in a type argument such as `List<AppFailure>` — and the lookup walks mixin, enum and extension-type members, not only classes.
+
 ## [3.0.0-dev.6] - 2026-11-28
 
 ### Change

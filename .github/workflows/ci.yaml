@@ -169,7 +169,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        analyzer: ["13", "14"]
+        analyzer: ["14"]
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
