@@ -180,11 +180,7 @@ void main() {
         '--fatal-infos',
         'lib/emitted.dart',
       ], workingDirectory: fixture.path);
-      expect(
-        analyze.exitCode,
-        0,
-        reason: '${analyze.stdout}${analyze.stderr}',
-      );
+      expect(analyze.exitCode, 0, reason: '${analyze.stdout}${analyze.stderr}');
     });
 
     test('the API shape stays null-safe for a nullable-bounded generic '
