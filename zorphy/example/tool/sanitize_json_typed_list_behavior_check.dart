@@ -36,7 +36,10 @@ void main() {
   );
   final lean = typed.toJsonLean();
   final cleaners = lean['cleaners'];
-  check('cleaners survives as a Map<String, dynamic>', cleaners is Map<String, dynamic>);
+  check(
+    'cleaners survives as a Map<String, dynamic>',
+    cleaners is Map<String, dynamic>,
+  );
   final innerList = (cleaners as Map<String, dynamic>)['options'];
   check(
     'inner list keeps runtime type List<Map<String, dynamic>>',

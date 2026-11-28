@@ -24,13 +24,11 @@ class TypedCleanersConverter {
 
   static Map<String, List<Map<String, dynamic>>>? toJson(
     Map<String, List<Map<String, dynamic>>>? value,
-  ) =>
-      value;
+  ) => value;
 
   static Map<String, List<Map<String, dynamic>>>? fromJson(
     Map<String, List<Map<String, dynamic>>>? json,
-  ) =>
-      json;
+  ) => json;
 }
 
 @Zorphy(generateJson: true)

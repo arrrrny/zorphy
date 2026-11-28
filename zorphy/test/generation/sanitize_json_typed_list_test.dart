@@ -137,7 +137,9 @@ void main() {
 
   group('behavior: generated toJsonLean() preserves the typed list', () {
     test('runtime checks pass in the example package context', () async {
-      final runner = File('example/tool/sanitize_json_typed_list_behavior_check.dart');
+      final runner = File(
+        'example/tool/sanitize_json_typed_list_behavior_check.dart',
+      );
       final fixture = File(
         'example/lib/various/sanitize_json_typed_list_example.zorphy.dart',
       );
