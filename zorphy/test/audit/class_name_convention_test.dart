@@ -155,8 +155,8 @@ void main() {
     test('PR and push workflows both run the root gate', () {
       final root = _repositoryRoot();
       for (final workflow in ['ci.yaml', 'dart.yml']) {
-        final source = File('${root.path}/.github/workflows/$workflow')
-            .readAsStringSync();
+        final path = '${root.path}/.github/workflows/$workflow';
+        final source = File(path).readAsStringSync();
         expect(
           source,
           contains('bash scripts/check_class_names.sh'),
