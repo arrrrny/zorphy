@@ -116,11 +116,7 @@ void main() {
       });
 
       final result = await _runGate(root);
-      expect(
-        result.exitCode,
-        0,
-        reason: '${result.stdout}\n${result.stderr}',
-      );
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     });
 
     test('does not ban non-Dart files under the scan roots', () async {
@@ -131,11 +127,7 @@ void main() {
       });
 
       final result = await _runGate(root);
-      expect(
-        result.exitCode,
-        0,
-        reason: '${result.stdout}\n${result.stderr}',
-      );
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     });
 
     test('rejects Impl on every type identifier, case-insensitively', () async {
@@ -163,9 +155,8 @@ void main() {
     test('PR and push workflows both run the root gate', () {
       final root = _repositoryRoot();
       for (final workflow in ['ci.yaml', 'dart.yml']) {
-        final source = File(
-          '${root.path}/.github/workflows/$workflow',
-        ).readAsStringSync();
+        final source = File('${root.path}/.github/workflows/$workflow')
+            .readAsStringSync();
         expect(
           source,
           contains('bash scripts/check_class_names.sh'),
