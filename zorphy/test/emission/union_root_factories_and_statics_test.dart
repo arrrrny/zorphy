@@ -197,6 +197,129 @@ class \$SliceReady<T> implements \$AsyncSlice<T> {
       },
     );
 
+    group('#351 — cross-library union types and nullable generics', () {
+      const failure =
+          '$_annotationImport'
+          '''
+part 'failure.zorphy.dart';
+
+@ZorphyUnion()
+abstract class \$AppFailure {
+  factory \$AppFailure.network({required String message}) = \$NetworkFailure;
+}
+
+@ZorphyValue()
+class \$NetworkFailure implements \$AppFailure {
+  @override
+  final String message;
+
+  const \$NetworkFailure({required this.message});
+}
+''';
+      const slice =
+          '$_annotationImport'
+          '''
+import 'failure.dart';
+
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class \$AsyncSlice<T> {
+  factory \$AsyncSlice.failed(AppFailure failure, {T? staleData}) =
+      \$AsyncSliceFailed<T>;
+}
+
+@ZorphyValue()
+class \$AsyncSliceFailed<T> implements \$AsyncSlice<T> {
+  @override
+  final AppFailure failure;
+  @override
+  final T? staleData;
+
+  const \$AsyncSliceFailed({required this.failure, this.staleData});
+}
+''';
+
+      test(
+        'preserves the union type and source nullability in IR and output',
+        () async {
+          final (ir, out) = await _compose({
+            'failure.dart': failure,
+            'nodes.dart': slice,
+          });
+          final failed = ir
+              .rootFor('AsyncSlice')!
+              .allConcreteLeaves
+              .firstWhere((node) => node.cleanName == 'AsyncSliceFailed');
+          final failureField = failed.fields.firstWhere(
+            (field) => field.name == 'failure',
+          );
+          final staleDataField = failed.fields.firstWhere(
+            (field) => field.name == 'staleData',
+          );
+          expect(failureField.type, 'AppFailure');
+          expect(staleDataField.type, 'T');
+          expect(staleDataField.isNullable, isTrue);
+          final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+          expect(flat, contains('final AppFailure failure;'));
+          expect(flat, contains('final T? staleData;'));
+          expect(
+            flat,
+            contains(
+              'factory AsyncSlice.failed(AppFailure failure, {T? staleData})',
+            ),
+          );
+        },
+      );
+
+      test(
+        'the emitted root compiles with the cross-library union type',
+        () async {
+          final (_, out) = await _compose({
+            'failure.dart': failure,
+            'nodes.dart': slice,
+          });
+          final probe = Directory('test/.union351_tmp').absolute.path;
+          Directory(probe).createSync(recursive: true);
+          final fixture = Directory(probe).createTempSync('fixture_');
+          addTearDown(() => fixture.deleteSync(recursive: true));
+          File('${fixture.path}/pubspec.yaml').writeAsStringSync(
+            'name: probe_351\n'
+            'environment:\n'
+            '  sdk: ">=3.11.0 <4.0.0"\n'
+            'dependencies:\n'
+            '  zorphy_annotation:\n'
+            '    path: ${Directory.current.parent.uri.resolve('zorphy_annotation/').toFilePath()}\n',
+          );
+          Directory('${fixture.path}/lib').createSync();
+          File('${fixture.path}/lib/emitted.dart').writeAsStringSync(
+            "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n"
+            'sealed class AppFailure {}\n\n'
+            '$out',
+          );
+          final pubGet = Process.runSync('dart', [
+            'pub',
+            'get',
+          ], workingDirectory: fixture.path);
+          expect(
+            pubGet.exitCode,
+            0,
+            reason: '${pubGet.stdout}${pubGet.stderr}',
+          );
+          final analyze = Process.runSync('dart', [
+            'analyze',
+            '--fatal-infos',
+            'lib/emitted.dart',
+          ], workingDirectory: fixture.path);
+          expect(
+            analyze.exitCode,
+            0,
+            reason: '${analyze.stdout}${analyze.stderr}',
+          );
+        },
+      );
+    });
+
     // Issue #290 (zuraffa 8.0 adoption): two defects the real AppFailure
     // union exposed — a non-const `fromTrusted` target, and declared defaults
     // being re-derived away from the variant's fields.

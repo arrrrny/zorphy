@@ -77,10 +77,10 @@ final class PolymorphicField {
   /// TEXT by [suppressQuestionMark].
   final bool isNullable;
 
-  /// Whether the source `?` is redundant and must not appear in type text.
+  /// Whether hand-built IR explicitly suppresses the source `?`.
   ///
-  /// Set from [ZorphyFieldIr.suppressQuestionMark] for a field typed by a
-  /// nullable-bounded type parameter (#273). See [emittedType].
+  /// Resolved fields leave this false so nullable generic constructor
+  /// parameters remain type-safe (#351).
   final bool suppressQuestionMark;
 
   /// The source field-formal default (`0`, `'unknown'`), or `null`.
@@ -97,8 +97,7 @@ final class PolymorphicField {
     this.constructorDefault,
   });
 
-  /// The type as emitted: the `?` suffix applied exactly once, unless the
-  /// source `?` was redundant (a nullable-bounded type parameter, #273).
+  /// The type as emitted: the source `?` suffix applied exactly once.
   String get emittedType {
     if (!isNullable || suppressQuestionMark || type.endsWith('?')) return type;
     return '$type?';

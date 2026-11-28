@@ -14,6 +14,7 @@ import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:source_gen/source_gen.dart';
 
+import 'declared_type_text.dart';
 import 'polymorphic_ir.dart';
 
 /// A member body's source and whether it was an expression body (`=>`).
@@ -367,7 +368,7 @@ final class ArchetypeParser {
     // nullability the emitter re-applies from a separate flag).
     return ZorphyUserParamIr(
       name: p.name ?? '',
-      type: p.type.getDisplayString(),
+      type: declaredTypeText(p.type, fragment),
       isNamed: p.isNamed,
       isRequired: p.isRequired,
       isOptionalPositional: p.isOptionalPositional,

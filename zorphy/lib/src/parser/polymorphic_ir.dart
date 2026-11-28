@@ -133,15 +133,11 @@ final class ZorphyFieldIr {
   /// emitted TYPE TEXT is suppressed separately by [suppressQuestionMark].
   final bool isNullable;
 
-  /// Whether a `?` on [type] would be redundant because the field is typed by
-  /// a type parameter whose bound is already nullable (ISSUE-273, ZRP-010).
+  /// Whether a hand-built IR explicitly marks the source `?` as redundant.
   ///
-  /// `class ToggleParams<I>` (implicit bound `Object?`) declares `I? get id`;
-  /// emitting `I? id` is an `unnecessary_question_mark` in generated code. The
-  /// bound is resolved ONCE here, at the IR level, so every type-text emitter
-  /// inherits the same answer instead of re-deriving it from strings. Only
-  /// type-text emission consults this flag — [isNullable] remains faithful to
-  /// the source `?` so the generated API keeps its null-clearing behavior.
+  /// Resolved source keeps the author's `?`: suppressing it on an unbounded
+  /// type parameter makes the generated constructor reject nullable values
+  /// (#351). The flag remains for callers that construct IR directly.
   final bool suppressQuestionMark;
 
   /// Whether the declaration carries `@ZorphyDomainBool()` — the author's
@@ -203,11 +199,10 @@ final class ZorphyFieldIr {
     this.enumElementTypes = const {},
   });
 
-  /// Whether the emitted type text carries a `?`.
+  /// Whether the emitted type text carries the source `?`.
   ///
-  /// The source `?` is suppressed only when it is redundant (a
-  /// nullable-bounded type parameter); [isNullable] itself stays faithful to
-  /// the source so API-shape logic keeps treating the field as nullable.
+  /// Only hand-built IR can suppress it; resolved source preserves nullable
+  /// generic fields so generated constructors remain type-safe (#351).
   bool get emitsQuestionMark => isNullable && !suppressQuestionMark;
 
   /// Whether this field is a `bool` (and therefore a candidate flag).

@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Fix
+
+- Preserve cross-library union field and factory types, and keep nullable generic field `?` suffixes in generated constructors (#351).
+
 ## [3.0.0-dev.6] - 2026-11-28
 
 ### Change

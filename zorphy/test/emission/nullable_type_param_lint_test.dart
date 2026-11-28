@@ -1,17 +1,9 @@
-// Regression tests for arrrrny/zorphy#273 (ZRP-010): the emitter must not
-// append a redundant `?` to a field whose type is a type parameter whose bound
-// is already nullable.
+// Regression tests for arrrrny/zorphy#351: nullable generic fields keep the
+// source `?` in generated type text. Suppressing it on an unbounded type
+// parameter makes the generated constructor reject nullable values.
 //
-// The IR is resolved from real Dart source through the analyzer (the same view
-// the generator sees), so the assertions are on the resolved nullability and on
-// the EMITTED source text — both SDK-independent. The `unnecessary_question_mark`
-// diagnostic itself is SDK-gated, so the structural emitted-source assertion is
-// what proves the fix on every SDK.
-//
-// The redundant `?` is suppressed ONLY in the emitted type text. `isNullable`
-// stays faithful to the source `?` so the generated API keeps its shape: an
-// unbounded `I` can be instantiated as `String?`, so `fromTrusted` must not
-// require the field and `copyWith(id: null)` must clear it.
+// The IR is resolved from real Dart source through the analyzer, so these
+// assertions cover both implicit and explicit non-nullable bounds.
 
 import 'dart:io';
 
@@ -92,25 +84,19 @@ void main() {
     if (root.existsSync()) root.deleteSync(recursive: true);
   });
 
-  group('nullable-bounded type parameter (#273)', () {
-    test('isNullable stays faithful to the source `?`; only type text '
-        'suppresses the redundant suffix', () async {
-      final ir = await _resolve({'nodes.dart': _nullableBound});
-      final node = ir.rootFor('ToggleParams');
-      expect(node, isNotNull);
-      final id = node!.fields.firstWhere((f) => f.name == 'id');
-      expect(
-        id.isNullable,
-        isTrue,
-        reason: 'the source declares `I?` — API shape must stay nullable',
-      );
-      expect(
-        id.suppressQuestionMark,
-        isTrue,
-        reason: 'bound is Object? — appending `?` in type text is redundant',
-      );
-      expect(id.emitsQuestionMark, isFalse);
-    });
+  group('nullable generic fields (#351)', () {
+    test(
+      'source nullability stays in type text for an implicit bound',
+      () async {
+        final ir = await _resolve({'nodes.dart': _nullableBound});
+        final node = ir.rootFor('ToggleParams');
+        expect(node, isNotNull);
+        final id = node!.fields.firstWhere((f) => f.name == 'id');
+        expect(id.isNullable, isTrue);
+        expect(id.suppressQuestionMark, isFalse);
+        expect(id.emitsQuestionMark, isTrue);
+      },
+    );
 
     test(
       'a field typed by a type param with a non-nullable bound stays nullable '
@@ -130,30 +116,16 @@ void main() {
       },
     );
 
-    test('emitted source carries `I id` for a nullable bound and `I? id` for a '
-        'non-nullable bound', () async {
+    test('emitted source keeps `I?` for both bound shapes', () async {
       final nullableIr = await _resolve({'nodes.dart': _nullableBound});
       final nullableEmitted = const ArchetypeComposer().compose(nullableIr);
-      expect(
-        nullableEmitted,
-        contains('final I id;'),
-        reason: 'no redundant `?` on a nullable-bounded parameter field',
-      );
-      expect(
-        nullableEmitted,
-        isNot(contains('final I? id;')),
-        reason: 'the redundant `final I? id;` field must not be emitted',
-      );
+      expect(nullableEmitted, contains('final I? id;'));
 
       final nonNullableIr = await _resolve({'nodes.dart': _nonNullableBound});
       final nonNullableEmitted = const ArchetypeComposer().compose(
         nonNullableIr,
       );
-      expect(
-        nonNullableEmitted,
-        contains('final I? id;'),
-        reason: 'a non-nullable bound keeps the meaningful `?` field',
-      );
+      expect(nonNullableEmitted, contains('final I? id;'));
     });
 
     test('the API shape stays null-safe for a nullable-bounded generic '
@@ -161,12 +133,11 @@ void main() {
       final ir = await _resolve({'nodes.dart': _nullableBound});
       final emitted = const ArchetypeComposer().compose(ir);
 
-      // `I` is unbounded: it can be instantiated as `String?`, so the field
-      // must remain optional in fromTrusted rather than becoming required.
+      // The field stays optional in fromTrusted and copyWith can clear it.
       expect(
         emitted,
         isNot(contains('fromTrusted({required this.id})')),
-        reason: 'a nullable-bounded field must not be forced required',
+        reason: 'a nullable field must not be forced required',
       );
       expect(emitted, contains('fromTrusted({this.id})'));
 
@@ -179,7 +150,7 @@ void main() {
       );
       expect(
         emitted,
-        contains('identical(id, _sentinel) ? this.id : id as I'),
+        contains('identical(id, _sentinel) ? this.id : id as I?'),
         reason: 'copyWith must take the clear-to-null sentinel path',
       );
     });
