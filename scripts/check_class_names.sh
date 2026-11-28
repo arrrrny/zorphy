@@ -27,20 +27,35 @@ while IFS= read -r -d '' file; do
   esac
 
   # Basenames only: parent paths such as simple_class are not file names.
+  # The FILE_NAME ban targets Dart sources only (a fixture such as
+  # test/impl_input.json is not a Dart package source file name).
   basename="${file##*/}"
-  case "$basename" in
-    *[Ii][Mm][Pp][Ll]*)
-      printf 'FILE_NAME %s\n' "$file"
-      violations=1
+  case "$file" in
+    *.dart)
+      # Token match, case-insensitive on the `impl` letters: `impl` is banned
+      # when it ends a naming segment — i.e. it is immediately followed by a
+      # non-lowercase character (an uppercase letter, digit, `_`, `.`, space,
+      # end of the basename). A name that merely CONTAINS the letters inside a
+      # longer lowercase word (simple.dart, simply.dart, implementation.dart)
+      # is NOT rejected, while cost_guards_impl.dart / COST_IMPL.dart are.
+      if printf '%s' "$basename" | grep -qE '[Ii][Mm][Pp][Ll]([^a-z]|$)'; then
+        printf 'FILE_NAME %s\n' "$file"
+        violations=1
+      fi
       ;;
   esac
 
   case "$file" in
     *.dart)
+      # Any type identifier (class/enum/mixin/extension) whose name carries an
+      # `Impl` naming segment is banned, with the SAME token rule as the
+      # FILE_NAME check above (case-insensitive `impl` letters, segment must end
+      # at a non-lowercase boundary) so the two checks share one contract and
+      # neither rejects a legitimate name such as `Simple`.
       while IFS= read -r match; do
         printf 'CLASS_NAME %s:%s\n' "$file" "$match"
         violations=1
-      done < <(grep -nE '(^|[[:space:]])class[[:space:]]+[[:alnum:]_$]*Impl[[:alnum:]_$]*' "$file" || true)
+      done < <(grep -nE '(^|[[:space:]])(class|enum|mixin|extension)[[:space:]]+[[:alnum:]_$]*[Ii][Mm][Pp][Ll]([^a-z]|$)' "$file" || true)
       ;;
   esac
 done < <(git ls-files -z --cached --others --exclude-standard -- "${scan_paths[@]}")

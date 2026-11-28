@@ -108,6 +108,58 @@ void main() {
       expect(result.stdout, contains('fixture/benchmark/COST_IMPL.dart'));
     });
 
+    test('allows a name that merely contains the letters impl', () async {
+      final root = await _fixtureRepository({
+        'fixture/pubspec.yaml': 'name: fixture\n',
+        'fixture/lib/simple.dart': _classSource('Simple'),
+        'fixture/lib/simply.dart': _classSource('Simply'),
+      });
+
+      final result = await _runGate(root);
+      expect(
+        result.exitCode,
+        0,
+        reason: '${result.stdout}\n${result.stderr}',
+      );
+    });
+
+    test('does not ban non-Dart files under the scan roots', () async {
+      final root = await _fixtureRepository({
+        'fixture/pubspec.yaml': 'name: fixture\n',
+        'fixture/lib/good.dart': _classSource('GoodName'),
+        'fixture/test/impl_input.json': '{}\n',
+      });
+
+      final result = await _runGate(root);
+      expect(
+        result.exitCode,
+        0,
+        reason: '${result.stdout}\n${result.stderr}',
+      );
+    });
+
+    test('rejects Impl on every type identifier, case-insensitively', () async {
+      for (final decl in [
+        'enum ColorImpl { a }',
+        'mixin WalkerImpl {}',
+        'extension HelperImpl on int {}',
+        'class lowerimpl {}',
+      ]) {
+        final root = await _fixtureRepository({
+          'fixture/pubspec.yaml': 'name: fixture\n',
+          'fixture/lib/bad.dart': '$decl\n',
+        });
+
+        final result = await _runGate(root);
+        expect(
+          result.exitCode,
+          1,
+          reason: 'expected rejection for `$decl`: ${result.stdout}',
+        );
+        expect(result.stdout, contains('CLASS_NAME'));
+      }
+    });
+
     test('PR and push workflows both run the root gate', () {
       final root = _repositoryRoot();
       for (final workflow in ['ci.yaml', 'dart.yml']) {
