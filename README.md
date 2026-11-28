@@ -302,6 +302,32 @@ zorphy build --watch
 zorphy build --clean
 ```
 
+### Repository-wide analysis
+
+Repository-wide analysis includes the nested `zorphy/example` package. Its
+colocated generated parts are not committed, so resolve each package and
+generate the example before running analysis from the repository root:
+
+```bash
+# From the repository root
+(cd zorphy_annotation && dart pub get --enforce-lockfile)
+(cd zorphy && dart pub get --enforce-lockfile)
+(cd zorphy/example && dart pub get --enforce-lockfile)
+(cd zorphy/example && dart run build_runner build)
+(cd zorphy_migrator && dart pub get --enforce-lockfile)
+
+dart analyze --fatal-infos
+```
+
+If the generated example parts are intentionally absent, scope `zorphy`
+analysis to its own directories instead:
+
+```bash
+for dir in lib bin test; do
+  (cd zorphy && dart analyze --fatal-infos "$dir")
+done
+```
+
 ## 📝 Naming Conventions
 
 ### Class Prefixes
