@@ -5,6 +5,15 @@
 /// toString, and more.
 library zorphy;
 
+// Smart-merge module — PUBLIC API (arrrrny/zorphy#355).
+//
+// Stable within a major line: breaking changes to `MergeOrchestrator`,
+// `MergeMode`, `MergeResult`, `MergeStrategy` and the rest of the merge
+// surface ship as a MAJOR bump with a migration path, never a silent
+// removal. Consumers must import these through `package:zorphy/zorphy.dart`
+// and never reach into `package:zorphy/src/...` (`implementation_imports`).
+export 'src/merge/merge.dart';
+
 // Cross-emitter wire-kind vocabulary (shared by the wire-capability matrix
 // drift gate): https://github.com/arrrrny/zorphy/issues/316
 export 'src/emission/wire_kind.dart';
