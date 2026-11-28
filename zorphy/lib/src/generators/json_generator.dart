@@ -450,7 +450,7 @@ class JsonGenerator extends UniversalGenerator {
   });
 } else if (json is List) {
   for (var i = 0; i < json.length; i++) {
-    json[i] = _sanitizeJson(json[i]);
+    _sanitizeJson(json[i]);
   }
   return json;
 }

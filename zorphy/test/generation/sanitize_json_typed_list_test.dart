@@ -13,6 +13,8 @@
 // body sanitizes in place and never builds a fresh `List<dynamic>` via
 // `.map(...).toList()`.
 
+import 'dart:io';
+
 import 'package:analyzer/dart/element/element.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:test/test.dart';
@@ -116,16 +118,48 @@ void main() {
       emitted = _emitSpecs(specs);
     });
 
-    test('sanitizes a list in place instead of building a List<dynamic>', () {
+    test('sanitizes list elements without assigning their slots', () {
       // The buggy branch returned `json.map((e) => _sanitizeJson(e)).toList()`.
       expect(
         emitted,
         isNot(contains('json.map((e) => _sanitizeJson(e)).toList()')),
       );
-      // The fix walks the list by index and reassigns in place, preserving the
-      // runtime list type (so a typed List<Map<String, dynamic>> slot accepts
-      // it back).
-      expect(emitted, contains('json[i] = _sanitizeJson(json[i])'));
+      // The fix walks the list by index and calls the sanitizer on each
+      // element WITHOUT reassigning the slot, so an unmodifiable list (or a
+      // typed List<Map<String, dynamic>>) survives sanitization. The emitted
+      // source assertions are supplementary; the runtime behavior group below
+      // executes the generated toJsonLean() to prove the typed list type is
+      // preserved (CodeRabbit finding on PR #349).
+      expect(emitted, contains('_sanitizeJson(json[i])'));
+      expect(emitted, isNot(contains('json[i] = _sanitizeJson(json[i])')));
     });
+  });
+
+  group('behavior: generated toJsonLean() preserves the typed list', () {
+    test('runtime checks pass in the example package context', () async {
+      final runner = File('example/tool/sanitize_json_typed_list_behavior_check.dart');
+      final fixture = File(
+        'example/lib/various/sanitize_json_typed_list_example.zorphy.dart',
+      );
+      if (!fixture.existsSync()) {
+        fail(
+          'Fixture not generated. Run: cd example && '
+          'dart run build_runner build',
+        );
+      }
+      if (!runner.existsSync()) {
+        fail(
+          'Behavior runner missing: '
+          'example/tool/sanitize_json_typed_list_behavior_check.dart',
+        );
+      }
+      final result = await Process.run('dart', [
+        'run',
+        'tool/sanitize_json_typed_list_behavior_check.dart',
+      ], workingDirectory: 'example');
+      final stdoutText = result.stdout as String;
+      expect(stdoutText, contains('ALL CHECKS PASSED'));
+      expect(result.exitCode, 0, reason: stdoutText);
+    }, timeout: const Timeout(Duration(minutes: 2)));
   });
 }
