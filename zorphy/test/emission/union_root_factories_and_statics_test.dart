@@ -273,6 +273,73 @@ class \$AsyncSliceFailed<T> implements \$AsyncSlice<T> {
       );
 
       test(
+        'recovers a union nested in a type argument (list-typed field and '
+        'factory parameter)',
+        () async {
+          // #351 review (CodeRabbit, Major): the recovery guard checked only a
+          // top-level InvalidType, so `List<AppFailure>` — a valid outer type
+          // whose argument is InvalidType — emitted the invalid argument name
+          // and produced code that does not compile. The declared source
+          // spelling must be recovered for the field AND the factory param.
+          const sliceList =
+              '$_annotationImport'
+              '''
+import 'failure.dart';
+
+part 'nodes.zorphy.dart';
+
+@ZorphyUnion()
+abstract class \$AsyncSlice<T> {
+  factory \$AsyncSlice.failed(
+    List<AppFailure> failures, {
+    T? staleData,
+  }) = \$AsyncSliceFailed<T>;
+}
+
+@ZorphyValue()
+class \$AsyncSliceFailed<T> implements \$AsyncSlice<T> {
+  @override
+  final List<AppFailure> failures;
+  @override
+  final T? staleData;
+
+  const \$AsyncSliceFailed({required this.failures, this.staleData});
+}
+''';
+          final (ir, out) = await _compose({
+            'failure.dart': failure,
+            'nodes.dart': sliceList,
+          });
+          final failed = ir
+              .rootFor('AsyncSlice')!
+              .allConcreteLeaves
+              .firstWhere((node) => node.cleanName == 'AsyncSliceFailed');
+          final failuresField = failed.fields.firstWhere(
+            (field) => field.name == 'failures',
+          );
+          expect(
+            failuresField.type,
+            'List<AppFailure>',
+            reason: 'the nested union type argument is recovered from source',
+          );
+          final flat = out.replaceAll(RegExp(r'\s+'), ' ');
+          expect(flat, contains('final List<AppFailure> failures;'));
+          expect(
+            flat,
+            contains(
+              'factory AsyncSlice.failed(List<AppFailure> failures, '
+              '{T? staleData})',
+            ),
+          );
+          expect(
+            flat,
+            isNot(contains('InvalidType')),
+            reason: 'no invalid type name survives in the output',
+          );
+        },
+      );
+
+      test(
         'the emitted root compiles with the cross-library union type',
         () async {
           final (_, out) = await _compose({

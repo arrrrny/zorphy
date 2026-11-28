@@ -78,6 +78,23 @@ abstract class \$DeleteParams<I extends Object> {
 }
 ''';
 
+/// A compile-clean fixture for the `--fatal-infos` probe: the nullable generic
+/// field is NOT the principal key (a separate non-nullable `String key` is), so
+/// the only question under test is whether `I?` trips
+/// `unnecessary_question_mark` — not an unrelated `principalKey` return-type
+/// error.
+const _nullableGenericField =
+    '$_annotationImport'
+    '''
+part 'nodes.zorphy.dart';
+
+@ZorphyEntity(principalKey: #key)
+abstract class \$Profile<I> {
+  String get key;
+  I? get nickname;
+}
+''';
+
 void main() {
   tearDownAll(() {
     final root = Directory('test/.nullable_type_param_tmp');
@@ -126,6 +143,48 @@ void main() {
         nonNullableIr,
       );
       expect(nonNullableEmitted, contains('final I? id;'));
+    });
+
+    test('the emitted nullable-generic output compiles under --fatal-infos '
+        '(#273 -> #351 reversal is compile-safe)', () async {
+      // #351 review: the `I?` reversal of #273 is asserted on emitted text
+      // only. The whole premise of #273 was the `unnecessary_question_mark`
+      // diagnostic, so lock it with a real `dart analyze --fatal-infos` of the
+      // generated output — a future SDK that flags `I?` on an unbounded
+      // parameter turns this red here instead of in a consumer's code.
+      final ir = await _resolve({'nodes.dart': _nullableGenericField});
+      final out = const ArchetypeComposer().compose(ir);
+      final probe = Directory('test/.nullable351_tmp').absolute.path;
+      Directory(probe).createSync(recursive: true);
+      final fixture = Directory(probe).createTempSync('fixture_');
+      addTearDown(() => fixture.deleteSync(recursive: true));
+      File('${fixture.path}/pubspec.yaml').writeAsStringSync(
+        'name: probe_nullable_351\n'
+        'environment:\n'
+        '  sdk: ">=3.11.0 <4.0.0"\n'
+        'dependencies:\n'
+        '  zorphy_annotation:\n'
+        '    path: ${Directory.current.parent.uri.resolve('zorphy_annotation/').toFilePath()}\n',
+      );
+      Directory('${fixture.path}/lib').createSync();
+      File('${fixture.path}/lib/emitted.dart').writeAsStringSync(
+        "import 'package:zorphy_annotation/zorphy_annotation.dart';\n\n$out",
+      );
+      final pubGet = Process.runSync('dart', [
+        'pub',
+        'get',
+      ], workingDirectory: fixture.path);
+      expect(pubGet.exitCode, 0, reason: '${pubGet.stdout}${pubGet.stderr}');
+      final analyze = Process.runSync('dart', [
+        'analyze',
+        '--fatal-infos',
+        'lib/emitted.dart',
+      ], workingDirectory: fixture.path);
+      expect(
+        analyze.exitCode,
+        0,
+        reason: '${analyze.stdout}${analyze.stderr}',
+      );
     });
 
     test('the API shape stays null-safe for a nullable-bounded generic '
