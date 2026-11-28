@@ -7,7 +7,7 @@ environment:
   sdk: ">=3.11.0 <4.0.0"
 
 dependencies:
-  zorphy_annotation: ^3.0.0-dev.5
+  zorphy_annotation: ^3.0.0-dev.6
   analyzer: ^14.0.0
   # build 5.x is required by build_runner 2.17.x; source_gen 4.3.1 already
   # allows it (build >=3.0.2 <6.0.0), so only this pin needed widening.
