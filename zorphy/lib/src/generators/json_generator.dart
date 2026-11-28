@@ -449,7 +449,10 @@ class JsonGenerator extends UniversalGenerator {
     json[key] = _sanitizeJson(value);
   });
 } else if (json is List) {
-  return json.map((e) => _sanitizeJson(e)).toList();
+  for (var i = 0; i < json.length; i++) {
+    json[i] = _sanitizeJson(json[i]);
+  }
+  return json;
 }
 return json;''');
       }),
