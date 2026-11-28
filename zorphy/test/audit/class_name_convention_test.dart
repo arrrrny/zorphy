@@ -152,6 +152,52 @@ void main() {
       }
     });
 
+    test('scans Dart files outside the package source roots', () async {
+      final root = await _fixtureRepository({
+        'fixture/pubspec.yaml': 'name: fixture\n',
+        'fixture/lib/good.dart': _classSource('GoodName'),
+        'tool/bad_impl.dart': 'void main() {}\n',
+      });
+
+      final result = await _runGate(root);
+      expect(result.exitCode, 1);
+      expect(result.stdout, contains('FILE_NAME'));
+      expect(result.stdout, contains('tool/bad_impl.dart'));
+    });
+
+    test('detects a declaration split across lines', () async {
+      final root = await _fixtureRepository({
+        'fixture/pubspec.yaml': 'name: fixture\n',
+        'fixture/lib/split.dart': 'class\nBadImpl {}\n',
+      });
+
+      final result = await _runGate(root);
+      expect(result.exitCode, 1);
+      expect(result.stdout, contains('CLASS_NAME'));
+      expect(result.stdout, contains('fixture/lib/split.dart'));
+    });
+
+    test(
+      'ignores declarations mentioned only in comments or strings',
+      () async {
+        final root = await _fixtureRepository({
+          'fixture/pubspec.yaml': 'name: fixture\n',
+          'fixture/lib/ok.dart':
+              '/// class BadImpl {}\n'
+              '// enum EImpl { a }\n'
+              "const s = 'class StringImpl {}';\n"
+              'class GoodName {}\n',
+        });
+
+        final result = await _runGate(root);
+        expect(
+          result.exitCode,
+          0,
+          reason: '${result.stdout}\n${result.stderr}',
+        );
+      },
+    );
+
     test('PR and push workflows both run the root gate', () {
       final root = _repositoryRoot();
       for (final workflow in ['ci.yaml', 'dart.yml']) {
