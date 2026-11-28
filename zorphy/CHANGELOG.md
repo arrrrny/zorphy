@@ -1,3 +1,9 @@
+## [2.5.2] - 2026-11-28
+
+### Fix
+
+- **`_sanitizeJson` preserves typed list values** instead of hard-casting them to `List<Map<String, dynamic>>` (arrrrny/zorphy#349). JSON lists of typed maps now round-trip without the runtime subtype error that blocked the zik_zak share-link flow.
+
 ## [2.5.1] - 2026-11-19
 
 ### Fix

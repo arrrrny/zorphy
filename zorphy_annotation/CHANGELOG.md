@@ -1,3 +1,9 @@
+## [2.5.2] - 2026-11-28
+
+### Change
+
+- Version synced with `zorphy` 2.5.2. The typed-list fix is generator-side only; no annotation API or dependency constraint changed.
+
 ## [2.5.1] - 2026-11-19
 
 ### Change
