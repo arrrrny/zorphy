@@ -21,9 +21,9 @@ Map<String, String> _parseDependencies(
 }
 
 void main() {
-  group('3.0.0-dev.5 dependency constraint pins', () {
+  group('3.0.0-dev.6 dependency constraint pins', () {
     test(
-      'zorphy and zorphy_annotation pin the 3.0.0-dev.5 dependency constraints',
+      'zorphy and zorphy_annotation pin the 3.0.0-dev.6 dependency constraints',
       () {
         final zorphyYaml =
             loadYaml(File('pubspec.yaml').readAsStringSync()) as YamlMap;
@@ -45,7 +45,7 @@ void main() {
         );
 
         final expectedZorphyDeps = <String, String>{
-          'zorphy_annotation': '^3.0.0-dev.5',
+          'zorphy_annotation': '^3.0.0-dev.6',
           'analyzer': '^14.0.0',
           'build': '>=4.0.4 <6.0.0',
           'source_gen': '^4.3.1',

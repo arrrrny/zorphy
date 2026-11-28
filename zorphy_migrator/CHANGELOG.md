@@ -1,3 +1,8 @@
+## [3.0.0-dev.6] - 2026-11-28
+
+### Change
+- concrete-enum toJson fix (#336); collection diff equality + nested-nullable decode (#339); enterprise remediation + hygiene
+
 ## [3.0.0-dev.5] - 2026-11-27
 
 ### Change
