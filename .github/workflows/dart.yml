@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Ban Impl class and file names
+        run: bash scripts/check_class_names.sh
 
       - name: Setup Dart
         uses: dart-lang/setup-dart@v1

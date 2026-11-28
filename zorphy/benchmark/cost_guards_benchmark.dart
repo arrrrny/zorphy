@@ -13,13 +13,13 @@
 //      outputs), which writes `benchmark/cost_guard_fixtures.zorphy.dart`.
 //      If generation fails, the launcher exits non-zero BEFORE any guard runs
 //      — the loud failure the acceptance gate names.
-//   2. It then spawns `benchmark/cost_guards_impl.dart`, which imports the
+//   2. It then spawns `benchmark/cost_guards_runner.dart`, which imports the
 //      generated classes and measures them. Because that library only compiles
 //      against real generated output, removing a surface from the generator
 //      makes this step fail to compile — again loudly.
 //
 // The launcher itself imports NO generated code (only `dart:io`), so it always
-// compiles; the compile-time dependency on generated output lives in the impl
+// compiles; the compile-time dependency on generated output lives in the runner
 // the launcher spawns. Both agree on three-valued semantics (#237):
 //
 //   * GREEN        — all four guards green; exit 0.
@@ -64,14 +64,14 @@ void main() async {
     return;
   }
 
-  // Step 2 — run the generated-aware guards. The impl imports the generated
+  // Step 2 — run the generated-aware guards. The runner imports the generated
   // part, so a missing surface fails to compile here (loud), and its exit code
   // carries the green/red/inconclusive verdict.
-  final impl = await _runInherit(dart, <String>[
+  final runner = await _runInherit(dart, <String>[
     'run',
-    'benchmark/cost_guards_impl.dart',
+    'benchmark/cost_guards_runner.dart',
   ], root.toFilePath());
-  exitCode = impl;
+  exitCode = runner;
 }
 
 /// Runs [exe] with [args] in [cwd] with inherited stdio (so the child's output

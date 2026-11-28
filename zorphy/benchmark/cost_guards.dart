@@ -6,7 +6,7 @@
 // harness (overload admission, robust sample statistics, the performance
 // verdict, the retry budget, the report types) plus the timing helpers. The
 // four guards themselves — and the `evaluateCostGuards()` that runs them —
-// live in `benchmark/cost_guards_impl.dart`, which imports the REAL
+// live in `benchmark/cost_guards_runner.dart`, which imports the REAL
 // `build_runner`-generated v3 classes from
 // `benchmark/cost_guard_fixtures.dart` and measures THEM (#234).
 //

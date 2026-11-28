@@ -216,7 +216,7 @@ class \$Ready {
 }
 
 @ZorphyValue()
-class \$FailedImpl implements \$AsyncStatus {
+class \$Failed implements \$AsyncStatus {
   bool get hasError;
 }
 '''),
@@ -228,7 +228,7 @@ class \$FailedImpl implements \$AsyncStatus {
           hasLength(1),
           reason: 'the implements-only union member is in scope',
         );
-        expect(hits.single.nodeName, r'$FailedImpl');
+        expect(hits.single.nodeName, r'$Failed');
         expect(hits.single.message, contains('hasError'));
       },
     );

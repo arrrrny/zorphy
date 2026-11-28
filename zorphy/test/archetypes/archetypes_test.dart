@@ -125,16 +125,16 @@ void main() {
     test(
       'a subtype can implement its archetype base and the common marker',
       () {
-        final e = _EntityImpl();
+        final e = _FakeEntity();
         final ZorphyEntityBase<Object> asEntity = e;
         final ZorphyPolymorphicBase asPoly = e;
         expect(asEntity, same(e));
         expect(asPoly, same(e));
 
-        final ZorphyStateBase s = _StateImpl();
-        final ZorphyUnionBase u = _UnionImpl();
-        final ZorphyIntentBase i = _IntentImpl();
-        final ZorphyValueBase v = _ValueImpl();
+        final ZorphyStateBase s = _FakeState();
+        final ZorphyUnionBase u = _FakeUnion();
+        final ZorphyIntentBase i = _FakeIntent();
+        final ZorphyValueBase v = _FakeValue();
         expect(s, isA<ZorphyStateBase>());
         expect(u, isA<ZorphyPolymorphicBase>());
         expect(i, isA<ZorphyPolymorphicBase>());
@@ -144,12 +144,13 @@ void main() {
   });
 }
 
-class _EntityImpl implements ZorphyEntityBase<Object> {}
+// Test doubles use the _Fake prefix to name their role.
+class _FakeEntity implements ZorphyEntityBase<Object> {}
 
-class _StateImpl implements ZorphyStateBase {}
+class _FakeState implements ZorphyStateBase {}
 
-class _UnionImpl implements ZorphyUnionBase {}
+class _FakeUnion implements ZorphyUnionBase {}
 
-class _IntentImpl implements ZorphyIntentBase {}
+class _FakeIntent implements ZorphyIntentBase {}
 
-class _ValueImpl implements ZorphyValueBase {}
+class _FakeValue implements ZorphyValueBase {}
