@@ -3,7 +3,7 @@ description: >-
   Codemod that migrates freezed model classes to zorphy using resolved AST
   analysis. Converts simple classes, sealed unions, @Default values, and
   @JsonKey annotations; reports anything that needs human attention.
-version: 3.0.0-dev.5
+version: 3.0.0-dev.6
 homepage: https://github.com/arrrrny/zorphy
 
 environment:
@@ -15,7 +15,7 @@ dependencies:
   path: ^1.9.1
   collection: ^1.19.1
   dart_style: ^3.1.1
-  zorphy_annotation: ^3.0.0-dev.5
+  zorphy_annotation: ^3.0.0-dev.6
 
 dev_dependencies:
   freezed_annotation: ^3.1.0
