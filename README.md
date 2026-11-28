@@ -302,6 +302,28 @@ zorphy build --watch
 zorphy build --clean
 ```
 
+## Repository analysis
+
+`zorphy/example` is a nested Dart package. Its generated `.zorphy.dart` parts
+are intentionally not committed, so generate them before running
+package-wide analysis from `zorphy/`:
+
+```bash
+cd zorphy/example
+dart pub get
+dart run build_runner build
+cd ..
+dart analyze --fatal-infos
+```
+
+If example generation is intentionally skipped, scope analysis to the
+`zorphy` package's own source and test directories:
+
+```bash
+cd zorphy
+dart analyze --fatal-infos lib bin test
+```
+
 ## 📝 Naming Conventions
 
 ### Class Prefixes
